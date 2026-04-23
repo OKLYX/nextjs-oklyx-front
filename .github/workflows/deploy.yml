@@ -1,0 +1,93 @@
+name: Deploy nextjs-oklyx-front to Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/ixtlim/nextjs-oklyx-front
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@master
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: GITHUB_ACTOR,GITHUB_TOKEN,IMAGE_NAME
+          script: |
+            # Log in to GitHub Container Registry
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+            # Stop and remove old container
+            docker stop nextjs-oklyx-front || true
+            docker rm nextjs-oklyx-front || true
+
+            # Pull latest image
+            docker pull "$IMAGE_NAME:latest"
+
+            # Run new container
+            docker run -d \
+              --name nextjs-oklyx-front \
+              -p 3000:3000 \
+              --network pms_network \
+              -e NEXT_PUBLIC_API_URL=http://spring-pms-backend:8083 \
+              --restart unless-stopped \
+              --log-driver json-file \
+              --log-opt max-size=10m \
+              --log-opt max-file=3 \
+              "$IMAGE_NAME:latest"
+
+            # Log out from registry
+            docker logout ghcr.io
+
+            # Wait for container to start
+            sleep 5
+
+            # Check deployment health
+            curl -f http://localhost:3000/ || exit 1
+
+            echo "Deployment completed successfully"
