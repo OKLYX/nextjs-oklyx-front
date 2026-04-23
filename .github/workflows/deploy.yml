@@ -49,16 +49,16 @@ jobs:
         uses: appleboy/ssh-action@master
         env:
           GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CR_PAT: ${{ secrets.CR_PAT }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: GITHUB_ACTOR,GITHUB_TOKEN,IMAGE_NAME
+          envs: GITHUB_ACTOR,CR_PAT,IMAGE_NAME
           script: |
             # Log in to GitHub Container Registry
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            echo "$CR_PAT" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
             # Stop and remove old container
             docker stop nextjs-oklyx-front || true
