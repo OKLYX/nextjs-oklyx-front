@@ -1,0 +1,42 @@
+# Dependencies (will be installed in Docker)
+node_modules/
+.npm
+.yarn/cache
+
+# Build output (will be rebuilt in Docker)
+.next/
+build/
+dist/
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment (secrets - NEVER include in image)
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs (don't need in image)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Misc
+.cache/
+*.log
+.turbo/
+.turbopack/
