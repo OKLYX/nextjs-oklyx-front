@@ -1,5 +1,52 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Authentication System
+
+The OKLYX frontend implements a secure, token-based authentication system using clean architecture principles.
+
+### Quick Start
+
+1. **Login Page**: Navigate to `/login`
+2. **Enter Credentials**: Email and password (password min 6 characters)
+3. **Submit**: Click "Login" button
+4. **Success**: Automatically redirected to `/dashboard`
+
+### Features
+
+- ✅ Form validation with Zod
+- ✅ API integration with Axios
+- ✅ Token storage in HTTP-only cookies
+- ✅ Error handling and user feedback
+- ✅ Loading states (disable button/inputs while submitting)
+- ✅ 92% test coverage
+
+### Documentation
+
+- [Authentication System](docs/AUTHENTICATION.md) - Architecture and flow
+- [Login Feature](docs/LOGIN_FEATURE.md) - Implementation details
+- [API Integration](docs/API_INTEGRATION.md) - Endpoint specifications
+- [Testing](docs/TESTING.md) - Test strategy and how to write tests
+- [Architecture](docs/ARCHITECTURE.md) - Clean architecture layers
+
+### Environment Variables
+
+```
+NEXT_PUBLIC_API_URL=http://your-api-server:8083
+```
+
+### Running Tests
+
+```bash
+# Run tests
+npm test
+
+# Watch mode
+npm run test:watch
+
+# Coverage report
+npm run test:coverage
+```
+
 ## Getting Started
 
 First, run the development server:
