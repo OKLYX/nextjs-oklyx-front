@@ -17,7 +17,7 @@ const config: Config = {
     },
   },
   collectCoverageFrom: [
-    'src/app/login/**/*.{ts,tsx}',
+    'src/app/login/components/**/*.{ts,tsx}',
     'src/application/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/**/*.stories.tsx',

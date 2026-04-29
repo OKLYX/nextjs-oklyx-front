@@ -15,7 +15,7 @@ describe('LoginUseCase', () => {
 
     mockAuthRepository = {
       login: jest.fn(),
-    } as any;
+    } as jest.Mocked<IAuthRepository>;
 
     mockTokenStorage = tokenStorageModule.tokenStorage as jest.Mocked<
       typeof tokenStorageModule.tokenStorage
