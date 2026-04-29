@@ -12,7 +12,7 @@ export function Navbar() {
         <li>
           <button
             onClick={() => setIsProductsOpen(!isProductsOpen)}
-            className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between font-medium"
+            className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between font-semibold text-gray-900"
           >
             상품관리
             <span>{isProductsOpen ? '▲' : '▼'}</span>
