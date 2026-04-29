@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ROUTES } from '@/config/routes';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 
 export default function Home() {
@@ -11,9 +12,9 @@ export default function Home() {
     const token = tokenStorage.getToken();
 
     if (token) {
-      router.push('/dashboard');
+      router.push(ROUTES.DASHBOARD);
     } else {
-      router.push('/login');
+      router.push(ROUTES.LOGIN);
     }
   }, [router]);
 
