@@ -1,3 +1,5 @@
+'use client';
+
 import { TopBar } from './components/TopBar';
 import { Navbar } from './components/Navbar';
 
