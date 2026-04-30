@@ -13,7 +13,7 @@ export function TopBar() {
   };
 
   const handleLogoClick = () => {
-    window.location.href = '/dashboard';
+    router.push(ROUTES.DASHBOARD);
   };
 
   return (
