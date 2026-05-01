@@ -3,8 +3,16 @@
 import axios from 'axios';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    return `${protocol}//${hostname}:8083`;
+  }
+  return process.env.NEXT_PUBLIC_API_URL || '';
+};
+
 export const axiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: getApiUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
