@@ -46,7 +46,7 @@ export interface ProductRepository {
   getProducts(params: GetProductsParams): Promise<GetProductsResponse>;
   getProductDetail(id: number): Promise<Product>;
   createProduct(data: CreateProductRequest): Promise<Product>;
-  uploadProductImage(id: number, file: File): Promise<void>;
+  uploadProductImage(id: number, file: File): Promise<Product>;
   checkBarcodeExists(barcodeId: string): Promise<boolean>;
   updateProduct(id: number, data: UpdateProductRequest): Promise<Product>;
   deleteProductImage(id: number): Promise<void>;
