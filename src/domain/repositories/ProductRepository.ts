@@ -14,6 +14,20 @@ export interface CreateProductRequest {
   description?: string;
 }
 
+export interface UpdateProductRequest {
+  productName?: string;
+  barcodeId?: string;
+  brand?: string;
+  price?: number;
+  store?: string;
+  unit?: string;
+  volumeHeight?: number;
+  volumeLong?: number;
+  volumeShort?: number;
+  weight?: number;
+  description?: string;
+}
+
 export interface GetProductsParams {
   page: number;
   size: number;
@@ -34,4 +48,6 @@ export interface ProductRepository {
   createProduct(data: CreateProductRequest): Promise<Product>;
   uploadProductImage(id: number, file: File): Promise<void>;
   checkBarcodeExists(barcodeId: string): Promise<boolean>;
+  updateProduct(id: number, data: UpdateProductRequest): Promise<Product>;
+  deleteProductImage(id: number): Promise<void>;
 }

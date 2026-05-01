@@ -5,5 +5,6 @@ export const ROUTES = {
   REGISTER: '/register',
   PRODUCTS_RETRIEVE: '/dashboard/products/retrieve',
   PRODUCTS_REGISTER: '/dashboard/products/register',
-  PRODUCT_DETAIL: (id: number | string) => `/dashboard/products/retrieve/${id}`,
+  PRODUCT_DETAIL: (id: number | string) => `/dashboard/products/${id}`,
+  PRODUCT_EDIT: (id: number | string) => `/dashboard/products/${id}?mode=edit`,
 } as const;

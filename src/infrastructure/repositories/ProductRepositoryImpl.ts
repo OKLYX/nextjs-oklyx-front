@@ -1,6 +1,6 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { Product } from '@/domain/entities/Product';
-import type { ProductRepository, GetProductsParams, GetProductsResponse, CreateProductRequest } from '@/domain/repositories/ProductRepository';
+import type { ProductRepository, GetProductsParams, GetProductsResponse, CreateProductRequest, UpdateProductRequest } from '@/domain/repositories/ProductRepository';
 
 export class ProductRepositoryImpl implements ProductRepository {
   async getProducts(params: GetProductsParams): Promise<GetProductsResponse> {
@@ -28,10 +28,15 @@ export class ProductRepositoryImpl implements ProductRepository {
     return response.data.data;
   }
 
-  async uploadProductImage(id: number, file: File): Promise<void> {
+  async uploadProductImage(id: number, file: File): Promise<Product> {
     const formData = new FormData();
     formData.append('file', file);
-    await axiosInstance.put(`/api/products/${id}/image`, formData);
+    const response = await axiosInstance.put(`/api/products/${id}/image`, formData, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    });
+    return response.data.data;
   }
 
   async checkBarcodeExists(barcodeId: string): Promise<boolean> {
@@ -41,5 +46,14 @@ export class ProductRepositoryImpl implements ProductRepository {
       },
     });
     return response.data.data.exists;
+  }
+
+  async updateProduct(id: number, data: UpdateProductRequest): Promise<Product> {
+    const response = await axiosInstance.patch(`/api/products/${id}`, data);
+    return response.data.data;
+  }
+
+  async deleteProductImage(id: number): Promise<void> {
+    await axiosInstance.delete(`/api/products/${id}/image`);
   }
 }
