@@ -1,8 +1,8 @@
-import { AuthRepository } from '@/domain/repositories/AuthRepository';
+import { IAuthRepository } from '@/domain/repositories/IAuthRepository';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 
 export class LoginUseCase {
-  constructor(private authRepository: AuthRepository) {}
+  constructor(private authRepository: IAuthRepository) {}
 
   async login(email: string, password: string): Promise<void> {
     try {

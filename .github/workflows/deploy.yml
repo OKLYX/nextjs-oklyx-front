@@ -73,6 +73,7 @@ jobs:
               -p 3000:3000 \
               --network pms_network \
               -e NEXT_PUBLIC_API_URL=http://spring-pms-backend:8083 \
+              -v ~/services/oklyx/uploads/products:/app/uploads/products \
               --restart unless-stopped \
               --log-driver json-file \
               --log-opt max-size=10m \

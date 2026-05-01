@@ -1,12 +1,12 @@
 import { LoginUseCase } from '@/application/usecases/LoginUseCase';
-import { AuthRepository } from '@/domain/repositories/AuthRepository';
+import { IAuthRepository } from '@/domain/repositories/IAuthRepository';
 import { LoginResponseDto } from '@/application/dto/LoginResponseDto';
 import * as tokenStorageModule from '@/infrastructure/auth/tokenStorage';
 
 jest.mock('@/infrastructure/auth/tokenStorage');
 
 describe('LoginUseCase', () => {
-  let mockAuthRepository: jest.Mocked<AuthRepository>;
+  let mockAuthRepository: jest.Mocked<IAuthRepository>;
   let mockTokenStorage: jest.Mocked<typeof tokenStorageModule.tokenStorage>;
   let useCase: LoginUseCase;
 
@@ -15,7 +15,7 @@ describe('LoginUseCase', () => {
 
     mockAuthRepository = {
       login: jest.fn(),
-    } as any;
+    } as jest.Mocked<IAuthRepository>;
 
     mockTokenStorage = tokenStorageModule.tokenStorage as jest.Mocked<
       typeof tokenStorageModule.tokenStorage

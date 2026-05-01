@@ -29,7 +29,7 @@ export function LoginForm() {
     try {
       const loginUseCase = new LoginUseCase(new AuthRepositoryImpl());
       await loginUseCase.login(data.email, data.password);
-      router.push(ROUTES.HOME);
+      router.push(ROUTES.DASHBOARD);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Login failed. Please try again.';

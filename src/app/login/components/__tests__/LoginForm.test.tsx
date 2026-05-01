@@ -2,6 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LoginForm } from '@/app/login/components/LoginForm';
 import { ROUTES } from '@/config/routes';
+import * as navigationModule from 'next/navigation';
+import * as loginUseCaseModule from '@/application/usecases/LoginUseCase';
 
 jest.mock('next/navigation');
 jest.mock('@/application/usecases/LoginUseCase');
@@ -17,13 +19,13 @@ describe('LoginForm', () => {
     mockPush = jest.fn();
     mockLoginUseCase = jest.fn();
 
-    const { useRouter } = require('next/navigation');
-    useRouter.mockReturnValue({
+    const mockUseRouter = navigationModule.useRouter as jest.Mock;
+    mockUseRouter.mockReturnValue({
       push: mockPush,
     });
 
-    const { LoginUseCase } = require('@/application/usecases/LoginUseCase');
-    LoginUseCase.mockImplementation(() => ({
+    const MockLoginUseCase = loginUseCaseModule.LoginUseCase as jest.Mock;
+    MockLoginUseCase.mockImplementation(() => ({
       login: mockLoginUseCase,
     }));
   });
@@ -126,7 +128,7 @@ describe('LoginForm', () => {
       await user.click(screen.getByRole('button', { name: /login/i }));
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(ROUTES.HOME);
+        expect(mockPush).toHaveBeenCalledWith(ROUTES.DASHBOARD);
       });
     });
 
@@ -154,6 +156,19 @@ describe('LoginForm', () => {
       await user.click(screen.getByRole('button', { name: /login/i }));
 
       expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('should display default error message for non-Error exceptions', async () => {
+      const user = userEvent.setup();
+      mockLoginUseCase.mockRejectedValue('String error');
+
+      render(<LoginForm />);
+
+      await user.type(screen.getByPlaceholderText(/email address/i), 'test@example.com');
+      await user.type(screen.getByPlaceholderText(/password/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /login/i }));
+
+      expect(await screen.findByText(/login failed. please try again/i)).toBeInTheDocument();
     });
   });
 
