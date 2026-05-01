@@ -169,16 +169,7 @@ export function ProductRegistrationForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Register New Product</h1>
-        <button
-          type="button"
-          onClick={() => router.push(ROUTES.PRODUCTS_RETRIEVE)}
-          className="text-blue-600 hover:text-blue-700 transition-colors"
-        >
-          ← Back to List
-        </button>
-      </div>
+      <h1 className="text-3xl font-bold">Register New Product</h1>
 
       {/* Required Fields */}
       <fieldset className="border border-gray-300 rounded-lg p-6 bg-gray-50">
