@@ -8,7 +8,7 @@ export class CreateProductUseCase {
     return this.repository.createProduct(data);
   }
 
-  async uploadImage(id: number, file: File): Promise<void> {
+  async uploadImage(id: number, file: File): Promise<Product> {
     return this.repository.uploadProductImage(id, file);
   }
 
