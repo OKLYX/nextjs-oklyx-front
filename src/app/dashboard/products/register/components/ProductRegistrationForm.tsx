@@ -3,8 +3,6 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { ROUTES } from '@/config/routes';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
 
@@ -21,36 +19,6 @@ interface ProductRegistrationFormValues {
   weight?: string;
   description?: string;
 }
-
-const numberField = z
-  .string()
-  .optional()
-  .transform(val => {
-    if (!val || val === '') return undefined;
-    const num = Number(val);
-    return Number.isNaN(num) || num <= 0 ? undefined : num;
-  });
-
-const schema = z.object({
-  productName: z.string().min(1, 'Product name is required'),
-  barcodeId: z.string().min(1, 'Barcode ID is required'),
-  brand: z.string().optional(),
-  price: z
-    .string()
-    .optional()
-    .transform(val => {
-      if (!val || val === '') return undefined;
-      const num = Number(val);
-      return Number.isNaN(num) || num <= 0 ? undefined : num;
-    }),
-  store: z.string().optional(),
-  unit: z.string().optional(),
-  volumeHeight: numberField,
-  volumeLong: numberField,
-  volumeShort: numberField,
-  weight: numberField,
-  description: z.string().optional(),
-});
 
 interface ProductRegistrationFormProps {
   onSubmit: (data: CreateProductRequest, imageFile: File | null) => Promise<void>;
@@ -85,8 +53,21 @@ export function ProductRegistrationForm({
     watch,
     reset,
     setValue,
+    setError,
   } = useForm<ProductRegistrationFormValues>({
-    resolver: zodResolver(schema),
+    defaultValues: {
+      productName: '',
+      barcodeId: '',
+      brand: '',
+      price: '',
+      store: '',
+      unit: '',
+      volumeHeight: '',
+      volumeLong: '',
+      volumeShort: '',
+      weight: '',
+      description: '',
+    },
   });
 
   const barcodeValue = watch('barcodeId');
@@ -152,6 +133,15 @@ export function ProductRegistrationForm({
 
   const handleFormSubmit = useCallback(
     async (data: ProductRegistrationFormValues) => {
+      if (!data.productName || data.productName.trim() === '') {
+        setError('productName', { message: 'Product name is required' });
+        return;
+      }
+      if (!data.barcodeId || data.barcodeId.trim() === '') {
+        setError('barcodeId', { message: 'Barcode ID is required' });
+        return;
+      }
+
       try {
         const payload: CreateProductRequest = {
           ...data,
@@ -169,7 +159,7 @@ export function ProductRegistrationForm({
         // Error is handled in container, form state preserved
       }
     },
-    [onSubmit, imageFile, reset, onSubmitSuccess]
+    [onSubmit, imageFile, reset, onSubmitSuccess, setError]
   );
 
   useEffect(() => {
