@@ -72,10 +72,7 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
   const handleSave = useCallback(
     async (data: UpdateProductRequest) => {
       try {
-        const payload = Object.fromEntries(
-          Object.entries(data).filter(([, value]) => value !== undefined && value !== null && value !== '')
-        );
-        const updated = await updateUseCase.updateProduct(id, payload as UpdateProductRequest);
+        const updated = await updateUseCase.updateProduct(id, data);
         setProduct(updated);
         router.push(ROUTES.PRODUCT_DETAIL(id));
       } catch (err) {

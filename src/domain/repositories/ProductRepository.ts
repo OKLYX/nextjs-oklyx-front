@@ -17,15 +17,15 @@ export interface CreateProductRequest {
 export interface UpdateProductRequest {
   productName?: string;
   barcodeId?: string;
-  brand?: string;
-  price?: number;
-  store?: string;
-  unit?: string;
-  volumeHeight?: number;
-  volumeLong?: number;
-  volumeShort?: number;
-  weight?: number;
-  description?: string;
+  brand?: string | null;
+  price?: number | null;
+  store?: string | null;
+  unit?: string | null;
+  volumeHeight?: string | number | null;
+  volumeLong?: string | number | null;
+  volumeShort?: string | number | null;
+  weight?: string | number | null;
+  description?: string | null;
 }
 
 export interface GetProductsParams {

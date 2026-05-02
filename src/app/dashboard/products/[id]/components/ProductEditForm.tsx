@@ -2,33 +2,9 @@
 
 import { useCallback, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import type { Product } from '@/domain/entities/Product';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
 import { ProductImageSection } from './ProductImageSection';
-
-const numberField = z.union([
-  z.number().positive('Must be positive'),
-  z.nan(),
-]).optional().transform(val => isNaN(val as number) ? undefined : val) as unknown as z.ZodOptional<z.ZodNumber>;
-
-const schema = z.object({
-  productName: z.string().min(1, 'Product name is required'),
-  barcodeId: z.string().min(1, 'Barcode ID is required'),
-  brand: z.string().optional(),
-  price: z.union([
-    z.number().positive('Price must be positive'),
-    z.nan(),
-  ]).optional().transform(val => isNaN(val as number) ? undefined : val) as unknown as z.ZodOptional<z.ZodNumber>,
-  store: z.string().optional(),
-  unit: z.string().optional(),
-  volumeHeight: numberField,
-  volumeLong: numberField,
-  volumeShort: numberField,
-  weight: numberField,
-  description: z.string().optional(),
-});
 
 interface ProductEditFormProps {
   product: Product;
@@ -55,23 +31,21 @@ export function ProductEditForm({
   const {
     register,
     handleSubmit,
-    formState: { errors },
     watch,
   } = useForm<UpdateProductRequest>({
-    resolver: zodResolver(schema) as any,
     defaultValues: {
       productName: product.productName,
       barcodeId: product.barcodeId,
-      brand: product.brand,
-      price: product.price,
-      store: product.store,
-      unit: product.unit,
-      volumeHeight: product.volumeHeight,
-      volumeLong: product.volumeLong,
-      volumeShort: product.volumeShort,
-      weight: product.weight,
-      description: product.description,
-    },
+      brand: product.brand ?? '',
+      price: product.price ? String(product.price) : '',
+      store: product.store ?? '',
+      unit: product.unit ?? '',
+      volumeHeight: product.volumeHeight ? String(product.volumeHeight) : '',
+      volumeLong: product.volumeLong ? String(product.volumeLong) : '',
+      volumeShort: product.volumeShort ? String(product.volumeShort) : '',
+      weight: product.weight ? String(product.weight) : '',
+      description: product.description ?? '',
+    } as UpdateProductRequest,
   });
 
   const barcodeValue = watch('barcodeId');
@@ -90,11 +64,7 @@ export function ProductEditForm({
     setIsCheckingBarcode(true);
     try {
       const exists = await onCheckBarcode(barcodeValue);
-      if (exists) {
-        setBarcodeError('Barcode already exists');
-      } else {
-        setBarcodeError(null);
-      }
+      setBarcodeError(exists ? 'Barcode already exists' : null);
     } catch {
       setBarcodeError('Error checking barcode');
     } finally {
@@ -112,7 +82,15 @@ export function ProductEditForm({
     async (data: UpdateProductRequest) => {
       setIsSaving(true);
       try {
-        await onSave(data);
+        const payload = {
+          ...data,
+          price: data.price ? Number(data.price) : null,
+          volumeHeight: data.volumeHeight ? Number(data.volumeHeight) : null,
+          volumeLong: data.volumeLong ? Number(data.volumeLong) : null,
+          volumeShort: data.volumeShort ? Number(data.volumeShort) : null,
+          weight: data.weight ? Number(data.weight) : null,
+        };
+        await onSave(payload as UpdateProductRequest);
       } catch {
         setIsSaving(false);
       }
@@ -124,7 +102,6 @@ export function ProductEditForm({
     <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
       <h1 className="text-3xl font-bold">Edit Product</h1>
 
-      {/* Required Fields */}
       <fieldset className="border border-gray-300 rounded-lg p-6 bg-gray-50">
         <legend className="text-lg font-semibold text-gray-900 px-2">Required</legend>
         <div className="space-y-4">
@@ -135,23 +112,12 @@ export function ProductEditForm({
             <input
               id="barcodeId"
               type="text"
+              placeholder="Enter barcode ID"
               {...register('barcodeId')}
               onBlur={handleBarcodeBlur}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            {barcodeError && (
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-red-600 text-sm flex-1">{barcodeError}</p>
-                <button
-                  type="button"
-                  onClick={() => setBarcodeError(null)}
-                  className="text-red-600 hover:text-red-700 text-lg font-bold"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-            {errors.barcodeId && <p className="text-red-600 text-sm mt-1">{errors.barcodeId.message}</p>}
+            {barcodeError && <p className="text-red-600 text-sm mt-1">{barcodeError}</p>}
           </div>
 
           <div>
@@ -161,15 +127,14 @@ export function ProductEditForm({
             <input
               id="productName"
               type="text"
+              placeholder="Enter product name"
               {...register('productName')}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            {errors.productName && <p className="text-red-600 text-sm mt-1">{errors.productName.message}</p>}
           </div>
         </div>
       </fieldset>
 
-      {/* Optional Fields */}
       <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
         <legend className="text-lg font-semibold text-gray-900 px-2">Optional</legend>
         <div className="space-y-4">
@@ -181,6 +146,7 @@ export function ProductEditForm({
               <input
                 id="brand"
                 type="text"
+                placeholder="Enter brand name"
                 {...register('brand')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -192,12 +158,13 @@ export function ProductEditForm({
               </label>
               <input
                 id="price"
-                type="number"
-                step="any"
-                {...register('price', { valueAsNumber: true })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Enter price"
+                {...register('price')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.price && <p className="text-red-600 text-sm mt-1">{errors.price.message}</p>}
             </div>
           </div>
 
@@ -206,24 +173,33 @@ export function ProductEditForm({
               <label htmlFor="store" className="block text-sm font-medium text-gray-900 mb-1">
                 Store
               </label>
-              <input
+              <select
                 id="store"
-                type="text"
                 {...register('store')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="">Select store</option>
+                <option value="이마트">이마트</option>
+                <option value="코스트코">코스트코</option>
+                <option value="노브랜드">노브랜드</option>
+              </select>
             </div>
 
             <div>
               <label htmlFor="unit" className="block text-sm font-medium text-gray-900 mb-1">
                 Unit
               </label>
-              <input
+              <select
                 id="unit"
-                type="text"
                 {...register('unit')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="">Select unit</option>
+                <option value="G">g</option>
+                <option value="KG">kg</option>
+                <option value="L">l</option>
+                <option value="ML">ml</option>
+              </select>
             </div>
           </div>
 
@@ -234,12 +210,13 @@ export function ProductEditForm({
               </label>
               <input
                 id="volumeHeight"
-                type="number"
-                step="any"
-                {...register('volumeHeight', { valueAsNumber: true })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Enter volume height"
+                {...register('volumeHeight')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.volumeHeight && <p className="text-red-600 text-sm mt-1">{errors.volumeHeight.message}</p>}
             </div>
 
             <div>
@@ -248,12 +225,13 @@ export function ProductEditForm({
               </label>
               <input
                 id="volumeLong"
-                type="number"
-                step="any"
-                {...register('volumeLong', { valueAsNumber: true })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Enter volume long"
+                {...register('volumeLong')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.volumeLong && <p className="text-red-600 text-sm mt-1">{errors.volumeLong.message}</p>}
             </div>
           </div>
 
@@ -264,12 +242,13 @@ export function ProductEditForm({
               </label>
               <input
                 id="volumeShort"
-                type="number"
-                step="any"
-                {...register('volumeShort', { valueAsNumber: true })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Enter volume short"
+                {...register('volumeShort')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.volumeShort && <p className="text-red-600 text-sm mt-1">{errors.volumeShort.message}</p>}
             </div>
 
             <div>
@@ -278,12 +257,13 @@ export function ProductEditForm({
               </label>
               <input
                 id="weight"
-                type="number"
-                step="any"
-                {...register('weight', { valueAsNumber: true })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Enter weight"
+                {...register('weight')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.weight && <p className="text-red-600 text-sm mt-1">{errors.weight.message}</p>}
             </div>
           </div>
 
@@ -293,6 +273,7 @@ export function ProductEditForm({
             </label>
             <textarea
               id="description"
+              placeholder="Enter product description"
               rows={4}
               {...register('description')}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -301,29 +282,18 @@ export function ProductEditForm({
         </div>
       </fieldset>
 
-      {/* Buttons */}
       <div className="flex gap-4">
-        <button
-          type="submit"
-          disabled={!!barcodeError || isSaving}
-          className="flex-1 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
+        <button type="submit" disabled={!!barcodeError || isSaving} className="btn-primary">
           {isSaving ? 'Saving...' : 'Save'}
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isSaving}
-          className="flex-1 px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
+        <button type="button" onClick={onCancel} className="btn-secondary">
           Cancel
         </button>
       </div>
 
-      {/* Image */}
       <ProductImageSection
         imageUrl={productImage}
-        onUpload={async (file) => {
+        onUpload={async file => {
           await onImageUpload(file);
           setProductImage(URL.createObjectURL(file));
         }}
