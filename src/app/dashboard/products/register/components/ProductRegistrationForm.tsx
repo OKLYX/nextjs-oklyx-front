@@ -8,6 +8,20 @@ import { z } from 'zod';
 import { ROUTES } from '@/config/routes';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
 
+interface ProductRegistrationFormValues {
+  productName: string;
+  barcodeId: string;
+  brand?: string;
+  price?: string;
+  store?: string;
+  unit?: string;
+  volumeHeight?: string;
+  volumeLong?: string;
+  volumeShort?: string;
+  weight?: string;
+  description?: string;
+}
+
 const numberField = z
   .string()
   .optional()
@@ -71,7 +85,7 @@ export function ProductRegistrationForm({
     watch,
     reset,
     setValue,
-  } = useForm<CreateProductRequest>({
+  } = useForm<ProductRegistrationFormValues>({
     resolver: zodResolver(schema),
   });
 
@@ -137,9 +151,17 @@ export function ProductRegistrationForm({
   );
 
   const handleFormSubmit = useCallback(
-    async (data: CreateProductRequest) => {
+    async (data: ProductRegistrationFormValues) => {
       try {
-        await onSubmit(data, imageFile);
+        const payload: CreateProductRequest = {
+          ...data,
+          price: data.price ? Number(data.price) : undefined,
+          volumeHeight: data.volumeHeight ? Number(data.volumeHeight) : undefined,
+          volumeLong: data.volumeLong ? Number(data.volumeLong) : undefined,
+          volumeShort: data.volumeShort ? Number(data.volumeShort) : undefined,
+          weight: data.weight ? Number(data.weight) : undefined,
+        };
+        await onSubmit(payload, imageFile);
         reset();
         setValidatedBarcode(null);
         onSubmitSuccess();
