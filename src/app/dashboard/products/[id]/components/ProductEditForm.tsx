@@ -6,6 +6,20 @@ import type { Product } from '@/domain/entities/Product';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
 import { ProductImageSection } from './ProductImageSection';
 
+interface ProductEditFormValues {
+  productName: string;
+  barcodeId: string;
+  brand: string;
+  price: string;
+  store: string;
+  unit: string;
+  volumeHeight: string;
+  volumeLong: string;
+  volumeShort: string;
+  weight: string;
+  description: string;
+}
+
 interface ProductEditFormProps {
   product: Product;
   onSave: (data: UpdateProductRequest) => Promise<void>;
@@ -32,7 +46,7 @@ export function ProductEditForm({
     register,
     handleSubmit,
     watch,
-  } = useForm<UpdateProductRequest>({
+  } = useForm<ProductEditFormValues>({
     defaultValues: {
       productName: product.productName,
       barcodeId: product.barcodeId,
@@ -45,7 +59,7 @@ export function ProductEditForm({
       volumeShort: product.volumeShort ? String(product.volumeShort) : '',
       weight: product.weight ? String(product.weight) : '',
       description: product.description ?? '',
-    } as UpdateProductRequest,
+    },
   });
 
   const barcodeValue = watch('barcodeId');
@@ -79,10 +93,10 @@ export function ProductEditForm({
   }, [barcodeValue, product.barcodeId]);
 
   const handleFormSubmit = useCallback(
-    async (data: UpdateProductRequest) => {
+    async (data: ProductEditFormValues) => {
       setIsSaving(true);
       try {
-        const payload = {
+        const payload: UpdateProductRequest = {
           ...data,
           price: data.price ? Number(data.price) : null,
           volumeHeight: data.volumeHeight ? Number(data.volumeHeight) : null,
@@ -90,7 +104,7 @@ export function ProductEditForm({
           volumeShort: data.volumeShort ? Number(data.volumeShort) : null,
           weight: data.weight ? Number(data.weight) : null,
         };
-        await onSave(payload as UpdateProductRequest);
+        await onSave(payload);
       } catch {
         setIsSaving(false);
       }
