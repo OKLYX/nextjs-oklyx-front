@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Accept API_URL as build argument
+ARG NEXT_PUBLIC_SERVER_API_URL
+
 # Copy package files
 COPY package*.json ./
 
@@ -12,8 +15,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build Next.js application
-RUN npm run build
+# Build Next.js application with API_URL
+RUN NEXT_PUBLIC_SERVER_API_URL=$NEXT_PUBLIC_SERVER_API_URL npm run build
 
 # Runtime stage
 FROM node:20-alpine

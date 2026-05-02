@@ -39,6 +39,8 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_SERVER_API_URL=${{ secrets.API_URL }}
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
@@ -73,7 +75,6 @@ jobs:
               --name nextjs-oklyx-front \
               -p 3000:3000 \
               --network pms_network \
-              -e NEXT_PUBLIC_SERVER_API_URL="$API_URL" \
               -v ~/services/oklyx/uploads/products:/app/uploads/products \
               --restart unless-stopped \
               --log-driver json-file \
