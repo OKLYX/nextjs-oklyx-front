@@ -8,19 +8,27 @@ import { z } from 'zod';
 import { ROUTES } from '@/config/routes';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
 
-const numberField = z.union([
-  z.number().positive('Must be positive'),
-  z.nan(),
-]).optional().transform(val => isNaN(val as number) ? undefined : val) as unknown as z.ZodOptional<z.ZodNumber>;
+const numberField = z
+  .string()
+  .optional()
+  .transform(val => {
+    if (!val || val === '') return undefined;
+    const num = Number(val);
+    return Number.isNaN(num) || num <= 0 ? undefined : num;
+  });
 
 const schema = z.object({
   productName: z.string().min(1, 'Product name is required'),
   barcodeId: z.string().min(1, 'Barcode ID is required'),
   brand: z.string().optional(),
-  price: z.union([
-    z.number().positive('Price must be positive'),
-    z.nan(),
-  ]).optional().transform(val => isNaN(val as number) ? undefined : val) as unknown as z.ZodOptional<z.ZodNumber>,
+  price: z
+    .string()
+    .optional()
+    .transform(val => {
+      if (!val || val === '') return undefined;
+      const num = Number(val);
+      return Number.isNaN(num) || num <= 0 ? undefined : num;
+    }),
   store: z.string().optional(),
   unit: z.string().optional(),
   volumeHeight: numberField,
@@ -268,11 +276,12 @@ export function ProductRegistrationForm({
               </label>
               <input
                 id="price"
-                type="number"
-                step="any"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="0.00"
                 disabled={isLoading}
-                {...register('price', { valueAsNumber: true })}
+                {...register('price')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.price && <p className="text-red-600 text-sm mt-1">{errors.price.message}</p>}
@@ -284,28 +293,35 @@ export function ProductRegistrationForm({
               <label htmlFor="store" className="block text-sm font-medium text-gray-900 mb-1">
                 Store
               </label>
-              <input
+              <select
                 id="store"
-                type="text"
-                placeholder="Enter store name"
                 disabled={isLoading}
                 {...register('store')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              />
+              >
+                <option value="">Select store</option>
+                <option value="이마트">이마트</option>
+                <option value="코스트코">코스트코</option>
+                <option value="노브랜드">노브랜드</option>
+              </select>
             </div>
 
             <div>
               <label htmlFor="unit" className="block text-sm font-medium text-gray-900 mb-1">
                 Unit
               </label>
-              <input
+              <select
                 id="unit"
-                type="text"
-                placeholder="e.g., kg, g, ml, l"
                 disabled={isLoading}
                 {...register('unit')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              />
+              >
+                <option value="">Select unit</option>
+                <option value="G">g</option>
+                <option value="KG">kg</option>
+                <option value="L">l</option>
+                <option value="ML">ml</option>
+              </select>
             </div>
           </div>
 
@@ -316,11 +332,12 @@ export function ProductRegistrationForm({
               </label>
               <input
                 id="volumeHeight"
-                type="number"
-                step="any"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('volumeHeight', { valueAsNumber: true })}
+                {...register('volumeHeight')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.volumeHeight && <p className="text-red-600 text-sm mt-1">{errors.volumeHeight.message}</p>}
@@ -332,11 +349,12 @@ export function ProductRegistrationForm({
               </label>
               <input
                 id="volumeLong"
-                type="number"
-                step="any"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('volumeLong', { valueAsNumber: true })}
+                {...register('volumeLong')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.volumeLong && <p className="text-red-600 text-sm mt-1">{errors.volumeLong.message}</p>}
@@ -350,11 +368,12 @@ export function ProductRegistrationForm({
               </label>
               <input
                 id="volumeShort"
-                type="number"
-                step="any"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('volumeShort', { valueAsNumber: true })}
+                {...register('volumeShort')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.volumeShort && <p className="text-red-600 text-sm mt-1">{errors.volumeShort.message}</p>}
@@ -366,11 +385,12 @@ export function ProductRegistrationForm({
               </label>
               <input
                 id="weight"
-                type="number"
-                step="any"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('weight', { valueAsNumber: true })}
+                {...register('weight')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.weight && <p className="text-red-600 text-sm mt-1">{errors.weight.message}</p>}

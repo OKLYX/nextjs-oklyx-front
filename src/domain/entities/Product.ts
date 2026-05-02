@@ -9,10 +9,10 @@ export interface Product {
   modifiedDate?: string;
   barcodeId?: string;
   unit?: string;
-  volumeHeight?: number;
-  volumeLong?: number;
-  volumeShort?: number;
-  weight?: number;
+  volumeHeight?: string;
+  volumeLong?: string;
+  volumeShort?: string;
+  weight?: string;
   description?: string;
   name?: string;
   imageUrl?: string;
