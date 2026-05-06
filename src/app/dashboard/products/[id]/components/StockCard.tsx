@@ -16,7 +16,7 @@ export function StockCard({ barcodeId, productName }: StockCardProps) {
   const [isStockLoading, setIsStockLoading] = useState(true);
   const [stockError, setStockError] = useState<string | null>(null);
   const [stockType, setStockType] = useState<'IN' | 'OUT'>('IN');
-  const [quantity, setQuantity] = useState('');
+  const [quantity, setQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -44,6 +44,39 @@ export function StockCard({ barcodeId, productName }: StockCardProps) {
     fetchStock();
   }, [fetchStock]);
 
+  useEffect(() => {
+    if (inStock === 0 && stockType === 'OUT') {
+      setStockType('IN');
+    }
+  }, [inStock, stockType]);
+
+  const handleQuantityChange = useCallback((value: string) => {
+    const num = value === '' ? 0 : parseInt(value, 10);
+    if (isNaN(num)) return;
+
+    let validNum = num;
+    if (validNum < 1) validNum = 1;
+    if (stockType === 'OUT' && inStock !== null && validNum > inStock) {
+      validNum = inStock;
+    }
+
+    setQuantity(validNum);
+  }, [stockType, inStock]);
+
+  const handleDecrement = useCallback(() => {
+    setQuantity((prev) => Math.max(1, prev - 1));
+  }, []);
+
+  const handleIncrement = useCallback(() => {
+    setQuantity((prev) => {
+      const next = prev + 1;
+      if (stockType === 'OUT' && inStock !== null && next > inStock) {
+        return inStock;
+      }
+      return next;
+    });
+  }, [stockType, inStock]);
+
   const handleSubmit = useCallback(async () => {
     try {
       setIsSubmitting(true);
@@ -52,13 +85,13 @@ export function StockCard({ barcodeId, productName }: StockCardProps) {
       const payload: CreateStockRequest = {
         barcodeId,
         type: stockType,
-        quantity: Number(quantity),
+        quantity,
         name: productName,
       };
 
       await stockUseCase.createStock(payload);
 
-      setQuantity('');
+      setQuantity(1);
       setSubmitSuccess(true);
 
       const updated = await stockUseCase.getCurrentStock(barcodeId);
@@ -76,7 +109,7 @@ export function StockCard({ barcodeId, productName }: StockCardProps) {
     }
   }, [barcodeId, stockType, quantity, productName, stockUseCase]);
 
-  const isQuantityValid = quantity && Number(quantity) >= 1;
+  const isQuantityValid = quantity >= 1;
   const isSubmitDisabled = isSubmitting || !isQuantityValid;
 
   return (
@@ -109,26 +142,44 @@ export function StockCard({ barcodeId, productName }: StockCardProps) {
               </button>
               <button
                 onClick={() => setStockType('OUT')}
+                disabled={inStock === 0}
                 className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                  stockType === 'OUT'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  inStock === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : stockType === 'OUT'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 OUT
               </button>
             </div>
 
-            <input
-              type="number"
-              min="1"
-              step="1"
-              placeholder="수량 입력"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              disabled={isSubmitting}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDecrement}
+                disabled={quantity <= 1 || isSubmitting}
+                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                −
+              </button>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="수량 입력"
+                value={quantity || ''}
+                onChange={(e) => handleQuantityChange(e.target.value)}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 text-center"
+              />
+              <button
+                onClick={handleIncrement}
+                disabled={isSubmitting || (stockType === 'OUT' && inStock !== null && quantity >= inStock)}
+                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                +
+              </button>
+            </div>
 
             {submitError && (
               <p className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">{submitError}</p>
