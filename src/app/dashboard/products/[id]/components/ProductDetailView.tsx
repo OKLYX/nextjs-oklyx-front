@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
 import { ProductImageSection } from './ProductImageSection';
+import { StockCard } from './StockCard';
 
 interface ProductDetailViewProps {
   product: Product;
@@ -125,6 +126,9 @@ export function ProductDetailView({ product, onDelete, onImageUpload, onImageDel
           <p className="text-gray-700 whitespace-pre-wrap">{product.description}</p>
         </div>
       )}
+
+      {/* Stock Card */}
+      {product.barcodeId && <StockCard barcodeId={product.barcodeId} productName={product.productName} />}
 
       {/* Image */}
       <ProductImageSection imageUrl={product.imageUrl || null} onUpload={onImageUpload} onDelete={onImageDelete} isViewMode={false} />
