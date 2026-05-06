@@ -40,6 +40,10 @@ export function LoginForm() {
 
   return (
     <div className="w-full max-w-md px-4">
+      <div className="mb-24 flex justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/oklyx_letter_logo.png" alt="OKLYX Logo" className="h-16" />
+      </div>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -78,9 +82,10 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full bg-black font-bold py-2 px-4 rounded-lg hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          style={{ color: '#fdc515' }}
         >
-          {isLoading ? 'Logging in...' : 'Login'}
+          {isLoading ? 'LOGGING IN...' : 'LOGIN'}
         </button>
       </form>
     </div>
