@@ -5,6 +5,8 @@ import type {
   BatchStockResponse,
   CreateStockRequest,
   CreateStockResponse,
+  GetStockLogsParams,
+  GetStockLogsResponse,
   GetStockResponse,
   StockRepository,
 } from '@/domain/repositories/StockRepository';
@@ -29,6 +31,19 @@ export class StockRepositoryImpl implements StockRepository {
 
   async createBatchStock(data: BatchStockRequest): Promise<BatchStockResponse> {
     const response = await axiosInstance.post('/api/stock/batch', data);
+    return response.data.data;
+  }
+
+  async getStockLogs(params: GetStockLogsParams): Promise<GetStockLogsResponse> {
+    const queryParams = {
+      ...(params.barcodeId && { barcodeId: params.barcodeId }),
+      ...(params.productName && { productName: params.productName }),
+      ...(params.startDate && { startDate: params.startDate }),
+      ...(params.endDate && { endDate: params.endDate }),
+      page: params.page ?? 0,
+      size: params.size ?? 20,
+    };
+    const response = await axiosInstance.get('/api/stock', { params: queryParams });
     return response.data.data;
   }
 }

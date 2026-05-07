@@ -3,6 +3,8 @@ import type {
   BatchStockResponse,
   CreateStockRequest,
   CreateStockResponse,
+  GetStockLogsParams,
+  GetStockLogsResponse,
   GetStockResponse,
   StockRepository,
 } from '@/domain/repositories/StockRepository';
@@ -20,5 +22,9 @@ export class StockUseCase {
 
   async createBatchStock(data: BatchStockRequest): Promise<BatchStockResponse> {
     return this.repository.createBatchStock(data);
+  }
+
+  async getStockLogs(params: GetStockLogsParams): Promise<GetStockLogsResponse> {
+    return this.repository.getStockLogs(params);
   }
 }

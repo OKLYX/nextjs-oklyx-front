@@ -65,7 +65,15 @@ export function Navbar() {
                   href={ROUTES.STOCK_IN_OUT}
                   className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                 >
-                  입출고관리
+                  입출고
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={ROUTES.STOCK_SEARCH}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  입출고조회
                 </Link>
               </li>
             </ul>

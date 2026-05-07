@@ -8,4 +8,5 @@ export const ROUTES = {
   PRODUCT_DETAIL: (id: number | string) => `/dashboard/products/${id}`,
   PRODUCT_EDIT: (id: number | string) => `/dashboard/products/${id}?mode=edit`,
   STOCK_IN_OUT: '/dashboard/stock/in-out',
+  STOCK_SEARCH: '/dashboard/stock/search',
 } as const;
