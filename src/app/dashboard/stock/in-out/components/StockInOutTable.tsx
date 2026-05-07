@@ -1,6 +1,7 @@
 'use client';
 
-import { RefObject } from 'react';
+import { useState, RefObject } from 'react';
+import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
 
 interface StockInOutItem {
   id: string;
@@ -33,19 +34,51 @@ export function StockInOutTable({
   onSubmit,
   barcodeInputRef,
 }: StockInOutTableProps) {
-  const handleQuantityKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === 'Escape') {
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [tempQuantity, setTempQuantity] = useState(0);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    itemId: string;
+    productName: string;
+  } | null>(null);
+
+  const handleEditStart = (item: StockInOutItem) => {
+    setEditingItemId(item.id);
+    setTempQuantity(item.quantity);
+  };
+
+  const handleEditConfirm = (item: StockInOutItem) => {
+    let newQuantity = tempQuantity;
+    if (newQuantity < 1) newQuantity = 1;
+    if (stockType === 'OUT' && newQuantity > item.currentStock) {
+      newQuantity = item.currentStock;
+    }
+    onUpdateQuantity(item.id, newQuantity);
+    setEditingItemId(null);
+    barcodeInputRef.current?.focus();
+  };
+
+  const handleEditCancel = () => {
+    setEditingItemId(null);
+    barcodeInputRef.current?.focus();
+  };
+
+  const handleDeleteClick = (item: StockInOutItem) => {
+    setDeleteConfirm({
+      itemId: item.id,
+      productName: item.productName,
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteConfirm) {
+      onDeleteItem(deleteConfirm.itemId);
+      setDeleteConfirm(null);
       barcodeInputRef.current?.focus();
     }
   };
 
-  const handleDeleteClick = (id: string) => {
-    onDeleteItem(id);
-    barcodeInputRef.current?.focus();
-  };
-
-  const handleQuantityBlur = () => {
-    barcodeInputRef.current?.focus();
+  const handleCancelDelete = () => {
+    setDeleteConfirm(null);
   };
 
   const submitButtonLabel = stockType === 'IN' ? '입고 처리' : '출고 처리';
@@ -54,12 +87,6 @@ export function StockInOutTable({
 
   return (
     <div className="p-6 space-y-4">
-      {submitError && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600 text-sm">
-          {submitError}
-        </div>
-      )}
-
       {submitSuccess && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-600 text-sm">
           {successMessage}
@@ -105,22 +132,46 @@ export function StockInOutTable({
                     {item.currentStock}
                   </td>
                   <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        onUpdateQuantity(item.id, parseInt(e.target.value) || 1)
-                      }
-                      onKeyDown={handleQuantityKeyDown}
-                      onBlur={handleQuantityBlur}
-                      className="w-20 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    {editingItemId === item.id ? (
+                      <div className="flex gap-1">
+                        <input
+                          type="number"
+                          min="1"
+                          value={tempQuantity}
+                          onChange={(e) =>
+                            setTempQuantity(parseInt(e.target.value) || 1)
+                          }
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleEditConfirm(item)}
+                          className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                        >
+                          완료
+                        </button>
+                        <button
+                          onClick={handleEditCancel}
+                          className="px-2 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{item.quantity}</span>
+                        <button
+                          onClick={() => handleEditStart(item)}
+                          className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                        >
+                          수정
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <button
-                      onClick={() => handleDeleteClick(item.id)}
+                      onClick={() => handleDeleteClick(item)}
                       className="text-red-600 hover:text-red-800 font-semibold"
                     >
                       [x]
@@ -140,6 +191,24 @@ export function StockInOutTable({
       >
         {isSubmitting ? '처리 중...' : submitButtonLabel}
       </button>
+
+      <PopupDialogModal
+        isOpen={deleteConfirm !== null}
+        title="상품 삭제 확인"
+        message={
+          deleteConfirm ? (
+            <>
+              <span className="font-semibold">{deleteConfirm.productName}</span>
+              을(를) {stockType === 'IN' ? '입고' : '출고'} 목록에서 제거하시겠습니까?
+            </>
+          ) : null
+        }
+        confirmText="삭제"
+        cancelText="취소"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        isDangerous
+      />
     </div>
   );
 }

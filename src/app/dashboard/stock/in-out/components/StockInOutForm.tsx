@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, RefObject } from 'react';
+import { useState, useEffect, RefObject } from 'react';
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 
 interface StockInOutFormProps {
@@ -8,6 +8,7 @@ interface StockInOutFormProps {
   onTypeChange: (type: 'IN' | 'OUT') => void;
   onAddItem: (barcodeId: string, productName: string, currentStock: number) => void;
   barcodeInputRef: RefObject<HTMLInputElement | null>;
+  submitError: string | null;
 }
 
 export function StockInOutForm({
@@ -15,10 +16,17 @@ export function StockInOutForm({
   onTypeChange,
   onAddItem,
   barcodeInputRef,
+  submitError,
 }: StockInOutFormProps) {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLookingUp) {
+      barcodeInputRef.current?.focus();
+    }
+  }, [isLookingUp, barcodeInputRef]);
 
   const handleTypeChange = (type: 'IN' | 'OUT') => {
     onTypeChange(type);
@@ -53,7 +61,6 @@ export function StockInOutForm({
       setLookupError('상품을 찾을 수 없습니다');
     } finally {
       setIsLookingUp(false);
-      barcodeInputRef.current?.focus();
     }
   };
 
@@ -94,10 +101,14 @@ export function StockInOutForm({
           autoFocus
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
         />
-        {isLookingUp && <p className="mt-2 text-gray-500">Loading...</p>}
-        {lookupError && (
-          <p className="mt-2 text-red-600 text-sm">{lookupError}</p>
-        )}
+        <div className="mt-3 space-y-2 text-sm">
+          <div className="text-gray-600">
+            Status: {isLookingUp ? <span className="text-blue-600 font-semibold">Loading...</span> : <span className="text-gray-400">-</span>}
+          </div>
+          <div className="text-gray-600 min-h-5">
+            Message: {submitError || lookupError ? <span className="text-red-600 font-semibold">{submitError || lookupError}</span> : <span className="text-gray-400">-</span>}
+          </div>
+        </div>
       </div>
     </div>
   );

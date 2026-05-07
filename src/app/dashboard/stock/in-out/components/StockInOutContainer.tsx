@@ -36,6 +36,11 @@ export function StockInOutContainer() {
   ) => {
     const existing = items.find((item) => item.barcodeId === barcodeId);
     if (existing) {
+      if (stockType === 'OUT' && existing.quantity >= currentStock) {
+        setSubmitError('출고 가능 수량을 초과하였습니다.');
+        setTimeout(() => setSubmitError(null), 3000);
+        return;
+      }
       setItems((prev) =>
         prev.map((item) =>
           item.barcodeId === barcodeId
@@ -59,9 +64,16 @@ export function StockInOutContainer() {
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity < 1) return;
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    if (stockType === 'OUT' && quantity > item.currentStock) {
+      setSubmitError('출고 가능 수량을 초과하였습니다.');
+      setTimeout(() => setSubmitError(null), 3000);
+      return;
+    }
     setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, quantity } : item
+      prev.map((i) =>
+        i.id === id ? { ...i, quantity } : i
       )
     );
   };
@@ -79,6 +91,17 @@ export function StockInOutContainer() {
     try {
       setIsSubmitting(true);
       setSubmitError(null);
+
+      if (stockType === 'OUT') {
+        const hasExceeded = items.some(
+          (item) => item.quantity > item.currentStock
+        );
+        if (hasExceeded) {
+          setSubmitError('출고 가능 수량을 초과하였습니다.');
+          return;
+        }
+      }
+
       await stockUseCase.createBatchStock({
         type: stockType,
         items: items.map((item) => ({
@@ -110,6 +133,7 @@ export function StockInOutContainer() {
           onTypeChange={handleTypeChange}
           onAddItem={handleAddItem}
           barcodeInputRef={barcodeInputRef}
+          submitError={submitError}
         />
       </div>
 
