@@ -7,8 +7,10 @@ import { ROUTES } from '@/config/routes';
 
 export function Navbar() {
   const isProductsOpen = useNavigationStore((state) => state.isProductsMenuOpen);
+  const isStockOpen = useNavigationStore((state) => state.isStockMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
+  const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
 
   useEffect(() => {
     if (!useNavigationStore.persist.hasHydrated()) {
@@ -43,6 +45,27 @@ export function Navbar() {
                   className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                 >
                   상품조회
+                </Link>
+              </li>
+            </ul>
+          )}
+        </li>
+        <li>
+          <button
+            onClick={toggleStockMenu}
+            className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between font-semibold text-gray-900"
+          >
+            재고관리
+            <span>{hasHydrated && isStockOpen ? '▲' : '▼'}</span>
+          </button>
+          {hasHydrated && isStockOpen && (
+            <ul className="ml-4 space-y-1 mt-2">
+              <li>
+                <Link
+                  href={ROUTES.STOCK_IN_OUT}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  입출고관리
                 </Link>
               </li>
             </ul>

@@ -1,4 +1,6 @@
 import type {
+  BatchStockRequest,
+  BatchStockResponse,
   CreateStockRequest,
   CreateStockResponse,
   GetStockResponse,
@@ -14,5 +16,9 @@ export class StockUseCase {
 
   async createStock(data: CreateStockRequest): Promise<CreateStockResponse> {
     return this.repository.createStock(data);
+  }
+
+  async createBatchStock(data: BatchStockRequest): Promise<BatchStockResponse> {
+    return this.repository.createBatchStock(data);
   }
 }

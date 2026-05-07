@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type {
+  BatchStockRequest,
+  BatchStockResponse,
   CreateStockRequest,
   CreateStockResponse,
   GetStockResponse,
@@ -22,6 +24,11 @@ export class StockRepositoryImpl implements StockRepository {
 
   async createStock(data: CreateStockRequest): Promise<CreateStockResponse> {
     const response = await axiosInstance.post('/api/stock', data);
+    return response.data.data;
+  }
+
+  async createBatchStock(data: BatchStockRequest): Promise<BatchStockResponse> {
+    const response = await axiosInstance.post('/api/stock/batch', data);
     return response.data.data;
   }
 }
