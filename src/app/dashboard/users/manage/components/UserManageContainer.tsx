@@ -7,6 +7,7 @@ import type { User } from '@/domain/entities/User';
 import type { GetUsersResponse } from '@/domain/repositories/UserRepository';
 import { UserSearchForm } from './UserSearchForm';
 import { UserTable } from './UserTable';
+import { UserDetailModal } from './UserDetailModal';
 
 export function UserManageContainer() {
   const [nameSearch, setNameSearch] = useState('');
@@ -18,6 +19,8 @@ export function UserManageContainer() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getUsersUseCase = useMemo(() => {
     const repository = new UserRepositoryImpl();
@@ -50,6 +53,20 @@ export function UserManageContainer() {
     await handleSearch(page);
   };
 
+  const handleRowClick = (user: User): void => {
+    setSelectedUser(user);
+    setIsModalOpen(true);
+  };
+
+  const handleModalClose = (): void => {
+    setIsModalOpen(false);
+    setSelectedUser(null);
+  };
+
+  const handleUserUpdated = (updatedUser: User): void => {
+    setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+  };
+
   useEffect(() => {
     handleSearch(0);
   }, []);
@@ -73,7 +90,16 @@ export function UserManageContainer() {
           isLoading={isLoading}
           error={error}
           onPageChange={handlePageChange}
+          onRowClick={handleRowClick}
         />
+        {selectedUser && (
+          <UserDetailModal
+            user={selectedUser}
+            isOpen={isModalOpen}
+            onClose={handleModalClose}
+            onUpdated={handleUserUpdated}
+          />
+        )}
       </div>
     </div>
   );

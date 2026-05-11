@@ -10,6 +10,7 @@ interface UserTableProps {
   isLoading: boolean;
   error: string | null;
   onPageChange: (page: number) => void;
+  onRowClick?: (user: User) => void;
 }
 
 function getRoleBadgeStyle(role: string): string {
@@ -37,6 +38,7 @@ export function UserTable({
   isLoading,
   error,
   onPageChange,
+  onRowClick,
 }: UserTableProps) {
   const getPaginationPages = () => {
     const pages = [];
@@ -83,7 +85,11 @@ export function UserTable({
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {users.map((user, index) => (
-                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                  <tr
+                    key={user.id}
+                    onClick={() => onRowClick?.(user)}
+                    className={`hover:bg-gray-50 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                  >
                     <td className="px-6 py-3 text-sm text-gray-700">{currentPage * 20 + index + 1}</td>
                     <td className="px-6 py-3 text-sm text-gray-700">{user.name}</td>
                     <td className="px-6 py-3 text-sm text-gray-700">{user.email}</td>

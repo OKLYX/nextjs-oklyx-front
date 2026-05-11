@@ -1,5 +1,5 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
-import type { CreateUserRequest, GetUsersParams, GetUsersResponse, UserRepository } from '@/domain/repositories/UserRepository';
+import type { CreateUserRequest, GetUsersParams, GetUsersResponse, UpdateUserRequest, UserRepository } from '@/domain/repositories/UserRepository';
 import type { User } from '@/domain/entities/User';
 
 export class UserRepositoryImpl implements UserRepository {
@@ -32,6 +32,11 @@ export class UserRepositoryImpl implements UserRepository {
     const response = await axiosInstance.get('/api/users', {
       params: queryParams,
     });
+    return response.data.data;
+  }
+
+  async updateUser(id: number, data: UpdateUserRequest): Promise<User> {
+    const response = await axiosInstance.patch(`/api/users/${id}`, data);
     return response.data.data;
   }
 }

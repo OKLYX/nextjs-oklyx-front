@@ -26,8 +26,15 @@ export interface GetUsersResponse {
   last: boolean;
 }
 
+export interface UpdateUserRequest {
+  name?: string;
+  email?: string;
+  role?: 'GUEST' | 'USER' | 'ADMIN';
+}
+
 export interface UserRepository {
   checkEmailExists(email: string): Promise<boolean>;
   createUser(data: CreateUserRequest): Promise<User>;
   getUsers(params: GetUsersParams): Promise<GetUsersResponse>;
+  updateUser(id: number, data: UpdateUserRequest): Promise<User>;
 }
