@@ -8,9 +8,11 @@ import { ROUTES } from '@/config/routes';
 export function Navbar() {
   const isProductsOpen = useNavigationStore((state) => state.isProductsMenuOpen);
   const isStockOpen = useNavigationStore((state) => state.isStockMenuOpen);
+  const isUsersOpen = useNavigationStore((state) => state.isUsersMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
+  const toggleUsersMenu = useNavigationStore((state) => state.toggleUsersMenu);
 
   useEffect(() => {
     if (!useNavigationStore.persist.hasHydrated()) {
@@ -74,6 +76,35 @@ export function Navbar() {
                   className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                 >
                   입출고조회
+                </Link>
+              </li>
+            </ul>
+          )}
+        </li>
+        <li>
+          <button
+            onClick={toggleUsersMenu}
+            className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between font-semibold text-gray-900"
+          >
+            회원관리
+            <span>{hasHydrated && isUsersOpen ? '▲' : '▼'}</span>
+          </button>
+          {hasHydrated && isUsersOpen && (
+            <ul className="ml-4 space-y-1 mt-2">
+              <li>
+                <Link
+                  href={ROUTES.USER_REGISTER}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  회원등록
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={ROUTES.USER_MANAGE}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  회원관리
                 </Link>
               </li>
             </ul>

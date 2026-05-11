@@ -9,4 +9,6 @@ export const ROUTES = {
   PRODUCT_EDIT: (id: number | string) => `/dashboard/products/${id}?mode=edit`,
   STOCK_IN_OUT: '/dashboard/stock/in-out',
   STOCK_SEARCH: '/dashboard/stock/search',
+  USER_REGISTER: '/dashboard/users/register',
+  USER_MANAGE: '/dashboard/users/manage',
 } as const;
