@@ -10,7 +10,24 @@ export interface CheckEmailResponse {
   exists: boolean;
 }
 
+export interface GetUsersParams {
+  name?: string;
+  email?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface GetUsersResponse {
+  content: User[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+}
+
 export interface UserRepository {
   checkEmailExists(email: string): Promise<boolean>;
   createUser(data: CreateUserRequest): Promise<User>;
+  getUsers(params: GetUsersParams): Promise<GetUsersResponse>;
 }
