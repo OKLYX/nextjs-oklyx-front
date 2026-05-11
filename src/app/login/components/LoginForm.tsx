@@ -7,12 +7,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { loginFormSchema, type LoginFormInput } from '@/application/dto/LoginFormSchema';
 import { LoginUseCase } from '@/application/usecases/LoginUseCase';
 import { AuthRepositoryImpl } from '@/infrastructure/repositories/AuthRepositoryImpl';
+import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { ROUTES } from '@/config/routes';
 
 export function LoginForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const setUser = useAuthStore((state) => state.setUser);
 
   const {
     register,
@@ -28,7 +30,12 @@ export function LoginForm() {
 
     try {
       const loginUseCase = new LoginUseCase(new AuthRepositoryImpl());
-      await loginUseCase.login(data.email, data.password);
+      const response = await loginUseCase.login(data.email, data.password);
+      setUser({
+        email: response.email,
+        name: response.name,
+        role: response.role as 'GUEST' | 'USER' | 'ADMIN',
+      });
       router.push(ROUTES.DASHBOARD);
     } catch (error) {
       const errorMessage =

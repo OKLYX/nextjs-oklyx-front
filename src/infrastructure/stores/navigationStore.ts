@@ -13,6 +13,7 @@ interface NavigationStore {
   toggleUsersMenu: () => void;
   closeUsersMenu: () => void;
   setHasHydrated: (hasHydrated: boolean) => void;
+  resetNavigation: () => void;
 }
 
 export const useNavigationStore = create<NavigationStore>()(
@@ -35,6 +36,11 @@ export const useNavigationStore = create<NavigationStore>()(
       },
       closeUsersMenu: () => set({ isUsersMenuOpen: false }),
       setHasHydrated: (hasHydrated: boolean) => set({ hasHydrated }),
+      resetNavigation: () => set({
+        isProductsMenuOpen: false,
+        isStockMenuOpen: false,
+        isUsersMenuOpen: false,
+      }),
     }),
     {
       name: 'navigation-storage',

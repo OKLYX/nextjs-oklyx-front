@@ -2,13 +2,19 @@
 
 import { useRouter } from 'next/navigation';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
+import { useAuthStore } from '@/infrastructure/stores/authStore';
+import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { ROUTES } from '@/config/routes';
 
 export function TopBar() {
   const router = useRouter();
+  const logout = useAuthStore((state) => state.logout);
+  const resetNavigation = useNavigationStore((state) => state.resetNavigation);
 
   const handleLogout = () => {
     tokenStorage.removeToken();
+    logout();
+    resetNavigation();
     router.push(ROUTES.LOGIN);
   };
 
