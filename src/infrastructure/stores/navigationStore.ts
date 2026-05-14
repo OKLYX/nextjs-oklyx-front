@@ -4,12 +4,15 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 interface NavigationStore {
   isProductsMenuOpen: boolean;
   isStockMenuOpen: boolean;
+  isCostsMenuOpen: boolean;
   isUsersMenuOpen: boolean;
   hasHydrated: boolean;
   toggleProductsMenu: () => void;
   closeProductsMenu: () => void;
   toggleStockMenu: () => void;
   closeStockMenu: () => void;
+  toggleCostsMenu: () => void;
+  closeCostsMenu: () => void;
   toggleUsersMenu: () => void;
   closeUsersMenu: () => void;
   setHasHydrated: (hasHydrated: boolean) => void;
@@ -21,6 +24,7 @@ export const useNavigationStore = create<NavigationStore>()(
     (set) => ({
       isProductsMenuOpen: false,
       isStockMenuOpen: false,
+      isCostsMenuOpen: false,
       isUsersMenuOpen: false,
       hasHydrated: false,
       toggleProductsMenu: () => {
@@ -31,6 +35,10 @@ export const useNavigationStore = create<NavigationStore>()(
         set((state) => ({ isStockMenuOpen: !state.isStockMenuOpen }));
       },
       closeStockMenu: () => set({ isStockMenuOpen: false }),
+      toggleCostsMenu: () => {
+        set((state) => ({ isCostsMenuOpen: !state.isCostsMenuOpen }));
+      },
+      closeCostsMenu: () => set({ isCostsMenuOpen: false }),
       toggleUsersMenu: () => {
         set((state) => ({ isUsersMenuOpen: !state.isUsersMenuOpen }));
       },
@@ -39,6 +47,7 @@ export const useNavigationStore = create<NavigationStore>()(
       resetNavigation: () => set({
         isProductsMenuOpen: false,
         isStockMenuOpen: false,
+        isCostsMenuOpen: false,
         isUsersMenuOpen: false,
       }),
     }),
@@ -48,6 +57,7 @@ export const useNavigationStore = create<NavigationStore>()(
       partialize: (state) => ({
         isProductsMenuOpen: state.isProductsMenuOpen,
         isStockMenuOpen: state.isStockMenuOpen,
+        isCostsMenuOpen: state.isCostsMenuOpen,
         isUsersMenuOpen: state.isUsersMenuOpen,
       }),
       onRehydrateStorage: () => (state) => {

@@ -11,4 +11,5 @@ export const ROUTES = {
   STOCK_SEARCH: '/dashboard/stock/search',
   USER_REGISTER: '/dashboard/users/register',
   USER_MANAGE: '/dashboard/users/manage',
+  COSTS_CARRIER: '/dashboard/costs/carrier',
 } as const;

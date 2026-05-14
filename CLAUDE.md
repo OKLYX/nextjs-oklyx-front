@@ -1,1 +1,1 @@
-@AGENTS.md
+/Users/ixtlim/Desktop/DeChallintier/YdMinS/Projects/claude-contexts/nextjs-oklyx-front.md

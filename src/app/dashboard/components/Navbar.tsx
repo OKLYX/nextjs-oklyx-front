@@ -9,10 +9,12 @@ import { ROUTES } from '@/config/routes';
 export function Navbar() {
   const isProductsOpen = useNavigationStore((state) => state.isProductsMenuOpen);
   const isStockOpen = useNavigationStore((state) => state.isStockMenuOpen);
+  const isCostsOpen = useNavigationStore((state) => state.isCostsMenuOpen);
   const isUsersOpen = useNavigationStore((state) => state.isUsersMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
+  const toggleCostsMenu = useNavigationStore((state) => state.toggleCostsMenu);
   const toggleUsersMenu = useNavigationStore((state) => state.toggleUsersMenu);
   const user = useAuthStore((state) => state.user);
 
@@ -78,6 +80,27 @@ export function Navbar() {
                   className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                 >
                   입출고조회
+                </Link>
+              </li>
+            </ul>
+          )}
+        </li>
+        <li>
+          <button
+            onClick={toggleCostsMenu}
+            className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between font-semibold text-gray-900"
+          >
+            비용관리
+            <span>{hasHydrated && isCostsOpen ? '▲' : '▼'}</span>
+          </button>
+          {hasHydrated && isCostsOpen && (
+            <ul className="ml-4 space-y-1 mt-2">
+              <li>
+                <Link
+                  href={ROUTES.COSTS_CARRIER}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  택배비
                 </Link>
               </li>
             </ul>
