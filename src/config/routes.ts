@@ -12,4 +12,5 @@ export const ROUTES = {
   USER_REGISTER: '/dashboard/users/register',
   USER_MANAGE: '/dashboard/users/manage',
   COSTS_CARRIER: '/dashboard/costs/carrier',
+  COSTS_PACKAGE: '/dashboard/costs/package',
 } as const;

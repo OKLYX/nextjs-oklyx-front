@@ -103,6 +103,14 @@ export function Navbar() {
                   택배비
                 </Link>
               </li>
+              <li>
+                <Link
+                  href={ROUTES.COSTS_PACKAGE}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  상자비
+                </Link>
+              </li>
             </ul>
           )}
         </li>
