@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Package } from '@/domain/entities/PackageEntity';
 import type { UpdatePackageRequest } from '@/application/dto/UpdatePackageRequest';
+import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
 
 const packageSchema = z.object({
   type: z.string().min(1, '패키지 타입을 입력하세요').max(50, '50자 이내'),
@@ -21,7 +22,9 @@ interface PackageDetailsModalProps {
   pkg: Package | null;
   onClose: () => void;
   onSubmit: (data: UpdatePackageRequest) => Promise<void>;
+  onDelete: () => Promise<void>;
   isLoading: boolean;
+  isDeleting: boolean;
 }
 
 export function PackageDetailsModal({
@@ -29,10 +32,14 @@ export function PackageDetailsModal({
   pkg,
   onClose,
   onSubmit,
+  onDelete,
   isLoading,
+  isDeleting,
 }: PackageDetailsModalProps) {
   const [requestError, setRequestError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const {
     control,
@@ -101,6 +108,24 @@ export function PackageDetailsModal({
     }
   };
 
+  const handleDeleteClick = () => {
+    setDeleteError('');
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      setDeleteError('');
+      await onDelete();
+      setIsDeleteDialogOpen(false);
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } }; message?: string };
+      const errorMessage = error?.response?.data?.message || '상자비 삭제에 실패했습니다.';
+      setDeleteError(errorMessage);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   if (!isOpen || !pkg) {
     return null;
   }
@@ -125,6 +150,12 @@ export function PackageDetailsModal({
         {requestError && (
           <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
             {requestError}
+          </div>
+        )}
+
+        {deleteError && (
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+            {deleteError}
           </div>
         )}
 
@@ -222,20 +253,36 @@ export function PackageDetailsModal({
                 reset();
                 onClose();
               }}
-              disabled={isSubmitting || isLoading}
+              disabled={isSubmitting || isLoading || isDeleting}
               className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 transition-colors"
             >
               취소
             </button>
             <button
               type="submit"
-              disabled={!isValid || isSubmitting || isLoading}
+              disabled={!isValid || isSubmitting || isLoading || isDeleting}
               className="flex-1 px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors"
             >
               {isSubmitting || isLoading ? '저장 중...' : '수정'}
             </button>
+            <button
+              type="button"
+              onClick={handleDeleteClick}
+              disabled={isSubmitting || isLoading || isDeleting}
+              className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
+              {isDeleting ? '삭제 중...' : '삭제'}
+            </button>
           </div>
         </form>
+
+        <DeleteConfirmationDialog
+          isOpen={isDeleteDialogOpen}
+          packageName={pkg?.type}
+          isLoading={isDeleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setIsDeleteDialogOpen(false)}
+        />
       </div>
     </div>
   );

@@ -17,4 +17,8 @@ export class PackageUseCase {
   async updatePackage(id: number, data: UpdatePackageRequest): Promise<Package> {
     return this.repository.updatePackage(id, data);
   }
+
+  async deletePackage(id: number): Promise<void> {
+    return this.repository.deletePackage(id);
+  }
 }

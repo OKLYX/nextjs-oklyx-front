@@ -22,4 +22,8 @@ export class PackageRepositoryImpl implements PackageRepository {
     const response = await axiosInstance.patch(`/api/admin/package/${id}`, data);
     return response.data.data;
   }
+
+  async deletePackage(id: number): Promise<void> {
+    await axiosInstance.delete(`/api/admin/package/${id}`);
+  }
 }

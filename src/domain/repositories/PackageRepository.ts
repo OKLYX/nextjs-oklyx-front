@@ -8,4 +8,6 @@ export interface PackageRepository {
   createPackage(data: CreatePackageRequest): Promise<Package>;
 
   updatePackage(id: number, data: UpdatePackageRequest): Promise<Package>;
+
+  deletePackage(id: number): Promise<void>;
 }

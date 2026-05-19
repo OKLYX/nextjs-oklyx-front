@@ -23,6 +23,7 @@ export function PackageContainer() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [isSubmittingDetails, setIsSubmittingDetails] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const packageUseCase = useMemo(() => {
     const repository = new PackageRepositoryImpl();
@@ -102,6 +103,21 @@ export function PackageContainer() {
     handleOpenDetailsModal(pkg);
   };
 
+  const handleDeletePackage = async () => {
+    if (!selectedPackage) return;
+
+    setIsDeleting(true);
+    try {
+      await packageUseCase.deletePackage(selectedPackage.id);
+      handleCloseDetailsModal();
+      await handleSearch();
+    } catch (err) {
+      throw err;
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-full">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -140,7 +156,9 @@ export function PackageContainer() {
           pkg={selectedPackage}
           onClose={handleCloseDetailsModal}
           onSubmit={handleUpdatePackage}
+          onDelete={handleDeletePackage}
           isLoading={isSubmittingDetails}
+          isDeleting={isDeleting}
         />
       </div>
     </div>
