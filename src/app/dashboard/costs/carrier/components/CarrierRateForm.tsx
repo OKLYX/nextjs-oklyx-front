@@ -19,8 +19,10 @@ type CarrierRateFormData = z.infer<typeof carrierRateSchema>;
 
 interface CarrierRateFormProps {
   isLoading: boolean;
+  isDeletingCarrier?: boolean;
   onSubmit: (data: CreateCarrierRateRequest | UpdateCarrierRateRequest) => Promise<void>;
   onCancel: () => void;
+  onOpenDeleteConfirm?: () => void;
   initialData?: Partial<CarrierRateFormData>;
   submitButtonLabel?: string;
   submitLoadingLabel?: string;
@@ -28,8 +30,10 @@ interface CarrierRateFormProps {
 
 export function CarrierRateForm({
   isLoading,
+  isDeletingCarrier = false,
   onSubmit,
   onCancel,
+  onOpenDeleteConfirm,
   initialData,
   submitButtonLabel = '추가',
   submitLoadingLabel = '추가 중...',
@@ -212,22 +216,34 @@ export function CarrierRateForm({
         />
       </div>
 
-      <div className="flex justify-end gap-3 pt-4 border-t">
-        <button
-          type="button"
-          onClick={handleCancel}
-          disabled={isLoading || isSubmitting}
-          className="px-4 py-2 text-sm font-medium border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          취소
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading || !isValid || isValidating || isSubmitting}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? submitLoadingLabel : submitButtonLabel}
-        </button>
+      <div className="flex justify-between gap-3 pt-4 border-t">
+        {onOpenDeleteConfirm && (
+          <button
+            type="button"
+            onClick={onOpenDeleteConfirm}
+            disabled={isLoading || isDeletingCarrier}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            삭제
+          </button>
+        )}
+        <div className="flex gap-3 ml-auto">
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={isLoading || isDeletingCarrier || isSubmitting}
+            className="px-4 py-2 text-sm font-medium border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            취소
+          </button>
+          <button
+            type="submit"
+            disabled={isLoading || isDeletingCarrier || !isValid || isValidating || isSubmitting}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? submitLoadingLabel : submitButtonLabel}
+          </button>
+        </div>
       </div>
     </form>
   );

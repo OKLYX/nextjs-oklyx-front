@@ -16,4 +16,5 @@ export interface CarrierRateRepository {
     effectiveDate: string;
     isDefault: boolean;
   }): Promise<CarrierRate>;
+  deleteCarrierRate(id: number): Promise<void>;
 }

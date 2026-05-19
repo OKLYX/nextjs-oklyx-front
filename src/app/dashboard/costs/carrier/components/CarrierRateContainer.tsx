@@ -25,6 +25,10 @@ export function CarrierRateContainer() {
   const [selectedCarrierRate, setSelectedCarrierRate] = useState<CarrierRate | null>(null);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeletingCarrier, setIsDeletingCarrier] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const carrierRateUseCase = useMemo(() => {
     const repository = new CarrierRateRepositoryImpl();
     return new CarrierRateUseCase(repository);
@@ -94,6 +98,34 @@ export function CarrierRateContainer() {
     }
   };
 
+  const handleOpenDeleteConfirm = () => {
+    setDeleteError(null);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const handleCloseDeleteConfirm = () => {
+    if (!isDeletingCarrier) {
+      setIsDeleteConfirmOpen(false);
+      setDeleteError(null);
+    }
+  };
+
+  const handleDeleteCarrierRate = async (id: number) => {
+    setIsDeletingCarrier(true);
+    try {
+      await carrierRateUseCase.deleteCarrierRate(id);
+      setIsDeleteConfirmOpen(false);
+      setDeleteError(null);
+      handleCloseEditModal();
+      await handleSearch();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : '삭제에 실패했습니다';
+      setDeleteError(errorMsg);
+    } finally {
+      setIsDeletingCarrier(false);
+    }
+  };
+
   const filteredRates = carrierRates.filter((rate) =>
     rate.carrier.toLowerCase().includes(searchCarrier.toLowerCase())
   );
@@ -132,7 +164,13 @@ export function CarrierRateContainer() {
           carrierRate={selectedCarrierRate}
           onClose={handleCloseEditModal}
           onSubmit={handleEditCarrierRate}
+          onDelete={handleDeleteCarrierRate}
           isLoading={isSubmittingEdit}
+          isDeletingCarrier={isDeletingCarrier}
+          isDeleteConfirmOpen={isDeleteConfirmOpen}
+          onOpenDeleteConfirm={handleOpenDeleteConfirm}
+          onCloseDeleteConfirm={handleCloseDeleteConfirm}
+          deleteError={deleteError ?? undefined}
         />
       </div>
     </div>

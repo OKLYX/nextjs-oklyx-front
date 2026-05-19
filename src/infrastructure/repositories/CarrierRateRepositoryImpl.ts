@@ -32,4 +32,8 @@ export class CarrierRateRepositoryImpl implements CarrierRateRepository {
     const response = await axiosInstance.patch(`/api/admin/carrier-rate/${id}`, data);
     return response.data.data;
   }
+
+  async deleteCarrierRate(id: number): Promise<void> {
+    await axiosInstance.delete(`/api/admin/carrier-rate/${id}`);
+  }
 }

@@ -17,4 +17,8 @@ export class CarrierRateUseCase {
   async updateCarrierRate(id: number, data: UpdateCarrierRateRequest): Promise<CarrierRate> {
     return this.repository.updateCarrierRate(id, data);
   }
+
+  async deleteCarrierRate(id: number): Promise<void> {
+    return this.repository.deleteCarrierRate(id);
+  }
 }
