@@ -111,6 +111,14 @@ export function Navbar() {
                   상자비
                 </Link>
               </li>
+              <li>
+                <Link
+                  href={ROUTES.COSTS_CATEGORY}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  카테고리
+                </Link>
+              </li>
             </ul>
           )}
         </li>
