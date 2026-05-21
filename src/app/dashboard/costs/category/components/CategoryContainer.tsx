@@ -10,7 +10,6 @@ import { CategorySearchCard } from './CategorySearchCard';
 import { CategoryTable } from './CategoryTable';
 import { CreateCategoryModal } from './CreateCategoryModal';
 import { EditCategoryModal } from './EditCategoryModal';
-import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
 
 export function CategoryContainer() {
   const [searchName, setSearchName] = useState('');
@@ -24,13 +23,12 @@ export function CategoryContainer() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>(undefined);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [deleteError, setDeleteError] = useState<string | undefined>(undefined);
 
   const categoryUseCase = useMemo(() => {
     const repository = new CategoryRepositoryImpl();
@@ -87,7 +85,7 @@ export function CategoryContainer() {
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
     setSelectedCategory(null);
-    setSelectedCategoryId(null);
+    setSelectedCategoryId(undefined);
   };
 
   const handleUpdateCategory = async (data: UpdateCategoryRequest) => {
@@ -104,30 +102,33 @@ export function CategoryContainer() {
     }
   };
 
-  const handleOpenDeleteConfirm = (category: Category) => {
-    setCategoryToDelete(category);
-    setDeleteError(null);
+  const handleOpenDeleteConfirm = () => {
     setIsDeleteConfirmOpen(true);
+    setDeleteError(undefined);
   };
 
   const handleCloseDeleteConfirm = () => {
     setIsDeleteConfirmOpen(false);
-    setCategoryToDelete(null);
-    setDeleteError(null);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!categoryToDelete) return;
-    setIsDeletingCategory(true);
-    setDeleteError(null);
-
+  const handleDeleteCategory = async (categoryId: number) => {
     try {
-      await categoryUseCase.deleteCategory(categoryToDelete.id);
-      handleCloseDeleteConfirm();
-      await handleSearch();
+      setIsDeletingCategory(true);
+      setDeleteError(undefined);
+
+      await categoryUseCase.deleteCategory(categoryId);
+
+      // 성공 시 모든 상태 초기화
+      setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
+      setIsEditModalOpen(false);
+      setSelectedCategory(null);
+      setSelectedCategoryId(undefined);
+      setIsDeleteConfirmOpen(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : '삭제에 실패했습니다.';
+      const message = err instanceof Error ? err.message : '삭제에 실패했습니다';
       setDeleteError(message);
+      // 에러 시: Dialog는 닫고 Modal 유지 (사용자가 재시도 가능)
+      setIsDeleteConfirmOpen(false);
     } finally {
       setIsDeletingCategory(false);
     }
@@ -177,22 +178,17 @@ export function CategoryContainer() {
         {isEditModalOpen && selectedCategory && (
           <EditCategoryModal
             isOpen={isEditModalOpen}
+            category={selectedCategory}
             onClose={handleCloseEditModal}
             onSubmit={handleUpdateCategory}
-            isSubmitting={isSubmittingEdit}
-            category={selectedCategory}
+            onDelete={handleDeleteCategory}
+            isLoading={isSubmittingEdit}
+            isDeletingCategory={isDeletingCategory}
+            isDeleteConfirmOpen={isDeleteConfirmOpen}
+            onOpenDeleteConfirm={handleOpenDeleteConfirm}
+            onCloseDeleteConfirm={handleCloseDeleteConfirm}
+            deleteError={deleteError}
             categories={categories}
-          />
-        )}
-
-        {isDeleteConfirmOpen && categoryToDelete && (
-          <DeleteConfirmationDialog
-            isOpen={isDeleteConfirmOpen}
-            onClose={handleCloseDeleteConfirm}
-            onConfirm={handleConfirmDelete}
-            isDeleting={isDeletingCategory}
-            error={deleteError}
-            categoryName={categoryToDelete.name}
           />
         )}
       </div>

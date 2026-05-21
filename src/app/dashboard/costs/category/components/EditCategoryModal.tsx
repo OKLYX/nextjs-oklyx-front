@@ -1,182 +1,109 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useEffect } from 'react';
+import { EditCategoryForm } from './EditCategoryForm';
+import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
 import type { Category } from '@/domain/entities/CategoryEntity';
 import type { UpdateCategoryRequest } from '@/application/dto/UpdateCategoryRequest';
 
-const schema = z.object({
-  name: z.string().min(1, '카테고리명은 필수입니다.').max(100),
-  platform: z.string().min(1, '플랫폼은 필수입니다.'),
-  platformCategoryId: z.string().min(1, '플랫폼 카테고리 ID는 필수입니다.').max(50),
-  parentId: z.coerce.number().nullable().optional().transform((val) => val || null),
-});
-
-type FormData = z.infer<typeof schema>;
-
 interface EditCategoryModalProps {
   isOpen: boolean;
+  category: Category | null;
   onClose: () => void;
   onSubmit: (data: UpdateCategoryRequest) => Promise<void>;
-  isSubmitting: boolean;
-  category: Category;
+  onDelete: (id: number) => Promise<void>;
+  isLoading: boolean;
+  isDeletingCategory: boolean;
+  isDeleteConfirmOpen: boolean;
+  onOpenDeleteConfirm: () => void;
+  onCloseDeleteConfirm: () => void;
+  deleteError?: string;
   categories: Category[];
 }
 
 export function EditCategoryModal({
   isOpen,
+  category,
   onClose,
   onSubmit,
-  isSubmitting,
-  category,
+  onDelete,
+  isLoading,
+  isDeletingCategory,
+  isDeleteConfirmOpen,
+  onOpenDeleteConfirm,
+  onCloseDeleteConfirm,
+  deleteError,
   categories,
 }: EditCategoryModalProps) {
-  const [submitError, setSubmitError] = useState('');
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isLoading && !isDeletingCategory) {
+        onClose();
+      }
+    };
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      name: category.name,
-      platform: category.platform,
-      platformCategoryId: category.platformCategoryId,
-      parentId: category.parentId || null,
-    },
-  });
-
-  if (!isOpen) return null;
-
-  const onFormSubmit = async (data: FormData) => {
-    setSubmitError('');
-    try {
-      const submitData = {
-        ...data,
-        parentId: data.parentId || null,
-      };
-      await onSubmit(submitData);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '저장에 실패했습니다.';
-      setSubmitError(message);
+    if (isOpen) {
+      window.addEventListener('keydown', handleEsc);
+      return () => window.removeEventListener('keydown', handleEsc);
     }
-  };
+  }, [isOpen, isLoading, isDeletingCategory, onClose]);
+
+  if (!isOpen) {
+    return null;
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">카테고리 수정</h2>
-          <button
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4">
-          {submitError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-              {submitError}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+          <div className="flex items-center justify-between p-4 border-b">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                카테고리명
-              </label>
-              <input
-                {...register('name')}
-                type="text"
-                placeholder="카테고리명"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <h2 className="text-lg font-semibold">카테고리 수정</h2>
+              {category && <p className="text-xs text-gray-500 mt-1">ID: {category.id}</p>}
+            </div>
+            <button
+              onClick={onClose}
+              disabled={isLoading || isDeletingCategory}
+              className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="p-4">
+            {deleteError && (
+              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 mb-4">
+                <p className="font-semibold">삭제 실패</p>
+                <p>{deleteError}</p>
+              </div>
+            )}
+            {category && (
+              <EditCategoryForm
+                category={category}
+                categories={categories}
+                isLoading={isLoading}
+                isDeletingCategory={isDeletingCategory}
+                onSubmit={onSubmit}
+                onCancel={onClose}
+                onOpenDeleteConfirm={onOpenDeleteConfirm}
               />
-              {errors.name && (
-                <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                플랫폼
-              </label>
-              <select
-                {...register('platform')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">선택하세요</option>
-                <option value="COUPANG">쿠팡</option>
-                <option value="GMARKET">지마켓</option>
-                <option value="AUCTION">옥션</option>
-                <option value="SMARTSTORE">스마트스토어</option>
-              </select>
-              {errors.platform && (
-                <p className="mt-1 text-xs text-red-600">{errors.platform.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                플랫폼 카테고리 ID
-              </label>
-              <input
-                {...register('platformCategoryId')}
-                type="text"
-                placeholder="예: cat_001"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {errors.platformCategoryId && (
-                <p className="mt-1 text-xs text-red-600">{errors.platformCategoryId.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                부모 카테고리
-              </label>
-              <select
-                {...register('parentId')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">선택 안함 (최상위)</option>
-                {categories
-                  .filter((cat) => cat.id !== category.id)
-                  .map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-              </select>
-              {errors.parentId && (
-                <p className="mt-1 text-xs text-red-600">{errors.parentId.message}</p>
-              )}
-            </div>
-
-            <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
-              <button
-                onClick={onClose}
-                disabled={isSubmitting}
-                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
-              >
-                취소
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
-              >
-                {isSubmitting ? '저장 중...' : '저장'}
-              </button>
-            </div>
-          </form>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {category && (
+        <PopupDialogModal
+          isOpen={isDeleteConfirmOpen}
+          title="카테고리 삭제"
+          message={`카테고리 "${category.name}"을 삭제하시겠습니까?`}
+          cancelText="취소"
+          confirmText={isDeletingCategory ? '삭제 중...' : '삭제'}
+          onCancel={onCloseDeleteConfirm}
+          onConfirm={() => onDelete(category.id)}
+          isDangerous
+        />
+      )}
+    </>
   );
 }
