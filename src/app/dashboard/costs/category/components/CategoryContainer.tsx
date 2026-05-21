@@ -24,6 +24,7 @@ export function CategoryContainer() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -79,12 +80,14 @@ export function CategoryContainer() {
 
   const handleOpenEditModal = (category: Category) => {
     setSelectedCategory(category);
+    setSelectedCategoryId(category.id);
     setIsEditModalOpen(true);
   };
 
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
     setSelectedCategory(null);
+    setSelectedCategoryId(null);
   };
 
   const handleUpdateCategory = async (data: UpdateCategoryRequest) => {
@@ -156,6 +159,8 @@ export function CategoryContainer() {
           <CategoryTable
             categories={filteredCategories}
             isLoading={isLoading}
+            selectedId={selectedCategoryId}
+            onRowClick={handleOpenEditModal}
           />
         )}
 

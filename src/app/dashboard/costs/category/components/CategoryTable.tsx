@@ -5,11 +5,15 @@ import type { Category } from '@/domain/entities/CategoryEntity';
 interface CategoryTableProps {
   categories: Category[];
   isLoading: boolean;
+  selectedId?: number;
+  onRowClick?: (category: Category) => void;
 }
 
 export function CategoryTable({
   categories,
   isLoading,
+  selectedId,
+  onRowClick,
 }: CategoryTableProps) {
   if (isLoading) {
     return (
@@ -40,7 +44,13 @@ export function CategoryTable({
         </thead>
         <tbody>
           {categories.map((cat) => (
-            <tr key={cat.id} className="border-b border-gray-200 hover:bg-gray-50">
+            <tr
+              key={cat.id}
+              onClick={() => onRowClick?.(cat)}
+              className={`border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors ${
+                selectedId === cat.id ? 'bg-blue-50' : ''
+              }`}
+            >
               <td className="px-6 py-3 text-gray-900">{cat.id}</td>
               <td className="px-6 py-3 text-gray-900">{cat.name}</td>
               <td className="px-6 py-3 text-gray-600">{cat.platform}</td>
