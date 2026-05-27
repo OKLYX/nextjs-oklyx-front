@@ -58,10 +58,12 @@ export function ProductDetailView({ product, onDelete, onImageUpload, onImageDel
               <p className="text-sm text-gray-600">Product Name</p>
               <p className="text-lg font-semibold text-gray-900">{product.productName}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Barcode ID</p>
-              <p className="text-lg font-semibold text-gray-900">{product.barcodeId}</p>
-            </div>
+            {product.barcodeId && (
+              <div>
+                <p className="text-sm text-gray-600">Barcode ID</p>
+                <p className="text-lg font-semibold text-gray-900">{product.barcodeId}</p>
+              </div>
+            )}
             {product.brand && (
               <div>
                 <p className="text-sm text-gray-600">Brand</p>

@@ -95,11 +95,11 @@ export function ProductRegistrationForm({
     }
   }, [barcodeValue, onCheckBarcode]);
 
-  const handleReset = useCallback(() => {
-    reset();
+  const handleResetBarcode = useCallback(() => {
+    setValue('barcodeId', '');
     setBarcodeError(null);
     setValidatedBarcode(null);
-  }, [reset]);
+  }, [setValue]);
 
   const handleImageFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,14 +137,15 @@ export function ProductRegistrationForm({
         setError('productName', { message: 'Product name is required' });
         return;
       }
-      if (!data.barcodeId || data.barcodeId.trim() === '') {
-        setError('barcodeId', { message: 'Barcode ID is required' });
+      if (data.barcodeId && data.barcodeId.trim() !== '' && validatedBarcode !== data.barcodeId.trim()) {
+        setError('barcodeId', { message: 'Please check barcode first' });
         return;
       }
 
       try {
         const payload: CreateProductRequest = {
           ...data,
+          barcodeId: data.barcodeId || undefined,
           price: data.price ? Number(data.price) : undefined,
           volumeHeight: data.volumeHeight ? Number(data.volumeHeight) : undefined,
           volumeLong: data.volumeLong ? Number(data.volumeLong) : undefined,
@@ -159,7 +160,7 @@ export function ProductRegistrationForm({
         // Error is handled in container, form state preserved
       }
     },
-    [onSubmit, imageFile, reset, onSubmitSuccess, setError]
+    [onSubmit, imageFile, reset, onSubmitSuccess, setError, validatedBarcode]
   );
 
   useEffect(() => {
@@ -185,7 +186,9 @@ export function ProductRegistrationForm({
     };
   }, [imagePreviewUrl]);
 
-  const isProductNameDisabled = !validatedBarcode;
+  const hasProductName = watch('productName') && watch('productName').trim() !== '';
+  const hasBarcodeWithoutValidation = barcodeValue && barcodeValue.trim() !== '' && validatedBarcode !== barcodeValue.trim();
+  const isSubmitDisabled = !hasProductName || hasBarcodeWithoutValidation;
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
@@ -194,6 +197,28 @@ export function ProductRegistrationForm({
       {/* Required Fields */}
       <fieldset className="border border-gray-300 rounded-lg p-6 bg-gray-50">
         <legend className="text-lg font-semibold text-gray-900 px-2">Required</legend>
+        <div className="space-y-4">
+          {/* Product Name */}
+          <div>
+            <label htmlFor="productName" className="block text-sm font-medium text-gray-900 mb-1">
+              Product Name
+            </label>
+            <input
+              id="productName"
+              type="text"
+              placeholder="Enter product name"
+              disabled={isLoading}
+              {...register('productName')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            />
+            {errors.productName && <p className="text-red-600 text-sm mt-1">{errors.productName.message}</p>}
+          </div>
+        </div>
+      </fieldset>
+
+      {/* Optional Fields */}
+      <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
+        <legend className="text-lg font-semibold text-gray-900 px-2">Optional</legend>
         <div className="space-y-4">
           {/* Barcode ID */}
           <div>
@@ -205,7 +230,7 @@ export function ProductRegistrationForm({
                 <input
                   id="barcodeId"
                   type="text"
-                  placeholder="Enter barcode ID"
+                  placeholder="Enter barcode ID (optional)"
                   {...register('barcodeId')}
                   disabled={validatedBarcode !== null}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -214,7 +239,7 @@ export function ProductRegistrationForm({
               {validatedBarcode !== null ? (
                 <button
                   type="button"
-                  onClick={handleReset}
+                  onClick={handleResetBarcode}
                   className="px-4 py-2 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors"
                 >
                   Reset
@@ -245,28 +270,6 @@ export function ProductRegistrationForm({
             {errors.barcodeId && <p className="text-red-600 text-sm mt-1">{errors.barcodeId.message}</p>}
           </div>
 
-          {/* Product Name */}
-          <div>
-            <label htmlFor="productName" className="block text-sm font-medium text-gray-900 mb-1">
-              Product Name
-            </label>
-            <input
-              id="productName"
-              type="text"
-              placeholder="Enter product name"
-              disabled={isProductNameDisabled || isLoading}
-              {...register('productName')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
-            {errors.productName && <p className="text-red-600 text-sm mt-1">{errors.productName.message}</p>}
-          </div>
-        </div>
-      </fieldset>
-
-      {/* Optional Fields */}
-      <fieldset disabled={isProductNameDisabled} className="border border-gray-200 rounded-lg p-6 bg-white disabled:opacity-50 disabled:pointer-events-none">
-        <legend className="text-lg font-semibold text-gray-900 px-2">Optional</legend>
-        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="brand" className="block text-sm font-medium text-gray-900 mb-1">
@@ -426,7 +429,7 @@ export function ProductRegistrationForm({
       </fieldset>
 
       {/* Image Upload */}
-      <fieldset disabled={isProductNameDisabled} className="border border-gray-200 rounded-lg p-6 bg-white disabled:opacity-50 disabled:pointer-events-none">
+      <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
         <legend className="text-lg font-semibold text-gray-900 px-2">Product Image (Optional)</legend>
         <div className="space-y-4">
           <input
@@ -475,10 +478,10 @@ export function ProductRegistrationForm({
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={isLoading || isProductNameDisabled}
+        disabled={isLoading || isSubmitDisabled}
         className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
       >
-        {isLoading ? 'Registering...' : 'Register Product'}
+        {isLoading ? 'Registering...' : 'Request Product'}
       </button>
     </form>
   );
