@@ -119,6 +119,14 @@ export function Navbar() {
                   카테고리
                 </Link>
               </li>
+              <li>
+                <Link
+                  href={ROUTES.COSTS_COMMISSION_RATE}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  수수료
+                </Link>
+              </li>
             </ul>
           )}
         </li>

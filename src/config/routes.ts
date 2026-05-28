@@ -14,4 +14,5 @@ export const ROUTES = {
   COSTS_CARRIER: '/dashboard/costs/carrier',
   COSTS_PACKAGE: '/dashboard/costs/package',
   COSTS_CATEGORY: '/dashboard/costs/category',
+  COSTS_COMMISSION_RATE: '/dashboard/costs/commission-rate',
 } as const;
