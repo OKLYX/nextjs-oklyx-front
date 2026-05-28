@@ -19,4 +19,8 @@ export class CommissionRateRepositoryImpl implements CommissionRateRepository {
     const response = await axiosInstance.patch(`/api/admin/commission-rate/${id}`, request);
     return response.data.data;
   }
+
+  async deleteCommissionRate(id: number): Promise<void> {
+    await axiosInstance.delete(`/api/admin/commission-rate/${id}`);
+  }
 }

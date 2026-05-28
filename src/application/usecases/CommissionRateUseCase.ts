@@ -17,4 +17,8 @@ export class CommissionRateUseCase {
   async updateCommissionRate(id: number, request: UpdateCommissionRateRequest): Promise<CommissionRate> {
     return this.repository.updateCommissionRate(id, request);
   }
+
+  async deleteCommissionRate(id: number): Promise<void> {
+    return this.repository.deleteCommissionRate(id);
+  }
 }

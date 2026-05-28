@@ -10,7 +10,9 @@ interface EditCommissionRateModalProps {
   commissionRate: CommissionRate | null;
   onClose: () => void;
   onSubmit: (data: UpdateCommissionRateFormData) => Promise<void>;
+  onOpenDeleteConfirm: () => void;
   isLoading: boolean;
+  isDeletingRate: boolean;
 }
 
 export function EditCommissionRateModal({
@@ -18,7 +20,9 @@ export function EditCommissionRateModal({
   commissionRate,
   onClose,
   onSubmit,
+  onOpenDeleteConfirm,
   isLoading,
+  isDeletingRate,
 }: EditCommissionRateModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -56,8 +60,10 @@ export function EditCommissionRateModal({
             <CommissionRateForm
               initialData={commissionRate}
               isLoading={isLoading}
+              isDeletingRate={isDeletingRate}
               onSubmit={onSubmit}
               onCancel={onClose}
+              onOpenDeleteConfirm={onOpenDeleteConfirm}
               submitButtonLabel="수정"
               submitLoadingLabel="수정 중..."
             />

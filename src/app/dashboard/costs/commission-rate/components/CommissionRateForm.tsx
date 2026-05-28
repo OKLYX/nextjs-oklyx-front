@@ -21,6 +21,8 @@ interface CommissionRateFormProps {
   isLoading: boolean;
   submitButtonLabel?: string;
   submitLoadingLabel?: string;
+  isDeletingRate?: boolean;
+  onOpenDeleteConfirm?: () => void;
 }
 
 export function CommissionRateForm({
@@ -30,6 +32,8 @@ export function CommissionRateForm({
   isLoading,
   submitButtonLabel = '추가',
   submitLoadingLabel = '추가 중...',
+  isDeletingRate = false,
+  onOpenDeleteConfirm,
 }: CommissionRateFormProps) {
   const [requestError, setRequestError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -223,18 +227,28 @@ export function CommissionRateForm({
             }
             onCancel();
           }}
-          disabled={isSubmitting || isLoading}
+          disabled={isSubmitting || isLoading || isDeletingRate}
           className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 transition-colors"
         >
           취소
         </button>
         <button
           type="submit"
-          disabled={!isValid || isSubmitting || isLoading}
+          disabled={!isValid || isSubmitting || isLoading || isDeletingRate}
           className="flex-1 px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
         >
           {isSubmitting || isLoading ? submitLoadingLabel : submitButtonLabel}
         </button>
+        {isEditMode && onOpenDeleteConfirm && (
+          <button
+            type="button"
+            onClick={onOpenDeleteConfirm}
+            disabled={isSubmitting || isLoading || isDeletingRate}
+            className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors font-medium"
+          >
+            {isDeletingRate ? '삭제 중...' : '삭제'}
+          </button>
+        )}
       </div>
     </form>
   );

@@ -6,4 +6,5 @@ export interface CommissionRateRepository {
   getCommissionRates(): Promise<CommissionRate[]>;
   createCommissionRate(request: CreateCommissionRateRequest): Promise<CommissionRate>;
   updateCommissionRate(id: number, request: UpdateCommissionRateRequest): Promise<CommissionRate>;
+  deleteCommissionRate(id: number): Promise<void>;
 }
