@@ -12,3 +12,6 @@ export const createCommissionRateSchema = z.object({
 });
 
 export type CreateCommissionRateFormData = z.infer<typeof createCommissionRateSchema>;
+
+export const updateCommissionRateSchema = createCommissionRateSchema.partial();
+export type UpdateCommissionRateFormData = z.infer<typeof updateCommissionRateSchema>;

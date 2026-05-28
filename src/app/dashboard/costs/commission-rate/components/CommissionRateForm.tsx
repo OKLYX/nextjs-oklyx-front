@@ -3,18 +3,34 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createCommissionRateSchema, CreateCommissionRateFormData } from '@/application/schemas/CommissionRateSchema';
+import {
+  createCommissionRateSchema,
+  updateCommissionRateSchema,
+  CreateCommissionRateFormData,
+  UpdateCommissionRateFormData
+} from '@/application/schemas/CommissionRateSchema';
 import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
 import type { Category } from '@/domain/entities/CategoryEntity';
+import type { CommissionRate } from '@/domain/entities/CommissionRateEntity';
 
 interface CommissionRateFormProps {
-  onSubmit: (data: CreateCommissionRateFormData) => Promise<void>;
+  initialData?: CommissionRate;
+  onSubmit: (data: CreateCommissionRateFormData | UpdateCommissionRateFormData) => Promise<void>;
   onCancel: () => void;
   isLoading: boolean;
+  submitButtonLabel?: string;
+  submitLoadingLabel?: string;
 }
 
-export function CommissionRateForm({ onSubmit, onCancel, isLoading }: CommissionRateFormProps) {
+export function CommissionRateForm({
+  initialData,
+  onSubmit,
+  onCancel,
+  isLoading,
+  submitButtonLabel = '추가',
+  submitLoadingLabel = '추가 중...',
+}: CommissionRateFormProps) {
   const [requestError, setRequestError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
@@ -25,19 +41,22 @@ export function CommissionRateForm({ onSubmit, onCancel, isLoading }: Commission
     return new CategoryUseCase(new CategoryRepositoryImpl());
   }, []);
 
+  const isEditMode = !!initialData;
+  const schema = isEditMode ? updateCommissionRateSchema : createCommissionRateSchema;
+
   const {
     control,
     handleSubmit,
     reset,
     watch,
     formState: { errors, isValid },
-  } = useForm<CreateCommissionRateFormData>({
-    resolver: zodResolver(createCommissionRateSchema),
+  } = useForm<CreateCommissionRateFormData | UpdateCommissionRateFormData>({
+    resolver: zodResolver(schema),
     mode: 'onChange',
     defaultValues: {
-      platform: '',
-      categoryId: 0,
-      rate: 0,
+      platform: initialData?.platform ?? '',
+      categoryId: initialData?.categoryId ?? 0,
+      rate: initialData?.rate ?? 0,
     },
   });
 
@@ -67,12 +86,14 @@ export function CommissionRateForm({ onSubmit, onCancel, isLoading }: Commission
     ? allCategories.filter(cat => cat.platform === selectedPlatform)
     : [];
 
-  const handleFormSubmit = async (data: CreateCommissionRateFormData) => {
+  const handleFormSubmit = async (data: CreateCommissionRateFormData | UpdateCommissionRateFormData) => {
     setIsSubmitting(true);
     setRequestError('');
     try {
       await onSubmit(data);
-      reset();
+      if (!isEditMode) {
+        reset();
+      }
     } catch (err) {
       const error = err as { response?: { status: number }; message?: string };
       const errorMessage =
@@ -86,7 +107,9 @@ export function CommissionRateForm({ onSubmit, onCancel, isLoading }: Commission
                 ? '요청 데이터가 유효하지 않습니다.'
                 : error?.message === 'Network Error'
                   ? '네트워크 연결을 확인해주세요.'
-                  : '수수료 생성에 실패했습니다. 다시 시도해주세요.';
+                  : isEditMode
+                    ? '수수료 수정에 실패했습니다. 다시 시도해주세요.'
+                    : '수수료 생성에 실패했습니다. 다시 시도해주세요.';
       setRequestError(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -195,7 +218,9 @@ export function CommissionRateForm({ onSubmit, onCancel, isLoading }: Commission
         <button
           type="button"
           onClick={() => {
-            reset();
+            if (!isEditMode) {
+              reset();
+            }
             onCancel();
           }}
           disabled={isSubmitting || isLoading}
@@ -208,7 +233,7 @@ export function CommissionRateForm({ onSubmit, onCancel, isLoading }: Commission
           disabled={!isValid || isSubmitting || isLoading}
           className="flex-1 px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
         >
-          {isSubmitting || isLoading ? '저장 중...' : '저장'}
+          {isSubmitting || isLoading ? submitLoadingLabel : submitButtonLabel}
         </button>
       </div>
     </form>

@@ -9,6 +9,8 @@ interface CommissionRateTableProps {
   isLoading: boolean;
   error: string;
   hasSearched: boolean;
+  selectedId?: number;
+  onRowClick: (rate: CommissionRate) => void;
 }
 
 export function CommissionRateTable({
@@ -17,6 +19,8 @@ export function CommissionRateTable({
   isLoading,
   error,
   hasSearched,
+  selectedId,
+  onRowClick,
 }: CommissionRateTableProps) {
   const getCategoryName = (categoryId: number | null): string => {
     if (categoryId === null) return '-';
@@ -91,7 +95,13 @@ export function CommissionRateTable({
         </thead>
         <tbody>
           {commissionRates.map((rate) => (
-            <tr key={rate.id} className="border-b hover:bg-gray-50">
+            <tr
+              key={rate.id}
+              onClick={() => onRowClick(rate)}
+              className={`border-b cursor-pointer hover:bg-gray-100 ${
+                selectedId === rate.id ? 'bg-blue-50' : ''
+              }`}
+            >
               <td className="px-6 py-3 text-sm text-gray-900">{rate.id}</td>
               <td className="px-6 py-3 text-sm text-gray-900">{rate.platform}</td>
               <td className="px-6 py-3 text-sm text-gray-900">

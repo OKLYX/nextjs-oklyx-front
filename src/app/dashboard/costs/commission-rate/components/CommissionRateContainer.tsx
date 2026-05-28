@@ -10,7 +10,8 @@ import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRe
 import { CommissionRateSearchCard } from './CommissionRateSearchCard';
 import { CommissionRateTable } from './CommissionRateTable';
 import { CreateCommissionRateModal } from './CreateCommissionRateModal';
-import type { CreateCommissionRateFormData } from '@/application/schemas/CommissionRateSchema';
+import { EditCommissionRateModal } from './EditCommissionRateModal';
+import type { CreateCommissionRateFormData, UpdateCommissionRateFormData } from '@/application/schemas/CommissionRateSchema';
 
 export function CommissionRateContainer() {
   const [selectedPlatform, setSelectedPlatform] = useState('');
@@ -23,6 +24,9 @@ export function CommissionRateContainer() {
   const [hasSearched, setHasSearched] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedCommissionRate, setSelectedCommissionRate] = useState<CommissionRate | null>(null);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const useCase = useMemo(() => {
     return new CommissionRateUseCase(new CommissionRateRepositoryImpl());
@@ -92,6 +96,33 @@ export function CommissionRateContainer() {
     }
   };
 
+  const handleOpenEditModal = (commissionRate: CommissionRate) => {
+    setSelectedCommissionRate(commissionRate);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedCommissionRate(null);
+  };
+
+  const handleEditCommissionRate = async (data: UpdateCommissionRateFormData) => {
+    if (!selectedCommissionRate) {
+      throw new Error('선택된 수수료가 없습니다');
+    }
+
+    setIsSubmittingEdit(true);
+    try {
+      await useCase.updateCommissionRate(selectedCommissionRate.id, data);
+      handleCloseEditModal();
+      await handleSearch();
+    } catch (err) {
+      throw err;
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
   const filteredCount = hasSearched ? commissionRates.length : 0;
 
   return (
@@ -120,6 +151,8 @@ export function CommissionRateContainer() {
         isLoading={isLoading}
         error={error}
         hasSearched={hasSearched}
+        selectedId={selectedCommissionRate?.id}
+        onRowClick={handleOpenEditModal}
       />
 
       <CreateCommissionRateModal
@@ -127,6 +160,14 @@ export function CommissionRateContainer() {
         onClose={handleCloseCreateModal}
         onSubmit={handleCreateCommissionRate}
         isSubmitting={isSubmitting}
+      />
+
+      <EditCommissionRateModal
+        isOpen={isEditModalOpen}
+        commissionRate={selectedCommissionRate}
+        onClose={handleCloseEditModal}
+        onSubmit={handleEditCommissionRate}
+        isLoading={isSubmittingEdit}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import type { CommissionRate } from '@/domain/entities/CommissionRateEntity';
 import type { CommissionRateRepository } from '@/domain/repositories/CommissionRateRepository';
 import type { CreateCommissionRateRequest } from '@/application/dto/CreateCommissionRateRequest';
+import type { UpdateCommissionRateRequest } from '@/application/dto/UpdateCommissionRateRequest';
 
 export class CommissionRateUseCase {
   constructor(private repository: CommissionRateRepository) {}
@@ -11,5 +12,9 @@ export class CommissionRateUseCase {
 
   async createCommissionRate(request: CreateCommissionRateRequest): Promise<CommissionRate> {
     return this.repository.createCommissionRate(request);
+  }
+
+  async updateCommissionRate(id: number, request: UpdateCommissionRateRequest): Promise<CommissionRate> {
+    return this.repository.updateCommissionRate(id, request);
   }
 }
