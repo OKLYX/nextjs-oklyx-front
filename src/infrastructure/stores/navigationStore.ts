@@ -6,6 +6,7 @@ interface NavigationStore {
   isStockMenuOpen: boolean;
   isCostsMenuOpen: boolean;
   isUsersMenuOpen: boolean;
+  isSalesProductsMenuOpen: boolean;
   hasHydrated: boolean;
   toggleProductsMenu: () => void;
   closeProductsMenu: () => void;
@@ -15,6 +16,7 @@ interface NavigationStore {
   closeCostsMenu: () => void;
   toggleUsersMenu: () => void;
   closeUsersMenu: () => void;
+  toggleSalesProductsMenu: () => void;
   setHasHydrated: (hasHydrated: boolean) => void;
   resetNavigation: () => void;
 }
@@ -26,6 +28,7 @@ export const useNavigationStore = create<NavigationStore>()(
       isStockMenuOpen: false,
       isCostsMenuOpen: false,
       isUsersMenuOpen: false,
+      isSalesProductsMenuOpen: false,
       hasHydrated: false,
       toggleProductsMenu: () => {
         set((state) => ({ isProductsMenuOpen: !state.isProductsMenuOpen }));
@@ -43,12 +46,16 @@ export const useNavigationStore = create<NavigationStore>()(
         set((state) => ({ isUsersMenuOpen: !state.isUsersMenuOpen }));
       },
       closeUsersMenu: () => set({ isUsersMenuOpen: false }),
+      toggleSalesProductsMenu: () => {
+        set((state) => ({ isSalesProductsMenuOpen: !state.isSalesProductsMenuOpen }));
+      },
       setHasHydrated: (hasHydrated: boolean) => set({ hasHydrated }),
       resetNavigation: () => set({
         isProductsMenuOpen: false,
         isStockMenuOpen: false,
         isCostsMenuOpen: false,
         isUsersMenuOpen: false,
+        isSalesProductsMenuOpen: false,
       }),
     }),
     {
@@ -59,6 +66,7 @@ export const useNavigationStore = create<NavigationStore>()(
         isStockMenuOpen: state.isStockMenuOpen,
         isCostsMenuOpen: state.isCostsMenuOpen,
         isUsersMenuOpen: state.isUsersMenuOpen,
+        isSalesProductsMenuOpen: state.isSalesProductsMenuOpen,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

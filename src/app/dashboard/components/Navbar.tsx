@@ -11,11 +11,13 @@ export function Navbar() {
   const isStockOpen = useNavigationStore((state) => state.isStockMenuOpen);
   const isCostsOpen = useNavigationStore((state) => state.isCostsMenuOpen);
   const isUsersOpen = useNavigationStore((state) => state.isUsersMenuOpen);
+  const isSalesProductsOpen = useNavigationStore((state) => state.isSalesProductsMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
   const toggleCostsMenu = useNavigationStore((state) => state.toggleCostsMenu);
   const toggleUsersMenu = useNavigationStore((state) => state.toggleUsersMenu);
+  const toggleSalesProductsMenu = useNavigationStore((state) => state.toggleSalesProductsMenu);
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
@@ -125,6 +127,35 @@ export function Navbar() {
                   className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                 >
                   수수료
+                </Link>
+              </li>
+            </ul>
+          )}
+        </li>
+        <li>
+          <button
+            onClick={toggleSalesProductsMenu}
+            className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between font-semibold text-gray-900"
+          >
+            판매상품
+            <span>{hasHydrated && isSalesProductsOpen ? '▲' : '▼'}</span>
+          </button>
+          {hasHydrated && isSalesProductsOpen && (
+            <ul className="ml-4 space-y-1 mt-2">
+              <li>
+                <Link
+                  href={ROUTES.SALES_PRODUCTS_REGISTER}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  판매상품 등록
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={ROUTES.SALES_PRODUCTS_RETRIEVE}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  판매상품 조회
                 </Link>
               </li>
             </ul>
