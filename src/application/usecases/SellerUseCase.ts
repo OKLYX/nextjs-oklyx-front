@@ -1,4 +1,4 @@
-import { SellerRepository, CreateSellerRequest, UpdateSellerRequest } from '@/domain/repositories/SellerRepository';
+import { SellerRepository, CreateSellerRequest, UpdateSellerRequest, SellerPageResponse } from '@/domain/repositories/SellerRepository';
 import { Seller } from '@/domain/entities/SellerEntity';
 
 export class SellerUseCase {
@@ -10,6 +10,10 @@ export class SellerUseCase {
 
   async getById(id: number): Promise<Seller> {
     return this.repository.getById(id);
+  }
+
+  async getAllPaginated(name: string, page: number, size: number = 20): Promise<SellerPageResponse> {
+    return this.repository.getAllPaginated(name, page, size);
   }
 
   async create(data: CreateSellerRequest): Promise<Seller> {
