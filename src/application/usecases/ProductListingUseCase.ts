@@ -1,6 +1,6 @@
 import type { ProductListingRepository } from '@/domain/repositories/ProductListingRepository';
-import type { ProductListing } from '@/domain/entities/ProductListingEntity';
-import type { CreateProductListingRequest, UpdateProductListingRequest } from '@/application/dto/ProductListingDTOs';
+import type { ProductListing, ProductListingOption, ProductListingProduct } from '@/domain/entities/ProductListingEntity';
+import type { CreateProductListingRequest, UpdateProductListingRequest, CreateProductListingOptionRequest, CreateProductListingProductRequest } from '@/application/dto/ProductListingDTOs';
 
 export class ProductListingUseCase {
   constructor(private repository: ProductListingRepository) {}
@@ -23,5 +23,13 @@ export class ProductListingUseCase {
 
   async delete(id: number): Promise<void> {
     return this.repository.deleteProductListing(id);
+  }
+
+  async addOption(request: CreateProductListingOptionRequest): Promise<ProductListingOption> {
+    return this.repository.addProductListingOption(request);
+  }
+
+  async addProduct(request: CreateProductListingProductRequest): Promise<ProductListingProduct> {
+    return this.repository.addProductListingProduct(request);
   }
 }

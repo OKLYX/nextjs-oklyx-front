@@ -11,10 +11,15 @@ const schema = z.object({
   name: z.string().min(1, '카테고리명은 필수입니다.').max(100),
   platform: z.string().min(1, '플랫폼은 필수입니다.'),
   platformCategoryId: z.string().min(1, '플랫폼 카테고리 ID는 필수입니다.').max(50),
-  parentId: z.coerce.number().nullable().optional().transform((val) => val || null),
+  parentId: z.number().nullable(),
 });
 
-type FormData = z.infer<typeof schema>;
+type FormData = {
+  name: string;
+  platform: string;
+  platformCategoryId: string;
+  parentId: number | null;
+};
 
 interface CreateCategoryModalProps {
   isOpen: boolean;

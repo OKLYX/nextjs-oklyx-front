@@ -307,6 +307,7 @@ export function ProductEditForm({
 
       <ProductImageSection
         imageUrl={productImage}
+        productId={product.id}
         onUpload={async file => {
           await onImageUpload(file);
           setProductImage(URL.createObjectURL(file));

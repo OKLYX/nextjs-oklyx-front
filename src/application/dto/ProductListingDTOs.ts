@@ -1,6 +1,7 @@
 export interface CreateProductListingRequest {
   platform: string;
   platformProductId: string;
+  sellerId: number;
   categoryId?: number;
   deliveryId?: number;
   packageId?: number;

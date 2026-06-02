@@ -1,7 +1,12 @@
-export function getImageUrl(imageUrl: string | null): string | null {
+import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
+
+export function getImageUrl(imageUrl: string | null, productId?: number): string | null {
   if (!imageUrl) return null;
-  if (imageUrl.startsWith('/app/uploads/')) {
-    return imageUrl.replace('/app/uploads/', '/api/uploads/');
+  // Use frontend proxy with token in query parameter
+  if (productId) {
+    const token = tokenStorage.getToken();
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `/api/products/${productId}/image-proxy${tokenParam}`;
   }
   return imageUrl;
 }

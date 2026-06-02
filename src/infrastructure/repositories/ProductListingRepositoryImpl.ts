@@ -1,7 +1,7 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { ProductListingRepository } from '@/domain/repositories/ProductListingRepository';
-import type { ProductListing } from '@/domain/entities/ProductListingEntity';
-import type { CreateProductListingRequest, UpdateProductListingRequest } from '@/application/dto/ProductListingDTOs';
+import type { ProductListing, ProductListingOption, ProductListingProduct } from '@/domain/entities/ProductListingEntity';
+import type { CreateProductListingRequest, UpdateProductListingRequest, CreateProductListingOptionRequest, CreateProductListingProductRequest } from '@/application/dto/ProductListingDTOs';
 
 export class ProductListingRepositoryImpl implements ProductListingRepository {
   async getProductListingById(id: number): Promise<ProductListing> {
@@ -28,5 +28,15 @@ export class ProductListingRepositoryImpl implements ProductListingRepository {
 
   async deleteProductListing(id: number): Promise<void> {
     await axiosInstance.delete(`/api/product-listings/${id}`);
+  }
+
+  async addProductListingOption(request: CreateProductListingOptionRequest): Promise<ProductListingOption> {
+    const response = await axiosInstance.post('/api/product-listings-options', request);
+    return response.data.data;
+  }
+
+  async addProductListingProduct(request: CreateProductListingProductRequest): Promise<ProductListingProduct> {
+    const response = await axiosInstance.post('/api/product-listings-products', request);
+    return response.data.data;
   }
 }

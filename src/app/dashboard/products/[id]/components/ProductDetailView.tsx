@@ -133,7 +133,7 @@ export function ProductDetailView({ product, onDelete, onImageUpload, onImageDel
       {product.barcodeId && <StockCard barcodeId={product.barcodeId} productName={product.productName} />}
 
       {/* Image */}
-      <ProductImageSection imageUrl={product.imageUrl || null} onUpload={onImageUpload} onDelete={onImageDelete} isViewMode={false} />
+      <ProductImageSection imageUrl={product.imageUrl || null} productId={product.id} onUpload={onImageUpload} onDelete={onImageDelete} isViewMode={false} />
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirmation && (

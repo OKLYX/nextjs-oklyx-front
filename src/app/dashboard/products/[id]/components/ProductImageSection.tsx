@@ -5,12 +5,13 @@ import { getImageUrl } from '@/infrastructure/utils/imageUrl';
 
 interface ProductImageSectionProps {
   imageUrl: string | null;
+  productId?: number;
   onUpload?: (file: File) => Promise<void>;
   onDelete?: () => Promise<void>;
   isViewMode: boolean;
 }
 
-export function ProductImageSection({ imageUrl, onUpload, onDelete, isViewMode }: ProductImageSectionProps) {
+export function ProductImageSection({ imageUrl, productId, onUpload, onDelete, isViewMode }: ProductImageSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,7 +26,7 @@ export function ProductImageSection({ imageUrl, onUpload, onDelete, isViewMode }
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Image</h2>
       {imageUrl ? (
         <div className="space-y-4">
-          <img src={getImageUrl(imageUrl) || imageUrl} alt="Product" className="max-h-96 rounded-lg border border-gray-300" />
+          <img src={getImageUrl(imageUrl, productId) || imageUrl} alt="Product" className="max-h-96 rounded-lg border border-gray-300" />
           {!isViewMode && onDelete && (
             <button
               type="button"

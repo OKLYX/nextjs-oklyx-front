@@ -1,5 +1,5 @@
-import type { ProductListing } from '@/domain/entities/ProductListingEntity';
-import type { CreateProductListingRequest, UpdateProductListingRequest } from '@/application/dto/ProductListingDTOs';
+import type { ProductListing, ProductListingOption, ProductListingProduct } from '@/domain/entities/ProductListingEntity';
+import type { CreateProductListingRequest, UpdateProductListingRequest, CreateProductListingOptionRequest, CreateProductListingProductRequest } from '@/application/dto/ProductListingDTOs';
 
 export interface ProductListingRepository {
   getProductListingById(id: number): Promise<ProductListing>;
@@ -20,4 +20,6 @@ export interface ProductListingRepository {
     request: UpdateProductListingRequest
   ): Promise<ProductListing>;
   deleteProductListing(id: number): Promise<void>;
+  addProductListingOption(request: CreateProductListingOptionRequest): Promise<ProductListingOption>;
+  addProductListingProduct(request: CreateProductListingProductRequest): Promise<ProductListingProduct>;
 }
