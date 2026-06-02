@@ -8,6 +8,7 @@ import type { CreateSellerRequest } from '@/application/dto/SellerDTOs';
 import { SellerSearchCard } from './SellerSearchCard';
 import { SellerTable } from './SellerTable';
 import { CreateSellerModal } from './CreateSellerModal';
+import { SellerDetailsModal } from './SellerDetailsModal';
 
 export function SellerContainer() {
   const [searchName, setSearchName] = useState('');
@@ -19,6 +20,8 @@ export function SellerContainer() {
   const [totalPages, setTotalPages] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isModalLoading, setIsModalLoading] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedSellerId, setSelectedSellerId] = useState<number | null>(null);
 
   const sellerUseCase = useMemo(() => {
     const repository = new SellerRepositoryImpl();
@@ -71,6 +74,16 @@ export function SellerContainer() {
     }
   };
 
+  const handleRowClick = (sellerId: number) => {
+    setSelectedSellerId(sellerId);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleCloseDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    setSelectedSellerId(null);
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-full">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -88,6 +101,7 @@ export function SellerContainer() {
           isLoading={isLoading}
           error={error}
           hasSearched={hasSearched}
+          onRowClick={handleRowClick}
         />
 
         {hasSearched && sellers.length > 0 && totalPages > 1 && (
@@ -131,6 +145,12 @@ export function SellerContainer() {
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateSubmit}
         isLoading={isModalLoading}
+      />
+
+      <SellerDetailsModal
+        isOpen={isDetailsModalOpen}
+        sellerId={selectedSellerId}
+        onClose={handleCloseDetailsModal}
       />
     </div>
   );

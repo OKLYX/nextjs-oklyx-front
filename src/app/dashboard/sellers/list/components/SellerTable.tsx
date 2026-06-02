@@ -7,6 +7,7 @@ interface SellerTableProps {
   isLoading: boolean;
   error: string;
   hasSearched: boolean;
+  onRowClick?: (sellerId: number) => void;
 }
 
 export function SellerTable({
@@ -14,6 +15,7 @@ export function SellerTable({
   isLoading,
   error,
   hasSearched,
+  onRowClick,
 }: SellerTableProps) {
   if (isLoading) {
     return (
@@ -81,7 +83,11 @@ export function SellerTable({
           </thead>
           <tbody className="divide-y divide-gray-200">
             {sellers.map((seller) => (
-              <tr key={seller.id} className="hover:bg-gray-50 transition-colors">
+              <tr
+                key={seller.id}
+                onClick={() => onRowClick?.(seller.id)}
+                className={`transition-colors ${onRowClick ? 'hover:bg-gray-100 cursor-pointer' : 'hover:bg-gray-50'}`}
+              >
                 <td className="px-6 py-3 text-sm text-gray-700">{seller.id}</td>
                 <td className="px-6 py-3 text-sm text-gray-700">{seller.sellerName}</td>
                 <td className="px-6 py-3 text-sm text-gray-700">{seller.businessRegistration}</td>
