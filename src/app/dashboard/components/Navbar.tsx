@@ -12,12 +12,14 @@ export function Navbar() {
   const isCostsOpen = useNavigationStore((state) => state.isCostsMenuOpen);
   const isUsersOpen = useNavigationStore((state) => state.isUsersMenuOpen);
   const isSalesProductsOpen = useNavigationStore((state) => state.isSalesProductsMenuOpen);
+  const isSellersOpen = useNavigationStore((state) => state.isSellersMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
   const toggleCostsMenu = useNavigationStore((state) => state.toggleCostsMenu);
   const toggleUsersMenu = useNavigationStore((state) => state.toggleUsersMenu);
   const toggleSalesProductsMenu = useNavigationStore((state) => state.toggleSalesProductsMenu);
+  const toggleSellersMenu = useNavigationStore((state) => state.toggleSellersMenu);
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
@@ -156,6 +158,35 @@ export function Navbar() {
                   className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                 >
                   판매상품 조회
+                </Link>
+              </li>
+            </ul>
+          )}
+        </li>
+        <li>
+          <button
+            onClick={toggleSellersMenu}
+            className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-between font-semibold text-gray-900"
+          >
+            판매자
+            <span>{hasHydrated && isSellersOpen ? '▲' : '▼'}</span>
+          </button>
+          {hasHydrated && isSellersOpen && (
+            <ul className="ml-4 space-y-1 mt-2">
+              <li>
+                <Link
+                  href={ROUTES.SELLERS_LIST}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  판매자 목록
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={ROUTES.SELLERS_MANAGE}
+                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  판매자 관리
                 </Link>
               </li>
             </ul>

@@ -17,4 +17,6 @@ export const ROUTES = {
   COSTS_COMMISSION_RATE: '/dashboard/costs/commission-rate',
   SALES_PRODUCTS_REGISTER: '/dashboard/sales-products/register' as const,
   SALES_PRODUCTS_RETRIEVE: '/dashboard/sales-products/retrieve' as const,
+  SELLERS_LIST: '/dashboard/sellers/list' as const,
+  SELLERS_MANAGE: '/dashboard/sellers/manage' as const,
 } as const;
