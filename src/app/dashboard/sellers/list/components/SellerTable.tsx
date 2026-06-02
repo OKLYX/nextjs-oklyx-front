@@ -7,9 +7,6 @@ interface SellerTableProps {
   isLoading: boolean;
   error: string;
   hasSearched: boolean;
-  onView: (seller: Seller) => void;
-  onEdit: (seller: Seller) => void;
-  onDelete: (id: number) => void;
 }
 
 export function SellerTable({
@@ -17,9 +14,6 @@ export function SellerTable({
   isLoading,
   error,
   hasSearched,
-  onView,
-  onEdit,
-  onDelete,
 }: SellerTableProps) {
   if (isLoading) {
     return (
@@ -31,13 +25,12 @@ export function SellerTable({
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">ID</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">판매자명</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">사업자등록번호</th>
-                <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">액션</th>
               </tr>
             </thead>
             <tbody>
               {[...Array(5)].map((_, i) => (
                 <tr key={i} className="border-b border-gray-200">
-                  {[...Array(4)].map((_, j) => (
+                  {[...Array(3)].map((_, j) => (
                     <td key={j} className="px-6 py-3">
                       <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
                     </td>
@@ -84,7 +77,6 @@ export function SellerTable({
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">ID</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">판매자명</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">사업자등록번호</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">액션</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -93,26 +85,6 @@ export function SellerTable({
                 <td className="px-6 py-3 text-sm text-gray-700">{seller.id}</td>
                 <td className="px-6 py-3 text-sm text-gray-700">{seller.sellerName}</td>
                 <td className="px-6 py-3 text-sm text-gray-700">{seller.businessRegistration}</td>
-                <td className="px-6 py-3 text-center space-x-2">
-                  <button
-                    onClick={() => onView(seller)}
-                    className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
-                  >
-                    조회
-                  </button>
-                  <button
-                    onClick={() => onEdit(seller)}
-                    className="px-3 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
-                  >
-                    수정
-                  </button>
-                  <button
-                    onClick={() => onDelete(seller.id)}
-                    className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
-                  >
-                    삭제
-                  </button>
-                </td>
               </tr>
             ))}
           </tbody>

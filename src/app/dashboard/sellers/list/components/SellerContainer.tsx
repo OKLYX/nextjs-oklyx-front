@@ -4,8 +4,10 @@ import { useMemo, useState } from 'react';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import type { CreateSellerRequest } from '@/application/dto/SellerDTOs';
 import { SellerSearchCard } from './SellerSearchCard';
 import { SellerTable } from './SellerTable';
+import { CreateSellerModal } from './CreateSellerModal';
 
 export function SellerContainer() {
   const [searchName, setSearchName] = useState('');
@@ -15,6 +17,8 @@ export function SellerContainer() {
   const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isModalLoading, setIsModalLoading] = useState(false);
 
   const sellerUseCase = useMemo(() => {
     const repository = new SellerRepositoryImpl();
@@ -52,16 +56,19 @@ export function SellerContainer() {
     }
   };
 
-  const handleView = (seller: Seller) => {
-    console.log('View seller:', seller);
-  };
 
-  const handleEdit = (seller: Seller) => {
-    console.log('Edit seller:', seller);
-  };
-
-  const handleDelete = (id: number) => {
-    console.log('Delete seller:', id);
+  const handleCreateSubmit = async (data: CreateSellerRequest) => {
+    try {
+      setIsModalLoading(true);
+      await sellerUseCase.create(data);
+      setIsCreateModalOpen(false);
+      setHasSearched(false);
+      setSellers([]);
+    } catch (err) {
+      throw err;
+    } finally {
+      setIsModalLoading(false);
+    }
   };
 
   return (
@@ -73,6 +80,7 @@ export function SellerContainer() {
           onSearch={handleSearch}
           isLoading={isLoading}
           resultCount={sellers.length}
+          onCreateClick={() => setIsCreateModalOpen(true)}
         />
 
         <SellerTable
@@ -80,9 +88,6 @@ export function SellerContainer() {
           isLoading={isLoading}
           error={error}
           hasSearched={hasSearched}
-          onView={handleView}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
         />
 
         {hasSearched && sellers.length > 0 && totalPages > 1 && (
@@ -120,6 +125,13 @@ export function SellerContainer() {
           </div>
         )}
       </div>
+
+      <CreateSellerModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateSubmit}
+        isLoading={isModalLoading}
+      />
     </div>
   );
 }

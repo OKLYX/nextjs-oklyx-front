@@ -6,6 +6,7 @@ interface SellerSearchCardProps {
   onSearch: () => void;
   isLoading: boolean;
   resultCount: number;
+  onCreateClick?: () => void;
 }
 
 export function SellerSearchCard({
@@ -14,6 +15,7 @@ export function SellerSearchCard({
   onSearch,
   isLoading,
   resultCount,
+  onCreateClick,
 }: SellerSearchCardProps) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -37,13 +39,21 @@ export function SellerSearchCard({
               <p className="text-sm text-gray-600">검색 결과 {resultCount}개</p>
             )}
           </div>
-          <button
-            onClick={onSearch}
-            disabled={isLoading}
-            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
-          >
-            {isLoading ? '검색 중...' : '검색'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onCreateClick}
+              className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+            >
+              판매자 추가
+            </button>
+            <button
+              onClick={onSearch}
+              disabled={isLoading}
+              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+            >
+              {isLoading ? '검색 중...' : '검색'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

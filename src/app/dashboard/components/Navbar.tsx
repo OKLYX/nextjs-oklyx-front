@@ -178,14 +178,6 @@ export function Navbar() {
                   href={ROUTES.SELLERS_LIST}
                   className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
                 >
-                  판매자 목록
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={ROUTES.SELLERS_MANAGE}
-                  className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
-                >
                   판매자 관리
                 </Link>
               </li>
