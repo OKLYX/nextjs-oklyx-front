@@ -29,6 +29,7 @@ interface OptionProduct {
 
 interface ProductListingBundleFormProps {
   listingId: number;
+  listingData: any;
   options: ProductListingOption[];
   onAddProduct: (request: CreateProductListingProductRequest) => Promise<void>;
   onSubmit: () => Promise<void>;
@@ -37,11 +38,13 @@ interface ProductListingBundleFormProps {
 
 export function ProductListingBundleForm({
   listingId,
+  listingData,
   options,
   onAddProduct,
   onSubmit,
   isLoading = false,
 }: ProductListingBundleFormProps) {
+  const hasRequiredFields = listingData?.categoryId && listingData?.deliveryId && listingData?.packageId;
   const [submitError, setSubmitError] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -268,8 +271,15 @@ export function ProductListingBundleForm({
                 </div>
 
                 <button
-                  type="submit"
-                  disabled={isLoading || isAdding !== null || !selectedProduct}
+                  type="button"
+                  disabled={!hasRequiredFields || isLoading || isAdding !== null || !selectedProduct}
+                  onClick={(e) => {
+                    if (!hasRequiredFields || isLoading || isAdding !== null || !selectedProduct) {
+                      e.preventDefault();
+                    } else {
+                      handleSubmit((values) => handleAddProduct(option.id, values))();
+                    }
+                  }}
                   className="w-full bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                 >
                   {isAdding === option.id ? '추가 중...' : '+ 상품 추가'}

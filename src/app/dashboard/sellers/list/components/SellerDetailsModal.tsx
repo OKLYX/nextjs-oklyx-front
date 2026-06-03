@@ -9,12 +9,16 @@ interface SellerDetailsModalProps {
   isOpen: boolean;
   sellerId: number | null;
   onClose: () => void;
+  onEditClick?: (sellerId: number) => void;
+  onDeleteClick?: (sellerId: number) => void;
 }
 
 export function SellerDetailsModal({
   isOpen,
   sellerId,
   onClose,
+  onEditClick,
+  onDeleteClick,
 }: SellerDetailsModalProps) {
   const [seller, setSeller] = useState<Seller | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -134,14 +138,32 @@ export function SellerDetailsModal({
           </div>
         )}
 
-        <div className="border-t p-6">
+        <div className="border-t p-6 flex gap-2">
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50 transition-colors text-sm font-medium"
+            className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50 transition-colors text-sm font-medium"
           >
             닫기
           </button>
+          {seller && onEditClick && (
+            <button
+              onClick={() => onEditClick(seller.id)}
+              disabled={isLoading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              수정
+            </button>
+          )}
+          {seller && onDeleteClick && (
+            <button
+              onClick={() => onDeleteClick(seller.id)}
+              disabled={isLoading}
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              삭제
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -29,23 +29,26 @@ const PLATFORM_CATEGORIES: Record<string, Array<{ id: number; name: string }>> =
 };
 
 const productListingSchema = z.object({
+  sellerId: z.coerce.number().min(1, '판매자를 선택해주세요'),
   platform: z.string().min(1, '플랫폼을 선택해주세요'),
   platformProductId: z.string().min(1, '상품 ID를 입력해주세요').max(255),
   categoryId: z.coerce.number().optional(),
-  deliveryId: z.coerce.number().optional(),
-  packageId: z.coerce.number().optional(),
+  deliveryId: z.coerce.number().min(1, '배송사를 선택해주세요'),
+  packageId: z.coerce.number().min(1, '패키지를 선택해주세요'),
 });
 
 type ProductListingFormValues = z.infer<typeof productListingSchema>;
 
 interface ProductListingFormProps {
+  sellers: Array<{ id: number; sellerName: string }>;
   carriers: Array<{ id: number; name: string }>;
   packages: Array<{ id: number; name: string }>;
-  onSubmit: (data: CreateProductListingRequest) => Promise<void>;
+  onSubmit: (data: Omit<CreateProductListingRequest, 'options'>) => Promise<void>;
   isLoading?: boolean;
 }
 
 export function ProductListingForm({
+  sellers,
   carriers,
   packages,
   onSubmit,
@@ -61,7 +64,9 @@ export function ProductListingForm({
     watch,
   } = useForm<ProductListingFormValues>({
     resolver: zodResolver(productListingSchema),
+    mode: 'onChange',
     defaultValues: {
+      sellerId: sellers.length > 0 ? sellers[0].id : undefined,
       platform: '',
       platformProductId: '',
       categoryId: undefined,
@@ -80,13 +85,16 @@ export function ProductListingForm({
   const onFormSubmit = async (values: ProductListingFormValues) => {
     setSubmitError('');
     try {
-      const request: CreateProductListingRequest = {
+      const request: Omit<CreateProductListingRequest, 'options'> = {
         platform: values.platform,
         platformProductId: values.platformProductId,
-        ...(values.categoryId && { categoryId: values.categoryId }),
-        ...(values.deliveryId && { deliveryId: values.deliveryId }),
-        ...(values.packageId && { packageId: values.packageId }),
+        sellerId: values.sellerId,
+        categoryId: values.categoryId,
+        deliveryId: values.deliveryId,
+        packageId: values.packageId,
       };
+
+      console.log('Step 1 - ProductListing 정보 전달:', request);
       await onSubmit(request);
     } catch (error) {
       const message = error instanceof Error ? error.message : '등록에 실패했습니다';
@@ -96,7 +104,7 @@ export function ProductListingForm({
 
   return (
     <div className="w-full max-w-md mx-auto py-8">
-      <h2 className="text-2xl font-bold mb-6">판매상품 정보 (Step 1/3)</h2>
+      <h2 className="text-2xl font-bold mb-6">판매상품 정보 (Step 1/2)</h2>
 
       {submitError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
@@ -105,6 +113,33 @@ export function ProductListingForm({
       )}
 
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            판매자 *
+          </label>
+          {sellers.length > 0 ? (
+            <select
+              {...register('sellerId')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            >
+              <option value="">판매자 선택...</option>
+              {sellers.map((seller) => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.sellerName}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="p-4 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+              등록된 판매자가 없습니다. 먼저 판매자를 등록해주세요.
+            </div>
+          )}
+          {errors.sellerId && (
+            <p className="mt-1 text-xs text-red-600">{errors.sellerId.message}</p>
+          )}
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             플랫폼 *
@@ -167,7 +202,7 @@ export function ProductListingForm({
           </div>
         )}
 
-        {carriers.length > 0 && (
+        {carriers.length > 0 ? (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               배송사 *
@@ -177,10 +212,17 @@ export function ProductListingForm({
               <p className="text-xs text-gray-500">등록된 배송사가 자동 선택됩니다</p>
             </div>
             <input {...register('deliveryId')} type="hidden" />
+            {errors.deliveryId && (
+              <p className="mt-1 text-xs text-red-600">{errors.deliveryId.message}</p>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            등록된 배송사가 없습니다. 먼저 배송사를 등록해주세요.
           </div>
         )}
 
-        {packages.length > 0 && (
+        {packages.length > 0 ? (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               패키지 *
@@ -190,6 +232,13 @@ export function ProductListingForm({
               <p className="text-xs text-gray-500">등록된 패키지가 자동 선택됩니다</p>
             </div>
             <input {...register('packageId')} type="hidden" />
+            {errors.packageId && (
+              <p className="mt-1 text-xs text-red-600">{errors.packageId.message}</p>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            등록된 패키지가 없습니다. 먼저 패키지를 등록해주세요.
           </div>
         )}
 

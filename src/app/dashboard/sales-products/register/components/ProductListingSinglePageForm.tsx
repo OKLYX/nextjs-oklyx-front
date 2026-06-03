@@ -451,6 +451,28 @@ export function ProductListingSinglePageForm() {
     setIsSubmitting(true);
     setError('');
     try {
+      // options을 CreateProductListingOptionWithProductsRequest[] 형태로 변환
+      const options = optionsData.map((optionData) => ({
+        optionName: optionData.option.optionName,
+        sellingPrice: optionData.option.sellingPrice,
+        platformOptionId: optionData.option.platformOptionId || undefined,
+        products: optionData.products.map((product) => ({
+          productId: product.productId,
+          quantity: product.quantity,
+        })),
+      }));
+
+      console.log('최종 요청 - ProductListing + Options:', {
+        platform: selectedPlatform,
+        platformProductId: platformProductId,
+        sellerId: selectedSellerId,
+        categoryId: selectedCategory,
+        deliveryId: selectedCarrierRateId,
+        packageId: selectedPackageId,
+        options,
+      });
+
+      // 한 번의 API 호출로 ProductListing + Options + Products 모두 생성
       const listingRequest: CreateProductListingRequest = {
         platform: selectedPlatform,
         platformProductId: platformProductId,
@@ -458,27 +480,10 @@ export function ProductListingSinglePageForm() {
         categoryId: selectedCategory,
         deliveryId: selectedCarrierRateId,
         packageId: selectedPackageId,
+        options,
       };
-      const listing = await useCase.create(listingRequest);
 
-      for (const optionData of optionsData) {
-        const optionRequest: CreateProductListingOptionRequest = {
-          productListingId: listing.id,
-          optionName: optionData.option.optionName,
-          sellingPrice: optionData.option.sellingPrice,
-          ...(optionData.option.platformOptionId && { platformOptionId: optionData.option.platformOptionId }),
-        };
-        const createdOption = await useCase.addOption(optionRequest);
-
-        for (const product of optionData.products) {
-          const productRequest: CreateProductListingProductRequest = {
-            productListingOptionId: createdOption.id,
-            productId: product.productId,
-            quantity: product.quantity,
-          };
-          await useCase.addProduct(productRequest);
-        }
-      }
+      await useCase.create(listingRequest);
 
       setSuccessMessage('판매상품이 생성되었습니다!');
       router.push('/dashboard/sales-products/retrieve');
@@ -946,7 +951,12 @@ export function ProductListingSinglePageForm() {
                 clearOptionForm();
                 setIsOptionFormOpen(true);
               }}
-              className="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700"
+              disabled={!selectedSellerId || !selectedPlatform || selectedProducts.length === 0 || !selectedCategory || !selectedCarrierRateId || !selectedPackageId}
+              className={`w-full px-4 py-2 font-medium rounded-lg transition-colors ${
+                !selectedSellerId || !selectedPlatform || selectedProducts.length === 0 || !selectedCategory || !selectedCarrierRateId || !selectedPackageId
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               + 옵션 추가
             </button>

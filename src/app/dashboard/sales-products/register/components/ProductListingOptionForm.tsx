@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import type { CreateProductListingOptionRequest } from '@/application/dto/ProductListingDTOs';
-import type { ProductListingOption } from '@/domain/entities/ProductListingEntity';
+import type { CreateProductListingOptionWithProductsRequest, CreateProductListingProductRequest } from '@/application/dto/ProductListingDTOs';
 
 const optionSchema = z.object({
   optionName: z.string().min(1, '옵션명을 입력해주세요').max(100),
@@ -15,83 +14,113 @@ const optionSchema = z.object({
 
 type OptionFormValues = z.infer<typeof optionSchema>;
 
+const productSchema = z.object({
+  productId: z.coerce.number().min(1, '상품을 선택해주세요'),
+  quantity: z.coerce.number().min(1, '수량은 최소 1이어야 합니다'),
+});
+
+type ProductFormValues = z.infer<typeof productSchema>;
+
 interface ProductListingOptionFormProps {
-  listingId: number;
-  existingOptions: ProductListingOption[];
-  onAddOption: (request: CreateProductListingOptionRequest) => Promise<ProductListingOption>;
-  onRemoveOption: (index: number) => void;
-  onSubmit: (options: ProductListingOption[]) => Promise<void>;
+  listingRequest: any;
+  onSubmit: (options: CreateProductListingOptionWithProductsRequest[]) => Promise<void>;
   isLoading?: boolean;
 }
 
 export function ProductListingOptionForm({
-  listingId,
-  existingOptions,
-  onAddOption,
-  onRemoveOption,
+  listingRequest,
   onSubmit,
   isLoading = false,
 }: ProductListingOptionFormProps) {
   const [submitError, setSubmitError] = useState('');
-  const [options, setOptions] = useState<ProductListingOption[]>(existingOptions);
-  const [isAdding, setIsAdding] = useState(false);
+  const [options, setOptions] = useState<CreateProductListingOptionWithProductsRequest[]>([]);
+  const [expandedOptionIndex, setExpandedOptionIndex] = useState<number | null>(null);
 
   const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
+    register: registerOption,
+    handleSubmit: handleSubmitOption,
+    formState: { errors: optionErrors },
+    reset: resetOption,
   } = useForm<OptionFormValues>({
     resolver: zodResolver(optionSchema),
-    defaultValues: {
-      optionName: '',
-      sellingPrice: undefined,
-      platformOptionId: '',
-    },
+    mode: 'onChange',
   });
 
-  const handleAddOption = async (values: OptionFormValues) => {
-    setSubmitError('');
-    setIsAdding(true);
-    try {
-      const request: CreateProductListingOptionRequest = {
-        productListingId: listingId,
-        optionName: values.optionName,
-        sellingPrice: values.sellingPrice,
-        ...(values.platformOptionId && { platformOptionId: values.platformOptionId }),
-      };
-      const newOption = await onAddOption(request);
-      setOptions([...options, newOption]);
-      reset();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '옵션 추가에 실패했습니다';
-      setSubmitError(message);
-    } finally {
-      setIsAdding(false);
-    }
+  const {
+    register: registerProduct,
+    handleSubmit: handleSubmitProduct,
+    formState: { errors: productErrors },
+    reset: resetProduct,
+    watch: watchProduct,
+  } = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    mode: 'onChange',
+  });
+
+  const productValues = watchProduct();
+
+  const onAddOption = (values: OptionFormValues) => {
+    const newOption: CreateProductListingOptionWithProductsRequest = {
+      optionName: values.optionName,
+      sellingPrice: values.sellingPrice,
+      platformOptionId: values.platformOptionId || undefined,
+      products: [],
+    };
+
+    console.log('옵션 추가됨:', newOption);
+    setOptions((prev) => {
+      const updated = [...prev, newOption];
+      console.log('현재 옵션 목록:', updated);
+      return updated;
+    });
+    resetOption();
   };
 
-  const handleRemove = (index: number) => {
-    setOptions(options.filter((_, i) => i !== index));
-    onRemoveOption(index);
+  const onAddProduct = (values: ProductFormValues, optionIndex: number) => {
+    const newProduct: CreateProductListingProductRequest = {
+      productId: values.productId,
+      quantity: values.quantity,
+    };
+
+    console.log('상품 추가됨:', newProduct, '옵션 인덱스:', optionIndex);
+    setOptions((prev) => {
+      const updated = [...prev];
+      updated[optionIndex].products.push(newProduct);
+      console.log('현재 상품 목록 (옵션' + optionIndex + '):', updated[optionIndex].products);
+      return updated;
+    });
+    resetProduct();
   };
 
-  const handleSubmitOptions = async () => {
+  const handleFinalSubmit = async () => {
+    console.log('=== 최종 제출 시작 ===');
+    console.log('현재 options 상태:', JSON.stringify(options, null, 2));
+
     if (options.length === 0) {
-      setSubmitError('최소 1개 이상의 옵션을 추가해주세요');
+      setSubmitError('최소 1개의 옵션을 추가해주세요');
       return;
     }
+
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].products.length === 0) {
+        setSubmitError(`옵션 "${options[i].optionName}"에 최소 1개의 상품을 추가해주세요`);
+        return;
+      }
+    }
+
+    setSubmitError('');
     try {
+      console.log('onSubmit 함수 호출, options 전달:', options);
       await onSubmit(options);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '제출에 실패했습니다';
+      const message = error instanceof Error ? error.message : '등록에 실패했습니다';
       setSubmitError(message);
     }
   };
 
   return (
     <div className="w-full max-w-2xl mx-auto py-8">
-      <h2 className="text-2xl font-bold mb-6">판매상품 옵션 (Step 2/3)</h2>
+      <h2 className="text-2xl font-bold mb-6">옵션 정보 (Step 2/2)</h2>
 
       {submitError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
@@ -99,106 +128,173 @@ export function ProductListingOptionForm({
         </div>
       )}
 
-      <div className="space-y-6">
-        {options.length > 0 && (
+      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
+        <h3 className="font-semibold text-blue-900 mb-2">선택된 상품 정보</h3>
+        <p className="text-sm text-blue-800">
+          판매자: {listingRequest.sellerId} | 플랫폼: {listingRequest.platform} | 상품 ID: {listingRequest.platformProductId}
+        </p>
+      </div>
+
+      {/* 옵션 추가 폼 */}
+      <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+        <h3 className="text-lg font-semibold mb-4">옵션 추가</h3>
+        <form onSubmit={handleSubmitOption(onAddOption)} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">옵션명 *</label>
+            <input
+              {...registerOption('optionName')}
+              type="text"
+              placeholder="예: Size M"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+            {optionErrors.optionName && <p className="text-xs text-red-600 mt-1">{optionErrors.optionName.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">판매가 *</label>
+            <input
+              {...registerOption('sellingPrice')}
+              type="number"
+              step="0.01"
+              placeholder="29900"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+            {optionErrors.sellingPrice && <p className="text-xs text-red-600 mt-1">{optionErrors.sellingPrice.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">플랫폼 옵션 ID (선택)</label>
+            <input
+              {...registerOption('platformOptionId')}
+              type="text"
+              placeholder="opt_12345"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300"
+          >
+            옵션 추가
+          </button>
+        </form>
+      </div>
+
+      {/* 등록된 옵션 목록 */}
+      {options.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-4">등록된 옵션 ({options.length}개)</h3>
           <div className="space-y-3">
-            {options.map((option, index) => (
-              <div key={option.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                <div className="flex justify-between items-start">
+            {options.map((option, optionIndex) => (
+              <div key={optionIndex} className="border border-gray-300 rounded-lg overflow-hidden">
+                <div
+                  className="p-4 bg-gray-100 cursor-pointer flex justify-between items-center"
+                  onClick={() => setExpandedOptionIndex(expandedOptionIndex === optionIndex ? null : optionIndex)}
+                >
                   <div>
-                    <p className="font-medium">{option.optionName}</p>
+                    <p className="font-semibold">{option.optionName}</p>
                     <p className="text-sm text-gray-600">
-                      판매가: {option.sellingPrice.toLocaleString()}원
+                      판매가: ₩{option.sellingPrice.toLocaleString()} | 상품 {option.products.length}개
                     </p>
-                    {option.platformOptionId && (
-                      <p className="text-sm text-gray-600">
-                        플랫폼 ID: {option.platformOptionId}
-                      </p>
-                    )}
                   </div>
                   <button
-                    type="button"
-                    onClick={() => handleRemove(index)}
-                    disabled={isLoading || isAdding}
-                    className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOptions(options.filter((_, i) => i !== optionIndex));
+                    }}
+                    className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+                    disabled={isLoading}
                   >
                     삭제
                   </button>
                 </div>
+
+                {expandedOptionIndex === optionIndex && (
+                  <div className="p-4 border-t border-gray-200">
+                    {/* 상품 목록 */}
+                    <div className="mb-4">
+                      <p className="font-semibold mb-2">포함된 상품:</p>
+                      {option.products.length === 0 ? (
+                        <p className="text-sm text-gray-600">상품이 없습니다</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {option.products.map((product, productIndex) => (
+                            <div key={productIndex} className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                              <span className="text-sm">상품 ID: {product.productId} × {product.quantity}개</span>
+                              <button
+                                onClick={() => {
+                                  setOptions((prev) => {
+                                    const updated = [...prev];
+                                    updated[optionIndex].products.splice(productIndex, 1);
+                                    return updated;
+                                  });
+                                }}
+                                className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                              >
+                                제거
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 상품 추가 폼 */}
+                    <form onSubmit={handleSubmitProduct((values) => onAddProduct(values, optionIndex))} className="space-y-3 p-3 bg-white border border-gray-200 rounded">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">상품 ID *</label>
+                        <input
+                          {...registerProduct('productId')}
+                          type="number"
+                          placeholder="1"
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                          disabled={isLoading}
+                        />
+                        {productErrors.productId && <p className="text-xs text-red-600 mt-1">{productErrors.productId.message}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">수량 *</label>
+                        <input
+                          {...registerProduct('quantity')}
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                          disabled={isLoading}
+                        />
+                        {productErrors.quantity && <p className="text-xs text-red-600 mt-1">{productErrors.quantity.message}</p>}
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading || !productValues.productId || !productValues.quantity}
+                        className="w-full px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300"
+                      >
+                        상품 추가
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
             ))}
           </div>
-        )}
-
-        <div className="p-4 border border-gray-200 rounded-lg">
-          <h3 className="font-medium mb-4">옵션 추가</h3>
-          <form onSubmit={handleSubmit(handleAddOption)} className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                옵션명 *
-              </label>
-              <input
-                {...register('optionName')}
-                type="text"
-                placeholder="Blue M"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isLoading || isAdding}
-              />
-              {errors.optionName && (
-                <p className="mt-1 text-xs text-red-600">{errors.optionName.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                판매가 *
-              </label>
-              <input
-                {...register('sellingPrice')}
-                type="number"
-                step="0.01"
-                placeholder="29900"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isLoading || isAdding}
-              />
-              {errors.sellingPrice && (
-                <p className="mt-1 text-xs text-red-600">{errors.sellingPrice.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                플랫폼 옵션 ID
-              </label>
-              <input
-                {...register('platformOptionId')}
-                type="text"
-                placeholder="option_abc123"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isLoading || isAdding}
-              />
-              {errors.platformOptionId && (
-                <p className="mt-1 text-xs text-red-600">{errors.platformOptionId.message}</p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading || isAdding}
-              className="w-full bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isAdding ? '추가 중...' : '+ 옵션 추가'}
-            </button>
-          </form>
         </div>
+      )}
 
+      {/* 최종 제출 버튼 */}
+      <div className="mt-8">
         <button
-          type="button"
-          onClick={handleSubmitOptions}
+          onClick={handleFinalSubmit}
           disabled={isLoading || options.length === 0}
-          className="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 font-semibold"
         >
-          {isLoading ? '처리 중...' : '다음 (상품 번들 구성) →'}
+          {isLoading ? '등록 중...' : '판매상품 등록'}
         </button>
       </div>
     </div>

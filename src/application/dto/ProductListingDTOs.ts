@@ -5,11 +5,13 @@ export interface CreateProductListingRequest {
   categoryId?: number;
   deliveryId?: number;
   packageId?: number;
+  options: CreateProductListingOptionWithProductsRequest[];
 }
 
 export interface UpdateProductListingRequest {
   platform: string;
   platformProductId: string;
+  sellerId: number;
   categoryId?: number;
   deliveryId?: number;
   packageId?: number;
@@ -22,8 +24,14 @@ export interface CreateProductListingOptionRequest {
   platformOptionId?: string;
 }
 
+export interface CreateProductListingOptionWithProductsRequest {
+  optionName: string;
+  sellingPrice: number;
+  platformOptionId?: string;
+  products: CreateProductListingProductRequest[];
+}
+
 export interface CreateProductListingProductRequest {
-  productListingOptionId: number;
   productId: number;
   quantity: number;
 }

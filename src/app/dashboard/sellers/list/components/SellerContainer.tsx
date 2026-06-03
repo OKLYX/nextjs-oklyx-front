@@ -9,6 +9,8 @@ import { SellerSearchCard } from './SellerSearchCard';
 import { SellerTable } from './SellerTable';
 import { CreateSellerModal } from './CreateSellerModal';
 import { SellerDetailsModal } from './SellerDetailsModal';
+import { EditSellerModal } from './EditSellerModal';
+import { DeleteSellerConfirmation } from './DeleteSellerConfirmation';
 
 export function SellerContainer() {
   const [searchName, setSearchName] = useState('');
@@ -22,6 +24,9 @@ export function SellerContainer() {
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedSellerId, setSelectedSellerId] = useState<number | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
 
   const sellerUseCase = useMemo(() => {
     const repository = new SellerRepositoryImpl();
@@ -82,6 +87,44 @@ export function SellerContainer() {
   const handleCloseDetailsModal = () => {
     setIsDetailsModalOpen(false);
     setSelectedSellerId(null);
+  };
+
+  const handleEditClick = (sellerId: number) => {
+    setSelectedSellerId(sellerId);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteClick = (sellerId: number) => {
+    setSelectedSellerId(sellerId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleEditSuccess = async () => {
+    setIsEditModalOpen(false);
+    setIsDetailsModalOpen(false);
+    setSelectedSellerId(null);
+    setHasSearched(false);
+    setSellers([]);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedSellerId) return;
+    try {
+      setIsDeleteLoading(true);
+      await sellerUseCase.delete(selectedSellerId);
+      setIsDeleteDialogOpen(false);
+      setIsDetailsModalOpen(false);
+      setSelectedSellerId(null);
+      setHasSearched(false);
+      setSellers([]);
+    } catch {
+      setIsDeleteLoading(false);
+    }
+  };
+
+  const getSelectedSellerName = (): string => {
+    const seller = sellers.find(s => s.id === selectedSellerId);
+    return seller?.sellerName || '';
   };
 
   return (
@@ -151,6 +194,23 @@ export function SellerContainer() {
         isOpen={isDetailsModalOpen}
         sellerId={selectedSellerId}
         onClose={handleCloseDetailsModal}
+        onEditClick={handleEditClick}
+        onDeleteClick={handleDeleteClick}
+      />
+
+      <EditSellerModal
+        isOpen={isEditModalOpen}
+        sellerId={selectedSellerId}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={handleEditSuccess}
+      />
+
+      <DeleteSellerConfirmation
+        isOpen={isDeleteDialogOpen}
+        sellerName={getSelectedSellerName()}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setIsDeleteDialogOpen(false)}
+        isLoading={isDeleteLoading}
       />
     </div>
   );
