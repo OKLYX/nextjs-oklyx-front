@@ -30,6 +30,13 @@ export class ProductListingRepositoryImpl implements ProductListingRepository {
     await axiosInstance.delete(`/api/product-listings/${id}`);
   }
 
+  async getProductListingOptions(listingId: number): Promise<ProductListingOption[]> {
+    const response = await axiosInstance.get('/api/product-listings-options', {
+      params: { listingId },
+    });
+    return response.data.data;
+  }
+
   async addProductListingOption(request: CreateProductListingOptionRequest): Promise<ProductListingOption> {
     const response = await axiosInstance.post('/api/product-listings-options', request);
     return response.data.data;

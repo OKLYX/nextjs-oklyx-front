@@ -1,5 +1,8 @@
 'use client';
 
+import { Fragment } from 'react';
+import { useRouter } from 'next/navigation';
+import { ROUTES } from '@/config/routes';
 import type { ProductListing } from '@/domain/entities/ProductListingEntity';
 
 interface ProductListingTableProps {
@@ -9,6 +12,7 @@ interface ProductListingTableProps {
   hasSearched: boolean;
   expandedListingId: number | null;
   onRowClick: (id: number) => void;
+  onSaveState?: () => void;
 }
 
 export function ProductListingTable({
@@ -18,7 +22,16 @@ export function ProductListingTable({
   hasSearched,
   expandedListingId,
   onRowClick,
+  onSaveState,
 }: ProductListingTableProps) {
+  const router = useRouter();
+
+  const handleRowNavigate = (id: number) => {
+    // 상태 저장 후 이동
+    onSaveState?.();
+    router.push(ROUTES.SALES_PRODUCTS_RETRIEVE_DETAILS(id));
+  };
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -93,15 +106,18 @@ export function ProductListingTable({
           </thead>
           <tbody className="divide-y divide-gray-200">
             {listings.map((listing) => (
-              <tbody key={listing.id}>
-                <tr className="hover:bg-gray-50 transition-colors">
+              <Fragment key={listing.id}>
+                <tr
+                  onClick={() => handleRowNavigate(listing.id)}
+                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                >
                   <td className="px-6 py-3 text-sm text-gray-700">{listing.id}</td>
                   <td className="px-6 py-3 text-sm text-gray-700">{listing.platform}</td>
                   <td className="px-6 py-3 text-sm text-gray-700">{listing.platformProductId}</td>
                   <td className="px-6 py-3 text-sm text-gray-700">{listing.categoryName || '-'}</td>
                   <td className="px-6 py-3 text-sm text-gray-700">{listing.carrierName || '-'}</td>
                   <td className="px-6 py-3 text-sm text-gray-700">{listing.packageType || '-'}</td>
-                  <td className="px-6 py-3 text-center">
+                  <td className="px-6 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => onRowClick(listing.id)}
                       className="inline-flex items-center justify-center w-8 h-8 text-gray-600 hover:bg-gray-200 rounded transition-colors"
@@ -119,7 +135,7 @@ export function ProductListingTable({
                     </td>
                   </tr>
                 )}
-              </tbody>
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -20,6 +20,7 @@ export interface ProductListingRepository {
     request: UpdateProductListingRequest
   ): Promise<ProductListing>;
   deleteProductListing(id: number): Promise<void>;
+  getProductListingOptions(listingId: number): Promise<ProductListingOption[]>;
   addProductListingOption(request: CreateProductListingOptionRequest): Promise<ProductListingOption>;
   addProductListingProduct(request: CreateProductListingProductRequest): Promise<ProductListingProduct>;
 }

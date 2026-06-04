@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/ProductListingRepositoryImpl';
 import { ProductListingUseCase } from '@/application/usecases/ProductListingUseCase';
 import type { ProductListing } from '@/domain/entities/ProductListingEntity';
@@ -20,6 +20,45 @@ export function ProductListingContainer() {
   const productListingUseCase = useMemo(() => {
     const repository = new ProductListingRepositoryImpl();
     return new ProductListingUseCase(repository);
+  }, []);
+
+  // 페이지 진입 시 검색 상태와 스크롤 위치 복원
+  useEffect(() => {
+    const restoreState = async () => {
+      try {
+        // 저장된 검색 상태 복원
+        const savedState = sessionStorage.getItem('sales-products-retrieve-state');
+        if (savedState) {
+          const state = JSON.parse(savedState);
+          setSearchPlatform(state.searchPlatform);
+          setListings(state.listings);
+          setHasSearched(state.hasSearched);
+          setCurrentPage(state.currentPage);
+          setTotalPages(state.totalPages);
+          sessionStorage.removeItem('sales-products-retrieve-state');
+        }
+      } catch (err) {
+        console.error('Failed to restore search state:', err);
+      }
+
+      // 스크롤 위치 복원
+      const savedScrollPosition = sessionStorage.getItem('sales-products-retrieve-scroll');
+      if (savedScrollPosition) {
+        const scrollPos = parseInt(savedScrollPosition, 10);
+        setTimeout(() => {
+          window.scrollTo({ top: scrollPos, behavior: 'auto' });
+        }, 100);
+        sessionStorage.removeItem('sales-products-retrieve-scroll');
+      }
+    };
+
+    // 페이지 로드 완료 후 상태 복원
+    if (document.readyState === 'complete') {
+      restoreState();
+    } else {
+      window.addEventListener('load', restoreState);
+      return () => window.removeEventListener('load', restoreState);
+    }
   }, []);
 
   const handleSearch = async () => {
@@ -62,6 +101,18 @@ export function ProductListingContainer() {
     setExpandedListingId(expandedListingId === id ? null : id);
   };
 
+  const handleSaveStateBeforeNavigation = () => {
+    // 상태 저장 (detail page 이동 전)
+    const state = {
+      searchPlatform,
+      listings,
+      hasSearched,
+      currentPage,
+      totalPages,
+    };
+    sessionStorage.setItem('sales-products-retrieve-state', JSON.stringify(state));
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-full">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -80,6 +131,7 @@ export function ProductListingContainer() {
           hasSearched={hasSearched}
           expandedListingId={expandedListingId}
           onRowClick={handleRowClick}
+          onSaveState={handleSaveStateBeforeNavigation}
         />
 
         {hasSearched && listings.length > 0 && totalPages > 1 && (

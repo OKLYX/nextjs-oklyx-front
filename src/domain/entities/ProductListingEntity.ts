@@ -8,6 +8,9 @@ export interface ProductListing {
   carrierName?: string;
   packageId?: number;
   packageType?: string;
+  sellerId?: number;
+  sellerName?: string;
+  options?: ProductListingOption[];
 }
 
 export interface ProductListingOption {
@@ -18,6 +21,7 @@ export interface ProductListingOption {
   platformOptionId?: string;
   margin?: number;
   marginRate?: number;
+  products?: ProductListingProduct[];
 }
 
 export interface ProductListingProduct {

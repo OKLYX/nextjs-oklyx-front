@@ -25,6 +25,10 @@ export class ProductListingUseCase {
     return this.repository.deleteProductListing(id);
   }
 
+  async getOptions(listingId: number): Promise<ProductListingOption[]> {
+    return this.repository.getProductListingOptions(listingId);
+  }
+
   async addOption(request: CreateProductListingOptionRequest): Promise<ProductListingOption> {
     return this.repository.addProductListingOption(request);
   }
