@@ -26,6 +26,41 @@ export function ProductListingContainer() {
   useEffect(() => {
     const restoreState = async () => {
       try {
+        // 수정/삭제 후 돌아온 경우 이전 검색 재실행
+        const refreshFlag = sessionStorage.getItem('refresh-product-listing');
+        if (refreshFlag === 'true') {
+          sessionStorage.removeItem('refresh-product-listing');
+
+          // 저장된 검색 상태 확인
+          const savedState = sessionStorage.getItem('sales-products-retrieve-state');
+          if (savedState) {
+            try {
+              const state = JSON.parse(savedState);
+              // 이전 플랫폼으로 자동 재검색
+              if (state.searchPlatform) {
+                setSearchPlatform(state.searchPlatform);
+
+                // 비동기로 재검색 실행
+                setTimeout(async () => {
+                  try {
+                    const result = await productListingUseCase.getByPlatform(state.searchPlatform, 0, 20);
+                    setListings(result.content);
+                    setTotalPages(result.totalPages);
+                    setHasSearched(true);
+                    setCurrentPage(0);
+                  } catch (err) {
+                    console.error('Failed to refresh listings:', err);
+                  }
+                }, 0);
+              }
+              sessionStorage.removeItem('sales-products-retrieve-state');
+            } catch (err) {
+              console.error('Failed to parse saved state:', err);
+            }
+          }
+          return;
+        }
+
         // 저장된 검색 상태 복원
         const savedState = sessionStorage.getItem('sales-products-retrieve-state');
         if (savedState) {
@@ -59,7 +94,7 @@ export function ProductListingContainer() {
       window.addEventListener('load', restoreState);
       return () => window.removeEventListener('load', restoreState);
     }
-  }, []);
+  }, [productListingUseCase]);
 
   const handleSearch = async () => {
     if (!searchPlatform) {

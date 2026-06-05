@@ -5,6 +5,7 @@ import type { ProductListing } from '@/domain/entities/ProductListingEntity';
 interface ProductListingDetailsCardProps {
   listing: ProductListing;
   isLoading: boolean;
+  error?: string;
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -13,12 +14,20 @@ interface ProductListingDetailsCardProps {
 export function ProductListingDetailsCard({
   listing,
   isLoading,
+  error,
   onBack,
   onEdit,
   onDelete,
 }: ProductListingDetailsCardProps) {
   return (
     <div className="space-y-6">
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

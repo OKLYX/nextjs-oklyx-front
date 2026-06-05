@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/ProductListingRepositoryImpl';
 import { ProductListingUseCase } from '@/application/usecases/ProductListingUseCase';
 import type { ProductListing } from '@/domain/entities/ProductListingEntity';
+import { ROUTES } from '@/config/routes';
 import { ProductListingDetailsCard } from './ProductListingDetailsCard';
 import { ProductListingDetailsTable } from './ProductListingDetailsTable';
+import { ProductListingDeleteDialog } from './ProductListingDeleteDialog';
 
 interface ProductListingDetailsContainerProps {
   id: string;
@@ -17,6 +19,9 @@ export function ProductListingDetailsContainer({ id }: ProductListingDetailsCont
   const [listing, setListing] = useState<ProductListing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const productListingUseCase = useMemo(() => {
     const repository = new ProductListingRepositoryImpl();
@@ -42,17 +47,33 @@ export function ProductListingDetailsContainer({ id }: ProductListingDetailsCont
   }, [id, productListingUseCase]);
 
   const handleBack = () => {
-    // 뒤로 가기 전에 스크롤 위치 저장
     sessionStorage.setItem('sales-products-retrieve-scroll', window.scrollY.toString());
     router.back();
   };
 
   const handleEdit = () => {
-    // Phase 5: Open edit modal
+    router.push(ROUTES.SALES_PRODUCTS_RETRIEVE_EDIT(id));
   };
 
-  const handleDelete = () => {
-    // Phase 5: Open delete confirmation
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      setApiError('');
+      await productListingUseCase.delete(parseInt(id, 10));
+      sessionStorage.setItem('refresh-product-listing', 'true');
+      router.push(ROUTES.SALES_PRODUCTS_RETRIEVE);
+    } catch (err: unknown) {
+      const error = err as { response?: { status: number } } & Error;
+      const statusCode = error?.response?.status;
+      if (statusCode === 404) {
+        setApiError('판매상품을 찾을 수 없습니다.');
+      } else if (error instanceof Error) {
+        setApiError(error.message);
+      } else {
+        setApiError('삭제에 실패했습니다. 다시 시도해주세요.');
+      }
+      setIsDeleting(false);
+    }
   };
 
   if (isLoading) {
@@ -101,16 +122,35 @@ export function ProductListingDetailsContainer({ id }: ProductListingDetailsCont
   }
 
   return (
-    <div className="space-y-6">
-      <ProductListingDetailsCard
-        listing={listing}
-        isLoading={isLoading}
-        onBack={handleBack}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+    <>
+      <div className="space-y-6">
+        <ProductListingDetailsCard
+          listing={listing}
+          isLoading={isLoading}
+          error={apiError}
+          onBack={handleBack}
+          onEdit={handleEdit}
+          onDelete={() => {
+            setApiError('');
+            setShowDeleteDialog(true);
+          }}
+        />
 
-      <ProductListingDetailsTable options={listing.options} isLoading={isLoading} />
-    </div>
+        <ProductListingDetailsTable options={listing.options} isLoading={isLoading} />
+      </div>
+
+      <ProductListingDeleteDialog
+        isOpen={showDeleteDialog}
+        isLoading={isDeleting}
+        listingId={listing.id}
+        listingName={`${listing.platform} - ${listing.platformProductId}`}
+        error={apiError}
+        onConfirm={handleDelete}
+        onCancel={() => {
+          setShowDeleteDialog(false);
+          setApiError('');
+        }}
+      />
+    </>
   );
 }

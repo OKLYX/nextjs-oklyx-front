@@ -18,6 +18,7 @@ export const ROUTES = {
   SALES_PRODUCTS_REGISTER: '/dashboard/sales-products/register' as const,
   SALES_PRODUCTS_RETRIEVE: '/dashboard/sales-products/retrieve' as const,
   SALES_PRODUCTS_RETRIEVE_DETAILS: (id: number | string) => `/dashboard/sales-products/retrieve/${id}` as const,
+  SALES_PRODUCTS_RETRIEVE_EDIT: (id: number | string) => `/dashboard/sales-products/retrieve/${id}/edit` as const,
   SELLERS_LIST: '/dashboard/sellers/list' as const,
   SELLERS_MANAGE: '/dashboard/sellers/manage' as const,
 } as const;

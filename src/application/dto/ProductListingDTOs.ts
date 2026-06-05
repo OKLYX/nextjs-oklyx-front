@@ -17,6 +17,15 @@ export interface UpdateProductListingRequest {
   categoryId?: number;
   deliveryId?: number;
   packageId?: number;
+  options: UpdateProductListingOptionRequest[];
+}
+
+export interface UpdateProductListingOptionRequest {
+  id?: number;
+  optionName: string;
+  sellingPrice: number;
+  platformOptionId?: string;
+  products: CreateProductListingProductRequest[];
 }
 
 export interface CreateProductListingOptionRequest {
