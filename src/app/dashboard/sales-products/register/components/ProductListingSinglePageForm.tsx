@@ -70,6 +70,7 @@ export function ProductListingSinglePageForm() {
 
   // Section 1: 플랫폼
   const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [productListingName, setProductListingName] = useState('');
 
   // Section 2: 상품 (여러 개) 및 카테고리
   const [platformProductId, setPlatformProductId] = useState('');
@@ -93,6 +94,11 @@ export function ProductListingSinglePageForm() {
   const [productQuantities, setProductQuantities] = useState<Record<number, number>>({});
   const [isOptionFormOpen, setIsOptionFormOpen] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<number | null>(null);
+
+  // Real-time product search
+  const [searchProducts, setSearchProducts] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const lastAutoAddedRef = useRef<string>('');
 
@@ -142,12 +148,40 @@ export function ProductListingSinglePageForm() {
 
   const filteredProductsForModal = useMemo(() => {
     const selectedIds = new Set(selectedProducts.map((p) => p.id));
-    let filtered = products.filter((p) => !selectedIds.has(p.id));
+    return searchProducts.filter((p) => !selectedIds.has(p.id));
+  }, [searchProducts, selectedProducts]);
 
-    if (!productModalSearchQuery.trim()) return filtered;
-    const query = productModalSearchQuery.toLowerCase();
-    return filtered.filter((p) => p.productName.toLowerCase().includes(query));
-  }, [productModalSearchQuery, products, selectedProducts]);
+  const handleProductSearch = async (query: string) => {
+    setProductModalSearchQuery(query);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!query.trim()) {
+      setSearchProducts([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await axiosInstance.get('/api/products', {
+          params: {
+            search: query.trim(),
+            page: 0,
+            size: 50,
+          },
+        });
+        setSearchProducts((response.data.data?.content || []) as Product[]);
+      } catch (err) {
+        setSearchProducts([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -186,6 +220,12 @@ export function ProductListingSinglePageForm() {
     };
 
     fetchData();
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
   }, []);
 
   const handleSelectProduct = (product: Product) => {
@@ -437,7 +477,7 @@ export function ProductListingSinglePageForm() {
   };
 
   const handleFinalSubmit = async () => {
-    if (!selectedSellerId || !selectedPlatform || selectedProducts.length === 0 || !platformProductId || !selectedCategory || !selectedCarrierRateId || !selectedPackageId || optionsData.length === 0) {
+    if (!selectedSellerId || !selectedPlatform || !productListingName.trim() || selectedProducts.length === 0 || !platformProductId || !selectedCategory || !selectedCarrierRateId || !selectedPackageId || optionsData.length === 0) {
       setError('모든 섹션을 완료해주세요');
       return;
     }
@@ -465,6 +505,7 @@ export function ProductListingSinglePageForm() {
       console.log('최종 요청 - ProductListing + Options:', {
         platform: selectedPlatform,
         platformProductId: platformProductId,
+        name: productListingName,
         sellerId: selectedSellerId,
         categoryId: selectedCategory,
         deliveryId: selectedCarrierRateId,
@@ -476,6 +517,7 @@ export function ProductListingSinglePageForm() {
       const listingRequest: CreateProductListingRequest = {
         platform: selectedPlatform,
         platformProductId: platformProductId,
+        name: productListingName,
         sellerId: selectedSellerId,
         categoryId: selectedCategory,
         deliveryId: selectedCarrierRateId,
@@ -498,7 +540,7 @@ export function ProductListingSinglePageForm() {
     return <div className="text-center py-12">데이터를 불러오는 중...</div>;
   }
 
-  const isAllComplete = selectedSellerId && selectedPlatform && platformProductId && selectedProducts.length > 0 && selectedCategory && selectedCarrierRateId && selectedPackageId && optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0);
+  const isAllComplete = selectedSellerId && selectedPlatform && productListingName.trim() && platformProductId && selectedProducts.length > 0 && selectedCategory && selectedCarrierRateId && selectedPackageId && optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0);
 
   return (
     <div className="w-full max-w-4xl mx-auto py-8">
@@ -577,13 +619,34 @@ export function ProductListingSinglePageForm() {
         </div>
       </div>
 
+      {/* Section 1-1: 판매상품 이름 */}
+      <div className="mb-8 p-6 border border-gray-200 rounded-lg">
+        <div className="flex items-center gap-3 mb-6 pb-3 border-b">
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${productListingName.trim() ? 'bg-green-600' : 'bg-gray-400'}`}>
+            {productListingName.trim() ? '✓' : '1-1'}
+          </div>
+          <h2 className="text-lg font-bold">판매상품 이름</h2>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">판매상품 이름 *</label>
+          <input
+            type="text"
+            value={productListingName}
+            onChange={(e) => setProductListingName(e.target.value)}
+            placeholder="판매상품의 이름을 입력해주세요 (예: 프리미엄 상품 세트)"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
+        </div>
+      </div>
+
       {/* Section 2: 상품 선택 (여러 개) */}
       <div className="mb-8 p-6 border border-gray-200 rounded-lg">
         <div className="flex items-center gap-3 mb-6 pb-3 border-b">
           <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${selectedProducts.length > 0 ? 'bg-green-600' : 'bg-gray-400'}`}>
             {selectedProducts.length > 0 ? '✓' : '2'}
           </div>
-          <h2 className="text-lg font-bold">판매 상품 선택</h2>
+          <h2 className="text-lg font-bold">구성 상품 선택</h2>
         </div>
 
         {selectedProducts.length > 0 && (
@@ -665,7 +728,7 @@ export function ProductListingSinglePageForm() {
           <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${selectedCarrierRateId && selectedPackageId ? 'bg-green-600' : 'bg-gray-400'}`}>
             {selectedCarrierRateId && selectedPackageId ? '✓' : '3'}
           </div>
-          <h2 className="text-lg font-bold">배송사, 택배비 및 패키지 선택</h2>
+          <h2 className="text-lg font-bold">배송사, 택배비 및 패키지</h2>
         </div>
 
         <div className="space-y-4">
@@ -1165,13 +1228,14 @@ export function ProductListingSinglePageForm() {
       {/* Product Search Modal */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 h-[85vh] flex flex-col">
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900">상품 검색</h2>
               <button
                 onClick={() => {
                   setIsProductModalOpen(false);
                   setProductModalSearchQuery('');
+                  setSearchProducts([]);
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -1179,19 +1243,24 @@ export function ProductListingSinglePageForm() {
               </button>
             </div>
 
-            <div className="p-6 border-b border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <input
                 type="text"
                 placeholder="상품명으로 검색..."
                 value={productModalSearchQuery}
-                onChange={(e) => setProductModalSearchQuery(e.target.value)}
+                onChange={(e) => handleProductSearch(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 autoFocus
               />
+              {isSearching && <p className="text-xs text-gray-500 mt-2">검색 중...</p>}
             </div>
 
-            <div className="p-6">
-              {filteredProductsForModal.length > 0 ? (
+            <div className="flex-1 overflow-y-auto p-6">
+              {isSearching ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-600">검색 중...</div>
+                </div>
+              ) : filteredProductsForModal.length > 0 ? (
                 <div className="space-y-3">
                   {filteredProductsForModal.map((product) => {
                     const imageUrl = getImageUrl(product.imageUrl, product.id);
@@ -1226,9 +1295,9 @@ export function ProductListingSinglePageForm() {
                   })}
                 </div>
               ) : productModalSearchQuery.trim() ? (
-                <p className="text-sm text-gray-600">검색 결과가 없습니다</p>
+                <p className="text-sm text-gray-600 text-center py-8">검색 결과가 없습니다</p>
               ) : (
-                <p className="text-sm text-gray-600">상품을 검색해주세요</p>
+                <p className="text-sm text-gray-600 text-center py-8">상품을 검색해주세요</p>
               )}
             </div>
           </div>

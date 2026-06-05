@@ -2,6 +2,7 @@ export interface ProductListing {
   id: number;
   platform: string;
   platformProductId: string;
+  name: string;
   categoryId?: number;
   categoryName?: string;
   deliveryId?: number;

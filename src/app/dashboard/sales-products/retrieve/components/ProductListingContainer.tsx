@@ -97,8 +97,23 @@ export function ProductListingContainer() {
     }
   };
 
-  const handleRowClick = (id: number) => {
-    setExpandedListingId(expandedListingId === id ? null : id);
+  const handleRowClick = async (id: number) => {
+    if (expandedListingId === id) {
+      setExpandedListingId(null);
+    } else {
+      setExpandedListingId(id);
+      // 옵션 데이터 로드
+      try {
+        const options = await productListingUseCase.getOptions(id);
+        setListings((prevListings) =>
+          prevListings.map((listing) =>
+            listing.id === id ? { ...listing, options } : listing
+          )
+        );
+      } catch {
+        console.error('옵션 조회에 실패했습니다.');
+      }
+    }
   };
 
   const handleSaveStateBeforeNavigation = () => {

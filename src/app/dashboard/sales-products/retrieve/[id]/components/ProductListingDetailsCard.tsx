@@ -59,6 +59,10 @@ export function ProductListingDetailsCard({
             <p className="text-sm text-gray-600">상품 ID</p>
             <p className="text-lg font-semibold text-gray-900">{listing.platformProductId}</p>
           </div>
+          <div>
+            <p className="text-sm text-gray-600">상품명</p>
+            <p className="text-lg font-semibold text-gray-900">{listing.name}</p>
+          </div>
         </div>
       </div>
 

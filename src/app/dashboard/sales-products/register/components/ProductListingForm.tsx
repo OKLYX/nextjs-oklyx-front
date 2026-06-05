@@ -32,6 +32,7 @@ const productListingSchema = z.object({
   sellerId: z.coerce.number().min(1, '판매자를 선택해주세요'),
   platform: z.string().min(1, '플랫폼을 선택해주세요'),
   platformProductId: z.string().min(1, '상품 ID를 입력해주세요').max(255),
+  name: z.string().min(1, '상품명을 입력해주세요').max(255),
   categoryId: z.coerce.number().optional(),
   deliveryId: z.coerce.number().min(1, '배송사를 선택해주세요'),
   packageId: z.coerce.number().min(1, '패키지를 선택해주세요'),
@@ -69,6 +70,7 @@ export function ProductListingForm({
       sellerId: sellers.length > 0 ? sellers[0].id : undefined,
       platform: '',
       platformProductId: '',
+      name: '',
       categoryId: undefined,
       deliveryId: carriers.length > 0 ? carriers[0].id : undefined,
       packageId: packages.length > 0 ? packages[0].id : undefined,
@@ -88,6 +90,7 @@ export function ProductListingForm({
       const request: Omit<CreateProductListingRequest, 'options'> = {
         platform: values.platform,
         platformProductId: values.platformProductId,
+        name: values.name,
         sellerId: values.sellerId,
         categoryId: values.categoryId,
         deliveryId: values.deliveryId,
@@ -176,6 +179,22 @@ export function ProductListingForm({
           />
           {errors.platformProductId && (
             <p className="mt-1 text-xs text-red-600">{errors.platformProductId.message}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            상품명 *
+          </label>
+          <input
+            {...register('name')}
+            type="text"
+            placeholder="예) Galaxy S21 Bundle"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isLoading}
+          />
+          {errors.name && (
+            <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
           )}
         </div>
 

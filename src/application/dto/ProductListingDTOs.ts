@@ -1,6 +1,7 @@
 export interface CreateProductListingRequest {
   platform: string;
   platformProductId: string;
+  name: string;
   sellerId: number;
   categoryId?: number;
   deliveryId?: number;
@@ -11,6 +12,7 @@ export interface CreateProductListingRequest {
 export interface UpdateProductListingRequest {
   platform: string;
   platformProductId: string;
+  name: string;
   sellerId: number;
   categoryId?: number;
   deliveryId?: number;
