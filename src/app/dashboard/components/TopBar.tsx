@@ -28,7 +28,7 @@ export function TopBar() {
         onClick={handleLogoClick}
         className="text-xl font-bold text-gray-900 cursor-pointer"
       >
-        OKLYX
+        OCLYX
       </button>
       <button
         onClick={handleLogout}
