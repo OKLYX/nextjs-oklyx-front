@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OKLYX",
-  description: "OKLYX Frontend Application",
+  title: "OCLYX",
+  description: "OCLYX Frontend Application",
 };
 
 export default function RootLayout({
