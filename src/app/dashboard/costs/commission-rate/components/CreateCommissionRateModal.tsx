@@ -2,12 +2,17 @@
 
 import { useEffect } from 'react';
 import { CommissionRateForm } from './CommissionRateForm';
-import type { CreateCommissionRateFormData } from '@/application/schemas/CommissionRateSchema';
+import type {
+  CreateCommissionRateFormData,
+  UpdateCommissionRateFormData,
+} from '@/application/schemas/CommissionRateSchema';
 
 interface CreateCommissionRateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateCommissionRateFormData) => Promise<void>;
+  onSubmit: (
+    data: CreateCommissionRateFormData | UpdateCommissionRateFormData
+  ) => Promise<void>;
   isSubmitting: boolean;
 }
 

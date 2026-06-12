@@ -59,7 +59,7 @@ export function ProductListingBundleForm({
     formState: { errors },
     reset,
     watch,
-  } = useForm<ProductFormValues>({
+  } = useForm<z.input<typeof productSchema>, unknown, ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       productId: undefined,
@@ -100,7 +100,6 @@ export function ProductListingBundleForm({
     setIsAdding(optionId);
     try {
       const request: CreateProductListingProductRequest = {
-        productListingOptionId: optionId,
         productId: values.productId,
         quantity: values.quantity,
       };

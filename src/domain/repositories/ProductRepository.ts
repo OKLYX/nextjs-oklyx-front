@@ -2,7 +2,7 @@ import type { Product } from '@/domain/entities/Product';
 
 export interface CreateProductRequest {
   productName: string;
-  barcodeId: string;
+  barcodeId?: string;
   brand?: string;
   price?: number;
   store?: string;

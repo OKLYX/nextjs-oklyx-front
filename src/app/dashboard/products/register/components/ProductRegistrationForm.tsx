@@ -187,7 +187,7 @@ export function ProductRegistrationForm({
   }, [imagePreviewUrl]);
 
   const hasProductName = watch('productName') && watch('productName').trim() !== '';
-  const hasBarcodeWithoutValidation = barcodeValue && barcodeValue.trim() !== '' && validatedBarcode !== barcodeValue.trim();
+  const hasBarcodeWithoutValidation = !!(barcodeValue && barcodeValue.trim() !== '' && validatedBarcode !== barcodeValue.trim());
   const isSubmitDisabled = !hasProductName || hasBarcodeWithoutValidation;
 
   return (

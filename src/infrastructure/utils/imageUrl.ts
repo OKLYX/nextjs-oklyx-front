@@ -1,6 +1,6 @@
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 
-export function getImageUrl(imageUrl: string | null, productId?: number): string | null {
+export function getImageUrl(imageUrl: string | null | undefined, productId?: number): string | null {
   if (!imageUrl) return null;
   // Use frontend proxy with token in query parameter
   if (productId) {

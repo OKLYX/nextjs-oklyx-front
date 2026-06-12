@@ -63,7 +63,7 @@ export function ProductListingForm({
     handleSubmit,
     formState: { errors },
     watch,
-  } = useForm<ProductListingFormValues>({
+  } = useForm<z.input<typeof productListingSchema>, unknown, ProductListingFormValues>({
     resolver: zodResolver(productListingSchema),
     mode: 'onChange',
     defaultValues: {

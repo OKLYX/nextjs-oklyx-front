@@ -99,7 +99,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
   const [newOptionPrice, setNewOptionPrice] = useState('');
   const [newOptionMarginRate, setNewOptionMarginRate] = useState('');
   const [newOptionPlatformId, setNewOptionPlatformId] = useState('');
-  const [productQuantities, setProductQuantities] = useState<Record<number, number>>({});
+  const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   const [isOptionFormOpen, setIsOptionFormOpen] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<number | null>(null);
 
@@ -377,7 +377,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
         optionName: newOptionName,
         sellingPrice: parseFloat(newOptionPrice),
         platformOptionId: newOptionPlatformId || undefined,
-        productListing: undefined as any,
+        productListingId: 0,
       };
 
       setOptionsData([...optionsData, { option: newOption, products: selectedProdQuantities }]);

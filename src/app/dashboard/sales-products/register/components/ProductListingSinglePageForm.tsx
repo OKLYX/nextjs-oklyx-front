@@ -91,7 +91,7 @@ export function ProductListingSinglePageForm() {
   const [newOptionPrice, setNewOptionPrice] = useState('');
   const [newOptionMarginRate, setNewOptionMarginRate] = useState('');
   const [newOptionPlatformId, setNewOptionPlatformId] = useState('');
-  const [productQuantities, setProductQuantities] = useState<Record<number, number>>({});
+  const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   const [isOptionFormOpen, setIsOptionFormOpen] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<number | null>(null);
 
@@ -323,7 +323,7 @@ export function ProductListingSinglePageForm() {
         optionName: newOptionName,
         sellingPrice: parseFloat(newOptionPrice),
         platformOptionId: newOptionPlatformId || undefined,
-        productListing: undefined as any,
+        productListingId: 0,
       };
 
       setOptionsData([...optionsData, { option: newOption, products: selectedProdQuantities }]);
@@ -656,7 +656,7 @@ export function ProductListingSinglePageForm() {
                 <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
                   {product.imageUrl && getImageUrl(product.imageUrl, product.id) ? (
                     <img
-                      src={getImageUrl(product.imageUrl, product.id)}
+                      src={getImageUrl(product.imageUrl, product.id) || undefined}
                       alt={product.productName}
                       className="w-full h-full object-cover"
                       onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}

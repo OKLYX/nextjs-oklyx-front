@@ -41,7 +41,7 @@ export function ProductListingOptionForm({
     handleSubmit: handleSubmitOption,
     formState: { errors: optionErrors },
     reset: resetOption,
-  } = useForm<OptionFormValues>({
+  } = useForm<z.input<typeof optionSchema>, unknown, OptionFormValues>({
     resolver: zodResolver(optionSchema),
     mode: 'onChange',
   });
@@ -52,7 +52,7 @@ export function ProductListingOptionForm({
     formState: { errors: productErrors },
     reset: resetProduct,
     watch: watchProduct,
-  } = useForm<ProductFormValues>({
+  } = useForm<z.input<typeof productSchema>, unknown, ProductFormValues>({
     resolver: zodResolver(productSchema),
     mode: 'onChange',
   });

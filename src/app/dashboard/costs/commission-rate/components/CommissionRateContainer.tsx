@@ -86,11 +86,11 @@ export function CommissionRateContainer() {
   };
 
   const handleCreateCommissionRate = async (
-    data: CreateCommissionRateFormData
+    data: CreateCommissionRateFormData | UpdateCommissionRateFormData
   ) => {
     setIsSubmitting(true);
     try {
-      await useCase.createCommissionRate(data);
+      await useCase.createCommissionRate(data as CreateCommissionRateFormData);
       setIsCreateModalOpen(false);
       await handleSearch();
     } catch (err) {
