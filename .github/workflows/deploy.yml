@@ -70,7 +70,11 @@ jobs:
             # Pull latest image
             docker pull "$IMAGE_NAME:latest"
 
-            # Run new container
+            # Ensure required networks exist (idempotent)
+            docker network inspect pms_network >/dev/null 2>&1 || docker network create pms_network
+            docker network inspect ydmins_proxy_network >/dev/null 2>&1 || docker network create ydmins_proxy_network
+
+            # Run new container (attached to pms_network)
             docker run -d \
               --name nextjs-oklyx-front \
               -p 3000:3000 \
@@ -81,6 +85,9 @@ jobs:
               --log-opt max-size=10m \
               --log-opt max-file=3 \
               "$IMAGE_NAME:latest"
+
+            # Attach the container to the second network (proxy)
+            docker network connect ydmins_proxy_network nextjs-oklyx-front
 
             # Log out from registry
             docker logout ghcr.io
