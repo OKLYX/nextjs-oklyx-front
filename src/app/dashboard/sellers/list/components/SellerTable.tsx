@@ -1,6 +1,9 @@
 'use client';
 
+import { Fragment, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import { SellerChannelSection } from './SellerChannelSection';
 
 interface SellerTableProps {
   sellers: Seller[];
@@ -17,6 +20,19 @@ export function SellerTable({
   hasSearched,
   onRowClick,
 }: SellerTableProps) {
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+  const toggleExpanded = (sellerId: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sellerId)) {
+        next.delete(sellerId);
+      } else {
+        next.add(sellerId);
+      }
+      return next;
+    });
+  };
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -24,6 +40,7 @@ export function SellerTable({
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
+                <th className="w-12 px-6 py-3"></th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">ID</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">판매자명</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">사업자등록번호</th>
@@ -32,7 +49,7 @@ export function SellerTable({
             <tbody>
               {[...Array(5)].map((_, i) => (
                 <tr key={i} className="border-b border-gray-200">
-                  {[...Array(3)].map((_, j) => (
+                  {[...Array(4)].map((_, j) => (
                     <td key={j} className="px-6 py-3">
                       <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
                     </td>
@@ -76,23 +93,53 @@ export function SellerTable({
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr>
+              <th className="w-12 px-6 py-3"></th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">ID</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">판매자명</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">사업자등록번호</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {sellers.map((seller) => (
-              <tr
-                key={seller.id}
-                onClick={() => onRowClick?.(seller.id)}
-                className={`transition-colors ${onRowClick ? 'hover:bg-gray-100 cursor-pointer' : 'hover:bg-gray-50'}`}
-              >
-                <td className="px-6 py-3 text-sm text-gray-700">{seller.id}</td>
-                <td className="px-6 py-3 text-sm text-gray-700">{seller.sellerName}</td>
-                <td className="px-6 py-3 text-sm text-gray-700">{seller.businessRegistration}</td>
-              </tr>
-            ))}
+            {sellers.map((seller) => {
+              const isExpanded = expandedIds.has(seller.id);
+              return (
+                <Fragment key={seller.id}>
+                  <tr
+                    onClick={() => onRowClick?.(seller.id)}
+                    className={`transition-colors ${onRowClick ? 'hover:bg-gray-100 cursor-pointer' : 'hover:bg-gray-50'}`}
+                  >
+                    <td className="px-6 py-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpanded(seller.id);
+                        }}
+                        aria-label={isExpanded ? '판매채널 접기' : '판매채널 펼치기'}
+                        aria-expanded={isExpanded}
+                        className="text-gray-500 hover:text-gray-900 transition-colors"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-5 w-5" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5" />
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-700">{seller.id}</td>
+                    <td className="px-6 py-3 text-sm text-gray-700">{seller.sellerName}</td>
+                    <td className="px-6 py-3 text-sm text-gray-700">{seller.businessRegistration}</td>
+                  </tr>
+                  {isExpanded && (
+                    <tr>
+                      <td colSpan={4} className="p-0">
+                        <SellerChannelSection sellerId={seller.id} sellerName={seller.sellerName} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
