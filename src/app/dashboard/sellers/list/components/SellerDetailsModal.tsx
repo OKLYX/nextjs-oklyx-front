@@ -139,13 +139,6 @@ export function SellerDetailsModal({
         )}
 
         <div className="border-t p-6 flex gap-2">
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50 transition-colors text-sm font-medium"
-          >
-            닫기
-          </button>
           {seller && onEditClick && (
             <button
               onClick={() => onEditClick(seller.id)}
