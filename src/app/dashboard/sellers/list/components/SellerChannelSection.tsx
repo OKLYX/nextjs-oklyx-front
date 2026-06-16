@@ -7,6 +7,7 @@ import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAcc
 import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
 import type { CreateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
 import { CreateChannelModal } from './CreateChannelModal';
+import { ChannelDetailsModal } from './ChannelDetailsModal';
 
 interface SellerChannelSectionProps {
   sellerId: number;
@@ -25,6 +26,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
   const [error, setError] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isModalLoading, setIsModalLoading] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState<MarketplaceAccount | null>(null);
 
   const useCase = useMemo(() => {
     const repository = new MarketplaceAccountRepositoryImpl();
@@ -106,7 +108,11 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
             </thead>
             <tbody className="divide-y divide-gray-200">
               {channels.map((channel) => (
-                <tr key={channel.id}>
+                <tr
+                  key={channel.id}
+                  onClick={() => setSelectedChannel(channel)}
+                  className="cursor-pointer hover:bg-gray-50 transition-colors"
+                >
                   <td className="px-4 py-2 text-sm text-gray-700">{channel.platform}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">{channel.accountAlias || '-'}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">{channel.vendorId}</td>
@@ -135,6 +141,13 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateSubmit}
         isLoading={isModalLoading}
+      />
+
+      <ChannelDetailsModal
+        isOpen={selectedChannel !== null}
+        channel={selectedChannel}
+        sellerName={sellerName}
+        onClose={() => setSelectedChannel(null)}
       />
     </div>
   );

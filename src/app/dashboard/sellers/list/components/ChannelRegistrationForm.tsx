@@ -9,6 +9,14 @@ import {
   type CreateMarketplaceAccountForm,
 } from '@/application/dto/MarketplaceAccountDTOs';
 
+// Hardcoded for now; will be replaced with a managed platform list later.
+const PLATFORM_OPTIONS = [
+  { value: 'COUPANG', label: '쿠팡' },
+  { value: 'NAVER', label: '네이버 스마트스토어' },
+  { value: 'ELEVENST', label: '11번가' },
+  { value: 'GMARKET', label: 'G마켓' },
+];
+
 interface ChannelRegistrationFormProps {
   isLoading?: boolean;
   onSubmit: (data: CreateMarketplaceAccountForm) => Promise<void>;
@@ -50,14 +58,22 @@ export function ChannelRegistrationForm({
         <label htmlFor="platform" className="block text-sm font-medium mb-1">
           플랫폼 <span className="text-red-600">*</span>
         </label>
-        <input
+        <select
           {...register('platform')}
           id="platform"
-          type="text"
-          placeholder="예: COUPANG"
+          defaultValue=""
           disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+          className="w-full px-3 py-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="" disabled>
+            플랫폼을 선택하세요
+          </option>
+          {PLATFORM_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         {formState.errors.platform && (
           <p className="mt-1 text-sm text-red-600">{formState.errors.platform.message}</p>
         )}
