@@ -1,6 +1,7 @@
 import {
   MarketplaceAccountRepository,
   CreateMarketplaceAccountRequest,
+  UpdateMarketplaceAccountRequest,
 } from '@/domain/repositories/MarketplaceAccountRepository';
 import { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
 
@@ -13,6 +14,10 @@ export class MarketplaceAccountUseCase {
 
   async create(data: CreateMarketplaceAccountRequest): Promise<MarketplaceAccount> {
     return this.repository.create(data);
+  }
+
+  async update(id: number, data: UpdateMarketplaceAccountRequest): Promise<MarketplaceAccount> {
+    return this.repository.update(id, data);
   }
 
   async delete(id: number): Promise<void> {

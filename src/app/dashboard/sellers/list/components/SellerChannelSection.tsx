@@ -8,6 +8,8 @@ import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEnt
 import type { CreateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
 import { CreateChannelModal } from './CreateChannelModal';
 import { ChannelDetailsModal } from './ChannelDetailsModal';
+import { EditChannelModal } from './EditChannelModal';
+import { DeleteChannelConfirmation } from './DeleteChannelConfirmation';
 
 interface SellerChannelSectionProps {
   sellerId: number;
@@ -27,6 +29,9 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<MarketplaceAccount | null>(null);
+  const [editChannel, setEditChannel] = useState<MarketplaceAccount | null>(null);
+  const [deleteChannel, setDeleteChannel] = useState<MarketplaceAccount | null>(null);
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
 
   const useCase = useMemo(() => {
     const repository = new MarketplaceAccountRepositoryImpl();
@@ -64,6 +69,25 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
       throw err;
     } finally {
       setIsModalLoading(false);
+    }
+  };
+
+  const handleEditSuccess = async () => {
+    setEditChannel(null);
+    setSelectedChannel(null);
+    await loadChannels();
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteChannel) return;
+    try {
+      setIsDeleteLoading(true);
+      await useCase.delete(deleteChannel.id);
+      setDeleteChannel(null);
+      setSelectedChannel(null);
+      await loadChannels();
+    } finally {
+      setIsDeleteLoading(false);
     }
   };
 
@@ -148,6 +172,24 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         channel={selectedChannel}
         sellerName={sellerName}
         onClose={() => setSelectedChannel(null)}
+        onEditClick={(channel) => setEditChannel(channel)}
+        onDeleteClick={(channel) => setDeleteChannel(channel)}
+      />
+
+      <EditChannelModal
+        isOpen={editChannel !== null}
+        channel={editChannel}
+        sellerName={sellerName}
+        onClose={() => setEditChannel(null)}
+        onSuccess={handleEditSuccess}
+      />
+
+      <DeleteChannelConfirmation
+        isOpen={deleteChannel !== null}
+        channelLabel={deleteChannel?.accountAlias || deleteChannel?.platform || ''}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteChannel(null)}
+        isLoading={isDeleteLoading}
       />
     </div>
   );

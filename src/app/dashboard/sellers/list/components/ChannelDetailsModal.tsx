@@ -16,6 +16,8 @@ interface ChannelDetailsModalProps {
   channel: MarketplaceAccount | null;
   sellerName: string;
   onClose: () => void;
+  onEditClick?: (channel: MarketplaceAccount) => void;
+  onDeleteClick?: (channel: MarketplaceAccount) => void;
 }
 
 /**
@@ -30,6 +32,8 @@ export function ChannelDetailsModal({
   channel,
   sellerName,
   onClose,
+  onEditClick,
+  onDeleteClick,
 }: ChannelDetailsModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -111,6 +115,27 @@ export function ChannelDetailsModal({
             </div>
           )}
         </div>
+
+        {(onEditClick || onDeleteClick) && (
+          <div className="border-t p-4 flex gap-2">
+            {onEditClick && (
+              <button
+                onClick={() => onEditClick(channel)}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                수정
+              </button>
+            )}
+            {onDeleteClick && (
+              <button
+                onClick={() => onDeleteClick(channel)}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+              >
+                삭제
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
