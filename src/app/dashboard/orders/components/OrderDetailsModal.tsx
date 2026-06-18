@@ -1,6 +1,7 @@
 'use client';
 
 import type { OrderItem } from '@/domain/entities/OrderEntity';
+import { getOrderStatusLabel } from '@/domain/entities/OrderEntity';
 
 interface OrderDetailsModalProps {
   order: OrderItem | null;
@@ -29,7 +30,7 @@ export function OrderDetailsModal({ order, onClose }: OrderDetailsModalProps) {
     { label: '취소수량', value: order.cancelCount },
     { label: '보류수량', value: order.holdCount },
     { label: '구매가능수량', value: order.purchasableQty },
-    { label: '상태', value: order.status },
+    { label: '상태', value: getOrderStatusLabel(order.status) },
     { label: '결제일', value: formatDate(order.paidAt) },
     { label: '마켓 계정 ID', value: order.marketplaceAccountId },
   ];

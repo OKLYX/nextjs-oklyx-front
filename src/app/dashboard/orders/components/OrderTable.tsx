@@ -25,11 +25,8 @@ interface Column {
 const COLUMNS: Column[] = [
   { key: 'externalOrderId', label: '주문번호', align: 'left' },
   { key: 'itemName', label: '상품명', align: 'left' },
-  { key: 'status', label: '상태', align: 'center' },
   { key: 'orderCount', label: '주문수량', align: 'right' },
   { key: 'cancelCount', label: '취소', align: 'right' },
-  { key: 'holdCount', label: '보류', align: 'right' },
-  { key: 'purchasableQty', label: '구매가능수량', align: 'right' },
   { key: 'paidAt', label: '결제일', align: 'left' },
 ];
 
@@ -142,15 +139,8 @@ export function OrderTable({
               >
                 <td className="px-6 py-3 text-sm text-gray-700">{order.externalOrderId}</td>
                 <td className="px-6 py-3 text-sm text-gray-700">{order.itemName || '-'}</td>
-                <td className="px-6 py-3 text-center">
-                  <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                    {order.status}
-                  </span>
-                </td>
                 <td className="px-6 py-3 text-sm text-right text-gray-700">{order.orderCount}</td>
                 <td className="px-6 py-3 text-sm text-right text-gray-700">{order.cancelCount}</td>
-                <td className="px-6 py-3 text-sm text-right text-gray-700">{order.holdCount}</td>
-                <td className="px-6 py-3 text-sm text-right text-gray-700">{order.purchasableQty}</td>
                 <td className="px-6 py-3 text-sm text-gray-700">{formatDate(order.paidAt)}</td>
               </tr>
             ))}

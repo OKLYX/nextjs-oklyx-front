@@ -9,6 +9,7 @@ import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderSyncResponse } from '@/application/dto/OrderDTOs';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { OrderSearchCard } from './OrderSearchCard';
+import { OrderStatusFilter } from './OrderStatusFilter';
 import { OrderTable } from './OrderTable';
 import { OrderDetailsModal } from './OrderDetailsModal';
 
@@ -29,6 +30,7 @@ export function OrderContainer() {
   const [syncResult, setSyncResult] = useState<OrderSyncResponse | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<keyof OrderItem | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
@@ -67,9 +69,23 @@ export function OrderContainer() {
     loadInitialOrders();
   }, [orderUseCase]);
 
+  // Count orders per status for the filter button badges (unaffected by selection)
+  const statusCounts = useMemo(() => {
+    return orders.reduce<Record<string, number>>((acc, order) => {
+      acc[order.status] = (acc[order.status] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [orders]);
+
+  // Apply the status filter before sorting/paging; null status shows all
+  const filteredOrders = useMemo(
+    () => (selectedStatus == null ? orders : orders.filter((o) => o.status === selectedStatus)),
+    [orders, selectedStatus]
+  );
+
   const sortedOrders = useMemo(() => {
-    if (sortKey == null) return orders;
-    const copy = [...orders];
+    if (sortKey == null) return filteredOrders;
+    const copy = [...filteredOrders];
     copy.sort((a, b) => {
       const aValue = a[sortKey];
       const bValue = b[sortKey];
@@ -86,7 +102,7 @@ export function OrderContainer() {
       return sortDir === 'asc' ? comparison : -comparison;
     });
     return copy;
-  }, [orders, sortKey, sortDir]);
+  }, [filteredOrders, sortKey, sortDir]);
 
   const totalPages = Math.ceil(sortedOrders.length / PAGE_SIZE);
 
@@ -140,6 +156,11 @@ export function OrderContainer() {
     setCurrentPage(0);
   };
 
+  const handleStatusChange = (status: string | null) => {
+    setSelectedStatus(status);
+    setCurrentPage(0);
+  };
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
@@ -168,6 +189,12 @@ export function OrderContainer() {
             동기화 완료 — 신규 {syncResult.newOrders}건, 수정 {syncResult.updatedOrders}건, 취소 {syncResult.canceledUpdated}건
           </div>
         )}
+
+        <OrderStatusFilter
+          selectedStatus={selectedStatus}
+          onStatusChange={handleStatusChange}
+          counts={statusCounts}
+        />
 
         <OrderTable
           orders={pagedOrders}
