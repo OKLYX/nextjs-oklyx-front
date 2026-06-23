@@ -22,6 +22,15 @@ import { UnmappedOrdersSection } from './UnmappedOrdersSection';
 import { AddManualItemModal } from './AddManualItemModal';
 import { PurchaseTabs, type PurchaseTab } from './PurchaseTabs';
 import { CompletedPurchaseTable } from './CompletedPurchaseTable';
+import { CompletedPurchaseFilter } from './CompletedPurchaseFilter';
+
+// 로컬 타임존 기준 오늘(YYYY-MM-DD). toISOString(UTC)은 KST에서 하루 어긋날 수 있어 직접 조립.
+const todayStr = () => {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+};
 
 export function PurchaseListContainer() {
   const [sellers, setSellers] = useState<Seller[]>([]);
@@ -44,6 +53,10 @@ export function PurchaseListContainer() {
   const [isCompletedLoading, setIsCompletedLoading] = useState(false);
   const [completedError, setCompletedError] = useState('');
   const [expandedCompletedId, setExpandedCompletedId] = useState<number | null>(null);
+  // 완료내역 필터(판매자 + 구매일 기간). 기본 조회는 오늘. 날짜를 비우면 전체. 조회 버튼으로 적용.
+  const [completedSellerId, setCompletedSellerId] = useState<number | null>(null);
+  const [completedFrom, setCompletedFrom] = useState(todayStr());
+  const [completedTo, setCompletedTo] = useState(todayStr());
 
   const purchaseListUseCase = useMemo(() => {
     const repository = new PurchaseListRepositoryImpl();
@@ -92,11 +105,19 @@ export function PurchaseListContainer() {
     }
   };
 
-  const loadCompleted = async () => {
+  const loadCompleted = async (
+    sid: number | null = completedSellerId,
+    from: string = completedFrom,
+    to: string = completedTo
+  ) => {
     try {
       setIsCompletedLoading(true);
       setCompletedError('');
-      const result = await purchaseListUseCase.getCompletedList();
+      const result = await purchaseListUseCase.getCompletedList(
+        sid ?? undefined,
+        from || undefined,
+        to || undefined
+      );
       setCompletedItems(result);
       loadImages(result);
     } catch {
@@ -113,6 +134,15 @@ export function PurchaseListContainer() {
       setCompletedLoaded(true);
       loadCompleted();
     }
+  };
+
+  const handleCompletedReset = () => {
+    const today = todayStr();
+    setCompletedSellerId(null);
+    setCompletedFrom(today);
+    setCompletedTo(today);
+    setExpandedCompletedId(null);
+    loadCompleted(null, today, today);
   };
 
   // 진입 시 셀러 목록 + 전체 구매 목록 로드
@@ -258,16 +288,34 @@ export function PurchaseListContainer() {
         )}
 
         {activeTab === 'completed' && (
-          <CompletedPurchaseTable
-            items={completedItems}
-            productImages={productImages}
-            isLoading={isCompletedLoading}
-            error={completedError}
-            expandedProductId={expandedCompletedId}
-            onToggle={(productId) =>
-              setExpandedCompletedId((prev) => (prev === productId ? null : productId))
-            }
-          />
+          <>
+            <CompletedPurchaseFilter
+              sellers={sellers}
+              sellerId={completedSellerId}
+              from={completedFrom}
+              to={completedTo}
+              isLoading={isCompletedLoading}
+              onSellerChange={setCompletedSellerId}
+              onFromChange={setCompletedFrom}
+              onToChange={setCompletedTo}
+              onApply={() => {
+                setExpandedCompletedId(null);
+                loadCompleted();
+              }}
+              onReset={handleCompletedReset}
+            />
+
+            <CompletedPurchaseTable
+              items={completedItems}
+              productImages={productImages}
+              isLoading={isCompletedLoading}
+              error={completedError}
+              expandedProductId={expandedCompletedId}
+              onToggle={(productId) =>
+                setExpandedCompletedId((prev) => (prev === productId ? null : productId))
+              }
+            />
+          </>
         )}
       </div>
 

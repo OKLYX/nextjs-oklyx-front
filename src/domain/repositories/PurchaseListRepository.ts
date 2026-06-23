@@ -8,7 +8,8 @@ import type {
 export interface PurchaseListRepository {
   getPurchaseList(sellerId?: number): Promise<PurchaseList>;
   // Completed purchases (remainingQty <= 0 && purchasedQty > 0), flat product list, no pagination.
-  getCompletedList(sellerId?: number): Promise<PurchaseListItem[]>;
+  // sellerId filters by order line's seller (manual lines excluded); from/to filter by purchase date (ISO yyyy-MM-dd, inclusive).
+  getCompletedList(sellerId?: number, from?: string, to?: string): Promise<PurchaseListItem[]>;
   extractPurchaseList(sellerId?: number): Promise<PurchaseList>;
   recordPurchase(itemId: number, request: RecordPurchaseRequest): Promise<void>;
   addManualItem(request: AddManualItemRequest): Promise<void>;

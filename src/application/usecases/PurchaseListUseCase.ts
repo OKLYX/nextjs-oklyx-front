@@ -13,8 +13,12 @@ export class PurchaseListUseCase {
     return this.repository.getPurchaseList(sellerId);
   }
 
-  async getCompletedList(sellerId?: number): Promise<PurchaseListItem[]> {
-    return this.repository.getCompletedList(sellerId);
+  async getCompletedList(
+    sellerId?: number,
+    from?: string,
+    to?: string
+  ): Promise<PurchaseListItem[]> {
+    return this.repository.getCompletedList(sellerId, from, to);
   }
 
   async extract(sellerId?: number): Promise<PurchaseList> {

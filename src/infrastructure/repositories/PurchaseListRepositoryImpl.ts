@@ -15,10 +15,16 @@ export class PurchaseListRepositoryImpl implements PurchaseListRepository {
     return response.data.data;
   }
 
-  async getCompletedList(sellerId?: number): Promise<PurchaseListItem[]> {
-    const response = await axiosInstance.get('/api/admin/purchase-list/completed', {
-      params: sellerId != null ? { sellerId } : {},
-    });
+  async getCompletedList(
+    sellerId?: number,
+    from?: string,
+    to?: string
+  ): Promise<PurchaseListItem[]> {
+    const params: Record<string, string | number> = {};
+    if (sellerId != null) params.sellerId = sellerId;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    const response = await axiosInstance.get('/api/admin/purchase-list/completed', { params });
     return response.data.data;
   }
 
