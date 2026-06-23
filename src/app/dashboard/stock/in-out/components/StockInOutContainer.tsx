@@ -127,7 +127,7 @@ export function StockInOutContainer() {
   };
 
   return (
-    <PageContainer contentClassName="flex flex-col gap-6">
+    <PageContainer contentClassName="max-w-6xl mx-auto flex flex-col gap-6">
       <div className="bg-white rounded-lg shadow">
         <StockInOutForm
           stockType={stockType}

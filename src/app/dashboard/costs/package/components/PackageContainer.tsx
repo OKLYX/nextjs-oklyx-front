@@ -120,7 +120,7 @@ export function PackageContainer() {
   };
 
   return (
-    <PageContainer>
+    <PageContainer contentClassName="max-w-2xl space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">상자비</h1>
           <p className="text-gray-600">배송 상자별 비용을 관리합니다.</p>

@@ -10,6 +10,11 @@ import type { ReactNode } from 'react';
  * - 배경색: `bg-page` 토큰 (globals.css `--page-background`, 단일 출처)
  * - 가장자리 채움: `-m-6`로 DashboardLayout `<main>`의 `p-6` 패딩을 상쇄
  * - 내부 여백: `p-6`로 콘텐츠 패딩 복원, `min-h-full`로 영역 채움
+ * - 최소 가로폭: `min-w-[1080px]`로 콘텐츠가 일정 폭 미만으로 줄지 않도록 보장
+ *   (주문내역의 주문상태 chip 6개가 한 줄에 들어가는 최소 폭 기준).
+ *   이보다 좁아지면 가로 스크롤이 생기고, 사이드바는 햄버거로 전환된다
+ *   (전환 기준폭은 DashboardLayout 참고: 1080 + 사이드바 224 = 1304px).
+ *   ⚠️ chip이 줄바꿈되면 이 값만 키우면 됨 (단일 조정 지점).
  *
  * **파일**: src/presentation/components/PageContainer.tsx
  *
@@ -47,7 +52,7 @@ export function PageContainer({
   contentClassName = 'max-w-6xl mx-auto space-y-6',
 }: PageContainerProps) {
   return (
-    <div className="-m-6 p-6 bg-page min-h-full">
+    <div className="-m-6 p-6 bg-page min-h-full min-w-[1080px]">
       <div className={contentClassName}>{children}</div>
     </div>
   );

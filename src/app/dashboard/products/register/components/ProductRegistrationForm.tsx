@@ -44,6 +44,7 @@ export function ProductRegistrationForm({
   const [isCheckingBarcode, setIsCheckingBarcode] = useState(false);
   const [validatedBarcode, setValidatedBarcode] = useState<string | null>(null);
   const [imageValidationError, setImageValidationError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -101,9 +102,8 @@ export function ProductRegistrationForm({
     setValidatedBarcode(null);
   }, [setValue]);
 
-  const handleImageFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+  const processFile = useCallback(
+    (file: File | undefined) => {
       setImageValidationError(null);
 
       if (!file) {
@@ -129,6 +129,40 @@ export function ProductRegistrationForm({
       onImageChange(file, previewUrl);
     },
     [onImageChange]
+  );
+
+  const handleImageFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      processFile(e.target.files?.[0]);
+    },
+    [processFile]
+  );
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      if (isLoading) return;
+      setIsDragging(true);
+    },
+    [isLoading]
+  );
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      if (isLoading) return;
+      processFile(e.dataTransfer.files?.[0]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    },
+    [isLoading, processFile]
   );
 
   const handleFormSubmit = useCallback(
@@ -432,14 +466,28 @@ export function ProductRegistrationForm({
       <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
         <legend className="text-lg font-semibold text-gray-900 px-2">상품 이미지 (선택)</legend>
         <div className="space-y-4">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png"
-            onChange={handleImageFileChange}
-            disabled={isLoading}
-            className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          />
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`flex flex-col items-center justify-center gap-2 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+              isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+            } ${isLoading ? 'pointer-events-none opacity-60' : ''}`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={handleImageFileChange}
+              disabled={isLoading}
+              className="hidden"
+            />
+            <p className="text-sm text-gray-600">
+              이미지를 드래그하여 추가하거나 클릭하여 선택하세요
+            </p>
+            <p className="text-xs text-gray-400">JPEG, PNG · 최대 20MB</p>
+          </div>
 
           {imageValidationError && <p className="text-red-600 text-sm">{imageValidationError}</p>}
 

@@ -136,7 +136,7 @@ export function CategoryContainer() {
   };
 
   return (
-    <PageContainer>
+    <PageContainer contentClassName="max-w-2xl space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">카테고리</h1>
           <p className="text-gray-600">상품 카테고리를 관리합니다.</p>

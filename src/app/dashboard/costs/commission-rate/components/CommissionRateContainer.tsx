@@ -162,10 +162,10 @@ export function CommissionRateContainer() {
   const filteredCount = hasSearched ? commissionRates.length : 0;
 
   return (
-    <PageContainer contentClassName="flex flex-col gap-6">
+    <PageContainer contentClassName="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">수수료</h1>
-        <p className="text-sm text-gray-600 mt-1">수수료 정보를 조회하고 관리합니다.</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">수수료</h1>
+        <p className="text-gray-600">수수료 정보를 조회하고 관리합니다.</p>
       </div>
 
       <CommissionRateSearchCard
