@@ -103,10 +103,10 @@ export function StockInOutForm({
         />
         <div className="mt-3 space-y-2 text-sm">
           <div className="text-gray-600">
-            Status: {isLookingUp ? <span className="text-blue-600 font-semibold">Loading...</span> : <span className="text-gray-400">-</span>}
+            상태: {isLookingUp ? <span className="text-blue-600 font-semibold">Loading...</span> : <span className="text-gray-400">-</span>}
           </div>
           <div className="text-gray-600 min-h-5">
-            Message: {submitError || lookupError ? <span className="text-red-600 font-semibold">{submitError || lookupError}</span> : <span className="text-gray-400">-</span>}
+            메시지: {submitError || lookupError ? <span className="text-red-600 font-semibold">{submitError || lookupError}</span> : <span className="text-gray-400">-</span>}
           </div>
         </div>
       </div>

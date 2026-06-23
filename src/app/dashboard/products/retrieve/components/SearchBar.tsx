@@ -21,7 +21,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
     <div className="flex gap-2">
       <input
         type="text"
-        placeholder="Search products..."
+        placeholder="상품 검색..."
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -30,7 +30,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         onClick={() => setInputValue('')}
         className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
       >
-        Clear
+        초기화
       </button>
     </div>
   );

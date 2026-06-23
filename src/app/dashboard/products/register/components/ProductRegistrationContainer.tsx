@@ -61,7 +61,7 @@ export function ProductRegistrationContainer() {
           throw err;
         }
 
-        let errorMessage = 'Failed to register product';
+        let errorMessage = '상품 등록에 실패했습니다';
         if (axios.isAxiosError(err)) {
           errorMessage = (err.response?.data as any)?.message || err.message;
         } else if (err instanceof Error) {

@@ -48,7 +48,7 @@ export function ProductListContainer() {
         }
 
         const errorMessage =
-          err instanceof Error ? err.message : 'Failed to fetch products';
+          err instanceof Error ? err.message : '상품 목록을 불러오지 못했습니다';
         setError(errorMessage);
       } finally {
         setIsLoading(false);
@@ -70,8 +70,8 @@ export function ProductListContainer() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Product List</h1>
-        <span className="text-gray-600">{totalElements} products</span>
+        <h1 className="text-3xl font-bold">상품 목록</h1>
+        <span className="text-gray-600">총 {totalElements}개</span>
       </div>
       <SearchBar onSearch={handleSearch} />
       <ProductTable

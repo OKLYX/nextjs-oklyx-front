@@ -662,7 +662,7 @@ export function ProductListingSinglePageForm() {
                       onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
                     />
                   ) : (
-                    <p className="text-gray-400 text-xs text-center px-2">No Image</p>
+                    <p className="text-gray-400 text-xs text-center px-2">이미지 없음</p>
                   )}
                 </div>
                 <div className="flex-1">
@@ -808,7 +808,7 @@ export function ProductListingSinglePageForm() {
                       type="text"
                       value={newOptionName}
                       onChange={(e) => setNewOptionName(e.target.value)}
-                      placeholder="Blue M"
+                      placeholder="예: 블루 M"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
                   </div>
@@ -1033,7 +1033,7 @@ export function ProductListingSinglePageForm() {
               type="text"
               value={newOptionName}
               onChange={(e) => setNewOptionName(e.target.value)}
-              placeholder="Blue M"
+              placeholder="예: 블루 M"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
           </div>
@@ -1280,7 +1280,7 @@ export function ProductListingSinglePageForm() {
                               onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
                             />
                           ) : (
-                            <p className="text-gray-400 text-xs text-center px-2">No Image</p>
+                            <p className="text-gray-400 text-xs text-center px-2">이미지 없음</p>
                           )}
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col justify-between">

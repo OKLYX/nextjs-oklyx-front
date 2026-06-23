@@ -27,7 +27,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
         onClick={() => onPageChange(0)}
         disabled={currentPage === 0}
         className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        title="First page"
+        title="처음으로"
       >
         ⏮
       </button>
@@ -36,7 +36,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 0}
         className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        title="Previous page"
+        title="이전"
       >
         ◀
       </button>
@@ -59,7 +59,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages - 1}
         className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        title="Next page"
+        title="다음"
       >
         ▶
       </button>
@@ -68,7 +68,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
         onClick={() => onPageChange(totalPages - 1)}
         disabled={currentPage === totalPages - 1}
         className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        title="Last page"
+        title="마지막으로"
       >
         ⏭
       </button>

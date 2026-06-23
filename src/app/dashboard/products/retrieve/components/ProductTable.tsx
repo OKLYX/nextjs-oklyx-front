@@ -31,7 +31,7 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <p className="text-gray-600">Loading products...</p>
+        <p className="text-gray-600">상품을 불러오는 중...</p>
       </div>
     );
   }
@@ -39,7 +39,7 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
   if (error) {
     return (
       <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-700">Error: {error}</p>
+        <p className="text-red-700">오류: {error}</p>
       </div>
     );
   }
@@ -47,7 +47,7 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
   if (products.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
-        <p className="text-gray-600">No products found.</p>
+        <p className="text-gray-600">상품이 없습니다.</p>
       </div>
     );
   }
@@ -57,13 +57,13 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-300">
           <tr>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">No.</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Product Name</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Brand</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Price</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Store</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Created Date</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">번호</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상품명</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">브랜드</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">가격</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">구매처</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상태</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">등록일</th>
           </tr>
         </thead>
         <tbody>
@@ -86,7 +86,7 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >
-                  {product.active ? 'Active' : 'Inactive'}
+                  {product.active ? '활성' : '비활성'}
                 </span>
               </td>
               <td className="px-4 py-3 text-sm text-gray-900">{formatDate(product.createdDate)}</td>

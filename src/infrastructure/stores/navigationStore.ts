@@ -27,57 +27,54 @@ interface NavigationStore {
   resetNavigation: () => void;
 }
 
+// All menus closed. Used to enforce accordion behavior:
+// opening one menu collapses every other menu.
+const ALL_MENUS_CLOSED = {
+  isProductsMenuOpen: false,
+  isStockMenuOpen: false,
+  isCostsMenuOpen: false,
+  isUsersMenuOpen: false,
+  isSalesProductsMenuOpen: false,
+  isSellersMenuOpen: false,
+  isOrdersMenuOpen: false,
+  isPurchaseMenuOpen: false,
+} as const;
+
 export const useNavigationStore = create<NavigationStore>()(
   persist(
     (set) => ({
-      isProductsMenuOpen: false,
-      isStockMenuOpen: false,
-      isCostsMenuOpen: false,
-      isUsersMenuOpen: false,
-      isSalesProductsMenuOpen: false,
-      isSellersMenuOpen: false,
-      isOrdersMenuOpen: false,
-      isPurchaseMenuOpen: false,
+      ...ALL_MENUS_CLOSED,
       hasHydrated: false,
       toggleProductsMenu: () => {
-        set((state) => ({ isProductsMenuOpen: !state.isProductsMenuOpen }));
+        set((state) => ({ ...ALL_MENUS_CLOSED, isProductsMenuOpen: !state.isProductsMenuOpen }));
       },
       closeProductsMenu: () => set({ isProductsMenuOpen: false }),
       toggleStockMenu: () => {
-        set((state) => ({ isStockMenuOpen: !state.isStockMenuOpen }));
+        set((state) => ({ ...ALL_MENUS_CLOSED, isStockMenuOpen: !state.isStockMenuOpen }));
       },
       closeStockMenu: () => set({ isStockMenuOpen: false }),
       toggleCostsMenu: () => {
-        set((state) => ({ isCostsMenuOpen: !state.isCostsMenuOpen }));
+        set((state) => ({ ...ALL_MENUS_CLOSED, isCostsMenuOpen: !state.isCostsMenuOpen }));
       },
       closeCostsMenu: () => set({ isCostsMenuOpen: false }),
       toggleUsersMenu: () => {
-        set((state) => ({ isUsersMenuOpen: !state.isUsersMenuOpen }));
+        set((state) => ({ ...ALL_MENUS_CLOSED, isUsersMenuOpen: !state.isUsersMenuOpen }));
       },
       closeUsersMenu: () => set({ isUsersMenuOpen: false }),
       toggleSalesProductsMenu: () => {
-        set((state) => ({ isSalesProductsMenuOpen: !state.isSalesProductsMenuOpen }));
+        set((state) => ({ ...ALL_MENUS_CLOSED, isSalesProductsMenuOpen: !state.isSalesProductsMenuOpen }));
       },
       toggleSellersMenu: () => {
-        set((state) => ({ isSellersMenuOpen: !state.isSellersMenuOpen }));
+        set((state) => ({ ...ALL_MENUS_CLOSED, isSellersMenuOpen: !state.isSellersMenuOpen }));
       },
       toggleOrdersMenu: () => {
-        set((state) => ({ isOrdersMenuOpen: !state.isOrdersMenuOpen }));
+        set((state) => ({ ...ALL_MENUS_CLOSED, isOrdersMenuOpen: !state.isOrdersMenuOpen }));
       },
       togglePurchaseMenu: () => {
-        set((state) => ({ isPurchaseMenuOpen: !state.isPurchaseMenuOpen }));
+        set((state) => ({ ...ALL_MENUS_CLOSED, isPurchaseMenuOpen: !state.isPurchaseMenuOpen }));
       },
       setHasHydrated: (hasHydrated: boolean) => set({ hasHydrated }),
-      resetNavigation: () => set({
-        isProductsMenuOpen: false,
-        isStockMenuOpen: false,
-        isCostsMenuOpen: false,
-        isUsersMenuOpen: false,
-        isSalesProductsMenuOpen: false,
-        isSellersMenuOpen: false,
-        isOrdersMenuOpen: false,
-        isPurchaseMenuOpen: false,
-      }),
+      resetNavigation: () => set({ ...ALL_MENUS_CLOSED }),
     }),
     {
       name: 'navigation-storage',

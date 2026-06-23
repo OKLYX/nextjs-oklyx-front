@@ -81,14 +81,14 @@ export function ProductRegistrationForm({
     try {
       const exists = await onCheckBarcode(barcodeValue);
       if (exists) {
-        setBarcodeError('Barcode already exists');
+        setBarcodeError('이미 존재하는 바코드입니다');
         setValidatedBarcode(null);
       } else {
         setBarcodeError(null);
         setValidatedBarcode(barcodeValue);
       }
     } catch {
-      setBarcodeError('Error checking barcode');
+      setBarcodeError('바코드 확인 중 오류가 발생했습니다');
       setValidatedBarcode(null);
     } finally {
       setIsCheckingBarcode(false);
@@ -113,14 +113,14 @@ export function ProductRegistrationForm({
 
       const validTypes = ['image/jpeg', 'image/png'];
       if (!validTypes.includes(file.type)) {
-        setImageValidationError('Only JPEG and PNG images are allowed.');
+        setImageValidationError('JPEG와 PNG 이미지만 업로드할 수 있습니다.');
         onImageChange(null, null);
         return;
       }
 
       const maxSize = 20 * 1024 * 1024;
       if (file.size > maxSize) {
-        setImageValidationError('Image size must not exceed 20MB.');
+        setImageValidationError('이미지 크기는 20MB를 초과할 수 없습니다.');
         onImageChange(null, null);
         return;
       }
@@ -134,11 +134,11 @@ export function ProductRegistrationForm({
   const handleFormSubmit = useCallback(
     async (data: ProductRegistrationFormValues) => {
       if (!data.productName || data.productName.trim() === '') {
-        setError('productName', { message: 'Product name is required' });
+        setError('productName', { message: '상품명을 입력해주세요' });
         return;
       }
       if (data.barcodeId && data.barcodeId.trim() !== '' && validatedBarcode !== data.barcodeId.trim()) {
-        setError('barcodeId', { message: 'Please check barcode first' });
+        setError('barcodeId', { message: '바코드 중복 확인을 먼저 해주세요' });
         return;
       }
 
@@ -192,21 +192,21 @@ export function ProductRegistrationForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
-      <h1 className="text-3xl font-bold">Register New Product</h1>
+      <h1 className="text-3xl font-bold">새 상품 등록</h1>
 
       {/* Required Fields */}
       <fieldset className="border border-gray-300 rounded-lg p-6 bg-gray-50">
-        <legend className="text-lg font-semibold text-gray-900 px-2">Required</legend>
+        <legend className="text-lg font-semibold text-gray-900 px-2">필수 항목</legend>
         <div className="space-y-4">
           {/* Product Name */}
           <div>
             <label htmlFor="productName" className="block text-sm font-medium text-gray-900 mb-1">
-              Product Name
+              상품명
             </label>
             <input
               id="productName"
               type="text"
-              placeholder="Enter product name"
+              placeholder="상품명을 입력해주세요"
               disabled={isLoading}
               {...register('productName')}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -218,19 +218,19 @@ export function ProductRegistrationForm({
 
       {/* Optional Fields */}
       <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
-        <legend className="text-lg font-semibold text-gray-900 px-2">Optional</legend>
+        <legend className="text-lg font-semibold text-gray-900 px-2">선택 항목</legend>
         <div className="space-y-4">
           {/* Barcode ID */}
           <div>
             <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
-              Barcode ID
+              바코드 ID
             </label>
             <div className="flex gap-2">
               <div className="flex-1">
                 <input
                   id="barcodeId"
                   type="text"
-                  placeholder="Enter barcode ID (optional)"
+                  placeholder="바코드 ID를 입력해주세요 (선택)"
                   {...register('barcodeId')}
                   disabled={validatedBarcode !== null}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -242,7 +242,7 @@ export function ProductRegistrationForm({
                   onClick={handleResetBarcode}
                   className="px-4 py-2 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors"
                 >
-                  Reset
+                  초기화
                 </button>
               ) : (
                 <button
@@ -251,7 +251,7 @@ export function ProductRegistrationForm({
                   disabled={!barcodeValue || barcodeValue.trim() === '' || isCheckingBarcode}
                   className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {isCheckingBarcode ? 'Checking...' : 'Check'}
+                  {isCheckingBarcode ? '확인 중...' : '중복 확인'}
                 </button>
               )}
             </div>
@@ -273,12 +273,12 @@ export function ProductRegistrationForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="brand" className="block text-sm font-medium text-gray-900 mb-1">
-                Brand
+                브랜드
               </label>
               <input
                 id="brand"
                 type="text"
-                placeholder="Enter brand name"
+                placeholder="브랜드명을 입력해주세요"
                 disabled={isLoading}
                 {...register('brand')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -287,7 +287,7 @@ export function ProductRegistrationForm({
 
             <div>
               <label htmlFor="price" className="block text-sm font-medium text-gray-900 mb-1">
-                Price
+                가격
               </label>
               <input
                 id="price"
@@ -306,7 +306,7 @@ export function ProductRegistrationForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="store" className="block text-sm font-medium text-gray-900 mb-1">
-                Store
+                구매처
               </label>
               <select
                 id="store"
@@ -314,7 +314,7 @@ export function ProductRegistrationForm({
                 {...register('store')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Select store</option>
+                <option value="">구매처 선택</option>
                 <option value="이마트">이마트</option>
                 <option value="코스트코">코스트코</option>
                 <option value="노브랜드">노브랜드</option>
@@ -323,7 +323,7 @@ export function ProductRegistrationForm({
 
             <div>
               <label htmlFor="unit" className="block text-sm font-medium text-gray-900 mb-1">
-                Unit
+                단위
               </label>
               <select
                 id="unit"
@@ -331,7 +331,7 @@ export function ProductRegistrationForm({
                 {...register('unit')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Select unit</option>
+                <option value="">단위 선택</option>
                 <option value="G">g</option>
                 <option value="KG">kg</option>
                 <option value="L">l</option>
@@ -343,7 +343,7 @@ export function ProductRegistrationForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="volumeHeight" className="block text-sm font-medium text-gray-900 mb-1">
-                Volume Height
+                높이
               </label>
               <input
                 id="volumeHeight"
@@ -360,7 +360,7 @@ export function ProductRegistrationForm({
 
             <div>
               <label htmlFor="volumeLong" className="block text-sm font-medium text-gray-900 mb-1">
-                Volume Long
+                가로
               </label>
               <input
                 id="volumeLong"
@@ -379,7 +379,7 @@ export function ProductRegistrationForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="volumeShort" className="block text-sm font-medium text-gray-900 mb-1">
-                Volume Short
+                세로
               </label>
               <input
                 id="volumeShort"
@@ -396,7 +396,7 @@ export function ProductRegistrationForm({
 
             <div>
               <label htmlFor="weight" className="block text-sm font-medium text-gray-900 mb-1">
-                Weight
+                무게
               </label>
               <input
                 id="weight"
@@ -414,11 +414,11 @@ export function ProductRegistrationForm({
 
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
-              Description
+              설명
             </label>
             <textarea
               id="description"
-              placeholder="Enter product description"
+              placeholder="상품 설명을 입력해주세요"
               rows={4}
               disabled={isLoading}
               {...register('description')}
@@ -430,7 +430,7 @@ export function ProductRegistrationForm({
 
       {/* Image Upload */}
       <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
-        <legend className="text-lg font-semibold text-gray-900 px-2">Product Image (Optional)</legend>
+        <legend className="text-lg font-semibold text-gray-900 px-2">상품 이미지 (선택)</legend>
         <div className="space-y-4">
           <input
             ref={fileInputRef}
@@ -448,7 +448,7 @@ export function ProductRegistrationForm({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imagePreviewUrl}
-                alt="Preview"
+                alt="미리보기"
                 className="max-h-48 rounded-lg border border-gray-300"
               />
               {imageFile && (
@@ -466,7 +466,7 @@ export function ProductRegistrationForm({
                     }}
                     className="text-sm text-red-600 hover:text-red-700 font-medium"
                   >
-                    Remove
+                    삭제
                   </button>
                 </div>
               )}
@@ -481,7 +481,7 @@ export function ProductRegistrationForm({
         disabled={isLoading || isSubmitDisabled}
         className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
       >
-        {isLoading ? 'Registering...' : 'Request Product'}
+        {isLoading ? '등록 중...' : '상품 등록'}
       </button>
     </form>
   );
