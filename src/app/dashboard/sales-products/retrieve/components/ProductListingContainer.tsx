@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/ProductListingRepositoryImpl';
 import { ProductListingUseCase } from '@/application/usecases/ProductListingUseCase';
 import type { ProductListing } from '@/domain/entities/ProductListingEntity';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import { ProductListingSearchCard } from './ProductListingSearchCard';
 import { ProductListingTable } from './ProductListingTable';
 
@@ -164,9 +165,8 @@ export function ProductListingContainer() {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <ProductListingSearchCard
+    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+      <ProductListingSearchCard
           searchPlatform={searchPlatform}
           onSearchChange={setSearchPlatform}
           onSearch={handleSearch}
@@ -218,7 +218,6 @@ export function ProductListingContainer() {
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </PageContainer>
   );
 }

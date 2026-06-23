@@ -53,7 +53,7 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
   }
 
   return (
-    <div className="overflow-x-auto border border-gray-300 rounded-lg">
+    <div className="overflow-x-auto border border-gray-300 rounded-lg bg-white">
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-300">
           <tr>

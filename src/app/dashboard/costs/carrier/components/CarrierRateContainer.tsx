@@ -8,6 +8,7 @@ import { CarrierRateSearchCard } from './CarrierRateSearchCard';
 import { CarrierRateTable } from './CarrierRateTable';
 import { CreateCarrierRateModal } from './CreateCarrierRateModal';
 import { EditCarrierRateModal } from './EditCarrierRateModal';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import type { CreateCarrierRateRequest } from '@/application/dto/CreateCarrierRateRequest';
 import type { UpdateCarrierRateRequest } from '@/application/dto/UpdateCarrierRateRequest';
 
@@ -131,8 +132,7 @@ export function CarrierRateContainer() {
   );
 
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <PageContainer>
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">택배비</h1>
           <p className="text-gray-600">배송사별 택배비를 관리합니다.</p>
@@ -172,7 +172,6 @@ export function CarrierRateContainer() {
           onCloseDeleteConfirm={handleCloseDeleteConfirm}
           deleteError={deleteError ?? undefined}
         />
-      </div>
-    </div>
+    </PageContainer>
   );
 }

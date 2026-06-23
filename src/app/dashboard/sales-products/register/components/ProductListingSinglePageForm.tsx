@@ -543,11 +543,11 @@ export function ProductListingSinglePageForm() {
   const isAllComplete = selectedSellerId && selectedPlatform && productListingName.trim() && platformProductId && selectedProducts.length > 0 && selectedCategory && selectedCarrierRateId && selectedPackageId && optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0);
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-8">판매상품 등록</h1>
+    <div className="max-w-2xl space-y-8">
+      <h1 className="text-3xl font-bold">판매상품 등록</h1>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           {error}
           <button onClick={() => setError('')} className="ml-2 underline text-red-600 hover:text-red-700">
             닫기
@@ -556,7 +556,7 @@ export function ProductListingSinglePageForm() {
       )}
 
       {successMessage && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
           {successMessage}
           <button onClick={() => setSuccessMessage('')} className="ml-2 underline text-green-600 hover:text-green-700">
             닫기
@@ -565,7 +565,7 @@ export function ProductListingSinglePageForm() {
       )}
 
       {/* Section 0: 판매자 선택 */}
-      <div className="mb-8 p-6 border border-gray-200 rounded-lg">
+      <div className="p-6 border border-gray-200 rounded-lg bg-white">
         <div className="flex items-center gap-3 mb-6 pb-3 border-b">
           <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${selectedSellerId ? 'bg-green-600' : 'bg-gray-400'}`}>
             {selectedSellerId ? '✓' : '0'}
@@ -574,7 +574,7 @@ export function ProductListingSinglePageForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">판매자 *</label>
+          <label className="block text-sm font-medium text-gray-900 mb-1">판매자 *</label>
           <select
             value={selectedSellerId || ''}
             onChange={(e) => setSelectedSellerId(parseInt(e.target.value) || null)}
@@ -591,7 +591,7 @@ export function ProductListingSinglePageForm() {
       </div>
 
       {/* Section 1: 플랫폼 선택 */}
-      <div className="mb-8 p-6 border border-gray-200 rounded-lg">
+      <div className="p-6 border border-gray-200 rounded-lg bg-white">
         <div className="flex items-center gap-3 mb-6 pb-3 border-b">
           <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${selectedPlatform ? 'bg-green-600' : 'bg-gray-400'}`}>
             {selectedPlatform ? '✓' : '1'}
@@ -600,7 +600,7 @@ export function ProductListingSinglePageForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">플랫폼 *</label>
+          <label className="block text-sm font-medium text-gray-900 mb-1">플랫폼 *</label>
           <select
             value={selectedPlatform}
             onChange={(e) => {
@@ -620,7 +620,7 @@ export function ProductListingSinglePageForm() {
       </div>
 
       {/* Section 1-1: 판매상품 이름 */}
-      <div className="mb-8 p-6 border border-gray-200 rounded-lg">
+      <div className="p-6 border border-gray-200 rounded-lg bg-white">
         <div className="flex items-center gap-3 mb-6 pb-3 border-b">
           <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${productListingName.trim() ? 'bg-green-600' : 'bg-gray-400'}`}>
             {productListingName.trim() ? '✓' : '1-1'}
@@ -629,7 +629,7 @@ export function ProductListingSinglePageForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">판매상품 이름 *</label>
+          <label className="block text-sm font-medium text-gray-900 mb-1">판매상품 이름 *</label>
           <input
             type="text"
             value={productListingName}
@@ -641,7 +641,7 @@ export function ProductListingSinglePageForm() {
       </div>
 
       {/* Section 2: 상품 선택 (여러 개) */}
-      <div className="mb-8 p-6 border border-gray-200 rounded-lg">
+      <div className="p-6 border border-gray-200 rounded-lg bg-white">
         <div className="flex items-center gap-3 mb-6 pb-3 border-b">
           <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${selectedProducts.length > 0 ? 'bg-green-600' : 'bg-gray-400'}`}>
             {selectedProducts.length > 0 ? '✓' : '2'}
@@ -692,7 +692,7 @@ export function ProductListingSinglePageForm() {
 
         {/* 쿠팡 상품 ID */}
         <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">쿠팡 상품 ID *</label>
+          <label className="block text-sm font-medium text-gray-900 mb-1">쿠팡 상품 ID *</label>
           <input
             type="text"
             value={platformProductId}
@@ -704,7 +704,7 @@ export function ProductListingSinglePageForm() {
 
         {/* 카테고리 선택 */}
         <div className="mt-6 pt-6 border-t">
-          <label className="block text-sm font-medium text-gray-700 mb-1">카테고리 *</label>
+          <label className="block text-sm font-medium text-gray-900 mb-1">카테고리 *</label>
           <select
             value={selectedCategory || ''}
             onChange={(e) => setSelectedCategory(parseInt(e.target.value) || null)}
@@ -723,7 +723,7 @@ export function ProductListingSinglePageForm() {
       </div>
 
       {/* Section 3: 배송사, 택배비, 패키지 선택 */}
-      <div className="mb-8 p-6 border border-gray-200 rounded-lg">
+      <div className="p-6 border border-gray-200 rounded-lg bg-white">
         <div className="flex items-center gap-3 mb-6 pb-3 border-b">
           <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${selectedCarrierRateId && selectedPackageId ? 'bg-green-600' : 'bg-gray-400'}`}>
             {selectedCarrierRateId && selectedPackageId ? '✓' : '3'}
@@ -733,7 +733,7 @@ export function ProductListingSinglePageForm() {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">배송사 *</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">배송사 *</label>
             <select
               value={selectedCarrier}
               onChange={(e) => {
@@ -752,7 +752,7 @@ export function ProductListingSinglePageForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">택배비 *</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">택배비 *</label>
             <select
               value={selectedCarrierRateId || ''}
               onChange={(e) => setSelectedCarrierRateId(parseInt(e.target.value) || null)}
@@ -769,7 +769,7 @@ export function ProductListingSinglePageForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">패키지 *</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">패키지 *</label>
             <select
               value={selectedPackageId || ''}
               onChange={(e) => setSelectedPackageId(parseInt(e.target.value) || null)}
@@ -787,7 +787,7 @@ export function ProductListingSinglePageForm() {
       </div>
 
       {/* Section 4: 옵션 관리 및 상품 번들 구성 */}
-      <div className="mb-8 p-6 border border-gray-200 rounded-lg">
+      <div className="p-6 border border-gray-200 rounded-lg bg-white">
         <div className="flex items-center gap-3 mb-6 pb-3 border-b">
           <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0) ? 'bg-green-600' : 'bg-gray-400'}`}>
             {optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0) ? '✓' : '4'}
@@ -803,7 +803,7 @@ export function ProductListingSinglePageForm() {
                   <h3 className="font-medium text-sm">옵션 수정</h3>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">옵션명 *</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">옵션명 *</label>
                     <input
                       type="text"
                       value={newOptionName}
@@ -814,7 +814,7 @@ export function ProductListingSinglePageForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">물품 수량 *</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">물품 수량 *</label>
                     <div className="space-y-2 p-2 border border-gray-300 rounded bg-white max-h-48 overflow-y-auto">
                       {selectedProducts.length > 0 ? (
                         selectedProducts.map((product) => (
@@ -863,7 +863,7 @@ export function ProductListingSinglePageForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">판매가 *</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">판매가 *</label>
                     <input
                       type="number"
                       value={newOptionPrice}
@@ -903,7 +903,7 @@ export function ProductListingSinglePageForm() {
                   })()}
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">플랫폼 옵션 ID</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">플랫폼 옵션 ID</label>
                     <input
                       type="text"
                       value={newOptionPlatformId}
@@ -1028,7 +1028,7 @@ export function ProductListingSinglePageForm() {
               <h3 className="font-medium text-sm">새 옵션 추가</h3>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">옵션명 *</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">옵션명 *</label>
             <input
               type="text"
               value={newOptionName}
@@ -1039,7 +1039,7 @@ export function ProductListingSinglePageForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">물품 수량 *</label>
+            <label className="block text-sm font-medium text-gray-900 mb-2">물품 수량 *</label>
             <div className="space-y-2 p-2 border border-gray-300 rounded bg-white max-h-48 overflow-y-auto">
               {selectedProducts.length > 0 ? (
                 selectedProducts.map((product) => (
@@ -1070,7 +1070,7 @@ export function ProductListingSinglePageForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">판매가 *</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">판매가 *</label>
             <input
               type="number"
               value={newOptionPrice}
@@ -1181,7 +1181,7 @@ export function ProductListingSinglePageForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">플랫폼 옵션 ID</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">플랫폼 옵션 ID</label>
             <input
               type="text"
               value={newOptionPlatformId}
@@ -1213,7 +1213,7 @@ export function ProductListingSinglePageForm() {
       </div>
 
       {/* Final Submit Button */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 -mx-8 px-8">
+      <div className="sticky bottom-0 -mb-6 bg-page border-t border-gray-200 p-4 -mx-6 px-6">
         <button
           onClick={handleFinalSubmit}
           disabled={!isAllComplete || isSubmitting}

@@ -24,7 +24,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         placeholder="상품 검색..."
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
-        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
       <button
         onClick={() => setInputValue('')}

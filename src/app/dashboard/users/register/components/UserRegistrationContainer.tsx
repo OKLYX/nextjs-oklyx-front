@@ -7,6 +7,7 @@ import { UserRepositoryImpl } from '@/infrastructure/repositories/UserRepository
 import { CreateUserUseCase } from '@/application/usecases/CreateUserUseCase';
 import type { CreateUserRequest } from '@/domain/repositories/UserRepository';
 import { ROUTES } from '@/config/routes';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import { UserRegistrationForm } from './UserRegistrationForm';
 import { UserRegistrationSuccessDialog } from './UserRegistrationSuccessDialog';
 
@@ -54,21 +55,19 @@ export function UserRegistrationContainer() {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-md mx-auto">
-        <UserRegistrationForm
-          onSubmit={handleSubmit}
-          onCheckEmail={handleCheckEmail}
-          isLoading={isLoading}
-          error={error}
-          resetTrigger={resetTrigger}
-        />
-        <UserRegistrationSuccessDialog
-          isOpen={showSuccessDialog}
-          onGoToUserManage={handleGoToUserManage}
-          onRegisterAnother={handleRegisterAnother}
-        />
-      </div>
-    </div>
+    <PageContainer contentClassName="space-y-6">
+      <UserRegistrationForm
+        onSubmit={handleSubmit}
+        onCheckEmail={handleCheckEmail}
+        isLoading={isLoading}
+        error={error}
+        resetTrigger={resetTrigger}
+      />
+      <UserRegistrationSuccessDialog
+        isOpen={showSuccessDialog}
+        onGoToUserManage={handleGoToUserManage}
+        onRegisterAnother={handleRegisterAnother}
+      />
+    </PageContainer>
   );
 }

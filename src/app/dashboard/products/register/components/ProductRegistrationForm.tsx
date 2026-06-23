@@ -192,10 +192,10 @@ export function ProductRegistrationForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
-      <h1 className="text-3xl font-bold">새 상품 등록</h1>
+      <h1 className="text-3xl font-bold">상품등록</h1>
 
       {/* Required Fields */}
-      <fieldset className="border border-gray-300 rounded-lg p-6 bg-gray-50">
+      <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
         <legend className="text-lg font-semibold text-gray-900 px-2">필수 항목</legend>
         <div className="space-y-4">
           {/* Product Name */}
@@ -475,14 +475,16 @@ export function ProductRegistrationForm({
         </div>
       </fieldset>
 
-      {/* Submit Button */}
-      <button
-        type="submit"
-        disabled={isLoading || isSubmitDisabled}
-        className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-      >
-        {isLoading ? '등록 중...' : '상품 등록'}
-      </button>
+      {/* Submit Button (sticky - 스크롤해도 하단에 고정) */}
+      <div className="sticky bottom-0 -mb-6 bg-page border-t border-gray-200 p-4 -mx-6 px-6">
+        <button
+          type="submit"
+          disabled={isLoading || isSubmitDisabled}
+          className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+        >
+          {isLoading ? '등록 중...' : '상품 등록'}
+        </button>
+      </div>
     </form>
   );
 }

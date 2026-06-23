@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import { CreateProductUseCase } from '@/application/usecases/CreateProductUseCase';
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
@@ -102,7 +103,7 @@ export function ProductRegistrationContainer() {
   }, [error]);
 
   return (
-    <div className="space-y-6">
+    <PageContainer contentClassName="space-y-6">
       {error && (
         <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-700">{error}</p>
@@ -128,6 +129,6 @@ export function ProductRegistrationContainer() {
         onGoToList={handleGoToList}
         onRegisterAnother={handleRegisterAnother}
       />
-    </div>
+    </PageContainer>
   );
 }

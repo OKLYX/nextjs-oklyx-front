@@ -23,6 +23,7 @@ import { AddManualItemModal } from './AddManualItemModal';
 import { PurchaseTabs, type PurchaseTab } from './PurchaseTabs';
 import { CompletedPurchaseTable } from './CompletedPurchaseTable';
 import { CompletedPurchaseFilter } from './CompletedPurchaseFilter';
+import { PageContainer } from '@/presentation/components/PageContainer';
 
 // 로컬 타임존 기준 오늘(YYYY-MM-DD). toISOString(UTC)은 KST에서 하루 어긋날 수 있어 직접 조립.
 const todayStr = () => {
@@ -240,9 +241,8 @@ export function PurchaseListContainer() {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <PurchaseTabs activeTab={activeTab} onChange={handleTabChange} />
+    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+      <PurchaseTabs activeTab={activeTab} onChange={handleTabChange} />
 
         {activeTab === 'list' && (
           <>
@@ -317,13 +317,12 @@ export function PurchaseListContainer() {
             />
           </>
         )}
-      </div>
 
       <AddManualItemModal
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
         onSubmit={handleAddManual}
       />
-    </div>
+    </PageContainer>
   );
 }

@@ -5,6 +5,7 @@ import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerReposi
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { CreateSellerRequest } from '@/application/dto/SellerDTOs';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import { SellerSearchCard } from './SellerSearchCard';
 import { SellerTable } from './SellerTable';
 import { CreateSellerModal } from './CreateSellerModal';
@@ -128,8 +129,7 @@ export function SellerContainer() {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
         <SellerSearchCard
           searchName={searchName}
           onSearchChange={setSearchName}
@@ -181,7 +181,6 @@ export function SellerContainer() {
             </button>
           </div>
         )}
-      </div>
 
       <CreateSellerModal
         isOpen={isCreateModalOpen}
@@ -212,6 +211,6 @@ export function SellerContainer() {
         onCancel={() => setIsDeleteDialogOpen(false)}
         isLoading={isDeleteLoading}
       />
-    </div>
+    </PageContainer>
   );
 }

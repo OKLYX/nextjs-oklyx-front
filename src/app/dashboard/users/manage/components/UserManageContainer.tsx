@@ -5,6 +5,7 @@ import { UserRepositoryImpl } from '@/infrastructure/repositories/UserRepository
 import { GetUsersUseCase } from '@/application/usecases/GetUsersUseCase';
 import type { User } from '@/domain/entities/User';
 import type { GetUsersResponse } from '@/domain/repositories/UserRepository';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import { UserSearchForm } from './UserSearchForm';
 import { UserTable } from './UserTable';
 import { UserDetailModal } from './UserDetailModal';
@@ -72,35 +73,33 @@ export function UserManageContainer() {
   }, []);
 
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <UserSearchForm
-          nameSearch={nameSearch}
-          emailSearch={emailSearch}
-          isLoading={isLoading}
-          onNameChange={setNameSearch}
-          onEmailChange={setEmailSearch}
-          onSearch={() => handleSearch(0)}
+    <PageContainer>
+      <UserSearchForm
+        nameSearch={nameSearch}
+        emailSearch={emailSearch}
+        isLoading={isLoading}
+        onNameChange={setNameSearch}
+        onEmailChange={setEmailSearch}
+        onSearch={() => handleSearch(0)}
+      />
+      <UserTable
+        users={users}
+        totalElements={totalElements}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        isLoading={isLoading}
+        error={error}
+        onPageChange={handlePageChange}
+        onRowClick={handleRowClick}
+      />
+      {selectedUser && (
+        <UserDetailModal
+          user={selectedUser}
+          isOpen={isModalOpen}
+          onClose={handleModalClose}
+          onUpdated={handleUserUpdated}
         />
-        <UserTable
-          users={users}
-          totalElements={totalElements}
-          totalPages={totalPages}
-          currentPage={currentPage}
-          isLoading={isLoading}
-          error={error}
-          onPageChange={handlePageChange}
-          onRowClick={handleRowClick}
-        />
-        {selectedUser && (
-          <UserDetailModal
-            user={selectedUser}
-            isOpen={isModalOpen}
-            onClose={handleModalClose}
-            onUpdated={handleUserUpdated}
-          />
-        )}
-      </div>
-    </div>
+      )}
+    </PageContainer>
   );
 }

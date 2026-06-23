@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import axios from 'axios';
 import { StockRepositoryImpl } from '@/infrastructure/repositories/StockRepositoryImpl';
 import { StockUseCase } from '@/application/usecases/StockUseCase';
@@ -126,7 +127,7 @@ export function StockInOutContainer() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <PageContainer contentClassName="flex flex-col gap-6">
       <div className="bg-white rounded-lg shadow">
         <StockInOutForm
           stockType={stockType}
@@ -150,6 +151,6 @@ export function StockInOutContainer() {
           barcodeInputRef={barcodeInputRef}
         />
       </div>
-    </div>
+    </PageContainer>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import { SearchBar } from './SearchBar';
 import { ProductTable } from './ProductTable';
 import { Pagination } from './Pagination';
@@ -68,7 +69,7 @@ export function ProductListContainer() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <PageContainer contentClassName="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">상품 목록</h1>
         <span className="text-gray-600">총 {totalElements}개</span>
@@ -88,6 +89,6 @@ export function ProductListContainer() {
           onPageChange={handlePageChange}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }

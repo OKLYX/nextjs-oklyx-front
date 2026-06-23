@@ -8,6 +8,7 @@ import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderSyncResponse } from '@/application/dto/OrderDTOs';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import { OrderSearchCard } from './OrderSearchCard';
 import { OrderStatusFilter } from './OrderStatusFilter';
 import { OrderTable } from './OrderTable';
@@ -170,8 +171,7 @@ export function OrderContainer() {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
         <OrderSearchCard
           sellers={sellers}
           selectedSellerId={selectedSellerId}
@@ -211,7 +211,6 @@ export function OrderContainer() {
         />
 
         <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
-      </div>
-    </div>
+    </PageContainer>
   );
 }

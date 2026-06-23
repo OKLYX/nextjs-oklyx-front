@@ -109,105 +109,115 @@ export function UserRegistrationForm({
   const isSubmitDisabled = isLoading || !email || !password || !name || !emailSuccess;
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">회원등록</h2>
+    <form onSubmit={handleSubmit} className="max-w-2xl flex flex-col min-h-[calc(100vh-7rem)] space-y-8">
+      <h1 className="text-3xl font-bold">회원등록</h1>
 
       {error && (
-        <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4 text-red-700">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 text-red-700 rounded-lg">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-            이메일
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setEmailError(null);
-                setEmailSuccess(false);
-              }}
-              onBlur={handleEmailBlur}
-              placeholder="이메일을 입력하세요"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            />
-            {!emailSuccess ? (
-              <button
-                type="button"
-                onClick={handleEmailCheck}
-                disabled={!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || isCheckingEmail}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
-              >
-                {isCheckingEmail ? '확인 중...' : '중복확인'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleReset}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors whitespace-nowrap"
-              >
-                리셋
-              </button>
+      {/* Required Fields */}
+      <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
+        <legend className="text-lg font-semibold text-gray-900 px-2">필수 항목</legend>
+        <div className="space-y-4">
+          {/* Email */}
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-1">
+              이메일
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailError(null);
+                  setEmailSuccess(false);
+                }}
+                onBlur={handleEmailBlur}
+                placeholder="이메일을 입력하세요"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {!emailSuccess ? (
+                <button
+                  type="button"
+                  onClick={handleEmailCheck}
+                  disabled={!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || isCheckingEmail}
+                  className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {isCheckingEmail ? '확인 중...' : '중복확인'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="px-4 py-2 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors whitespace-nowrap"
+                >
+                  리셋
+                </button>
+              )}
+            </div>
+            {emailError && !isCheckingEmail && (
+              <p className="text-red-600 text-sm mt-1">{emailError}</p>
+            )}
+            {emailSuccess && !isCheckingEmail && (
+              <p className="text-green-600 text-sm mt-1">사용 가능한 이메일입니다</p>
             )}
           </div>
-          {emailError && !isCheckingEmail && (
-            <p className="mt-1 text-sm text-red-600">{emailError}</p>
-          )}
-          {emailSuccess && !isCheckingEmail && (
-            <p className="mt-1 text-sm text-green-600">사용 가능한 이메일입니다</p>
-          )}
-        </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-            비밀번호
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={!emailSuccess}
-            placeholder="8-20자리 비밀번호를 입력하세요"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
-          />
-          {passwordError && (
-            <p className="mt-1 text-sm text-red-600">{passwordError}</p>
-          )}
-        </div>
+          {/* Password */}
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-1">
+              비밀번호
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={!emailSuccess}
+              placeholder="8-20자리 비밀번호를 입력하세요"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+            />
+            {passwordError && (
+              <p className="text-red-600 text-sm mt-1">{passwordError}</p>
+            )}
+          </div>
 
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-            이름
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={!emailSuccess}
-            placeholder="이름을 입력하세요"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
-          />
-          {nameError && (
-            <p className="mt-1 text-sm text-red-600">{nameError}</p>
-          )}
+          {/* Name */}
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-900 mb-1">
+              이름
+            </label>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={!emailSuccess}
+              placeholder="이름을 입력하세요"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+            />
+            {nameError && (
+              <p className="text-red-600 text-sm mt-1">{nameError}</p>
+            )}
+          </div>
         </div>
+      </fieldset>
 
+      {/* Submit Button (mt-auto로 하단 밀착 + sticky로 스크롤 시 고정) */}
+      <div className="mt-auto sticky bottom-0 -mb-6 bg-page border-t border-gray-200 p-4 -mx-6 px-6">
         <button
           type="submit"
           disabled={isSubmitDisabled}
-          className="w-full py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+          className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           {isLoading ? '등록 중...' : '회원등록'}
         </button>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 }

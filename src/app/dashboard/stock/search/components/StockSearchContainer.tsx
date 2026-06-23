@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import { StockRepositoryImpl } from '@/infrastructure/repositories/StockRepositoryImpl';
 import { StockUseCase } from '@/application/usecases/StockUseCase';
 import type { GetStockLogsResponse } from '@/domain/repositories/StockRepository';
@@ -70,8 +71,7 @@ export function StockSearchContainer() {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <PageContainer>
         <StockSearchForm
           barcodeId={barcodeId}
           productName={productName}
@@ -106,7 +106,6 @@ export function StockSearchContainer() {
             검색 결과가 없습니다.
           </div>
         )}
-      </div>
-    </div>
+    </PageContainer>
   );
 }

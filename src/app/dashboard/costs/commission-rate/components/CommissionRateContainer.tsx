@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import type { CommissionRate } from '@/domain/entities/CommissionRateEntity';
 import type { Category } from '@/domain/entities/CategoryEntity';
 import { CommissionRateUseCase } from '@/application/usecases/CommissionRateUseCase';
@@ -161,7 +162,7 @@ export function CommissionRateContainer() {
   const filteredCount = hasSearched ? commissionRates.length : 0;
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <PageContainer contentClassName="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">수수료</h1>
         <p className="text-sm text-gray-600 mt-1">수수료 정보를 조회하고 관리합니다.</p>
@@ -214,6 +215,6 @@ export function CommissionRateContainer() {
         isLoading={isDeletingRate}
         error={deleteError || undefined}
       />
-    </div>
+    </PageContainer>
   );
 }

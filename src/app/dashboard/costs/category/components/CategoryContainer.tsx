@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import type { Category } from '@/domain/entities/CategoryEntity';
 import type { CreateCategoryRequest } from '@/application/dto/CreateCategoryRequest';
 import type { UpdateCategoryRequest } from '@/application/dto/UpdateCategoryRequest';
@@ -135,8 +136,7 @@ export function CategoryContainer() {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <PageContainer>
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">카테고리</h1>
           <p className="text-gray-600">상품 카테고리를 관리합니다.</p>
@@ -191,7 +191,6 @@ export function CategoryContainer() {
             categories={categories}
           />
         )}
-      </div>
-    </div>
+    </PageContainer>
   );
 }
