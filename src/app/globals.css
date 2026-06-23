@@ -1,11 +1,31 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode: `.dark` on <html> activates the overrides below. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
   /* Dashboard content area background (single source of truth) */
   --page-background: #f9fafb;
-  color-scheme: light only;
+  color-scheme: light;
+}
+
+/* ============================================================
+   DARK MODE — single source of truth
+   ------------------------------------------------------------
+   The app hardcodes neutral Tailwind utilities (bg-white,
+   text-gray-900, border-gray-300, ...). Instead of editing
+   ~100 components, we remap those utilities under `.dark` here.
+   To tune the dark palette, edit ONLY this block.
+   Semantic colors (red/blue/green buttons & badges) are
+   remapped sparingly so alerts stay readable.
+   ============================================================ */
+.dark {
+  --background: #121212;
+  --foreground: #e5e5e5;
+  --page-background: #181818;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -23,3 +43,63 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ---- Surfaces (backgrounds) ---- */
+.dark .bg-white { background-color: #1e1e1e; }
+.dark .bg-gray-50 { background-color: #181818; }
+.dark .bg-gray-100 { background-color: #262626; }
+.dark .bg-gray-200 { background-color: #303030; }
+.dark .bg-gray-300 { background-color: #3a3a3a; }
+.dark .bg-page { background-color: var(--page-background); }
+
+/* ---- Text ---- */
+.dark .text-gray-900 { color: #e5e5e5; }
+.dark .text-gray-800 { color: #dadada; }
+.dark .text-gray-700 { color: #cfcfcf; }
+.dark .text-gray-600 { color: #a8a8a8; }
+.dark .text-gray-500 { color: #8c8c8c; }
+.dark .text-gray-400 { color: #6e6e6e; }
+.dark .text-gray-300 { color: #5a5a5a; }
+
+/* ---- Borders & dividers ---- */
+.dark .border-gray-100 { border-color: #2a2a2a; }
+.dark .border-gray-200 { border-color: #333333; }
+.dark .border-gray-300 { border-color: #404040; }
+.dark .border-gray-400 { border-color: #4a4a4a; }
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #2a2a2a; }
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #333333; }
+.dark .divide-gray-300 > :not([hidden]) ~ :not([hidden]) { border-color: #404040; }
+
+/* ---- Interactive states (hover / focus / disabled) ---- */
+.dark .hover\:bg-gray-50:hover { background-color: #242424; }
+.dark .hover\:bg-gray-100:hover { background-color: #2c2c2c; }
+.dark .hover\:bg-gray-200:hover { background-color: #363636; }
+.dark .hover\:bg-gray-300:hover { background-color: #404040; }
+.dark .hover\:text-gray-700:hover { color: #cfcfcf; }
+.dark .hover\:text-gray-900:hover { color: #e5e5e5; }
+.dark .hover\:border-gray-400:hover { border-color: #4a4a4a; }
+.dark .disabled\:bg-gray-50:disabled { background-color: #1e1e1e; }
+.dark .disabled\:bg-gray-100:disabled { background-color: #262626; }
+.dark .disabled\:bg-gray-200:disabled { background-color: #2c2c2c; }
+.dark .disabled\:bg-gray-300:disabled { background-color: #333333; }
+.dark .disabled\:text-gray-400:disabled { color: #5a5a5a; }
+.dark .disabled\:text-gray-500:disabled { color: #6e6e6e; }
+
+/* ---- Semantic alert/badge surfaces (soft -50/-100 → dark tints) ---- */
+.dark .bg-red-50 { background-color: #2a1416; }
+.dark .bg-red-100 { background-color: #3a1a1d; }
+.dark .bg-blue-50 { background-color: #11202e; }
+.dark .bg-blue-100 { background-color: #16293a; }
+.dark .bg-green-50 { background-color: #11261a; }
+.dark .bg-green-100 { background-color: #163021; }
+.dark .bg-purple-50 { background-color: #1f1630; }
+.dark .bg-purple-100 { background-color: #271a3a; }
+.dark .bg-amber-50 { background-color: #2a2110; }
+.dark .hover\:bg-blue-50:hover { background-color: #16293a; }
+
+/* ---- Semantic alert/badge text (dark -700/-800 → lighter on dark bg) ---- */
+.dark .text-red-700, .dark .text-red-800 { color: #f87171; }
+.dark .text-blue-700, .dark .text-blue-800, .dark .text-blue-900 { color: #60a5fa; }
+.dark .text-green-700, .dark .text-green-800 { color: #4ade80; }
+.dark .text-purple-700 { color: #c084fc; }
+.dark .text-amber-700, .dark .text-amber-800 { color: #fbbf24; }
