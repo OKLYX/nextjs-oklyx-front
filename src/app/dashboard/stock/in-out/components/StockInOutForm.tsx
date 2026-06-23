@@ -71,7 +71,7 @@ export function StockInOutForm({
           onClick={() => handleTypeChange('IN')}
           className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
             stockType === 'IN'
-              ? 'bg-blue-500 text-white'
+              ? 'bg-sky-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -81,7 +81,7 @@ export function StockInOutForm({
           onClick={() => handleTypeChange('OUT')}
           className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
             stockType === 'OUT'
-              ? 'bg-blue-500 text-white'
+              ? 'bg-red-700 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -99,7 +99,9 @@ export function StockInOutForm({
           placeholder="바코드를 입력하세요"
           disabled={isLookingUp}
           autoFocus
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 disabled:bg-gray-100 ${
+            stockType === 'IN' ? 'focus:ring-sky-600' : 'focus:ring-red-700'
+          }`}
         />
         <div className="mt-3 space-y-2 text-sm">
           <div className="text-gray-600">

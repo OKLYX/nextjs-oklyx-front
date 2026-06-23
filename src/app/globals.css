@@ -8,6 +8,20 @@
   --foreground: #171717;
   /* Dashboard content area background (single source of truth) */
   --page-background: #f9fafb;
+
+  /* ---- Brand palette (single source of truth) ----
+     Main  #FEC416 — primary actions (buttons, focus rings, brand logo)
+     Sub   #14A05D — positive / confirm actions
+     Sub   #0A7E7D — teal accent  (token: bg-brand-teal / text-brand-teal)
+     Sub   #263238 — slate accent (token: bg-brand-slate / text-brand-slate) */
+  --brand-main: #fec416;
+  --brand-main-hover: #e0ac13;
+  --brand-main-light: #fed44f;
+  --brand-green: #14a05d;
+  --brand-green-hover: #0f804a;
+  --brand-teal: #0a7e7d;
+  --brand-slate: #263238;
+
   color-scheme: light;
 }
 
@@ -22,9 +36,9 @@
    remapped sparingly so alerts stay readable.
    ============================================================ */
 .dark {
-  --background: #121212;
+  --background: #292929;
   --foreground: #e5e5e5;
-  --page-background: #181818;
+  --page-background: #303030;
   color-scheme: dark;
 }
 
@@ -33,6 +47,13 @@
   --color-foreground: var(--foreground);
   /* Exposes `bg-page`, `text-page`, etc. for the page surface color */
   --color-page: var(--page-background);
+  /* Exposes brand utilities: bg-brand, text-brand, border-brand, bg-brand-green, ... */
+  --color-brand: var(--brand-main);
+  --color-brand-hover: var(--brand-main-hover);
+  --color-brand-light: var(--brand-main-light);
+  --color-brand-green: var(--brand-green);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-slate: var(--brand-slate);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -45,11 +66,11 @@ body {
 }
 
 /* ---- Surfaces (backgrounds) ---- */
-.dark .bg-white { background-color: #1e1e1e; }
-.dark .bg-gray-50 { background-color: #181818; }
-.dark .bg-gray-100 { background-color: #262626; }
-.dark .bg-gray-200 { background-color: #303030; }
-.dark .bg-gray-300 { background-color: #3a3a3a; }
+.dark .bg-white { background-color: #363636; }
+.dark .bg-gray-50 { background-color: #303030; }
+.dark .bg-gray-100 { background-color: #3c3c3c; }
+.dark .bg-gray-200 { background-color: #464646; }
+.dark .bg-gray-300 { background-color: #505050; }
 .dark .bg-page { background-color: var(--page-background); }
 
 /* ---- Text ---- */
@@ -103,3 +124,34 @@ body {
 .dark .text-green-700, .dark .text-green-800 { color: #4ade80; }
 .dark .text-purple-700 { color: #c084fc; }
 .dark .text-amber-700, .dark .text-amber-800 { color: #fbbf24; }
+
+/* ============================================================
+   BRAND PALETTE REMAP — single source of truth
+   ------------------------------------------------------------
+   The app hardcodes saturated `blue-*` for primary actions and
+   `green-*` for confirm/positive actions. Instead of editing
+   ~100 components, we remap those action utilities to the brand
+   colors here (same approach as the dark block above).
+   Applies in BOTH light and dark mode.
+   Soft -50/-100 tints and text-* badges are intentionally left
+   as-is so info/success alert semantics stay readable.
+   To tune the brand, edit ONLY the --brand-* vars in :root.
+   ============================================================ */
+/* Primary action → Main (#D99026) */
+.bg-blue-400 { background-color: var(--brand-main-light); }
+.bg-blue-500,
+.bg-blue-600 { background-color: var(--brand-main); }
+.hover\:bg-blue-600:hover,
+.hover\:bg-blue-700:hover { background-color: var(--brand-main-hover); }
+.border-blue-500,
+.border-blue-600 { border-color: var(--brand-main); }
+.text-blue-600 { color: var(--brand-main-hover); }
+.focus\:ring-blue-500:focus { --tw-ring-color: var(--brand-main); }
+
+/* Positive / confirm action → Sub green (#14A05D) */
+.bg-green-400,
+.bg-green-500,
+.bg-green-600 { background-color: var(--brand-green); }
+.bg-green-700 { background-color: var(--brand-green-hover); }
+.hover\:bg-green-600:hover,
+.hover\:bg-green-700:hover { background-color: var(--brand-green-hover); }
