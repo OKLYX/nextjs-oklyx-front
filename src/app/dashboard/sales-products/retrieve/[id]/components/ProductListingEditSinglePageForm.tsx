@@ -854,20 +854,45 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                   {(() => {
                     const sellingPrice = newOptionPrice ? parseFloat(newOptionPrice) : 0;
                     const margin = calculateMarginPreview(sellingPrice);
+                    const marginRate = sellingPrice > 0 ? Math.round((margin / sellingPrice) * 100 * 100) / 100 : 0;
                     const marginColor = margin > 0 ? 'text-green-600' : 'text-red-600';
+                    const selectedCarrierRate = carrierRates.find((cr) => cr.id === selectedCarrierRateId);
+                    const selectedPkg = packages.find((p) => p.id === selectedPackageId);
+                    const totalProductCost = selectedProducts.reduce((sum, product) => {
+                      if (productQuantities[product.id] === undefined) return sum;
+                      return sum + (product.price ? product.price * (productQuantities[product.id] || 1) : 0);
+                    }, 0);
+                    const commissionFee = sellingPrice * commissionRate * 1.1;
                     return (
-                      <div className="p-2 bg-blue-50 rounded text-xs space-y-1">
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">판매가:</span>
-                          <span>₩{Math.round(sellingPrice).toLocaleString()}</span>
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs space-y-1">
+                        <p className="font-semibold text-gray-900 mb-2">마진 계산</p>
+                        <div className="flex justify-between text-gray-700">
+                          <span>판매가:</span>
+                          <span className="font-medium">₩{Math.round(sellingPrice).toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-700">수수료 (+ 10%):</span>
-                          <span>₩{Math.round(sellingPrice * commissionRate * 1.1).toLocaleString()}</span>
+                        <div className="flex justify-between text-gray-700">
+                          <span>- 수수료 (+ 10%):</span>
+                          <span>₩{Math.round(commissionFee).toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between border-t pt-1 mt-1">
-                          <span className="font-semibold text-gray-900">마진:</span>
-                          <span className={`font-bold ${marginColor}`}>₩{Math.round(margin).toLocaleString()}</span>
+                        <div className="flex justify-between text-gray-700">
+                          <span>- 상품 비용:</span>
+                          <span>₩{totalProductCost.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-700">
+                          <span>- 택배비:</span>
+                          <span>₩{(selectedCarrierRate?.cost || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-700">
+                          <span>- 상자비:</span>
+                          <span>₩{(selectedPkg?.cost || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-blue-300 pt-2 mt-2">
+                          <span className="font-semibold text-gray-900">= 마진:</span>
+                          <span className={`font-bold text-lg ${marginColor}`}>₩{Math.round(margin).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between pt-2">
+                          <span className="text-gray-700">마진율:</span>
+                          <span className="font-semibold text-gray-900">{marginRate}%</span>
                         </div>
                       </div>
                     );
@@ -1104,11 +1129,11 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                         <span>₩{totalProductCost.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-gray-700">
-                        <span>- 배송료:</span>
+                        <span>- 택배비:</span>
                         <span>₩{(selectedCarrierRate?.cost || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-gray-700">
-                        <span>- 패키지:</span>
+                        <span>- 상자비:</span>
                         <span>₩{(selectedPkg?.cost || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between border-t border-blue-300 pt-2 mt-2">
