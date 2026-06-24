@@ -252,6 +252,19 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
             })) : [],
           }));
           setOptionsData(optionsWithProducts);
+
+          // 옵션 편집 폼에 보여줄 상품 목록 구성 (모든 옵션의 구성상품 합집합, productId 기준 중복 제거)
+          // 가격은 로드된 products 목록에서 조회 (마진 계산용); 미조회 시 최소 형태로 폴백
+          const productMap = new Map<number, Product>();
+          listing.options.forEach((opt: ProductListingOption) =>
+            opt.products?.forEach((p) => {
+              if (!productMap.has(p.productId)) {
+                const full = productsData.find((fp) => fp.id === p.productId);
+                productMap.set(p.productId, full ?? ({ id: p.productId, productName: p.productName } as Product));
+              }
+            })
+          );
+          setSelectedProducts(Array.from(productMap.values()));
         }
 
         if (commissionData.length > 0) {
@@ -338,17 +351,21 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
       return;
     }
 
-    // 선택된 모든 상품 포함 (수량 적용)
+    // 체크된 상품만 포함 (raw productId 키, 수량 적용)
     const selectedProdQuantities: Array<{ productId: number; productName: string; quantity: number }> = [];
     selectedProducts.forEach((product) => {
-      const key = `add-option-${product.id}`;
-      const quantity = productQuantities[key] || 1;
+      if (productQuantities[product.id] === undefined) return;
       selectedProdQuantities.push({
         productId: product.id,
         productName: product.productName,
-        quantity: quantity,
+        quantity: productQuantities[product.id] || 1,
       });
     });
+
+    if (selectedProdQuantities.length === 0) {
+      setError('최소 1개 이상의 상품을 선택해주세요');
+      return;
+    }
 
     if (editingOptionId) {
       // 기존 옵션 수정
@@ -412,11 +429,10 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
 
     const selectedProdQuantities: Array<{ productId: number; quantity: number }> = [];
     selectedProducts.forEach((product) => {
-      const key = `add-option-${product.id}`;
-      const quantity = productQuantities[key] || 1;
+      if (productQuantities[product.id] === undefined) return;
       selectedProdQuantities.push({
         productId: product.id,
-        quantity: quantity,
+        quantity: productQuantities[product.id] || 1,
       });
     });
 
@@ -449,11 +465,10 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
 
     const selectedProdQuantities: Array<{ productId: number; quantity: number }> = [];
     selectedProducts.forEach((product) => {
-      const key = `add-option-${product.id}`;
-      const quantity = productQuantities[key] || 1;
+      if (productQuantities[product.id] === undefined) return;
       selectedProdQuantities.push({
         productId: product.id,
-        quantity: quantity,
+        quantity: productQuantities[product.id] || 1,
       });
     });
 
@@ -753,45 +768,212 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
 
         {optionsData.length > 0 && (
           <div className="mb-6 space-y-4">
-            {optionsData.map((item) => (
-              <div key={item.option.id} className="p-4 bg-gray-50 rounded border border-gray-200">
-                <div className="flex justify-between items-start mb-3">
+            {optionsData.map((item) =>
+              editingOptionId === item.option.id ? (
+                <div key={item.option.id} className="space-y-3 p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <h3 className="font-medium text-sm">옵션 수정</h3>
+
                   <div>
-                    <p className="font-medium">{item.option.optionName}</p>
-                    <p className="text-sm text-gray-600">판매가: ₩{item.option.sellingPrice.toLocaleString()}</p>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">옵션명 *</label>
+                    <input
+                      type="text"
+                      value={newOptionName}
+                      onChange={(e) => setNewOptionName(e.target.value)}
+                      placeholder="예: 블루 M"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">물품 수량 *</label>
+                    <div className="space-y-2 p-2 border border-gray-300 rounded bg-white max-h-48 overflow-y-auto">
+                      {selectedProducts.length > 0 ? (
+                        selectedProducts.map((product) => (
+                          <div key={product.id} className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-900">{product.productName}</p>
+                              {product.price && <p className="text-xs text-gray-500">₩{Math.round(product.price).toLocaleString()}</p>}
+                            </div>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={productQuantities[product.id] !== undefined}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setProductQuantities({
+                                      ...productQuantities,
+                                      [product.id]: productQuantities[product.id] || 1,
+                                    });
+                                  } else {
+                                    const newQuantities = { ...productQuantities };
+                                    delete newQuantities[product.id];
+                                    setProductQuantities(newQuantities);
+                                  }
+                                }}
+                                className="rounded"
+                              />
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={productQuantities[product.id] || 1}
+                              onChange={(e) => {
+                                setProductQuantities({
+                                  ...productQuantities,
+                                  [product.id]: parseInt(e.target.value) || 1,
+                                });
+                              }}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-600">선택된 상품이 없습니다</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">판매가 *</label>
+                    <input
+                      type="number"
+                      value={newOptionPrice}
+                      onChange={(e) => setNewOptionPrice(e.target.value)}
+                      onBlur={() => {
+                        if (newOptionPrice) {
+                          const num = parseFloat(newOptionPrice) || 0;
+                          const roundedToTen = Math.floor(num / 10) * 10;
+                          setNewOptionPrice(String(roundedToTen));
+                        }
+                      }}
+                      placeholder="29900"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+
+                  {(() => {
+                    const sellingPrice = newOptionPrice ? parseFloat(newOptionPrice) : 0;
+                    const margin = calculateMarginPreview(sellingPrice);
+                    const marginColor = margin > 0 ? 'text-green-600' : 'text-red-600';
+                    return (
+                      <div className="p-2 bg-blue-50 rounded text-xs space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">판매가:</span>
+                          <span>₩{Math.round(sellingPrice).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">수수료 (+ 10%):</span>
+                          <span>₩{Math.round(sellingPrice * commissionRate * 1.1).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-1 mt-1">
+                          <span className="font-semibold text-gray-900">마진:</span>
+                          <span className={`font-bold ${marginColor}`}>₩{Math.round(margin).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">플랫폼 옵션 ID</label>
+                    <input
+                      type="text"
+                      value={newOptionPlatformId}
+                      onChange={(e) => setNewOptionPlatformId(e.target.value)}
+                      placeholder="option_abc123"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => handleEditOption(item.option, item.products)}
-                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                      onClick={handleAddOption}
+                      className="flex-1 bg-green-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-green-700 text-sm"
                     >
-                      수정
+                      저장
                     </button>
                     <button
                       type="button"
-                      onClick={() => removeOption(item.option.id)}
-                      className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                      onClick={handleCancelEdit}
+                      className="flex-1 bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg hover:bg-gray-400 text-sm"
                     >
-                      삭제
+                      취소
                     </button>
                   </div>
                 </div>
+              ) : (
+                <div key={item.option.id} className="p-4 bg-gray-50 rounded border border-gray-200">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-medium">{item.option.optionName}</p>
+                      <p className="text-sm text-gray-600">판매가: ₩{item.option.sellingPrice.toLocaleString()}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleEditOption(item.option, item.products)}
+                        className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                      >
+                        수정
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeOption(item.option.id)}
+                        className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
 
-                {item.products.length > 0 && (
-                  <div className="mb-3 p-3 bg-white rounded border border-gray-200 space-y-2">
-                    {item.products.map((product, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-sm">
-                        <div>
-                          <p className="font-medium">{product.productName}</p>
-                          <p className="text-gray-600">수량: {product.quantity}</p>
+                  {item.products.length > 0 && (
+                    <div className="mb-3 p-3 bg-white rounded border border-gray-200 space-y-2">
+                      {item.products.map((product, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-sm">
+                          <div>
+                            <p className="font-medium">{product.productName}</p>
+                            <p className="text-gray-600">수량: {product.quantity}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {(() => {
+                    const margin = calculateMargin(item.option.sellingPrice, item.products);
+                    const marginColor = margin > 0 ? 'text-green-600' : 'text-red-600';
+                    return (
+                      <div className="p-2 bg-blue-50 rounded text-xs space-y-1 mb-3">
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">판매가:</span>
+                          <span>₩{Math.round(item.option.sellingPrice).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">수수료 (+ 10%):</span>
+                          <span>₩{Math.round(item.option.sellingPrice * commissionRate * 1.1).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-700">상품 비용:</span>
+                          <span>
+                            ₩
+                            {item.products
+                              .reduce((sum, p) => {
+                                const product = selectedProducts.find((sp) => sp.id === p.productId);
+                                return sum + (product?.price ? product.price * p.quantity : 0);
+                              }, 0)
+                              .toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-1 mt-1">
+                          <span className="font-semibold text-gray-900">마진:</span>
+                          <span className={`font-bold ${marginColor}`}>₩{Math.round(margin).toLocaleString()}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                    );
+                  })()}
+                </div>
+              )
+            )}
           </div>
         )}
 
@@ -817,29 +999,165 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
               <h3 className="font-medium text-sm">새 옵션 추가</h3>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">옵션명 *</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">옵션명 *</label>
                 <input
                   type="text"
                   value={newOptionName}
                   onChange={(e) => setNewOptionName(e.target.value)}
-                  placeholder="옵션명 (예: Blue M)"
+                  placeholder="예: 블루 M"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">판매가 *</label>
+                <label className="block text-sm font-medium text-gray-900 mb-2">물품 수량 *</label>
+                <div className="space-y-2 p-2 border border-gray-300 rounded bg-white max-h-48 overflow-y-auto">
+                  {selectedProducts.length > 0 ? (
+                    selectedProducts.map((product) => (
+                      <div key={product.id} className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">{product.productName}</p>
+                          {product.price && <p className="text-xs text-gray-500">₩{Math.round(product.price).toLocaleString()}</p>}
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={productQuantities[product.id] !== undefined}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setProductQuantities({
+                                  ...productQuantities,
+                                  [product.id]: productQuantities[product.id] || 1,
+                                });
+                              } else {
+                                const newQuantities = { ...productQuantities };
+                                delete newQuantities[product.id];
+                                setProductQuantities(newQuantities);
+                              }
+                            }}
+                            className="rounded"
+                          />
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={productQuantities[product.id] || 1}
+                          onChange={(e) => {
+                            setProductQuantities({
+                              ...productQuantities,
+                              [product.id]: parseInt(e.target.value) || 1,
+                            });
+                          }}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-500 py-2">선택된 상품이 없습니다</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">판매가 *</label>
                 <input
                   type="number"
                   value={newOptionPrice}
                   onChange={(e) => setNewOptionPrice(e.target.value)}
+                  onBlur={() => {
+                    if (newOptionPrice) {
+                      const num = parseFloat(newOptionPrice) || 0;
+                      const roundedToTen = Math.floor(num / 10) * 10;
+                      setNewOptionPrice(String(roundedToTen));
+                    }
+                  }}
                   placeholder="29900"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
+
+                {(() => {
+                  const sellingPrice = parseFloat(newOptionPrice) || 0;
+                  const margin = calculateMarginPreview(sellingPrice);
+                  const marginRate = sellingPrice > 0 ? Math.round((margin / sellingPrice) * 100 * 100) / 100 : 0;
+                  const marginColor = margin > 0 ? 'text-green-600' : 'text-red-600';
+                  const selectedCarrierRate = carrierRates.find((cr) => cr.id === selectedCarrierRateId);
+                  const selectedPkg = packages.find((p) => p.id === selectedPackageId);
+                  const totalProductCost = selectedProducts.reduce((sum, product) => {
+                    if (productQuantities[product.id] === undefined) return sum;
+                    return sum + (product.price ? product.price * (productQuantities[product.id] || 1) : 0);
+                  }, 0);
+                  const commissionFee = sellingPrice * commissionRate * 1.1;
+
+                  return (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs space-y-1">
+                      <p className="font-semibold text-gray-900 mb-2">마진 계산</p>
+                      <div className="flex justify-between text-gray-700">
+                        <span>판매가:</span>
+                        <span className="font-medium">₩{Math.round(sellingPrice).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700">
+                        <span>- 수수료 (+ 10%):</span>
+                        <span>₩{Math.round(commissionFee).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700">
+                        <span>- 상품 비용:</span>
+                        <span>₩{totalProductCost.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700">
+                        <span>- 배송료:</span>
+                        <span>₩{(selectedCarrierRate?.cost || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-700">
+                        <span>- 패키지:</span>
+                        <span>₩{(selectedPkg?.cost || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-blue-300 pt-2 mt-2">
+                        <span className="font-semibold text-gray-900">= 마진:</span>
+                        <span className={`font-bold text-lg ${marginColor}`}>₩{Math.round(margin).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between pt-2">
+                        <span className="text-gray-700">마진율:</span>
+                        <span className="font-semibold text-gray-900">{marginRate}%</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 마진율로 판매가 설정 */}
+                <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">마진율로 판매가 설정</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={newOptionMarginRate}
+                      onChange={(e) => setNewOptionMarginRate(e.target.value)}
+                      placeholder="목표 마진율 (%)"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      className="flex-1 px-4 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rate = parseFloat(newOptionMarginRate);
+                        if (!isNaN(rate) && rate >= 0 && rate < 100) {
+                          const newPrice = calculateSellingPriceFromMarginRate(rate);
+                          const roundedPrice = Math.ceil(newPrice / 10) * 10;
+                          setNewOptionPrice(String(roundedPrice));
+                          setNewOptionMarginRate('');
+                        }
+                      }}
+                      className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 text-sm"
+                    >
+                      적용
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">플랫폼 옵션 ID</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">플랫폼 옵션 ID</label>
                 <input
                   type="text"
                   value={newOptionPlatformId}
@@ -855,7 +1173,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                   onClick={handleAddOption}
                   className="flex-1 bg-green-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-green-700"
                 >
-                  옵션 추가
+                  옵션 설정 완료
                 </button>
                 <button
                   type="button"
