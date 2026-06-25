@@ -27,6 +27,7 @@ interface NavigationStore {
   togglePurchaseMenu: () => void;
   toggleSidebar: () => void;
   closeSidebar: () => void;
+  setSidebarOpen: (open: boolean) => void;
   setHasHydrated: (hasHydrated: boolean) => void;
   resetNavigation: () => void;
 }
@@ -80,6 +81,7 @@ export const useNavigationStore = create<NavigationStore>()(
       },
       toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
       closeSidebar: () => set({ isSidebarOpen: false }),
+      setSidebarOpen: (open: boolean) => set({ isSidebarOpen: open }),
       setHasHydrated: (hasHydrated: boolean) => set({ hasHydrated }),
       resetNavigation: () => set({ ...ALL_MENUS_CLOSED, isSidebarOpen: false }),
     }),
