@@ -1,11 +1,12 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { useThemeStore } from '@/infrastructure/stores/themeStore';
+import { AuthRepositoryImpl } from '@/infrastructure/repositories/AuthRepositoryImpl';
 import { ROUTES } from '@/config/routes';
 
 export function TopBar() {
@@ -14,6 +15,7 @@ export function TopBar() {
   const resetNavigation = useNavigationStore((state) => state.resetNavigation);
   const theme = useThemeStore((state) => state.theme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const authRepository = useMemo(() => new AuthRepositoryImpl(), []);
 
   // Avoid hydration mismatch: theme is resolved from localStorage on the client,
   // so render the light state until mounted (false on server, true on client).
@@ -24,8 +26,15 @@ export function TopBar() {
   );
   const isDark = mounted && theme === 'dark';
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const refreshToken = tokenStorage.getRefreshToken();
+    if (refreshToken) {
+      try {
+        await authRepository.logout(refreshToken);
+      } catch {}
+    }
     tokenStorage.removeToken();
+    tokenStorage.removeRefreshToken();
     logout();
     resetNavigation();
     router.push(ROUTES.LOGIN);

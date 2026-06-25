@@ -1,6 +1,7 @@
 'use client';
 
 const TOKEN_KEY = 'oklyx_token';
+const REFRESH_TOKEN_KEY = 'oklyx_refresh_token';
 
 export const tokenStorage = {
   getToken(): string | null {
@@ -27,5 +28,31 @@ export const tokenStorage = {
     }
 
     document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
+  },
+
+  getRefreshToken(): string | null {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const cookies = document.cookie.split('; ');
+    const tokenCookie = cookies.find((cookie) => cookie.startsWith(`${REFRESH_TOKEN_KEY}=`));
+    return tokenCookie ? tokenCookie.split('=')[1] : null;
+  },
+
+  setRefreshToken(token: string): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    document.cookie = `${REFRESH_TOKEN_KEY}=${token}; path=/; SameSite=Strict`;
+  },
+
+  removeRefreshToken(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    document.cookie = `${REFRESH_TOKEN_KEY}=; path=/; max-age=0`;
   },
 };

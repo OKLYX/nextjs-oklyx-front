@@ -8,4 +8,18 @@ export class AuthRepositoryImpl implements IAuthRepository {
     const response = await axiosInstance.post('/api/auth/login', request);
     return response.data.data;
   }
+
+  async refresh(refreshToken: string): Promise<LoginResponseDto> {
+    const res = await axiosInstance.post('/api/auth/refresh', { refreshToken });
+    return res.data.data;
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    await axiosInstance.post('/api/auth/logout', { refreshToken });
+  }
+
+  async me(): Promise<LoginResponseDto> {
+    const res = await axiosInstance.get('/api/auth/me');
+    return res.data.data;
+  }
 }

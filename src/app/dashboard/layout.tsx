@@ -1,9 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { TopBar } from './components/TopBar';
 import { Navbar } from './components/Navbar';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
+import { useAuthStore } from '@/infrastructure/stores/authStore';
+import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
+import { AuthRepositoryImpl } from '@/infrastructure/repositories/AuthRepositoryImpl';
+import { ROUTES } from '@/config/routes';
 
 // Viewport width at/above which the sidebar defaults to expanded (pushed).
 // = content min-w (1080px) + expanded sidebar (w-56 = 224px). Below it the
@@ -24,6 +29,30 @@ export default function DashboardLayout({
 }) {
   const isSidebarOpen = useNavigationStore((state) => state.isSidebarOpen);
   const setSidebarOpen = useNavigationStore((state) => state.setSidebarOpen);
+
+  // Session restore: validate the session against the server and refresh the
+  // access token on dashboard entry (a page reload may have expired the 30-min
+  // access token). The axios interceptor refreshes on 401 and retries; if the
+  // refresh also fails it redirects to /login via clearAndRedirect.
+  const router = useRouter();
+  const setUser = useAuthStore((s) => s.setUser);
+  const authRepository = useMemo(() => new AuthRepositoryImpl(), []);
+
+  useEffect(() => {
+    if (!tokenStorage.getToken() && !tokenStorage.getRefreshToken()) {
+      router.replace(ROUTES.LOGIN);
+      return;
+    }
+    authRepository
+      .me()
+      .then((data) => {
+        tokenStorage.setToken(data.token);
+        setUser({ email: data.email, name: data.name, role: data.role as 'GUEST' | 'USER' | 'ADMIN' });
+      })
+      .catch(() => {
+        // 401 handled by the interceptor (refresh → redirect on failure).
+      });
+  }, [authRepository, router, setUser]);
 
   // Flip the default only when the viewport crosses the breakpoint.
   const wasWide = useRef<boolean | null>(null);

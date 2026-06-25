@@ -9,6 +9,7 @@ export class LoginUseCase {
     try {
       const response = await this.authRepository.login({ email, password });
       tokenStorage.setToken(response.token);
+      tokenStorage.setRefreshToken(response.refreshToken);
       return response;
     } catch (error) {
       if (error instanceof Error) {
