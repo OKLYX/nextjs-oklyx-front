@@ -11,7 +11,7 @@ export function UnmappedOrdersSection({ orders, isLoading }: UnmappedOrdersSecti
   if (isLoading || orders.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden border border-amber-200">
+    <div className="bg-white rounded-lg shadow list-table-scroll border border-amber-200">
       <div className="px-6 py-4 border-b border-amber-200 bg-amber-50">
         <h2 className="text-lg font-semibold text-amber-800">등록 필요</h2>
         <p className="mt-1 text-xs text-amber-700">

@@ -27,7 +27,7 @@ export function PurchaseListTable({
   onAdjustManual,
 }: PurchaseListTableProps) {
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-white rounded-lg shadow list-table-scroll">
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900">구매 목록</h2>
         <p className="mt-1 text-xs text-gray-500">잔여 수량이 남은 구성품만 표시됩니다.</p>

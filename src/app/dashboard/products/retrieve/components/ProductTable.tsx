@@ -2,6 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/config/routes';
+import { DataCard } from '@/presentation/components/DataCard';
+import { ViewModeToggle } from '@/presentation/components/ViewModeToggle';
+import { useIsMobile } from '@/presentation/hooks/useIsMobile';
+import { useListViewStore } from '@/infrastructure/stores/listViewStore';
 import type { Product } from '@/domain/entities/Product';
 
 interface ProductTableProps {
@@ -14,6 +18,10 @@ interface ProductTableProps {
 
 export function ProductTable({ products, isLoading, error, currentPage, pageSize }: ProductTableProps) {
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const viewMode = useListViewStore((state) => state.viewMode);
+  // Card view is a narrow-screen affordance only; md+ always shows the table.
+  const showCards = isMobile && viewMode === 'card';
 
   const formatPrice = (price: number): string => {
     return new Intl.NumberFormat('ko-KR', {
@@ -27,6 +35,16 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
   const formatDate = (dateString: string): string => {
     return dateString.substring(0, 10);
   };
+
+  const statusChip = (active: boolean) => (
+    <span
+      className={`px-2 py-1 rounded-full text-xs font-medium ${
+        active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+      }`}
+    >
+      {active ? '활성' : '비활성'}
+    </span>
+  );
 
   if (isLoading) {
     return (
@@ -53,47 +71,71 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
   }
 
   return (
-    <div className="overflow-x-auto border border-gray-300 rounded-lg bg-white">
-      <table className="w-full">
-        <thead className="bg-gray-100 border-b border-gray-300">
-          <tr>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">번호</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상품명</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">브랜드</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">가격</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">구매처</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상태</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">등록일</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((product, index) => (
-            <tr
+    <div className="space-y-3">
+      {/* Narrow-screen only: let the user switch table (h-scroll) ↔ cards. */}
+      <div className="flex justify-end md:hidden">
+        <ViewModeToggle />
+      </div>
+
+      {/* Table: always on md+. Below md it stays unless the user picks card view.
+          whitespace-nowrap keeps text on one line so columns shrink only to
+          content width, then scroll (no vertical character wrapping). */}
+      <div
+        className={`${
+          showCards ? 'hidden md:block' : 'block'
+        } list-table-scroll border border-gray-300 rounded-lg bg-white`}
+      >
+        <table className="w-full">
+          <thead className="bg-gray-100 border-b border-gray-300">
+            <tr>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">번호</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상품명</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">브랜드</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">가격</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">구매처</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상태</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">등록일</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product, index) => (
+              <tr
+                key={product.id}
+                onClick={() => router.push(ROUTES.PRODUCT_DETAIL(product.id))}
+                className="border-b border-gray-300 hover:bg-gray-50 cursor-pointer transition-colors"
+              >
+                <td className="px-4 py-3 text-sm text-gray-900">{currentPage * pageSize + index + 1}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{product.productName}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{product.brand}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{formatPrice(product.price)}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{product.store}</td>
+                <td className="px-4 py-3 text-sm">{statusChip(product.active)}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{formatDate(product.createdDate)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Below md + card mode: one DataCard per row, same tap → detail. */}
+      {showCards && (
+        <div className="md:hidden space-y-3">
+          {products.map((product) => (
+            <DataCard
               key={product.id}
               onClick={() => router.push(ROUTES.PRODUCT_DETAIL(product.id))}
-              className="border-b border-gray-300 hover:bg-gray-50 cursor-pointer transition-colors"
-            >
-              <td className="px-4 py-3 text-sm text-gray-900">{currentPage * pageSize + index + 1}</td>
-              <td className="px-4 py-3 text-sm text-gray-900">{product.productName}</td>
-              <td className="px-4 py-3 text-sm text-gray-900">{product.brand}</td>
-              <td className="px-4 py-3 text-sm text-gray-900">{formatPrice(product.price)}</td>
-              <td className="px-4 py-3 text-sm text-gray-900">{product.store}</td>
-              <td className="px-4 py-3 text-sm">
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    product.active
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {product.active ? '활성' : '비활성'}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-900">{formatDate(product.createdDate)}</td>
-            </tr>
+              fields={[
+                { label: '상품명', value: product.productName },
+                { label: '브랜드', value: product.brand },
+                { label: '가격', value: formatPrice(product.price) },
+                { label: '구매처', value: product.store },
+                { label: '상태', value: statusChip(product.active) },
+                { label: '등록일', value: formatDate(product.createdDate) },
+              ]}
+            />
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
   );
 }

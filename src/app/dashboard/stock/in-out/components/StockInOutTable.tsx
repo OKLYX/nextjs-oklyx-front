@@ -98,7 +98,7 @@ export function StockInOutTable({
           스캔하거나 바코드를 입력하세요
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="list-table-scroll">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">

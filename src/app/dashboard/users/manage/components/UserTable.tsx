@@ -72,7 +72,7 @@ export function UserTable({
         <div className="p-8 text-center text-gray-500">조회 결과가 없습니다.</div>
       ) : (
         <>
-          <div className="overflow-x-auto">
+          <div className="list-table-scroll">
             <table className="w-full">
               <thead className="bg-gray-100 border-b border-gray-200">
                 <tr>

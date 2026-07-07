@@ -36,7 +36,7 @@ export function SellerTable({
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="list-table-scroll">
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
@@ -89,7 +89,7 @@ export function SellerTable({
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="list-table-scroll">
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr>

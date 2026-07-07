@@ -48,7 +48,7 @@ export function PackageTable({
 }: PackageTableProps) {
   if (isLoading && hasSearched) {
     return (
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow list-table-scroll">
         <table className="w-full">
           <thead className="bg-gray-100 border-b">
             <tr>
@@ -99,7 +99,7 @@ export function PackageTable({
   return (
     <>
       {errorBanner}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow list-table-scroll">
         <table className="w-full" role="grid" aria-label="상자비 목록">
           <thead className="bg-gray-100 border-b">
             <tr>

@@ -35,7 +35,7 @@ export function ProductListingTable({
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="list-table-scroll">
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
@@ -92,7 +92,7 @@ export function ProductListingTable({
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="list-table-scroll">
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr>
@@ -165,7 +165,7 @@ export function ProductListingTable({
                   <tr className="bg-gray-50">
                     <td colSpan={8} className="px-6 py-4">
                       {listing.options && listing.options.length > 0 ? (
-                        <div className="overflow-x-auto">
+                        <div className="list-table-scroll">
                             <table className="w-full text-sm">
                               <thead className="bg-gray-200">
                                 <tr>

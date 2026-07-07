@@ -119,7 +119,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
           등록된 판매채널이 없습니다.
         </div>
       ) : (
-        <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-md border border-gray-200 list-table-scroll">
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>

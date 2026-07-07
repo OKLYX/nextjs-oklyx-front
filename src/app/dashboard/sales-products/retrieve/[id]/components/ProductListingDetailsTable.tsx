@@ -46,7 +46,7 @@ export function ProductListingDetailsTable({ options = [], isLoading }: ProductL
         <h2 className="text-lg font-semibold text-gray-900">📋 옵션 및 구성상품</h2>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="list-table-scroll">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>

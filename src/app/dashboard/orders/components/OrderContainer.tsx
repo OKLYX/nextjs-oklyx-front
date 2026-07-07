@@ -6,6 +6,7 @@ import { OrderUseCase } from '@/application/usecases/OrderUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
+import { CANCELED_FILTER, isFullyCanceled } from '@/domain/entities/OrderEntity';
 import type { OrderSyncResponse } from '@/application/dto/OrderDTOs';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -70,19 +71,28 @@ export function OrderContainer() {
     loadInitialOrders();
   }, [orderUseCase]);
 
-  // Count orders per status for the filter button badges (unaffected by selection)
+  // Count orders per status for the filter button badges (unaffected by selection).
+  // Fully-canceled orders are excluded here and counted separately below.
   const statusCounts = useMemo(() => {
     return orders.reduce<Record<string, number>>((acc, order) => {
+      if (isFullyCanceled(order)) return acc;
       acc[order.status] = (acc[order.status] ?? 0) + 1;
       return acc;
     }, {});
   }, [orders]);
 
-  // Apply the status filter before sorting/paging; null status shows all
-  const filteredOrders = useMemo(
-    () => (selectedStatus == null ? orders : orders.filter((o) => o.status === selectedStatus)),
-    [orders, selectedStatus]
-  );
+  // Fully-canceled orders (orderCount === cancelCount) surfaced under the 취소항목 chip
+  const canceledCount = useMemo(() => orders.filter(isFullyCanceled).length, [orders]);
+
+  // Apply the selected filter before sorting/paging:
+  // - CANCELED_FILTER: only fully-canceled orders
+  // - a status code: that status, excluding fully-canceled ones
+  // - null: all orders except fully-canceled (those live under 취소항목)
+  const filteredOrders = useMemo(() => {
+    if (selectedStatus === CANCELED_FILTER) return orders.filter(isFullyCanceled);
+    if (selectedStatus == null) return orders.filter((o) => !isFullyCanceled(o));
+    return orders.filter((o) => o.status === selectedStatus && !isFullyCanceled(o));
+  }, [orders, selectedStatus]);
 
   const sortedOrders = useMemo(() => {
     if (sortKey == null) return filteredOrders;
@@ -194,6 +204,7 @@ export function OrderContainer() {
           selectedStatus={selectedStatus}
           onStatusChange={handleStatusChange}
           counts={statusCounts}
+          canceledCount={canceledCount}
         />
 
         <OrderTable

@@ -9,6 +9,14 @@
   /* Dashboard content area background (single source of truth) */
   --page-background: #f9fafb;
 
+  /* List table minimum width (single source of truth).
+     = md breakpoint (768px) − mobile horizontal padding (16px × 2) = 736px, i.e.
+     the content width the instant the sidebar becomes the hamburger/drawer.
+     So once the drawer appears (< 768px) the table no longer shrinks — the
+     .list-table-scroll wrapper scrolls horizontally instead.
+     Applied via `.list-table-scroll table { min-width: var(--list-table-min-w) }`. */
+  --list-table-min-w: 736px;
+
   /* ---- Brand palette (single source of truth) ----
      Main  #FEC416 — primary actions (buttons, focus rings, brand logo)
      Sub   #14A05D — positive / confirm actions
@@ -155,3 +163,17 @@ body {
 .bg-green-700 { background-color: var(--brand-green-hover); }
 .hover\:bg-green-600:hover,
 .hover\:bg-green-700:hover { background-color: var(--brand-green-hover); }
+
+/* ---- List table horizontal-scroll + minimum width (single source) ----
+   Wrap a list <table> in an element with `.list-table-scroll`. The table keeps
+   every cell on one line (no vertical character wrapping) and never shrinks
+   below --list-table-min-w (= md 768px content width the moment the sidebar
+   becomes the hamburger/drawer ≈ 736px). Below that the wrapper scrolls
+   horizontally instead of the table shrinking further.
+   Tune the floor in one place: :root --list-table-min-w. */
+.list-table-scroll { overflow-x: auto; }
+.list-table-scroll table {
+  width: 100%;
+  min-width: var(--list-table-min-w);
+  white-space: nowrap;
+}

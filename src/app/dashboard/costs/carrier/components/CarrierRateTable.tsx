@@ -29,7 +29,7 @@ export function CarrierRateTable({
 
   if (isLoading && hasSearched) {
     return (
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow list-table-scroll">
         <table className="w-full">
           <thead className="bg-gray-100 border-b">
             <tr>
@@ -83,7 +83,7 @@ export function CarrierRateTable({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-white rounded-lg shadow list-table-scroll">
       <table className="w-full">
         <thead className="bg-gray-100 border-b">
           <tr>

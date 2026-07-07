@@ -38,3 +38,14 @@ export const ORDER_STATUSES = [
   'FINAL_DELIVERY',
   'NONE_TRACKING',
 ] as const;
+
+// Virtual filter key for fully-canceled orders. Coupang keeps the raw status
+// (e.g. ACCEPT) even when an order is fully canceled, so this is not a real
+// status code — it is a derived filter surfaced as its own chip.
+export const CANCELED_FILTER = 'CANCELED';
+
+// True when the whole order was canceled: cancelCount equals orderCount (and > 0).
+// A partial cancel (cancelCount < orderCount) stays under its normal status.
+export function isFullyCanceled(order: Pick<OrderItem, 'orderCount' | 'cancelCount'>): boolean {
+  return order.cancelCount > 0 && order.cancelCount === order.orderCount;
+}
