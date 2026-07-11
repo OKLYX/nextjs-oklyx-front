@@ -1,6 +1,8 @@
 'use client';
 
+import { Download } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import { Spinner } from '@/presentation/components/Spinner';
 
 interface OrderSearchCardProps {
   sellers: Seller[];
@@ -12,6 +14,9 @@ interface OrderSearchCardProps {
   isSyncing: boolean;
   resultCount: number;
   lastSyncedAt: string | null;
+  canDownload: boolean;
+  isDownloading: boolean;
+  onDownload: () => void;
 }
 
 function formatSyncedAt(value: string | null): string {
@@ -31,6 +36,9 @@ export function OrderSearchCard({
   isSyncing,
   resultCount,
   lastSyncedAt,
+  canDownload,
+  isDownloading,
+  onDownload,
 }: OrderSearchCardProps) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -44,18 +52,36 @@ export function OrderSearchCard({
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">판매자</label>
-          <select
-            value={selectedSellerId}
-            onChange={(e) => onSellerChange(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-          >
-            <option value="">전체</option>
-            {sellers.map((seller) => (
-              <option key={seller.id} value={seller.id}>
-                {seller.sellerName}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedSellerId}
+              onChange={(e) => onSellerChange(e.target.value === '' ? '' : Number(e.target.value))}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            >
+              <option value="">전체</option>
+              {sellers.map((seller) => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.sellerName}
+                </option>
+              ))}
+            </select>
+            {canDownload && (
+              <button
+                onClick={onDownload}
+                disabled={isDownloading}
+                className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDownloading ? (
+                  <Spinner label="다운로드 중..." />
+                ) : (
+                  <>
+                    <Download size={16} />
+                    주문목록 다운로드
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between">

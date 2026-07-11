@@ -5,6 +5,9 @@ import { OrderRepositoryImpl } from '@/infrastructure/repositories/OrderReposito
 import { OrderUseCase } from '@/application/usecases/OrderUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
+import { ShippingLabelRepositoryImpl } from '@/infrastructure/repositories/ShippingLabelRepositoryImpl';
+import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
+import { useAuthStore } from '@/infrastructure/stores/authStore';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { CANCELED_FILTER, isFullyCanceled } from '@/domain/entities/OrderEntity';
 import type { OrderSyncResponse } from '@/application/dto/OrderDTOs';
@@ -21,6 +24,12 @@ const LAST_SYNCED_AT_KEY = 'oklyx_order_last_synced_at';
 export function OrderContainer() {
   const orderUseCase = useMemo(() => new OrderUseCase(new OrderRepositoryImpl()), []);
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
+  const shippingLabelUseCase = useMemo(
+    () => new ShippingLabelUseCase(new ShippingLabelRepositoryImpl()),
+    []
+  );
+
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [selectedSellerId, setSelectedSellerId] = useState<number | ''>('');
@@ -36,6 +45,7 @@ export function OrderContainer() {
   const [sortKey, setSortKey] = useState<keyof OrderItem | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Reuse existing SellerUseCase.getAll() for the seller dropdown
   useEffect(() => {
@@ -157,6 +167,26 @@ export function OrderContainer() {
     }
   };
 
+  // Server queries Coupang INSTRUCT orders live to build the sheet — unrelated to the on-screen filter.
+  const handleDownload = async () => {
+    try {
+      setIsDownloading(true);
+      setError('');
+      const blob = await shippingLabelUseCase.downloadSpreadsheet(selectedSellerId || undefined);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      anchor.href = url;
+      anchor.download = `주문목록_${today}.xlsx`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('주문목록 다운로드에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleSort = (key: keyof OrderItem) => {
     if (sortKey === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -192,6 +222,9 @@ export function OrderContainer() {
           isSyncing={isSyncing}
           resultCount={orders.length}
           lastSyncedAt={lastSyncedAt}
+          canDownload={isAdmin}
+          isDownloading={isDownloading}
+          onDownload={handleDownload}
         />
 
         {syncResult && (
