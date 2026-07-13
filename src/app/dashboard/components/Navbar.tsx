@@ -91,6 +91,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       toggle: toggleCostsMenu,
       items: [
         { href: ROUTES.COSTS_CARRIER, label: '택배비' },
+        { href: ROUTES.COSTS_CARRIER_COMPANY, label: '택배사 관리' },
         { href: ROUTES.COSTS_PACKAGE, label: '상자비' },
         { href: ROUTES.COSTS_CATEGORY, label: '카테고리' },
         { href: ROUTES.COSTS_COMMISSION_RATE, label: '수수료' },
