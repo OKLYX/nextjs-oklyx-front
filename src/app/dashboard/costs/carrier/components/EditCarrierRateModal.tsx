@@ -5,10 +5,12 @@ import { CarrierRateForm } from './CarrierRateForm';
 import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { UpdateCarrierRateRequest } from '@/application/dto/UpdateCarrierRateRequest';
+import type { Carrier } from '@/domain/entities/CarrierEntity';
 
 interface EditCarrierRateModalProps {
   isOpen: boolean;
   carrierRate: CarrierRate | null;
+  carriers: Carrier[];
   onClose: () => void;
   onSubmit: (data: UpdateCarrierRateRequest) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
@@ -23,6 +25,7 @@ interface EditCarrierRateModalProps {
 export function EditCarrierRateModal({
   isOpen,
   carrierRate,
+  carriers,
   onClose,
   onSubmit,
   onDelete,
@@ -80,6 +83,7 @@ export function EditCarrierRateModal({
             {carrierRate && (
               <EditCarrierRateForm
                 carrierRate={carrierRate}
+                carriers={carriers}
                 isLoading={isLoading}
                 isDeletingCarrier={isDeletingCarrier}
                 onSubmit={onSubmit}
@@ -109,6 +113,7 @@ export function EditCarrierRateModal({
 
 interface EditCarrierRateFormProps {
   carrierRate: CarrierRate;
+  carriers: Carrier[];
   isLoading: boolean;
   isDeletingCarrier: boolean;
   onSubmit: (data: UpdateCarrierRateRequest) => Promise<void>;
@@ -118,6 +123,7 @@ interface EditCarrierRateFormProps {
 
 function EditCarrierRateForm({
   carrierRate,
+  carriers,
   isLoading,
   isDeletingCarrier,
   onSubmit,
@@ -128,11 +134,12 @@ function EditCarrierRateForm({
     <CarrierRateForm
       isLoading={isLoading}
       isDeletingCarrier={isDeletingCarrier}
+      carriers={carriers}
       onSubmit={onSubmit}
       onCancel={onCancel}
       onOpenDeleteConfirm={onOpenDeleteConfirm}
       initialData={{
-        carrier: carrierRate.carrier,
+        carrierId: String(carrierRate.carrierId),
         type: carrierRate.type,
         cost: String(carrierRate.cost),
         effectiveDate: carrierRate.effectiveDate,

@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
+import type { Carrier } from '@/domain/entities/CarrierEntity';
 import { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
 import { CarrierRateRepositoryImpl } from '@/infrastructure/repositories/CarrierRateRepositoryImpl';
+import { CarrierUseCase } from '@/application/usecases/CarrierUseCase';
+import { CarrierRepositoryImpl } from '@/infrastructure/repositories/CarrierRepositoryImpl';
 import { CarrierRateSearchCard } from './CarrierRateSearchCard';
 import { CarrierRateTable } from './CarrierRateTable';
 import { CreateCarrierRateModal } from './CreateCarrierRateModal';
@@ -15,6 +18,7 @@ import type { UpdateCarrierRateRequest } from '@/application/dto/UpdateCarrierRa
 export function CarrierRateContainer() {
   const [searchCarrier, setSearchCarrier] = useState('');
   const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
+  const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -34,6 +38,17 @@ export function CarrierRateContainer() {
     const repository = new CarrierRateRepositoryImpl();
     return new CarrierRateUseCase(repository);
   }, []);
+
+  const carrierUseCase = useMemo(() => {
+    return new CarrierUseCase(new CarrierRepositoryImpl());
+  }, []);
+
+  useEffect(() => {
+    carrierUseCase
+      .getAll()
+      .then(setCarriers)
+      .catch(() => setCarriers([]));
+  }, [carrierUseCase]);
 
   const handleSearch = async () => {
     setError('');
@@ -158,10 +173,12 @@ export function CarrierRateContainer() {
           onClose={handleCloseCreateModal}
           onSubmit={handleCreateCarrierRate}
           isLoading={isSubmitting}
+          carriers={carriers}
         />
         <EditCarrierRateModal
           isOpen={isEditModalOpen}
           carrierRate={selectedCarrierRate}
+          carriers={carriers}
           onClose={handleCloseEditModal}
           onSubmit={handleEditCarrierRate}
           onDelete={handleDeleteCarrierRate}

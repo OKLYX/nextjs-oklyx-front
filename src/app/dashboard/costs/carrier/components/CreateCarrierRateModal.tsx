@@ -3,12 +3,14 @@
 import { useEffect } from 'react';
 import { CarrierRateForm } from './CarrierRateForm';
 import type { CreateCarrierRateRequest } from '@/application/dto/CreateCarrierRateRequest';
+import type { Carrier } from '@/domain/entities/CarrierEntity';
 
 interface CreateCarrierRateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: CreateCarrierRateRequest) => Promise<void>;
   isLoading: boolean;
+  carriers: Carrier[];
 }
 
 export function CreateCarrierRateModal({
@@ -16,6 +18,7 @@ export function CreateCarrierRateModal({
   onClose,
   onSubmit,
   isLoading,
+  carriers,
 }: CreateCarrierRateModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -51,6 +54,7 @@ export function CreateCarrierRateModal({
         <div className="p-4">
           <CarrierRateForm
             isLoading={isLoading}
+            carriers={carriers}
             onSubmit={onSubmit}
             onCancel={onClose}
           />

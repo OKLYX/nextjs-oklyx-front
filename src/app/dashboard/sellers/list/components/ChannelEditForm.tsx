@@ -11,7 +11,8 @@ import {
 import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
 
 // Hardcoded for now; mirrors ChannelRegistrationForm's PLATFORM_OPTIONS.
-const PLATFORM_OPTIONS = [
+// Exported as SSOT so other features (e.g. carrier platform codes) can reuse it.
+export const PLATFORM_OPTIONS = [
   { value: 'COUPANG', label: '쿠팡' },
   { value: 'NAVER', label: '네이버 스마트스토어' },
   { value: 'ELEVENST', label: '11번가' },

@@ -9,7 +9,7 @@ export class CarrierRateRepositoryImpl implements CarrierRateRepository {
   }
 
   async createCarrierRate(data: {
-    carrier: string;
+    carrierId: number;
     type: string;
     cost: number;
     effectiveDate: string;
@@ -22,7 +22,7 @@ export class CarrierRateRepositoryImpl implements CarrierRateRepository {
   async updateCarrierRate(
     id: number,
     data: {
-      carrier: string;
+      carrierId: number;
       type: string;
       cost: number;
       effectiveDate: string;

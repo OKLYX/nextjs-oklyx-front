@@ -1,6 +1,8 @@
 'use client';
 
+import { Fragment, useState } from 'react';
 import type { Carrier } from '@/domain/entities/CarrierEntity';
+import { CarrierPlatformCodes } from './CarrierPlatformCodes';
 
 interface CarrierTableProps {
   carriers: Carrier[];
@@ -17,6 +19,9 @@ export function CarrierTable({
   onEdit,
   onDelete,
 }: CarrierTableProps) {
+  // Single expansion: only one carrier's platform codes are shown at a time.
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg shadow list-table-scroll">
@@ -64,8 +69,23 @@ export function CarrierTable({
         </thead>
         <tbody className="divide-y divide-gray-200">
           {carriers.map((carrier) => (
-            <tr key={carrier.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-6 py-3 text-sm text-gray-700">{carrier.name}</td>
+            <Fragment key={carrier.id}>
+            <tr className="hover:bg-gray-50 transition-colors">
+              <td className="px-6 py-3 text-sm text-gray-700">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedId((prev) => (prev === carrier.id ? null : carrier.id))
+                  }
+                  aria-expanded={expandedId === carrier.id}
+                  className="flex items-center gap-2 text-left hover:text-blue-600 transition-colors"
+                >
+                  <span className="text-xs text-gray-400">
+                    {expandedId === carrier.id ? '▼' : '▶'}
+                  </span>
+                  {carrier.name}
+                </button>
+              </td>
               <td className="px-6 py-3">
                 <button
                   type="button"
@@ -97,6 +117,14 @@ export function CarrierTable({
                 </button>
               </td>
             </tr>
+            {expandedId === carrier.id && (
+              <tr>
+                <td colSpan={3} className="p-0">
+                  <CarrierPlatformCodes carrierId={carrier.id} />
+                </td>
+              </tr>
+            )}
+            </Fragment>
           ))}
         </tbody>
       </table>

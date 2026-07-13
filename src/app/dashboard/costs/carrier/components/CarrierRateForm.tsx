@@ -6,9 +6,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { CreateCarrierRateRequest } from '@/application/dto/CreateCarrierRateRequest';
 import type { UpdateCarrierRateRequest } from '@/application/dto/UpdateCarrierRateRequest';
+import type { Carrier } from '@/domain/entities/CarrierEntity';
 
 const carrierRateSchema = z.object({
-  carrier: z.string().min(1, '배송사를 입력하세요').max(100, '100자 이내'),
+  carrierId: z.string().min(1, '택배사를 선택하세요'),
   type: z.string().min(1, '타입을 입력하세요').max(50, '50자 이내'),
   cost: z.string().refine((val) => !Number.isNaN(parseFloat(val)) && parseFloat(val) > 0, '비용은 양수여야 합니다'),
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD 형식'),
@@ -20,6 +21,7 @@ type CarrierRateFormData = z.infer<typeof carrierRateSchema>;
 interface CarrierRateFormProps {
   isLoading: boolean;
   isDeletingCarrier?: boolean;
+  carriers: Carrier[];
   onSubmit: (data: CreateCarrierRateRequest | UpdateCarrierRateRequest) => Promise<void>;
   onCancel: () => void;
   onOpenDeleteConfirm?: () => void;
@@ -31,6 +33,7 @@ interface CarrierRateFormProps {
 export function CarrierRateForm({
   isLoading,
   isDeletingCarrier = false,
+  carriers,
   onSubmit,
   onCancel,
   onOpenDeleteConfirm,
@@ -39,6 +42,19 @@ export function CarrierRateForm({
   submitLoadingLabel = '추가 중...',
 }: CarrierRateFormProps) {
   const [requestError, setRequestError] = useState('');
+
+  const currentCarrierId = initialData?.carrierId;
+  const selectableCarriers = carriers.filter((c) => c.isActive);
+  if (
+    currentCarrierId &&
+    !selectableCarriers.some((c) => String(c.id) === currentCarrierId)
+  ) {
+    const current = carriers.find((c) => String(c.id) === currentCarrierId);
+    if (current) {
+      selectableCarriers.push(current);
+    }
+  }
+  const noCarriers = selectableCarriers.length === 0;
 
   const {
     control,
@@ -49,7 +65,7 @@ export function CarrierRateForm({
     resolver: zodResolver(carrierRateSchema),
     mode: 'onChange',
     defaultValues: {
-      carrier: initialData?.carrier ?? '',
+      carrierId: initialData?.carrierId ?? '',
       type: initialData?.type ?? '',
       cost: initialData?.cost ?? '',
       effectiveDate: initialData?.effectiveDate ?? '',
@@ -60,7 +76,7 @@ export function CarrierRateForm({
   useEffect(() => {
     if (initialData) {
       reset({
-        carrier: initialData.carrier ?? '',
+        carrierId: initialData.carrierId ?? '',
         type: initialData.type ?? '',
         cost: initialData.cost ?? '',
         effectiveDate: initialData.effectiveDate ?? '',
@@ -74,6 +90,7 @@ export function CarrierRateForm({
     try {
       await onSubmit({
         ...formData,
+        carrierId: parseInt(formData.carrierId, 10),
         cost: parseFloat(formData.cost),
       });
       reset();
@@ -97,28 +114,39 @@ export function CarrierRateForm({
       )}
 
       <div>
-        <label htmlFor="carrier" className="block text-sm font-medium mb-1">
+        <label htmlFor="carrierId" className="block text-sm font-medium mb-1">
           배송사 *
         </label>
-        <Controller
-          name="carrier"
-          control={control}
-          render={({ field }) => (
-            <>
-              <input
-                {...field}
-                id="carrier"
-                type="text"
-                maxLength={100}
-                disabled={isLoading}
-                className="w-full px-3 py-2 border rounded-md"
-              />
-              {errors.carrier && (
-                <p className="mt-1 text-sm text-red-600">{errors.carrier.message}</p>
-              )}
-            </>
-          )}
-        />
+        {noCarriers ? (
+          <p className="text-sm text-red-600">
+            등록된 택배사가 없습니다. 먼저 택배사를 등록하세요.
+          </p>
+        ) : (
+          <Controller
+            name="carrierId"
+            control={control}
+            render={({ field }) => (
+              <>
+                <select
+                  {...field}
+                  id="carrierId"
+                  disabled={isLoading}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="">택배사 선택</option>
+                  {selectableCarriers.map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.carrierId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.carrierId.message}</p>
+                )}
+              </>
+            )}
+          />
+        )}
       </div>
 
       <div>
@@ -238,7 +266,7 @@ export function CarrierRateForm({
           </button>
           <button
             type="submit"
-            disabled={isLoading || isDeletingCarrier || !isValid || isValidating || isSubmitting}
+            disabled={isLoading || isDeletingCarrier || noCarriers || !isValid || isValidating || isSubmitting}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? submitLoadingLabel : submitButtonLabel}
