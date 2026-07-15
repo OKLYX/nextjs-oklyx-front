@@ -17,6 +17,7 @@ import { OrderSearchCard } from './OrderSearchCard';
 import { OrderStatusFilter } from './OrderStatusFilter';
 import { OrderTable } from './OrderTable';
 import { OrderDetailsModal } from './OrderDetailsModal';
+import { ShipmentConfirmModal } from './ShipmentConfirmModal';
 
 const PAGE_SIZE = 20;
 const LAST_SYNCED_AT_KEY = 'oklyx_order_last_synced_at';
@@ -46,6 +47,7 @@ export function OrderContainer() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   // Reuse existing SellerUseCase.getAll() for the seller dropdown
   useEffect(() => {
@@ -225,6 +227,7 @@ export function OrderContainer() {
           canDownload={isAdmin}
           isDownloading={isDownloading}
           onDownload={handleDownload}
+          onOpenConfirm={() => setIsConfirmOpen(true)}
         />
 
         {syncResult && (
@@ -255,6 +258,12 @@ export function OrderContainer() {
         />
 
         <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+
+        <ShipmentConfirmModal
+          isOpen={isConfirmOpen}
+          onClose={() => setIsConfirmOpen(false)}
+          useCase={shippingLabelUseCase}
+        />
     </PageContainer>
   );
 }

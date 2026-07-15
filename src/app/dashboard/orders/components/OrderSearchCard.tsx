@@ -1,6 +1,6 @@
 'use client';
 
-import { Download } from 'lucide-react';
+import { Download, Upload } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { Spinner } from '@/presentation/components/Spinner';
 
@@ -17,6 +17,7 @@ interface OrderSearchCardProps {
   canDownload: boolean;
   isDownloading: boolean;
   onDownload: () => void;
+  onOpenConfirm: () => void;
 }
 
 function formatSyncedAt(value: string | null): string {
@@ -39,6 +40,7 @@ export function OrderSearchCard({
   canDownload,
   isDownloading,
   onDownload,
+  onOpenConfirm,
 }: OrderSearchCardProps) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -79,6 +81,15 @@ export function OrderSearchCard({
                     주문목록 다운로드
                   </>
                 )}
+              </button>
+            )}
+            {canDownload && (
+              <button
+                onClick={onOpenConfirm}
+                className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+              >
+                <Upload size={16} />
+                발송처리
               </button>
             )}
           </div>
