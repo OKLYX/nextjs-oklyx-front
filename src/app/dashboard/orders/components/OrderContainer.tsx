@@ -18,6 +18,7 @@ import { OrderStatusFilter } from './OrderStatusFilter';
 import { OrderTable } from './OrderTable';
 import { OrderDetailsModal } from './OrderDetailsModal';
 import { ShipmentConfirmModal } from './ShipmentConfirmModal';
+import { ShippingLabelPreviewModal } from './ShippingLabelPreviewModal';
 
 const PAGE_SIZE = 20;
 const LAST_SYNCED_AT_KEY = 'oklyx_order_last_synced_at';
@@ -48,6 +49,7 @@ export function OrderContainer() {
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Reuse existing SellerUseCase.getAll() for the seller dropdown
   useEffect(() => {
@@ -227,6 +229,7 @@ export function OrderContainer() {
           canDownload={isAdmin}
           isDownloading={isDownloading}
           onDownload={handleDownload}
+          onDownloadV2={() => setIsPreviewOpen(true)}
           onOpenConfirm={() => setIsConfirmOpen(true)}
         />
 
@@ -262,6 +265,14 @@ export function OrderContainer() {
         <ShipmentConfirmModal
           isOpen={isConfirmOpen}
           onClose={() => setIsConfirmOpen(false)}
+          useCase={shippingLabelUseCase}
+        />
+
+        <ShippingLabelPreviewModal
+          open={isPreviewOpen}
+          onOpenChange={setIsPreviewOpen}
+          sellerId={selectedSellerId || undefined}
+          isAdmin={isAdmin}
           useCase={shippingLabelUseCase}
         />
     </PageContainer>

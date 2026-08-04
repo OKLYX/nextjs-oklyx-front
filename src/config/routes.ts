@@ -24,4 +24,5 @@ export const ROUTES = {
   SELLERS_MANAGE: '/dashboard/sellers/manage' as const,
   ORDERS_RETRIEVE: '/dashboard/orders' as const,
   PURCHASE_LIST: '/dashboard/purchase/list' as const,
+  SETTINGS_LOGGING: '/dashboard/settings/logging' as const,
 } as const;

@@ -2,7 +2,11 @@
 
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { ShippingLabelRepository } from '@/domain/repositories/ShippingLabelRepository';
-import type { ShipmentConfirmResult } from '@/application/dto/ShippingLabelDTOs';
+import type {
+  ShipmentConfirmResult,
+  ShippingLabelPreviewRow,
+  ShippingLabelExportRow,
+} from '@/application/dto/ShippingLabelDTOs';
 
 export class ShippingLabelRepositoryImpl implements ShippingLabelRepository {
   // xlsx is binary — must use responseType 'blob' and return response.data
@@ -24,5 +28,23 @@ export class ShippingLabelRepositoryImpl implements ShippingLabelRepository {
       headers: { 'Content-Type': undefined },
     });
     return response.data.data;
+  }
+
+  // V2 preview returns the standard JSON envelope — unwrap `response.data.data`.
+  async previewRows(sellerId?: number): Promise<ShippingLabelPreviewRow[]> {
+    const response = await axiosInstance.get('/api/admin/shipping-labels/v2/preview', {
+      params: sellerId != null ? { sellerId } : undefined,
+    });
+    return response.data.data;
+  }
+
+  // V2 export posts edited rows and returns the xlsx binary — responseType 'blob', no unwrapping.
+  async exportSpreadsheet(rows: ShippingLabelExportRow[]): Promise<Blob> {
+    const response = await axiosInstance.post(
+      '/api/admin/shipping-labels/v2/spreadsheet',
+      { rows },
+      { responseType: 'blob' }
+    );
+    return response.data;
   }
 }

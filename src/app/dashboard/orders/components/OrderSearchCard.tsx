@@ -17,6 +17,7 @@ interface OrderSearchCardProps {
   canDownload: boolean;
   isDownloading: boolean;
   onDownload: () => void;
+  onDownloadV2: () => void;
   onOpenConfirm: () => void;
 }
 
@@ -40,6 +41,7 @@ export function OrderSearchCard({
   canDownload,
   isDownloading,
   onDownload,
+  onDownloadV2,
   onOpenConfirm,
 }: OrderSearchCardProps) {
   return (
@@ -81,6 +83,15 @@ export function OrderSearchCard({
                     주문목록 다운로드
                   </>
                 )}
+              </button>
+            )}
+            {canDownload && (
+              <button
+                onClick={onDownloadV2}
+                className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+              >
+                <Download size={16} />
+                주문목록 다운로드 V2
               </button>
             )}
             {canDownload && (

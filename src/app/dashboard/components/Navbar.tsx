@@ -11,6 +11,7 @@ import {
   ClipboardList,
   ShoppingCart,
   UserCog,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
@@ -46,6 +47,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const isSellersOpen = useNavigationStore((state) => state.isSellersMenuOpen);
   const isOrdersOpen = useNavigationStore((state) => state.isOrdersMenuOpen);
   const isPurchaseOpen = useNavigationStore((state) => state.isPurchaseMenuOpen);
+  const isSettingsOpen = useNavigationStore((state) => state.isSettingsMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
@@ -55,6 +57,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const toggleSellersMenu = useNavigationStore((state) => state.toggleSellersMenu);
   const toggleOrdersMenu = useNavigationStore((state) => state.toggleOrdersMenu);
   const togglePurchaseMenu = useNavigationStore((state) => state.togglePurchaseMenu);
+  const toggleSettingsMenu = useNavigationStore((state) => state.toggleSettingsMenu);
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
@@ -140,6 +143,13 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         { href: ROUTES.USER_REGISTER, label: '회원등록' },
         { href: ROUTES.USER_MANAGE, label: '회원관리' },
       ],
+    });
+    menuGroups.push({
+      icon: Settings,
+      label: '설정',
+      open: isSettingsOpen,
+      toggle: toggleSettingsMenu,
+      items: [{ href: ROUTES.SETTINGS_LOGGING, label: '로그 설정' }],
     });
   }
 
