@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/presentation/components/Providers";
+import { EnvBadge } from "@/presentation/components/EnvBadge";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,6 +46,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
+        <EnvBadge />
       </body>
     </html>
   );
