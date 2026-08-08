@@ -9,7 +9,7 @@ export async function GET(
     const { searchParams } = request.nextUrl;
     const token = searchParams.get('token');
 
-    const backendUrl = process.env.NEXT_PUBLIC_SERVER_API_URL || 'https://api.oclyx.com';
+    const backendUrl = process.env.NEXT_PUBLIC_SERVER_API_URL || 'http://localhost:8083';
     const imageUrl = `${backendUrl}/api/products/${id}/image`;
 
     const headers: HeadersInit = {
