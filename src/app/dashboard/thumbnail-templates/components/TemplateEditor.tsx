@@ -34,12 +34,12 @@ function createElement(type: 'text' | 'image', canvasWidth: number, canvasHeight
       h,
     },
     align: { h: 'center', v: 'center' },
-    padding: { top: 0, bottom: 0, left: 0, right: 0 },
     fontId: null,
     color: type === 'text' ? '#000000' : null,
     maxFontSize: 48,
     minFontSize: 16,
     maxLines: 2,
+    lineSpacing: 1.0,
     opacity: 1,
   };
 }

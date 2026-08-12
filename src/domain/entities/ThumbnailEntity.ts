@@ -28,25 +28,18 @@ export interface ElementAlign {
   v: 'top' | 'center' | 'bottom';
 }
 
-export interface ElementPadding {
-  top: number;
-  bottom: number;
-  left: number;
-  right: number;
-}
-
 export interface TemplateElement {
   type: ElementType;
   bind: TextBind | ImageBind | null; // text -> TextBind / image -> ImageBind (or fixed src)
   src: string | null; // image: fixed storage key
-  region: ElementRegion; // canvas source coordinates (px)
+  region: ElementRegion; // canvas source coordinates (px); the text box (no padding)
   align: ElementAlign;
-  padding: ElementPadding;
   fontId: number | null;
   color: string | null; // '#RRGGBB'
   maxFontSize: number;
   minFontSize: number;
   maxLines: number;
+  lineSpacing?: number; // text: line-height multiplier (e.g. 1.15); backend null -> 1.0
   opacity: number; // image
 }
 

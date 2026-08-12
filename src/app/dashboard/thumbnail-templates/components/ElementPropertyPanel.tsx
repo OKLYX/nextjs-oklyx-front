@@ -38,8 +38,6 @@ export function ElementPropertyPanel({
     onChange({ region: { ...element.region, ...patch } });
   const setAlign = (patch: Partial<TemplateElement['align']>) =>
     onChange({ align: { ...element.align, ...patch } });
-  const setPadding = (patch: Partial<TemplateElement['padding']>) =>
-    onChange({ padding: { ...element.padding, ...patch } });
 
   const handleFontFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,17 +131,6 @@ export function ElementPropertyPanel({
         </div>
       </div>
 
-      {/* padding */}
-      <div>
-        <label className={labelCls}>패딩 (상/하/좌/우)</label>
-        <div className="grid grid-cols-4 gap-2">
-          <input type="number" className={inputCls} value={element.padding.top} onChange={(e) => setPadding({ top: Number(e.target.value) })} />
-          <input type="number" className={inputCls} value={element.padding.bottom} onChange={(e) => setPadding({ bottom: Number(e.target.value) })} />
-          <input type="number" className={inputCls} value={element.padding.left} onChange={(e) => setPadding({ left: Number(e.target.value) })} />
-          <input type="number" className={inputCls} value={element.padding.right} onChange={(e) => setPadding({ right: Number(e.target.value) })} />
-        </div>
-      </div>
-
       {/* position/size (numeric fine-tuning) */}
       <div>
         <label className={labelCls}>위치·크기 (x/y/w/h, 원본 px)</label>
@@ -204,6 +191,21 @@ export function ElementPropertyPanel({
             <div>
               <label className={labelCls}>maxLines</label>
               <input type="number" className={inputCls} value={element.maxLines} onChange={(e) => onChange({ maxLines: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label className={labelCls}>줄간격</label>
+              <input
+                type="number"
+                min={1}
+                max={1.6}
+                step={0.1}
+                className={inputCls}
+                value={element.lineSpacing ?? 1.0}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  onChange({ lineSpacing: Number.isNaN(v) ? 1.0 : v });
+                }}
+              />
             </div>
           </div>
         </>
