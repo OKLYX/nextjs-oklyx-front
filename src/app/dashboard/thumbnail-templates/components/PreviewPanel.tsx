@@ -11,9 +11,11 @@ import { Spinner } from '@/presentation/components/Spinner';
  */
 interface PreviewPanelProps {
   onPreview: (sampleBindings: Record<string, string>) => Promise<Blob>;
+  /** Returns a blocking error message (e.g. a text element missing a font), or null if valid. */
+  validate?: () => string | null;
 }
 
-export function PreviewPanel({ onPreview }: PreviewPanelProps) {
+export function PreviewPanel({ onPreview, validate }: PreviewPanelProps) {
   const [brandName, setBrandName] = useState('브랜드명');
   const [productName, setProductName] = useState('아주 긴 상품명 예시 텍스트 오토핏 확인용');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -29,6 +31,11 @@ export function PreviewPanel({ onPreview }: PreviewPanelProps) {
   );
 
   const handlePreview = async () => {
+    const validationError = validate?.();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setIsLoading(true);
     setError('');
     try {
