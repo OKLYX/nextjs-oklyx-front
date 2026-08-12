@@ -20,7 +20,12 @@ interface TemplateEditorProps {
 
 const DISPLAY_MAX = 460; // largest canvas edge shown on screen (px)
 
-function createElement(type: 'text' | 'image', canvasWidth: number, canvasHeight: number): TemplateElement {
+function createElement(
+  type: 'text' | 'image',
+  canvasWidth: number,
+  canvasHeight: number,
+  defaultFontId: number | null
+): TemplateElement {
   const w = Math.round(canvasWidth * 0.5);
   const h = Math.round(canvasHeight * 0.15);
   return {
@@ -34,7 +39,9 @@ function createElement(type: 'text' | 'image', canvasWidth: number, canvasHeight
       h,
     },
     align: { h: 'center', v: 'center' },
-    fontId: null,
+    // Text elements require a fontId (backend rejects null). Default to the first
+    // available font so a freshly-added element renders without manual selection.
+    fontId: type === 'text' ? defaultFontId : null,
     color: type === 'text' ? '#000000' : null,
     maxFontSize: 48,
     minFontSize: 16,
@@ -130,7 +137,7 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
   );
 
   const handleAddElement = (type: 'text' | 'image') => {
-    setElements((prev) => [...prev, createElement(type, canvasWidth, canvasHeight)]);
+    setElements((prev) => [...prev, createElement(type, canvasWidth, canvasHeight, fonts[0]?.id ?? null)]);
     setSelectedIndex(elements.length);
   };
 
@@ -155,6 +162,13 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
     if (selectedIndex != null) handleElementPatch(selectedIndex, { fontId: created.id });
   };
 
+  // Text elements without a font fail backend render (400 "fontId is required").
+  // Returns a user-facing message for the first offending element, or null if valid.
+  const missingFontError = useCallback((): string | null => {
+    const idx = elements.findIndex((el) => el.type === 'text' && el.fontId == null);
+    return idx === -1 ? null : `텍스트 요소 #${idx + 1}에 폰트를 선택하세요.`;
+  }, [elements]);
+
   const handlePreview = async (sampleBindings: Record<string, string>): Promise<Blob> => {
     return useCase.preview({ template: buildRequest(), sampleBindings });
   };
@@ -166,6 +180,11 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
     }
     if (canvasWidth <= 0 || canvasHeight <= 0) {
       setError('캔버스 크기는 0보다 커야 합니다.');
+      return;
+    }
+    const fontError = missingFontError();
+    if (fontError) {
+      setError(fontError);
       return;
     }
     setIsSaving(true);
@@ -339,7 +358,7 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
               편집할 요소를 캔버스에서 선택하세요.
             </div>
           )}
-          <PreviewPanel onPreview={handlePreview} />
+          <PreviewPanel onPreview={handlePreview} validate={missingFontError} />
         </div>
       </div>
     </PageContainer>
