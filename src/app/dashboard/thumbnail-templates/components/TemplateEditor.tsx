@@ -330,6 +330,13 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
     if (selectedIndex != null) handleElementPatch(selectedIndex, { fontId: created.id });
   };
 
+  // Text elements without a font fail backend render (400 "fontId is required").
+  // Returns a user-facing message for the first offending element, or null if valid.
+  const missingFontError = useCallback((): string | null => {
+    const idx = elements.findIndex((el) => el.type === 'text' && el.fontId == null);
+    return idx === -1 ? null : `텍스트 요소 #${idx + 1}에 폰트를 선택하세요.`;
+  }, [elements]);
+
   const handlePreview = async (sampleBindings: Record<string, string>): Promise<Blob> => {
     return useCase.preview({ template: buildRequest(), sampleBindings });
   };
@@ -347,6 +354,12 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
     const missingDefault = fields.find((f) => !isReservedKey(f.key) && !f.defaultValue.trim());
     if (missingDefault) {
       setError(`커스텀 필드 '${missingDefault.label}'의 기본값을 입력하세요.`);
+      return;
+    }
+    // Text elements without a font fail backend render (400 "fontId is required").
+    const fontError = missingFontError();
+    if (fontError) {
+      setError(fontError);
       return;
     }
     setIsSaving(true);
@@ -600,6 +613,7 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
             onPreview={handlePreview}
             displayWidth={canvasWidth * scale}
             displayHeight={canvasHeight * scale}
+            validate={missingFontError}
           />
         </div>
       </div>

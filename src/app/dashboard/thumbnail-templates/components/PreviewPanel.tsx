@@ -17,9 +17,11 @@ interface PreviewPanelProps {
   // canvas (canvasWidth*scale × canvasHeight*scale) so element sizes match 1:1.
   displayWidth: number;
   displayHeight: number;
+  /** Returns a blocking error message (e.g. a text element missing a font), or null if valid. */
+  validate?: () => string | null;
 }
 
-export function PreviewPanel({ fields, onPreview, displayWidth, displayHeight }: PreviewPanelProps) {
+export function PreviewPanel({ fields, onPreview, displayWidth, displayHeight, validate }: PreviewPanelProps) {
   // Sample value per field = user override, else defaultValue || label (reserved
   // fields have empty defaults → their label shows in the preview). Derived, so
   // no effect is needed to re-sync when fields change.
@@ -39,6 +41,11 @@ export function PreviewPanel({ fields, onPreview, displayWidth, displayHeight }:
   );
 
   const handlePreview = async () => {
+    const validationError = validate?.();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setIsLoading(true);
     setError('');
     try {
