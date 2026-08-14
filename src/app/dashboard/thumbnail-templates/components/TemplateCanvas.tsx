@@ -46,6 +46,7 @@ interface TemplateCanvasProps {
   backgroundMode: BackgroundMode;
   gradientTopColor: string | null;
   gradientBottomColor: string | null;
+  assetNames: Record<string, string>; // storageKey → display name for fixed images
   selectedIndex: number | null;
   onSelect: (index: number) => void;
   onRegionChange: (index: number, region: Partial<TemplateElement['region']>) => void;
@@ -145,6 +146,7 @@ export function TemplateCanvas({
   backgroundMode,
   gradientTopColor,
   gradientBottomColor,
+  assetNames,
   selectedIndex,
   onSelect,
   onRegionChange,
@@ -265,7 +267,11 @@ export function TemplateCanvas({
             }`}
           >
             <span className="pointer-events-none select-none px-1 text-gray-800">
-              {el.type}: {el.type === 'text' ? el.bind ?? '?' : el.bind ?? el.src ?? 'image'}
+              {el.type === 'text'
+                ? `text: ${el.bind ?? '?'}`
+                : el.bind === 'productImage'
+                  ? '상품 사진'
+                  : `이미지: ${(el.src && assetNames[el.src]) || el.src || '?'}`}
             </span>
           </Rnd>
         );

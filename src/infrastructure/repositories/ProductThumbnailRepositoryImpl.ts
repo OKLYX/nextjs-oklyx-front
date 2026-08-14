@@ -12,10 +12,16 @@ export class ProductThumbnailRepositoryImpl implements ProductThumbnailRepositor
     return response.data.data;
   }
 
-  async generate(productId: number, sellerId: number): Promise<ProductThumbnail> {
-    const response = await axiosInstance.post(`${base(productId)}/generate`, null, {
-      params: { sellerId },
-    });
+  async generate(
+    productId: number,
+    sellerId: number,
+    fieldValues: Record<string, string>
+  ): Promise<ProductThumbnail> {
+    const response = await axiosInstance.post(
+      `${base(productId)}/generate`,
+      { fieldValues },
+      { params: { sellerId } }
+    );
     return response.data.data;
   }
 

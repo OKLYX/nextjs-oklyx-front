@@ -8,8 +8,12 @@ export class ProductThumbnailUseCase {
     return this.repository.listByProduct(productId);
   }
 
-  async generate(productId: number, sellerId: number): Promise<ProductThumbnail> {
-    return this.repository.generate(productId, sellerId);
+  async generate(
+    productId: number,
+    sellerId: number,
+    fieldValues: Record<string, string>
+  ): Promise<ProductThumbnail> {
+    return this.repository.generate(productId, sellerId, fieldValues);
   }
 
   async override(productId: number, sellerId: number, file: File): Promise<ProductThumbnail> {

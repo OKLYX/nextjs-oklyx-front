@@ -7,11 +7,14 @@ import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
-import type { BackgroundMode, TemplateElement, FontAsset } from '@/domain/entities/ThumbnailEntity';
+import type { BackgroundMode, TemplateElement, FontAsset, TemplateField, TemplateAsset } from '@/domain/entities/ThumbnailEntity';
+import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import type { ThumbnailTemplateRequest } from '@/application/dto/ThumbnailDTOs';
 import { TemplateCanvas } from './TemplateCanvas';
 import { ElementPropertyPanel } from './ElementPropertyPanel';
 import { PreviewPanel } from './PreviewPanel';
+import { AssetPickerModal } from './AssetPickerModal';
+import { LayerListPanel } from './LayerListPanel';
 
 interface TemplateEditorProps {
   mode: 'new' | 'edit';
@@ -20,35 +23,105 @@ interface TemplateEditorProps {
 
 const DISPLAY_MAX = 460; // largest canvas edge shown on screen (px)
 
-function createElement(
-  type: 'text' | 'image',
-  canvasWidth: number,
-  canvasHeight: number,
-  defaultFontId: number | null
-): TemplateElement {
+// Reserved fields: always present, auto-filled from the product, not deletable.
+const reservedFields = (): TemplateField[] => [
+  { key: 'brandName', label: '브랜드명', defaultValue: '' },
+  { key: 'productName', label: '상품명', defaultValue: '' },
+];
+
+const isReservedKey = (key: string): boolean => (BUILTIN_FIELD_KEYS as readonly string[]).includes(key);
+
+function baseRegion(canvasWidth: number, canvasHeight: number) {
   const w = Math.round(canvasWidth * 0.5);
   const h = Math.round(canvasHeight * 0.15);
+  return { x: Math.round((canvasWidth - w) / 2), y: Math.round((canvasHeight - h) / 2), w, h };
+}
+
+// Text element is created bound to a chosen field key; bind is fixed at creation.
+function createTextElement(
+  bind: string,
+  canvasWidth: number,
+  canvasHeight: number,
+  fontId: number | null
+): TemplateElement {
   return {
-    type,
-    bind: type === 'text' ? 'productName' : 'productImage',
+    type: 'text',
+    bind,
     src: null,
-    region: {
-      x: Math.round((canvasWidth - w) / 2),
-      y: Math.round((canvasHeight - h) / 2),
-      w,
-      h,
-    },
+    region: baseRegion(canvasWidth, canvasHeight),
     align: { h: 'center', v: 'center' },
-    // Text elements require a fontId (backend rejects null). Default to the first
-    // available font so a freshly-added element renders without manual selection.
-    fontId: type === 'text' ? defaultFontId : null,
-    color: type === 'text' ? '#000000' : null,
+    fontId,
+    color: '#000000',
     maxFontSize: 48,
     minFontSize: 16,
     maxLines: 2,
     lineSpacing: 1.0,
     opacity: 1,
   };
+}
+
+// Product-image base layer: auto-included, always index 0 (bottom), full canvas,
+// contain-fit at render. bind is read-only and it cannot be deleted/reordered.
+function createProductImageElement(canvasWidth: number, canvasHeight: number): TemplateElement {
+  return {
+    type: 'image',
+    bind: 'productImage',
+    src: null,
+    region: { x: 0, y: 0, w: canvasWidth, h: canvasHeight },
+    align: { h: 'center', v: 'center' },
+    fontId: null,
+    color: null,
+    maxFontSize: 48,
+    minFontSize: 16,
+    maxLines: 2,
+    lineSpacing: 1.0,
+    opacity: 1,
+  };
+}
+
+// Fixed image element bound to a library asset (src = asset storageKey).
+// Defaults to a centered 30% box.
+function createFixedImageElement(
+  storageKey: string,
+  canvasWidth: number,
+  canvasHeight: number
+): TemplateElement {
+  const w = Math.round(canvasWidth * 0.3);
+  const h = Math.round(canvasHeight * 0.3);
+  return {
+    type: 'image',
+    bind: null,
+    src: storageKey,
+    region: { x: Math.round((canvasWidth - w) / 2), y: Math.round((canvasHeight - h) / 2), w, h },
+    align: { h: 'center', v: 'center' },
+    fontId: null,
+    color: null,
+    maxFontSize: 48,
+    minFontSize: 16,
+    maxLines: 2,
+    lineSpacing: 1.0,
+    opacity: 1,
+  };
+}
+
+const isProductBase = (el: TemplateElement): boolean => el.type === 'image' && el.bind === 'productImage';
+
+// Enforce the invariant that the productImage base is exactly at index 0. If
+// missing, prepend a full-canvas base (legacy templates). If present at index≠0,
+// move the first one to index 0 (values preserved). Extra product-image elements
+// beyond the first are left in place (matches backend firstProductImageElement).
+function normalizeBaseLayer(
+  els: TemplateElement[],
+  canvasWidth: number,
+  canvasHeight: number
+): TemplateElement[] {
+  const idx = els.findIndex(isProductBase);
+  if (idx === -1) return [createProductImageElement(canvasWidth, canvasHeight), ...els];
+  if (idx === 0) return els;
+  const next = [...els];
+  const [base] = next.splice(idx, 1);
+  next.unshift(base);
+  return next;
 }
 
 export function TemplateEditor({ mode, id }: TemplateEditorProps) {
@@ -63,10 +136,19 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
   const [gradientTopColor, setGradientTopColor] = useState('#ffffff');
   const [gradientBottomColor, setGradientBottomColor] = useState('#000000');
   const [isDefault, setIsDefault] = useState(false);
-  const [elements, setElements] = useState<TemplateElement[]>([]);
+  const [fields, setFields] = useState<TemplateField[]>(reservedFields);
+  const [addFieldKey, setAddFieldKey] = useState(''); // field selected in the "add text element" dropdown
+  // New templates start with the product-image base at index 0 (always bottom).
+  const [elements, setElements] = useState<TemplateElement[]>(() =>
+    mode === 'new' ? [createProductImageElement(1000, 1000)] : []
+  );
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
 
   const [fonts, setFonts] = useState<FontAsset[]>([]);
+  // storageKey → asset display name, so placed fixed-image elements (which only
+  // store src) show a friendly name instead of the raw storage key.
+  const [assetNames, setAssetNames] = useState<Record<string, string>>({});
 
   const [isLoading, setIsLoading] = useState(mode === 'edit');
   const [isSaving, setIsSaving] = useState(false);
@@ -89,6 +171,26 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
     };
   }, [useCase]);
 
+  const applyAssetNames = useCallback((assets: TemplateAsset[]) => {
+    setAssetNames(Object.fromEntries(assets.map((a) => [a.storageKey, a.name])));
+  }, []);
+
+  // Load asset names once so already-placed fixed images resolve to their name.
+  useEffect(() => {
+    let active_ = true;
+    (async () => {
+      try {
+        const assets = await useCase.listAssets();
+        if (active_) applyAssetNames(assets);
+      } catch {
+        // Non-fatal: fixed images just fall back to showing their storage key.
+      }
+    })();
+    return () => {
+      active_ = false;
+    };
+  }, [useCase, applyAssetNames]);
+
   // Load existing template in edit mode.
   useEffect(() => {
     if (mode !== 'edit' || id == null) return;
@@ -106,7 +208,18 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
         setGradientTopColor(t.gradientTopColor ?? '#ffffff');
         setGradientBottomColor(t.gradientBottomColor ?? '#000000');
         setIsDefault(t.isDefault);
-        setElements(t.elements ?? []);
+        // Legacy templates may have fields=null → restore the reserved pair.
+        const loadedFields = t.fields?.length ? t.fields : reservedFields();
+        setFields(loadedFields);
+        // Legacy element bind correction: any text element whose bind is missing
+        // from the loaded field keys (orphan) falls back to 'productName' (always
+        // present) so the backend does not reject an unknown bind on save.
+        const fieldKeys = new Set(loadedFields.map((f) => f.key));
+        const corrected = (t.elements ?? []).map((el) =>
+          el.type === 'text' && (!el.bind || !fieldKeys.has(el.bind)) ? { ...el, bind: 'productName' } : el
+        );
+        // Enforce the product-image base at index 0 (adds it for legacy templates).
+        setElements(normalizeBaseLayer(corrected, t.canvasWidth, t.canvasHeight));
       } catch {
         if (active_) setError('템플릿을 불러오지 못했습니다.');
       } finally {
@@ -129,16 +242,70 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
       // Gradient colors only carry meaning in GRADIENT_MANUAL; send null otherwise.
       gradientTopColor: backgroundMode === 'GRADIENT_MANUAL' ? gradientTopColor : null,
       gradientBottomColor: backgroundMode === 'GRADIENT_MANUAL' ? gradientBottomColor : null,
+      fields,
       elements,
       active: true, // active toggle removed from UI; templates are always active
       isDefault,
     }),
-    [name, canvasWidth, canvasHeight, backgroundMode, gradientTopColor, gradientBottomColor, elements, isDefault]
+    [name, canvasWidth, canvasHeight, backgroundMode, gradientTopColor, gradientBottomColor, fields, elements, isDefault]
   );
 
-  const handleAddElement = (type: 'text' | 'image') => {
-    setElements((prev) => [...prev, createElement(type, canvasWidth, canvasHeight, fonts[0]?.id ?? null)]);
-    setSelectedIndex(elements.length);
+  // --- Field management ---
+  const handleFieldLabelChange = (key: string, label: string) =>
+    setFields((prev) => prev.map((f) => (f.key === key ? { ...f, label } : f)));
+
+  const handleFieldDefaultChange = (key: string, defaultValue: string) =>
+    setFields((prev) => prev.map((f) => (f.key === key ? { ...f, defaultValue } : f)));
+
+  const handleAddField = () => {
+    setFields((prev) => {
+      let key = `field_${Date.now()}`;
+      let suffix = 1;
+      // Guard against same-ms collisions (rapid clicks).
+      while (prev.some((f) => f.key === key)) key = `field_${Date.now()}_${suffix++}`;
+      return [...prev, { key, label: '새 필드', defaultValue: '' }];
+    });
+  };
+
+  const handleDeleteField = (key: string) => {
+    if (isReservedKey(key)) return;
+    if (elements.some((e) => e.bind === key)) {
+      alert('이 필드에 연결된 요소가 있어 삭제할 수 없습니다. 요소를 먼저 삭제하세요.');
+      return;
+    }
+    setFields((prev) => prev.filter((f) => f.key !== key));
+  };
+
+  // --- Element add (text = pick a field, image = fixed) ---
+  const handleAddTextElement = (key: string) => {
+    if (!key) return;
+    setElements((prev) => {
+      setSelectedIndex(prev.length); // new element position
+      return [...prev, createTextElement(key, canvasWidth, canvasHeight, fonts[0]?.id ?? null)];
+    });
+    setAddFieldKey('');
+  };
+
+  // Asset picked in the modal → add a fixed image element on top (end of array).
+  const handleSelectAsset = (asset: TemplateAsset) => {
+    setElements((prev) => {
+      setSelectedIndex(prev.length);
+      return [...prev, createFixedImageElement(asset.storageKey, canvasWidth, canvasHeight)];
+    });
+    setIsAssetModalOpen(false);
+  };
+
+  // Swap an overlay element with its neighbor. dir +1 = forward (toward top),
+  // dir -1 = backward. The base (index 0) is excluded → swaps clamp to [1, len-1].
+  const moveElement = (index: number, dir: 1 | -1) => {
+    const target = index + dir;
+    if (target < 1 || target > elements.length - 1) return;
+    setElements((prev) => {
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+    setSelectedIndex(target);
   };
 
   const handleElementPatch = (index: number, patch: Partial<TemplateElement>) => {
@@ -152,6 +319,7 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
   };
 
   const handleDeleteElement = (index: number) => {
+    if (isProductBase(elements[index])) return; // base cannot be deleted
     setElements((prev) => prev.filter((_, i) => i !== index));
     setSelectedIndex(null);
   };
@@ -182,6 +350,13 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
       setError('캔버스 크기는 0보다 커야 합니다.');
       return;
     }
+    // Custom fields require a default value (backend rejects blanks with 400).
+    const missingDefault = fields.find((f) => !isReservedKey(f.key) && !f.defaultValue.trim());
+    if (missingDefault) {
+      setError(`커스텀 필드 '${missingDefault.label}'의 기본값을 입력하세요.`);
+      return;
+    }
+    // Text elements without a font fail backend render (400 "fontId is required").
     const fontError = missingFontError();
     if (fontError) {
       setError(fontError);
@@ -306,25 +481,89 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
             </p>
           )}
         </div>
+
+        {/* Template input fields */}
+        <div className="md:col-span-6">
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-xs font-medium text-gray-600">입력 필드</label>
+            <button
+              type="button"
+              onClick={handleAddField}
+              className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+            >
+              + 필드 추가
+            </button>
+          </div>
+          <div className="space-y-2">
+            {fields.map((f) => {
+              const reserved = isReservedKey(f.key);
+              return (
+                <div key={f.key} className="flex flex-wrap items-center gap-2">
+                  {reserved ? (
+                    <>
+                      <span className={`${inputCls} w-40 bg-gray-50`}>{f.label}</span>
+                      <span className="text-xs text-gray-500">자동채움 (상품값)</span>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        className={`${inputCls} w-40`}
+                        value={f.label}
+                        placeholder="라벨"
+                        onChange={(e) => handleFieldLabelChange(f.key, e.target.value)}
+                      />
+                      <input
+                        className={`${inputCls} w-48`}
+                        value={f.defaultValue}
+                        placeholder="기본값 (필수)"
+                        onChange={(e) => handleFieldDefaultChange(f.key, e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteField(f.key)}
+                        className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                      >
+                        삭제
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Editor: left canvas, right panels */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_1fr]">
         <div className="space-y-3">
           <div className="flex gap-2">
+            <select
+              className={inputCls}
+              value={addFieldKey}
+              onChange={(e) => setAddFieldKey(e.target.value)}
+            >
+              <option value="">텍스트 필드 선택</option>
+              {fields.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
-              onClick={() => handleAddElement('text')}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              onClick={() => handleAddTextElement(addFieldKey)}
+              disabled={!addFieldKey}
+              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              + 텍스트
+              추가
             </button>
             <button
               type="button"
-              onClick={() => handleAddElement('image')}
+              onClick={() => setIsAssetModalOpen(true)}
               className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
             >
-              + 이미지
+              + 고정 이미지
             </button>
           </div>
           <TemplateCanvas
@@ -335,6 +574,7 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
             backgroundMode={backgroundMode}
             gradientTopColor={gradientTopColor}
             gradientBottomColor={gradientBottomColor}
+            assetNames={assetNames}
             selectedIndex={selectedIndex}
             onSelect={setSelectedIndex}
             onRegionChange={handleRegionChange}
@@ -345,10 +585,20 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
         </div>
 
         <div className="space-y-6">
+          <LayerListPanel
+            elements={elements}
+            fields={fields}
+            assetNames={assetNames}
+            selectedIndex={selectedIndex}
+            onSelect={setSelectedIndex}
+            onMove={moveElement}
+          />
           {selected ? (
             <ElementPropertyPanel
               element={selected}
+              fields={fields}
               fonts={fonts}
+              assetNames={assetNames}
               onChange={(patch) => handleElementPatch(selectedIndex!, patch)}
               onUploadFont={handleUploadFont}
               onDelete={() => handleDeleteElement(selectedIndex!)}
@@ -358,9 +608,23 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
               편집할 요소를 캔버스에서 선택하세요.
             </div>
           )}
-          <PreviewPanel onPreview={handlePreview} validate={missingFontError} />
+          <PreviewPanel
+            fields={fields}
+            onPreview={handlePreview}
+            displayWidth={canvasWidth * scale}
+            displayHeight={canvasHeight * scale}
+            validate={missingFontError}
+          />
         </div>
       </div>
+
+      <AssetPickerModal
+        isOpen={isAssetModalOpen}
+        onClose={() => setIsAssetModalOpen(false)}
+        onSelect={handleSelectAsset}
+        useCase={useCase}
+        onAssetsChange={applyAssetNames}
+      />
     </PageContainer>
   );
 }

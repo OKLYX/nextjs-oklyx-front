@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ProductThumbnailUseCase } from '@/application/usecases/ProductThumbnailUseCase';
 import { ProductThumbnailRepositoryImpl } from '@/infrastructure/repositories/ProductThumbnailRepositoryImpl';
+import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
+import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
-import type { ProductThumbnail } from '@/domain/entities/ThumbnailEntity';
+import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
+import type { ProductThumbnail, TemplateField } from '@/domain/entities/ThumbnailEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 
 /**
@@ -18,24 +21,23 @@ import type { Seller } from '@/domain/entities/SellerEntity';
  */
 interface ProductThumbnailSectionProps {
   productId: number;
+  // Prefill sources for reserved fields (from the already-loaded parent product).
+  productBrand?: string;
+  productName?: string;
 }
 
-// dev/prod thumbnails are public URLs; local disk paths go through the uploads proxy.
-function resolveThumbUrl(imageUrl: string, bust?: number): string {
-  const base = imageUrl.startsWith('http') ? imageUrl : `/api/uploads/${imageUrl.replace(/^\/+/, '')}`;
-  if (!bust) return base;
-  return `${base}${base.includes('?') ? '&' : '?'}t=${bust}`;
-}
-
-export function ProductThumbnailSection({ productId }: ProductThumbnailSectionProps) {
+export function ProductThumbnailSection({ productId, productBrand, productName }: ProductThumbnailSectionProps) {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.role === 'ADMIN';
 
   const useCase = useMemo(() => new ProductThumbnailUseCase(new ProductThumbnailRepositoryImpl()), []);
+  const templateUseCase = useMemo(() => new ThumbnailTemplateUseCase(new ThumbnailTemplateRepositoryImpl()), []);
   const sellerRepository = useMemo(() => new SellerRepositoryImpl(), []);
 
   const [thumbnails, setThumbnails] = useState<ProductThumbnail[]>([]);
   const [sellers, setSellers] = useState<Seller[]>([]);
+  const [templateFields, setTemplateFields] = useState<TemplateField[]>([]);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [selectedSellerId, setSelectedSellerId] = useState<number | ''>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -67,11 +69,28 @@ export function ProductThumbnailSection({ productId }: ProductThumbnailSectionPr
       } finally {
         if (alive) setIsLoading(false);
       }
+      // Default-template fields drive the field-value panel. Non-fatal: on failure
+      // or legacy fields=null the panel stays empty and the backend uses defaults.
+      try {
+        const templates = await templateUseCase.list();
+        if (!alive) return;
+        const tf = templates.find((t) => t.isDefault)?.fields ?? [];
+        setTemplateFields(tf);
+        const initial: Record<string, string> = {};
+        for (const f of tf) {
+          if (f.key === 'brandName') initial[f.key] = productBrand ?? '';
+          else if (f.key === 'productName') initial[f.key] = productName ?? '';
+          else initial[f.key] = f.defaultValue;
+        }
+        setFieldValues(initial);
+      } catch {
+        // Leave the panel empty.
+      }
     })();
     return () => {
       alive = false;
     };
-  }, [useCase, sellerRepository, productId, isAdmin]);
+  }, [useCase, templateUseCase, sellerRepository, productId, isAdmin, productBrand, productName]);
 
   const bust = (sellerId: number) => setCacheBust((prev) => ({ ...prev, [sellerId]: Date.now() }));
 
@@ -80,7 +99,7 @@ export function ProductThumbnailSection({ productId }: ProductThumbnailSectionPr
     setBusySellerId(sellerId);
     if (selectedSellerId === sellerId || selectedSellerId === '') setIsGenerating(true);
     try {
-      await useCase.generate(productId, sellerId);
+      await useCase.generate(productId, sellerId, fieldValues);
       await loadThumbnails();
       bust(sellerId);
     } catch {
@@ -167,6 +186,28 @@ export function ProductThumbnailSection({ productId }: ProductThumbnailSectionPr
           {isGenerating ? <Spinner label="생성 중..." /> : '생성 / 재생성'}
         </button>
       </div>
+
+      {/* Field values applied to generate/regenerate (reserved keys prefilled from product). */}
+      {templateFields.length > 0 && (
+        <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2 lg:grid-cols-3">
+          {templateFields.map((f) => {
+            const reserved = f.key === 'brandName' || f.key === 'productName';
+            return (
+              <div key={f.key}>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  {f.label}
+                  {reserved ? ' (자동)' : ''}
+                </label>
+                <input
+                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                  value={fieldValues[f.key] ?? ''}
+                  onChange={(e) => setFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 

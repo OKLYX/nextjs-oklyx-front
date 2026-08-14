@@ -137,7 +137,11 @@ export function ProductDetailView({ product, onDelete, onImageUpload, onImageDel
       <ProductImageSection imageUrl={product.imageUrl || null} productId={product.id} onUpload={onImageUpload} onDelete={onImageDelete} isViewMode={false} />
 
       {/* Per-seller generated thumbnails */}
-      <ProductThumbnailSection productId={product.id} />
+      <ProductThumbnailSection
+        productId={product.id}
+        productBrand={product.brand}
+        productName={product.productName}
+      />
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirmation && (
