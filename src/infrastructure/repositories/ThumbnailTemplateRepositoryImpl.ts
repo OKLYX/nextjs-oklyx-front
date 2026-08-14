@@ -2,11 +2,12 @@
 
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { ThumbnailTemplateRepository } from '@/domain/repositories/ThumbnailTemplateRepository';
-import type { ThumbnailTemplate, FontAsset } from '@/domain/entities/ThumbnailEntity';
+import type { ThumbnailTemplate, FontAsset, TemplateAsset } from '@/domain/entities/ThumbnailEntity';
 import type { ThumbnailTemplateRequest, ThumbnailPreviewRequest } from '@/application/dto/ThumbnailDTOs';
 
 const TEMPLATE_BASE = '/api/admin/thumbnail-templates';
 const FONT_BASE = '/api/admin/fonts';
+const ASSET_BASE = '/api/admin/thumbnail-assets';
 
 export class ThumbnailTemplateRepositoryImpl implements ThumbnailTemplateRepository {
   async list(): Promise<ThumbnailTemplate[]> {
@@ -53,5 +54,28 @@ export class ThumbnailTemplateRepositoryImpl implements ThumbnailTemplateReposit
       headers: { 'Content-Type': undefined },
     });
     return response.data.data;
+  }
+
+  async listAssets(): Promise<TemplateAsset[]> {
+    const response = await axiosInstance.get(ASSET_BASE);
+    return response.data.data;
+  }
+
+  async uploadAsset(file: File): Promise<TemplateAsset> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await axiosInstance.post(ASSET_BASE, formData, {
+      headers: { 'Content-Type': undefined },
+    });
+    return response.data.data;
+  }
+
+  async renameAsset(id: number, name: string): Promise<TemplateAsset> {
+    const response = await axiosInstance.patch(`${ASSET_BASE}/${id}`, { name });
+    return response.data.data;
+  }
+
+  async deleteAsset(id: number): Promise<void> {
+    await axiosInstance.delete(`${ASSET_BASE}/${id}`);
   }
 }

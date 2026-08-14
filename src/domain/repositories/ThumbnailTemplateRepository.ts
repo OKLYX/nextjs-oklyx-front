@@ -1,4 +1,4 @@
-import type { ThumbnailTemplate, FontAsset } from '@/domain/entities/ThumbnailEntity';
+import type { ThumbnailTemplate, FontAsset, TemplateAsset } from '@/domain/entities/ThumbnailEntity';
 import type { ThumbnailTemplateRequest, ThumbnailPreviewRequest } from '@/application/dto/ThumbnailDTOs';
 
 export interface ThumbnailTemplateRepository {
@@ -11,4 +11,9 @@ export interface ThumbnailTemplateRepository {
   preview(req: ThumbnailPreviewRequest): Promise<Blob>;
   listFonts(): Promise<FontAsset[]>;
   uploadFont(file: File): Promise<FontAsset>;
+  // Tenant-shared fixed image assets (mirror of the font endpoints).
+  listAssets(): Promise<TemplateAsset[]>;
+  uploadAsset(file: File): Promise<TemplateAsset>;
+  renameAsset(id: number, name: string): Promise<TemplateAsset>;
+  deleteAsset(id: number): Promise<void>;
 }

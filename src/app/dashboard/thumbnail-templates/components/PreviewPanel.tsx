@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
+import type { TemplateField } from '@/domain/entities/ThumbnailEntity';
 
 /**
  * Real composed preview rendered by the backend. The "미리보기" button (NOT
@@ -10,16 +11,25 @@ import { Spinner } from '@/presentation/components/Spinner';
  * File: src/app/dashboard/thumbnail-templates/components/PreviewPanel.tsx
  */
 interface PreviewPanelProps {
+  fields: TemplateField[];
   onPreview: (sampleBindings: Record<string, string>) => Promise<Blob>;
+  // Display the rendered preview at the SAME on-screen size as the editing
+  // canvas (canvasWidth*scale × canvasHeight*scale) so element sizes match 1:1.
+  displayWidth: number;
+  displayHeight: number;
 }
 
-export function PreviewPanel({ onPreview }: PreviewPanelProps) {
-  const [brandName, setBrandName] = useState('브랜드명');
-  const [productName, setProductName] = useState('아주 긴 상품명 예시 텍스트 오토핏 확인용');
+export function PreviewPanel({ fields, onPreview, displayWidth, displayHeight }: PreviewPanelProps) {
+  // Sample value per field = user override, else defaultValue || label (reserved
+  // fields have empty defaults → their label shows in the preview). Derived, so
+  // no effect is needed to re-sync when fields change.
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const objectUrlRef = useRef<string | null>(null);
+
+  const valueOf = (f: TemplateField) => overrides[f.key] ?? (f.defaultValue || f.label);
 
   useEffect(
     () => () => {
@@ -32,7 +42,9 @@ export function PreviewPanel({ onPreview }: PreviewPanelProps) {
     setIsLoading(true);
     setError('');
     try {
-      const blob = await onPreview({ brandName, productName });
+      const bindings: Record<string, string> = {};
+      for (const f of fields) bindings[f.key] = valueOf(f);
+      const blob = await onPreview(bindings);
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       const url = URL.createObjectURL(blob);
       objectUrlRef.current = url;
@@ -51,14 +63,16 @@ export function PreviewPanel({ onPreview }: PreviewPanelProps) {
     <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
       <h3 className="text-sm font-semibold text-gray-900">미리보기</h3>
       <div className="space-y-2">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">brandName</label>
-          <input className={fieldCls} value={brandName} onChange={(e) => setBrandName(e.target.value)} />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">productName</label>
-          <input className={fieldCls} value={productName} onChange={(e) => setProductName(e.target.value)} />
-        </div>
+        {fields.map((f) => (
+          <div key={f.key}>
+            <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
+            <input
+              className={fieldCls}
+              value={valueOf(f)}
+              onChange={(e) => setOverrides((prev) => ({ ...prev, [f.key]: e.target.value }))}
+            />
+          </div>
+        ))}
       </div>
       <button
         type="button"
@@ -71,7 +85,12 @@ export function PreviewPanel({ onPreview }: PreviewPanelProps) {
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {imageUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt="preview" className="w-full rounded border border-gray-300" />
+        <img
+          src={imageUrl}
+          alt="preview"
+          className="rounded border border-gray-300"
+          style={{ width: displayWidth, height: displayHeight, maxWidth: '100%' }}
+        />
       )}
     </div>
   );

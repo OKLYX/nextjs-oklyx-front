@@ -1,5 +1,5 @@
 import type { ThumbnailTemplateRepository } from '@/domain/repositories/ThumbnailTemplateRepository';
-import type { ThumbnailTemplate, FontAsset } from '@/domain/entities/ThumbnailEntity';
+import type { ThumbnailTemplate, FontAsset, TemplateAsset } from '@/domain/entities/ThumbnailEntity';
 import type { ThumbnailTemplateRequest, ThumbnailPreviewRequest } from '@/application/dto/ThumbnailDTOs';
 
 export class ThumbnailTemplateUseCase {
@@ -35,5 +35,21 @@ export class ThumbnailTemplateUseCase {
 
   async uploadFont(file: File): Promise<FontAsset> {
     return this.repository.uploadFont(file);
+  }
+
+  async listAssets(): Promise<TemplateAsset[]> {
+    return this.repository.listAssets();
+  }
+
+  async uploadAsset(file: File): Promise<TemplateAsset> {
+    return this.repository.uploadAsset(file);
+  }
+
+  async renameAsset(id: number, name: string): Promise<TemplateAsset> {
+    return this.repository.renameAsset(id, name);
+  }
+
+  async deleteAsset(id: number): Promise<void> {
+    return this.repository.deleteAsset(id);
   }
 }
