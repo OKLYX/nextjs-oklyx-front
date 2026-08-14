@@ -255,7 +255,15 @@ export function ElementPropertyPanel({
                 min={0}
                 className={inputCls}
                 value={element.outlineWidth ?? 0}
-                onChange={(e) => onChange({ outlineWidth: Math.max(0, Number(e.target.value) || 0) })}
+                onChange={(e) => {
+                  // Commit the displayed default color when enabling via width alone,
+                  // otherwise a null color skips rendering (preview shows nothing).
+                  const w = Math.max(0, Number(e.target.value) || 0);
+                  onChange({
+                    outlineWidth: w,
+                    ...(w > 0 && element.outlineColor == null ? { outlineColor: '#ffffff' } : {}),
+                  });
+                }}
               />
             </div>
           </div>
@@ -295,7 +303,15 @@ export function ElementPropertyPanel({
             min={0}
             className={inputCls}
             value={element.borderWidth ?? 0}
-            onChange={(e) => onChange({ borderWidth: Math.max(0, Number(e.target.value) || 0) })}
+            onChange={(e) => {
+              // Commit the displayed default color when enabling via width alone,
+              // otherwise a null color skips rendering (preview shows nothing).
+              const w = Math.max(0, Number(e.target.value) || 0);
+              onChange({
+                borderWidth: w,
+                ...(w > 0 && element.borderColor == null ? { borderColor: '#000000' } : {}),
+              });
+            }}
           />
         </div>
       </div>
