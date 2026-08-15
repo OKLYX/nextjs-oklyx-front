@@ -25,4 +25,7 @@ export const ROUTES = {
   ORDERS_RETRIEVE: '/dashboard/orders' as const,
   PURCHASE_LIST: '/dashboard/purchase/list' as const,
   SETTINGS_LOGGING: '/dashboard/settings/logging' as const,
+  THUMBNAIL_TEMPLATES: '/dashboard/thumbnail-templates' as const,
+  THUMBNAIL_TEMPLATE_NEW: '/dashboard/thumbnail-templates/new' as const,
+  THUMBNAIL_TEMPLATE_EDIT: (id: number | string) => `/dashboard/thumbnail-templates/${id}` as const,
 } as const;
