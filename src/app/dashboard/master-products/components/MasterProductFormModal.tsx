@@ -1,0 +1,267 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Spinner } from '@/presentation/components/Spinner';
+import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
+import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import type { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
+import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
+import type { Product } from '@/domain/entities/Product';
+import { MasterOptionEditor } from './MasterOptionEditor';
+
+interface MasterProductFormModalProps {
+  master: MasterProductResponse | null; // null = create mode
+  useCase: MasterProductUseCase;
+  productsUseCase: GetProductsUseCase;
+  onClose: () => void;
+  onDataChanged: () => Promise<void> | void; // reload parent list
+}
+
+/**
+ * 판매상품 마스터 생성/수정 모달.
+ * File: src/app/dashboard/master-products/components/MasterProductFormModal.tsx
+ * 옵션 편집(MasterOptionEditor)은 수정 모드(=마스터 id 존재)에서만 노출.
+ */
+export function MasterProductFormModal({
+  master: initialMaster,
+  useCase,
+  productsUseCase,
+  onClose,
+  onDataChanged,
+}: MasterProductFormModalProps) {
+  const [master, setMaster] = useState<MasterProductResponse | null>(initialMaster);
+  const isEdit = master != null;
+
+  const [name, setName] = useState(initialMaster?.name ?? '');
+  const [selectedIds, setSelectedIds] = useState<number[]>(
+    initialMaster?.components.map((c) => c.productId) ?? []
+  );
+  const [detailSource, setDetailSource] = useState(initialMaster?.detailSource ?? '');
+  const [active, setActive] = useState(initialMaster?.active ?? true);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productFilter, setProductFilter] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await productsUseCase.getProducts({ page: 0, size: 1000 });
+        if (alive) setProducts(res.content);
+      } catch {
+        if (alive) setError('구성상품 후보를 불러오지 못했습니다.');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [productsUseCase]);
+
+  const reloadMaster = useCallback(async () => {
+    if (!master) return;
+    const fresh = await useCase.getById(master.id);
+    setMaster(fresh);
+  }, [useCase, master]);
+
+  const toggleProduct = (id: number) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const filteredProducts = useMemo(() => {
+    const q = productFilter.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) => (p.productName ?? '').toLowerCase().includes(q));
+  }, [products, productFilter]);
+
+  const handleSubmit = async () => {
+    setError('');
+    if (!name.trim()) {
+      setError('이름을 입력하세요.');
+      return;
+    }
+    if (selectedIds.length === 0) {
+      setError('구성상품을 1개 이상 선택하세요.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      if (!isEdit) {
+        // Create the master first to obtain an id, then upload the image override.
+        const created = await useCase.create({
+          name: name.trim(),
+          componentProductIds: selectedIds,
+          detailSource: detailSource.trim() || undefined,
+        });
+        if (imageFile) await useCase.uploadImage(created.id, imageFile);
+        await onDataChanged();
+        onClose();
+      } else {
+        await useCase.update(master!.id, {
+          name: name.trim(),
+          componentProductIds: selectedIds,
+          detailSource: detailSource.trim(),
+          active,
+        });
+        if (imageFile) await useCase.uploadImage(master!.id, imageFile);
+        await onDataChanged();
+        onClose();
+      }
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      setError(status === 400 ? '입력값을 확인하세요.' : '저장에 실패했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const currentImageUrl = master?.sourceImageUrl ?? null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+      <div className="my-8 w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isEdit ? '마스터 수정' : '새 마스터'}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">이름 *</label>
+            <input
+              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              구성상품 세트 ({selectedIds.length}개 선택)
+            </label>
+            <input
+              className="mb-2 w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              placeholder="상품명 검색"
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value)}
+            />
+            <div className="max-h-48 overflow-y-auto rounded border border-gray-200">
+              {filteredProducts.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-gray-500">상품이 없습니다.</p>
+              ) : (
+                filteredProducts.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-3 py-1.5 text-sm text-gray-900 last:border-0 hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(p.id)}
+                      onChange={() => toggleProduct(p.id)}
+                    />
+                    <span>{p.productName}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">상세 설명 (detailSource)</label>
+            <textarea
+              className="h-24 w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              value={detailSource}
+              onChange={(e) => setDetailSource(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">대표사진 override</label>
+            <div className="flex items-center gap-3">
+              <div className="h-16 w-16 overflow-hidden rounded bg-gray-100">
+                {imageFile ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={URL.createObjectURL(imageFile)}
+                    alt="preview"
+                    className="h-full w-full object-contain"
+                  />
+                ) : currentImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={resolveThumbUrl(currentImageUrl)}
+                    alt="current"
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">
+                    없음
+                  </span>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                className="text-sm text-gray-700"
+              />
+            </div>
+          </div>
+
+          {isEdit && (
+            <label className="flex items-center gap-2 text-sm text-gray-900">
+              <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+              활성 (active)
+            </label>
+          )}
+        </div>
+
+        <div className="mt-6 flex gap-2">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isSubmitting ? <Spinner label="저장 중..." /> : '저장'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          >
+            닫기
+          </button>
+        </div>
+
+        {isEdit && master && (
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <MasterOptionEditor
+              master={master}
+              useCase={useCase}
+              onChanged={async () => {
+                await reloadMaster();
+                await onDataChanged();
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
