@@ -16,6 +16,8 @@ export interface MasterOptionResponse {
   id: number;
   name: string;
   items: MasterOptionItem[];
+  deliveryId: number | null; // carrier override; null = use master default
+  packageId: number | null; // box override; null = use master default
 }
 
 export interface MasterProductResponse {
@@ -25,6 +27,8 @@ export interface MasterProductResponse {
   sourceImageUrl: string | null;
   detailSource: string | null;
   fieldValues: Record<string, string>;
+  defaultDeliveryId: number | null; // default carrier for the price engine
+  defaultPackageId: number | null; // default box for the price engine
   components: MasterComponent[];
   options: MasterOptionResponse[];
 }
@@ -35,6 +39,8 @@ export interface MasterProductRequest {
   componentProductIds: number[];
   detailSource?: string;
   fieldValues?: Record<string, string>;
+  defaultDeliveryId?: number;
+  defaultPackageId?: number;
 }
 
 export interface MasterProductUpdateRequest {
@@ -43,6 +49,8 @@ export interface MasterProductUpdateRequest {
   fieldValues?: Record<string, string>;
   active?: boolean;
   componentProductIds?: number[];
+  defaultDeliveryId?: number; // omit = keep existing (backend PATCH null = keep)
+  defaultPackageId?: number;
 }
 
 export interface MasterOptionRequestItem {
@@ -53,6 +61,20 @@ export interface MasterOptionRequestItem {
 export interface MasterOptionRequest {
   name: string;
   items: MasterOptionRequestItem[];
+  deliveryId?: number; // omit = keep existing; set = replace override
+  packageId?: number;
+}
+
+// Master category (master × platform); backend 13.
+export interface MasterCategoryResponse {
+  platform: string;
+  categoryId: number;
+  categoryName: string;
+}
+
+export interface MasterCategoryRequest {
+  platform: string;
+  categoryId: number;
 }
 
 // Coverage matrix (accounts × listings)

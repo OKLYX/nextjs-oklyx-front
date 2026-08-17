@@ -11,6 +11,10 @@ import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCas
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
 import { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
+import { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
+import { CarrierRateRepositoryImpl } from '@/infrastructure/repositories/CarrierRateRepositoryImpl';
+import { PackageUseCase } from '@/application/usecases/PackageUseCase';
+import { PackageRepositoryImpl } from '@/infrastructure/repositories/PackageRepositoryImpl';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import { MasterProductFormModal } from './MasterProductFormModal';
 
@@ -25,6 +29,8 @@ export function MasterProductList() {
 
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   const productsUseCase = useMemo(() => new GetProductsUseCase(new ProductRepositoryImpl()), []);
+  const carrierRateUseCase = useMemo(() => new CarrierRateUseCase(new CarrierRateRepositoryImpl()), []);
+  const packageUseCase = useMemo(() => new PackageUseCase(new PackageRepositoryImpl()), []);
 
   const [masters, setMasters] = useState<MasterProductResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -205,6 +211,8 @@ export function MasterProductList() {
           master={editingMaster}
           useCase={useCase}
           productsUseCase={productsUseCase}
+          carrierRateUseCase={carrierRateUseCase}
+          packageUseCase={packageUseCase}
           onClose={() => setModalOpen(false)}
           onDataChanged={load}
         />

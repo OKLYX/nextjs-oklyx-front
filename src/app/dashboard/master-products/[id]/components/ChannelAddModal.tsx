@@ -8,16 +8,7 @@ import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegist
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
-import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
-import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
-import { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
-import { CarrierRateRepositoryImpl } from '@/infrastructure/repositories/CarrierRateRepositoryImpl';
-import { PackageUseCase } from '@/application/usecases/PackageUseCase';
-import { PackageRepositoryImpl } from '@/infrastructure/repositories/PackageRepositoryImpl';
 import type { Seller } from '@/domain/entities/SellerEntity';
-import type { Category } from '@/domain/entities/CategoryEntity';
-import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
-import type { Package } from '@/domain/entities/PackageEntity';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type { GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
 
@@ -35,7 +26,8 @@ const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
  * 채널 추가 마법사 (2단계: 폼 → 자동 생성 미리보기).
  * File: src/app/dashboard/master-products/[id]/components/ChannelAddModal.tsx
  *
- * - 폼: 판매자/플랫폼/카테고리/택배비/상자비/옵션(다중, 최소 1) → addChannel.
+ * - 폼: 판매자/플랫폼/옵션(다중, 최소 1) → addChannel. 카테고리·택배·박스는 마스터 레벨(13)로 이동해 여기서 입력하지 않음.
+ * - 카테고리 미설정 플랫폼은 addChannel 400 → 마스터 상세 '플랫폼별 카테고리'에서 먼저 지정 안내.
  * - 성공 시 같은 모달에서 미리보기(썸네일 + 옵션별 판매가) → [마켓 등록] 또는 [닫기].
  * - `options` 는 부모(09 매트릭스)에서 로드된 마스터 옵션 — 재fetch 금지.
  */
@@ -45,23 +37,14 @@ export function ChannelAddModal({ masterId, options, prefill, onDone, onClose }:
     [],
   );
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
-  const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
-  const carrierRateUseCase = useMemo(() => new CarrierRateUseCase(new CarrierRateRepositoryImpl()), []);
-  const packageUseCase = useMemo(() => new PackageUseCase(new PackageRepositoryImpl()), []);
 
   // Dropdown sources
   const [sellers, setSellers] = useState<Seller[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
-  const [packages, setPackages] = useState<Package[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
 
   // Form state
   const [sellerId, setSellerId] = useState<number | ''>(prefill?.sellerId ?? '');
   const [platform, setPlatform] = useState<string>(prefill?.platform ?? '');
-  const [categoryId, setCategoryId] = useState<number | ''>('');
-  const [deliveryId, setDeliveryId] = useState<number | ''>('');
-  const [packageId, setPackageId] = useState<number | ''>('');
   const [optionIds, setOptionIds] = useState<number[]>([]);
 
   const [fieldError, setFieldError] = useState('');
@@ -79,17 +62,9 @@ export function ChannelAddModal({ masterId, options, prefill, onDone, onClose }:
     (async () => {
       setLoadingOptions(true);
       try {
-        const [s, c, r, p] = await Promise.all([
-          sellerUseCase.getAll(),
-          categoryUseCase.getCategories(),
-          carrierRateUseCase.getCarrierRates(),
-          packageUseCase.getPackages(),
-        ]);
+        const s = await sellerUseCase.getAll();
         if (!alive) return;
         setSellers(s);
-        setCategories(c);
-        setCarrierRates(r);
-        setPackages(p);
       } catch {
         if (alive) setError('선택 목록을 불러오지 못했습니다.');
       } finally {
@@ -99,12 +74,7 @@ export function ChannelAddModal({ masterId, options, prefill, onDone, onClose }:
     return () => {
       alive = false;
     };
-  }, [sellerUseCase, categoryUseCase, carrierRateUseCase, packageUseCase]);
-
-  // Categories are platform-scoped; only show matching ones once a platform is chosen.
-  const visibleCategories = platform
-    ? categories.filter((c) => c.platform === platform)
-    : categories;
+  }, [sellerUseCase]);
 
   const toggleOption = (id: number) => {
     setOptionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -113,8 +83,8 @@ export function ChannelAddModal({ masterId, options, prefill, onDone, onClose }:
   const handleSubmit = async () => {
     setFieldError('');
     setError('');
-    if (sellerId === '' || !platform || categoryId === '' || deliveryId === '' || packageId === '') {
-      setFieldError('판매자·플랫폼·카테고리·택배비·상자비를 모두 선택하세요.');
+    if (sellerId === '' || !platform) {
+      setFieldError('판매자·플랫폼을 선택하세요.');
       return;
     }
     if (optionIds.length === 0) {
@@ -126,15 +96,20 @@ export function ChannelAddModal({ masterId, options, prefill, onDone, onClose }:
       const res = await listingUseCase.addChannel(masterId, {
         sellerId: Number(sellerId),
         platform,
-        categoryId: Number(categoryId),
-        deliveryId: Number(deliveryId),
-        packageId: Number(packageId),
         optionIds,
       });
       setListingId(res.productListingId);
       setGenerated(res.generated);
-    } catch {
-      setError('채널 추가에 실패했습니다. 입력값을 확인하세요.');
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { message?: string } } };
+      if (err?.response?.status === 400) {
+        setError(
+          '이 플랫폼의 카테고리가 마스터에 설정되지 않았습니다. 마스터 상세의 ‘플랫폼별 카테고리’에서 먼저 지정하세요.'
+            + (err.response.data?.message ? ` (${err.response.data.message})` : ''),
+        );
+      } else {
+        setError('채널 추가에 실패했습니다. 입력값을 확인하세요.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -206,63 +181,12 @@ export function ChannelAddModal({ masterId, options, prefill, onDone, onClose }:
                   <select
                     className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
                     value={platform}
-                    onChange={(e) => {
-                      setPlatform(e.target.value);
-                      setCategoryId('');
-                    }}
+                    onChange={(e) => setPlatform(e.target.value)}
                   >
                     <option value="">선택</option>
                     {PLATFORMS.map((p) => (
                       <option key={p} value={p}>
                         {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">카테고리</label>
-                  <select
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}
-                  >
-                    <option value="">선택</option>
-                    {visibleCategories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">택배비</label>
-                  <select
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-                    value={deliveryId}
-                    onChange={(e) => setDeliveryId(e.target.value ? Number(e.target.value) : '')}
-                  >
-                    <option value="">선택</option>
-                    {carrierRates.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.carrier} {r.type} · {formatWon(r.cost)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">상자비</label>
-                  <select
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-                    value={packageId}
-                    onChange={(e) => setPackageId(e.target.value ? Number(e.target.value) : '')}
-                  >
-                    <option value="">선택</option>
-                    {packages.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.type} · {formatWon(p.cost)}
                       </option>
                     ))}
                   </select>

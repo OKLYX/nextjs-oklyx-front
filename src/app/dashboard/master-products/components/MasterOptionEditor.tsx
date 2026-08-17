@@ -7,10 +7,16 @@ import type {
   MasterProductResponse,
   MasterOptionResponse,
 } from '@/domain/entities/MasterProductEntity';
+import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
+import type { Package } from '@/domain/entities/PackageEntity';
+
+const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 interface MasterOptionEditorProps {
   master: MasterProductResponse;
   useCase: MasterProductUseCase;
+  carrierRates: CarrierRate[]; // owned by master list page, loaded once
+  packages: Package[];
   onChanged: () => Promise<void> | void; // reload master + parent list
 }
 
@@ -21,13 +27,21 @@ interface MasterOptionEditorProps {
  * 옵션 1줄 = 이름 + 마스터 구성상품 전체에 대한 수량 조합.
  * UI 가 항상 전체 구성상품 행을 보여주므로 부분집합(누락) 불가.
  */
-export function MasterOptionEditor({ master, useCase, onChanged }: MasterOptionEditorProps) {
+export function MasterOptionEditor({
+  master,
+  useCase,
+  carrierRates,
+  packages,
+  onChanged,
+}: MasterOptionEditorProps) {
   const { components, options, id: masterId } = master;
 
   const [showForm, setShowForm] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<number | null>(null);
   const [optName, setOptName] = useState('');
   const [quantities, setQuantities] = useState<Record<number, string>>({});
+  const [optDeliveryId, setOptDeliveryId] = useState<number | ''>('');
+  const [optPackageId, setOptPackageId] = useState<number | ''>('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [busyOptionId, setBusyOptionId] = useState<number | null>(null);
@@ -36,6 +50,8 @@ export function MasterOptionEditor({ master, useCase, onChanged }: MasterOptionE
     setEditingOptionId(null);
     setOptName('');
     setQuantities(Object.fromEntries(components.map((c) => [c.productId, '1'])));
+    setOptDeliveryId('');
+    setOptPackageId('');
     setFormError('');
     setShowForm(true);
   };
@@ -47,6 +63,8 @@ export function MasterOptionEditor({ master, useCase, onChanged }: MasterOptionE
     setQuantities(
       Object.fromEntries(components.map((c) => [c.productId, String(byId.get(c.productId) ?? 1)]))
     );
+    setOptDeliveryId(opt.deliveryId ?? '');
+    setOptPackageId(opt.packageId ?? '');
     setFormError('');
     setShowForm(true);
   };
@@ -72,7 +90,12 @@ export function MasterOptionEditor({ master, useCase, onChanged }: MasterOptionE
     }
     setIsSubmitting(true);
     try {
-      const payload = { name: optName.trim(), items };
+      const payload = {
+        name: optName.trim(),
+        items,
+        deliveryId: optDeliveryId === '' ? undefined : Number(optDeliveryId),
+        packageId: optPackageId === '' ? undefined : Number(optPackageId),
+      };
       if (editingOptionId == null) await useCase.addOption(masterId, payload);
       else await useCase.updateOption(masterId, editingOptionId, payload);
       await onChanged();
@@ -181,6 +204,41 @@ export function MasterOptionEditor({ master, useCase, onChanged }: MasterOptionE
                 />
               </div>
             ))}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">택배 override</label>
+              <select
+                className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                value={optDeliveryId}
+                onChange={(e) => setOptDeliveryId(e.target.value ? Number(e.target.value) : '')}
+              >
+                <option value="">기본값 사용</option>
+                {carrierRates.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.carrier} {r.type} · {formatWon(r.cost)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">상자 override</label>
+              <select
+                className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                value={optPackageId}
+                onChange={(e) => setOptPackageId(e.target.value ? Number(e.target.value) : '')}
+              >
+                <option value="">기본값 사용</option>
+                {packages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.type} · {formatWon(p.cost)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="col-span-2 text-[11px] text-gray-500">
+              비우면 마스터 기본 택배/박스를 사용합니다.
+            </p>
           </div>
           <div className="mt-3 flex gap-2">
             <button

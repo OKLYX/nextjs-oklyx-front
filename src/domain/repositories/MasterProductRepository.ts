@@ -4,6 +4,8 @@ import type {
   MasterProductUpdateRequest,
   MasterOptionRequest,
   MasterOptionResponse,
+  MasterCategoryRequest,
+  MasterCategoryResponse,
   ListingMatrixResponse,
 } from '@/domain/entities/MasterProductEntity';
 
@@ -18,4 +20,7 @@ export interface MasterProductRepository {
   updateOption(id: number, optionId: number, data: MasterOptionRequest): Promise<MasterOptionResponse>;
   deleteOption(id: number, optionId: number): Promise<void>;
   getMatrix(id: number): Promise<ListingMatrixResponse>;
+  upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
+  getCategories(id: number): Promise<MasterCategoryResponse[]>;
+  deleteCategory(id: number, platform: string): Promise<void>;
 }

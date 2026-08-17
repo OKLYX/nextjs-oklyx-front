@@ -5,14 +5,22 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import type { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
+import type { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
+import type { PackageUseCase } from '@/application/usecases/PackageUseCase';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import type { Product } from '@/domain/entities/Product';
+import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
+import type { Package } from '@/domain/entities/PackageEntity';
 import { MasterOptionEditor } from './MasterOptionEditor';
+
+const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 interface MasterProductFormModalProps {
   master: MasterProductResponse | null; // null = create mode
   useCase: MasterProductUseCase;
   productsUseCase: GetProductsUseCase;
+  carrierRateUseCase: CarrierRateUseCase;
+  packageUseCase: PackageUseCase;
   onClose: () => void;
   onDataChanged: () => Promise<void> | void; // reload parent list
 }
@@ -26,6 +34,8 @@ export function MasterProductFormModal({
   master: initialMaster,
   useCase,
   productsUseCase,
+  carrierRateUseCase,
+  packageUseCase,
   onClose,
   onDataChanged,
 }: MasterProductFormModalProps) {
@@ -40,7 +50,17 @@ export function MasterProductFormModal({
   const [active, setActive] = useState(initialMaster?.active ?? true);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  // Default carrier/box for the price engine (options may override individually).
+  const [defaultDeliveryId, setDefaultDeliveryId] = useState<number | ''>(
+    initialMaster?.defaultDeliveryId ?? ''
+  );
+  const [defaultPackageId, setDefaultPackageId] = useState<number | ''>(
+    initialMaster?.defaultPackageId ?? ''
+  );
+
   const [products, setProducts] = useState<Product[]>([]);
+  const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [productFilter, setProductFilter] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,16 +70,23 @@ export function MasterProductFormModal({
     let alive = true;
     (async () => {
       try {
-        const res = await productsUseCase.getProducts({ page: 0, size: 1000 });
-        if (alive) setProducts(res.content);
+        const [prod, rates, boxes] = await Promise.all([
+          productsUseCase.getProducts({ page: 0, size: 1000 }),
+          carrierRateUseCase.getCarrierRates(),
+          packageUseCase.getPackages(),
+        ]);
+        if (!alive) return;
+        setProducts(prod.content);
+        setCarrierRates(rates);
+        setPackages(boxes);
       } catch {
-        if (alive) setError('구성상품 후보를 불러오지 못했습니다.');
+        if (alive) setError('구성상품·택배/박스 후보를 불러오지 못했습니다.');
       }
     })();
     return () => {
       alive = false;
     };
-  }, [productsUseCase]);
+  }, [productsUseCase, carrierRateUseCase, packageUseCase]);
 
   const reloadMaster = useCallback(async () => {
     if (!master) return;
@@ -95,6 +122,8 @@ export function MasterProductFormModal({
           name: name.trim(),
           componentProductIds: selectedIds,
           detailSource: detailSource.trim() || undefined,
+          defaultDeliveryId: defaultDeliveryId === '' ? undefined : Number(defaultDeliveryId),
+          defaultPackageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
         });
         if (imageFile) await useCase.uploadImage(created.id, imageFile);
         await onDataChanged();
@@ -105,6 +134,8 @@ export function MasterProductFormModal({
           componentProductIds: selectedIds,
           detailSource: detailSource.trim(),
           active,
+          defaultDeliveryId: defaultDeliveryId === '' ? undefined : Number(defaultDeliveryId),
+          defaultPackageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
         });
         if (imageFile) await useCase.uploadImage(master!.id, imageFile);
         await onDataChanged();
@@ -188,6 +219,42 @@ export function MasterProductFormModal({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">기본 택배비</label>
+              <select
+                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                value={defaultDeliveryId}
+                onChange={(e) => setDefaultDeliveryId(e.target.value ? Number(e.target.value) : '')}
+              >
+                <option value="">선택 안 함</option>
+                {carrierRates.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.carrier} {r.type} · {formatWon(r.cost)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">기본 상자비</label>
+              <select
+                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                value={defaultPackageId}
+                onChange={(e) => setDefaultPackageId(e.target.value ? Number(e.target.value) : '')}
+              >
+                <option value="">선택 안 함</option>
+                {packages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.type} · {formatWon(p.cost)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="col-span-2 text-[11px] text-gray-500">
+              옵션에서 개별 지정하지 않으면 이 값이 모든 옵션 판매가 계산에 쓰입니다.
+            </p>
+          </div>
+
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">대표사진 override</label>
             <div className="flex items-center gap-3">
@@ -254,6 +321,8 @@ export function MasterProductFormModal({
             <MasterOptionEditor
               master={master}
               useCase={useCase}
+              carrierRates={carrierRates}
+              packages={packages}
               onChanged={async () => {
                 await reloadMaster();
                 await onDataChanged();
