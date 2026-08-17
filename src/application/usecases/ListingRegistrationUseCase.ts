@@ -2,6 +2,8 @@ import type { ListingRegistrationRepository } from '@/domain/repositories/Listin
 import type {
   ChannelAddRequest,
   ChannelAddResponse,
+  BatchChannelAddRequest,
+  BatchChannelAddResponse,
   ListingRegisterResponse,
   ListingStatusResponse,
   ListingSyncResponse,
@@ -18,6 +20,10 @@ export class ListingRegistrationUseCase {
 
   addChannel(masterId: number, data: ChannelAddRequest): Promise<ChannelAddResponse> {
     return this.repository.addChannel(masterId, data);
+  }
+
+  addChannelsBatch(masterId: number, data: BatchChannelAddRequest): Promise<BatchChannelAddResponse> {
+    return this.repository.addChannelsBatch(masterId, data);
   }
 
   register(listingId: number): Promise<ListingRegisterResponse> {

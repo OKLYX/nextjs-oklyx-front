@@ -1,6 +1,8 @@
 import type {
   ChannelAddRequest,
   ChannelAddResponse,
+  BatchChannelAddRequest,
+  BatchChannelAddResponse,
   ListingRegisterResponse,
   ListingStatusResponse,
   ListingSyncResponse,
@@ -14,6 +16,7 @@ import type {
 
 export interface ListingRegistrationRepository {
   addChannel(masterId: number, data: ChannelAddRequest): Promise<ChannelAddResponse>;
+  addChannelsBatch(masterId: number, data: BatchChannelAddRequest): Promise<BatchChannelAddResponse>;
   register(listingId: number): Promise<ListingRegisterResponse>;
   fetchStatus(listingId: number): Promise<ListingStatusResponse>;
   syncApprovals(): Promise<ListingSyncResponse>;
