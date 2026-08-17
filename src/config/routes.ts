@@ -23,6 +23,7 @@ export const ROUTES = {
   MASTER_PRODUCTS: '/dashboard/master-products' as const,
   MASTER_PRODUCT_DETAIL: (id: number | string) => `/dashboard/master-products/${id}` as const,
   MARGIN_POLICIES: '/dashboard/margin-policies' as const,
+  LISTINGS_SYNC: '/dashboard/listings/sync' as const,
   SELLERS_LIST: '/dashboard/sellers/list' as const,
   SELLERS_MANAGE: '/dashboard/sellers/manage' as const,
   ORDERS_RETRIEVE: '/dashboard/orders' as const,

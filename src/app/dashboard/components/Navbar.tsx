@@ -113,6 +113,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         { href: ROUTES.SALES_PRODUCTS_RETRIEVE, label: '판매상품 조회' },
         { href: ROUTES.MASTER_PRODUCTS, label: '판매상품 마스터' },
         { href: ROUTES.MARGIN_POLICIES, label: '마진 프리셋' },
+        { href: ROUTES.LISTINGS_SYNC, label: '마켓 반영/승인' },
       ],
     },
     {
