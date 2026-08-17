@@ -6,13 +6,11 @@ export type ListingStatus = 'DRAFT' | 'SUBMITTED' | 'SELLING' | 'REJECTED' | 'SU
 export type ApprovalStatus = 'APPROVED' | 'NOT_APPROVED';
 export type GeneratedSource = 'AUTO' | 'MANUAL_OVERRIDE';
 
-// Channel add (3b')
+// Channel add (3b' / 13): category·delivery·box now live on the master, so the
+// channel-add payload only carries seller, platform, and the chosen options.
 export interface ChannelAddRequest {
   sellerId: number;
   platform: string;
-  categoryId: number;
-  deliveryId: number;
-  packageId: number;
   optionIds: number[];
 }
 

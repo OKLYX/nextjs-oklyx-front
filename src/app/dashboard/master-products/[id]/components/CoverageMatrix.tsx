@@ -10,9 +10,12 @@ import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCas
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
+import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
+import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
 import type { ListingMatrixResponse, MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type { ListingStatus } from '@/domain/entities/ListingRegistrationEntity';
 import { ChannelAddModal } from './ChannelAddModal';
+import { MasterCategoryPanel } from './MasterCategoryPanel';
 import { CellActions } from './CellActions';
 
 interface CoverageMatrixProps {
@@ -39,6 +42,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new ListingRegistrationUseCase(new ListingRegistrationRepositoryImpl()),
     [],
   );
+  const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
 
   const [matrix, setMatrix] = useState<ListingMatrixResponse | null>(null);
   const [options, setOptions] = useState<MasterOptionResponse[]>([]);
@@ -151,6 +155,14 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       )}
 
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+      {isAdmin && (
+        <MasterCategoryPanel
+          masterId={masterId}
+          useCase={masterUseCase}
+          categoryUseCase={categoryUseCase}
+        />
+      )}
 
       <div className="rounded-lg bg-white shadow list-table-scroll">
         {isLoading ? (

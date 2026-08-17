@@ -5,6 +5,8 @@ import type {
   MasterProductUpdateRequest,
   MasterOptionRequest,
   MasterOptionResponse,
+  MasterCategoryRequest,
+  MasterCategoryResponse,
   ListingMatrixResponse,
 } from '@/domain/entities/MasterProductEntity';
 
@@ -49,5 +51,17 @@ export class MasterProductUseCase {
 
   getMatrix(id: number): Promise<ListingMatrixResponse> {
     return this.repository.getMatrix(id);
+  }
+
+  upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
+    return this.repository.upsertCategory(id, data);
+  }
+
+  getCategories(id: number): Promise<MasterCategoryResponse[]> {
+    return this.repository.getCategories(id);
+  }
+
+  deleteCategory(id: number, platform: string): Promise<void> {
+    return this.repository.deleteCategory(id, platform);
   }
 }

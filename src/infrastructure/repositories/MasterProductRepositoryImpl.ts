@@ -8,6 +8,8 @@ import type {
   MasterProductUpdateRequest,
   MasterOptionRequest,
   MasterOptionResponse,
+  MasterCategoryRequest,
+  MasterCategoryResponse,
   ListingMatrixResponse,
 } from '@/domain/entities/MasterProductEntity';
 
@@ -64,5 +66,19 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
   async getMatrix(id: number): Promise<ListingMatrixResponse> {
     const response = await axiosInstance.get(`${base}/${id}/matrix`);
     return response.data.data;
+  }
+
+  async upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
+    const response = await axiosInstance.put(`${base}/${id}/category`, data);
+    return response.data.data;
+  }
+
+  async getCategories(id: number): Promise<MasterCategoryResponse[]> {
+    const response = await axiosInstance.get(`${base}/${id}/categories`);
+    return response.data.data;
+  }
+
+  async deleteCategory(id: number, platform: string): Promise<void> {
+    await axiosInstance.delete(`${base}/${id}/categories/${platform}`);
   }
 }
