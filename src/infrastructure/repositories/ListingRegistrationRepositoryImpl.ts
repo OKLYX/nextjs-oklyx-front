@@ -5,6 +5,8 @@ import type { ListingRegistrationRepository } from '@/domain/repositories/Listin
 import type {
   ChannelAddRequest,
   ChannelAddResponse,
+  BatchChannelAddRequest,
+  BatchChannelAddResponse,
   ListingRegisterResponse,
   ListingStatusResponse,
   ListingSyncResponse,
@@ -23,6 +25,14 @@ const listingsBase = '/api/admin/listings';
 export class ListingRegistrationRepositoryImpl implements ListingRegistrationRepository {
   async addChannel(masterId: number, data: ChannelAddRequest): Promise<ChannelAddResponse> {
     const response = await axiosInstance.post(`${masterBase}/${masterId}/listings`, data);
+    return response.data.data;
+  }
+
+  async addChannelsBatch(
+    masterId: number,
+    data: BatchChannelAddRequest,
+  ): Promise<BatchChannelAddResponse> {
+    const response = await axiosInstance.post(`${masterBase}/${masterId}/listings/batch`, data);
     return response.data.data;
   }
 

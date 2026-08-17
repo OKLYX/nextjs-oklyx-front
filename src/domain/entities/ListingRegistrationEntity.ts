@@ -6,12 +6,32 @@ export type ListingStatus = 'DRAFT' | 'SUBMITTED' | 'SELLING' | 'REJECTED' | 'SU
 export type ApprovalStatus = 'APPROVED' | 'NOT_APPROVED';
 export type GeneratedSource = 'AUTO' | 'MANUAL_OVERRIDE';
 
-// Channel add (3b' / 13): category·delivery·box now live on the master, so the
-// channel-add payload only carries seller, platform, and the chosen options.
+// Channel add (15): category·delivery·box live on the master and every option is
+// copied, so the channel-add payload only identifies the target channel.
 export interface ChannelAddRequest {
   sellerId: number;
   platform: string;
-  optionIds: number[];
+}
+
+// Batch channel add (15): register many unregistered channels at once. Partial
+// success is normal — `results` reports per-target outcome.
+export interface BatchChannelAddRequest {
+  targets: { sellerId: number; platform: string }[];
+}
+
+export interface BatchChannelAddResult {
+  sellerId: number;
+  platform: string;
+  success: boolean;
+  productListingId?: number;
+  errorMessage?: string;
+}
+
+export interface BatchChannelAddResponse {
+  requested: number;
+  succeeded: number;
+  failed: number;
+  results: BatchChannelAddResult[];
 }
 
 export interface OptionPrice {

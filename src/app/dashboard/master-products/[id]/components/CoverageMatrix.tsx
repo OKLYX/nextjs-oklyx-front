@@ -14,7 +14,6 @@ import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
 import type { ListingMatrixResponse, MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type { ListingStatus } from '@/domain/entities/ListingRegistrationEntity';
-import { ChannelAddModal } from './ChannelAddModal';
 import { MasterCategoryPanel } from './MasterCategoryPanel';
 import { CellActions } from './CellActions';
 
@@ -25,8 +24,12 @@ interface CoverageMatrixProps {
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 /**
- * 마스터 상세 = 커버리지 매트릭스(계정 × 리스팅) + 등록/전파 배선.
+ * 마스터 상세 = 채널 체크목록(계정 × 리스팅) + 미등록 일괄/행별 등록 + 전파 배선.
  * File: src/app/dashboard/master-products/[id]/components/CoverageMatrix.tsx
+ *
+ * 채널(판매자×플랫폼)은 판매채널 관리 화면에서 정의됨 → 여기선 다시 선택하지 않는다.
+ * 매트릭스 행이 곧 테넌트 전 채널 목록(registered 플래그). 미등록 행을 체크해 일괄 등록하거나
+ * 행별 [등록] 원클릭으로 등록한다. 옵션은 15에서 전체 복사되므로 옵션 선택 UI 없음.
  */
 export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const router = useRouter();
@@ -49,9 +52,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Channel-add modal (optionally prefilled from an unregistered row)
-  const [addPrefill, setAddPrefill] = useState<{ sellerId: number; platform: string } | undefined>();
-  const [showAdd, setShowAdd] = useState(false);
+  // Selection of unregistered channels, keyed by accountId.
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [isBatchAdding, setIsBatchAdding] = useState(false);
+  const [rowBusyId, setRowBusyId] = useState<number | null>(null);
+  const [batchSummary, setBatchSummary] = useState<
+    { text: string; tone: 'green' | 'amber'; failures: string[] } | null
+  >(null);
 
   // Propagate (A-layer) summary banner
   const [isPropagating, setIsPropagating] = useState(false);
@@ -67,6 +74,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       ]);
       setMatrix(m);
       setOptions(master.options);
+      setSelected(new Set());
     } catch {
       setError('커버리지 매트릭스를 불러오지 못했습니다.');
     } finally {
@@ -80,9 +88,75 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     })();
   }, [load]);
 
-  const openAdd = (prefill?: { sellerId: number; platform: string }) => {
-    setAddPrefill(prefill);
-    setShowAdd(true);
+  const unregisteredRows = useMemo(
+    () => matrix?.rows.filter((r) => !r.registered) ?? [],
+    [matrix],
+  );
+  const allSelected = unregisteredRows.length > 0 && selected.size === unregisteredRows.length;
+
+  const toggleOne = (accountId: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(accountId)) next.delete(accountId);
+      else next.add(accountId);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelected(allSelected ? new Set() : new Set(unregisteredRows.map((r) => r.accountId)));
+  };
+
+  const handleBatchAdd = async () => {
+    if (selected.size === 0) return;
+    const targets = unregisteredRows
+      .filter((r) => selected.has(r.accountId))
+      .map((r) => ({ sellerId: r.sellerId, platform: r.platform }));
+    setIsBatchAdding(true);
+    setBatchSummary(null);
+    setError('');
+    try {
+      const res = await listingUseCase.addChannelsBatch(masterId, { targets });
+      const failures = res.results
+        .filter((r) => !r.success)
+        .map((r) => {
+          const name = matrix?.rows.find(
+            (row) => row.sellerId === r.sellerId && row.platform === r.platform,
+          )?.sellerName;
+          return `${name ?? r.sellerId}/${r.platform} — ${r.errorMessage ?? '실패'}`;
+        });
+      setBatchSummary({
+        text: `요청 ${res.requested} · 등록 ${res.succeeded} · 실패 ${res.failed}`,
+        tone: res.failed > 0 ? 'amber' : 'green',
+        failures,
+      });
+      await load();
+    } catch {
+      setError('일괄 등록에 실패했습니다.');
+    } finally {
+      setIsBatchAdding(false);
+    }
+  };
+
+  const handleRowAdd = async (accountId: number, sellerId: number, platform: string) => {
+    setRowBusyId(accountId);
+    setError('');
+    try {
+      await listingUseCase.addChannel(masterId, { sellerId, platform });
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { message?: string } } };
+      if (err?.response?.status === 400) {
+        setError(
+          '이 플랫폼의 카테고리가 마스터에 설정되지 않았습니다. 위 ‘플랫폼별 카테고리’에서 먼저 지정하세요.'
+            + (err.response.data?.message ? ` (${err.response.data.message})` : ''),
+        );
+      } else {
+        setError('채널 등록에 실패했습니다.');
+      }
+    } finally {
+      setRowBusyId(null);
+    }
   };
 
   const handlePropagate = async () => {
@@ -108,6 +182,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const initialStatus = (platformProductId: string | null): ListingStatus =>
     platformProductId ? 'SUBMITTED' : 'DRAFT';
 
+  const busy = isBatchAdding || rowBusyId !== null;
+
   return (
     <PageContainer>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -127,10 +203,15 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => openAdd()}
-              className="rounded-lg border border-blue-300 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
+              onClick={handleBatchAdd}
+              disabled={selected.size === 0 || busy}
+              className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              채널 추가
+              {isBatchAdding ? (
+                <Spinner label="등록 중..." />
+              ) : (
+                `선택 채널 일괄 등록${selected.size > 0 ? ` (${selected.size})` : ''}`
+              )}
             </button>
             <button
               type="button"
@@ -143,6 +224,23 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           </div>
         )}
       </div>
+
+      {batchSummary && (
+        <div
+          className={`rounded px-3 py-2 text-sm ${
+            batchSummary.tone === 'green' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+          }`}
+        >
+          <p>{batchSummary.text}</p>
+          {batchSummary.failures.length > 0 && (
+            <ul className="mt-1 list-disc pl-5 text-xs">
+              {batchSummary.failures.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {banner && (
         <p
@@ -177,6 +275,19 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           <table>
             <thead>
               <tr className="border-b border-gray-200 text-left text-sm text-gray-600">
+                <th className="px-4 py-3">
+                  {isAdmin && unregisteredRows.length > 0 ? (
+                    <label className="flex items-center gap-1 text-xs font-normal">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleAll}
+                        disabled={busy}
+                      />
+                      미등록 전체
+                    </label>
+                  ) : null}
+                </th>
                 <th className="px-4 py-3">판매자</th>
                 <th className="px-4 py-3">플랫폼</th>
                 <th className="px-4 py-3">계정</th>
@@ -197,6 +308,16 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     key={row.accountId}
                     className="border-b border-gray-100 text-sm text-gray-900"
                   >
+                    <td className="px-4 py-3">
+                      {isAdmin && !row.registered ? (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(row.accountId)}
+                          onChange={() => toggleOne(row.accountId)}
+                          disabled={busy}
+                        />
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3">{row.sellerName}</td>
                     <td className="px-4 py-3">{row.platform}</td>
                     <td className="px-4 py-3">{row.accountLabel}</td>
@@ -223,11 +344,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                         <button
                           type="button"
                           onClick={() =>
-                            openAdd({ sellerId: row.sellerId, platform: row.platform })
+                            handleRowAdd(row.accountId, row.sellerId, row.platform)
                           }
-                          className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                          disabled={busy}
+                          className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
                         >
-                          등록
+                          {rowBusyId === row.accountId ? <Spinner size={12} label="등록 중" /> : '등록'}
                         </button>
                       ) : (
                         <CellActions
@@ -247,19 +369,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           </table>
         )}
       </div>
-
-      {showAdd && (
-        <ChannelAddModal
-          masterId={masterId}
-          options={options}
-          prefill={addPrefill}
-          onClose={() => setShowAdd(false)}
-          onDone={() => {
-            setShowAdd(false);
-            void load();
-          }}
-        />
-      )}
     </PageContainer>
   );
 }
