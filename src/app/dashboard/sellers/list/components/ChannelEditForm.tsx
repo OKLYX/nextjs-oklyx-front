@@ -8,7 +8,7 @@ import {
   updateMarketplaceAccountSchema,
   type UpdateMarketplaceAccountForm,
 } from '@/application/dto/MarketplaceAccountDTOs';
-import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 
 // Hardcoded for now; mirrors ChannelRegistrationForm's PLATFORM_OPTIONS.
 // Exported as SSOT so other features (e.g. carrier platform codes) can reuse it.
@@ -24,6 +24,9 @@ interface ChannelEditFormProps {
   isLoading?: boolean;
   onSubmit: (data: UpdateMarketplaceAccountForm) => Promise<void>;
   onCancel: () => void;
+  thumbTemplates?: TemplateOption[];
+  detailTemplates?: TemplateOption[];
+  templatesLoading?: boolean;
 }
 
 export function ChannelEditForm({
@@ -31,6 +34,9 @@ export function ChannelEditForm({
   isLoading = false,
   onSubmit: externalOnSubmit,
   onCancel,
+  thumbTemplates = [],
+  detailTemplates = [],
+  templatesLoading = false,
 }: ChannelEditFormProps) {
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +49,8 @@ export function ChannelEditForm({
       vendorId: channel.vendorId,
       accessKey: channel.accessKey,
       secretKey: '',
+      thumbnailTemplateId: channel.thumbnailTemplateId != null ? String(channel.thumbnailTemplateId) : '',
+      detailTemplateId: channel.detailTemplateId != null ? String(channel.detailTemplateId) : '',
     },
   });
 
@@ -156,6 +164,48 @@ export function ChannelEditForm({
           <p className="mt-1 text-sm text-red-600">{formState.errors.secretKey.message}</p>
         )}
       </div>
+
+      <div>
+        <label htmlFor="thumbnailTemplateId" className="block text-sm font-medium mb-1">
+          썸네일 템플릿
+        </label>
+        <select
+          {...register('thumbnailTemplateId')}
+          id="thumbnailTemplateId"
+          disabled={isLoading || templatesLoading}
+          className="w-full px-3 py-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        >
+          <option value="">기본값 사용 (테넌트 기본 템플릿)</option>
+          {thumbTemplates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}{t.isDefault ? ' (기본)' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="detailTemplateId" className="block text-sm font-medium mb-1">
+          상세 템플릿
+        </label>
+        <select
+          {...register('detailTemplateId')}
+          id="detailTemplateId"
+          disabled={isLoading || templatesLoading}
+          className="w-full px-3 py-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        >
+          <option value="">기본값 사용 (테넌트 기본 템플릿)</option>
+          {detailTemplates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}{t.isDefault ? ' (기본)' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <p className="text-xs text-gray-500">
+        비워두면 기존 지정을 유지합니다(기본값으로 되돌리기는 지원하지 않음).
+      </p>
 
       <div className="flex gap-2 pt-2">
         <button
