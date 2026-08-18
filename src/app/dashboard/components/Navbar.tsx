@@ -13,6 +13,7 @@ import {
   UserCog,
   Settings,
   Image as ImageIcon,
+  LayoutTemplate,
   type LucideIcon,
 } from 'lucide-react';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
@@ -50,6 +51,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const isPurchaseOpen = useNavigationStore((state) => state.isPurchaseMenuOpen);
   const isSettingsOpen = useNavigationStore((state) => state.isSettingsMenuOpen);
   const isThumbnailTemplatesOpen = useNavigationStore((state) => state.isThumbnailTemplatesMenuOpen);
+  const isDetailTemplatesOpen = useNavigationStore((state) => state.isDetailTemplatesMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
@@ -61,6 +63,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const togglePurchaseMenu = useNavigationStore((state) => state.togglePurchaseMenu);
   const toggleSettingsMenu = useNavigationStore((state) => state.toggleSettingsMenu);
   const toggleThumbnailTemplatesMenu = useNavigationStore((state) => state.toggleThumbnailTemplatesMenu);
+  const toggleDetailTemplatesMenu = useNavigationStore((state) => state.toggleDetailTemplatesMenu);
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
@@ -156,6 +159,13 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       open: isThumbnailTemplatesOpen,
       toggle: toggleThumbnailTemplatesMenu,
       items: [{ href: ROUTES.THUMBNAIL_TEMPLATES, label: '템플릿 관리' }],
+    });
+    menuGroups.push({
+      icon: LayoutTemplate,
+      label: '상세 템플릿',
+      open: isDetailTemplatesOpen,
+      toggle: toggleDetailTemplatesMenu,
+      items: [{ href: ROUTES.DETAIL_TEMPLATES, label: '템플릿 관리' }],
     });
     menuGroups.push({
       icon: Settings,

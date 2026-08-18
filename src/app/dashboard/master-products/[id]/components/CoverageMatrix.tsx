@@ -353,6 +353,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                         </button>
                       ) : (
                         <CellActions
+                          masterId={masterId}
                           listing={{
                             id: row.cell.productListingId,
                             status: initialStatus(row.cell.platformProductId),

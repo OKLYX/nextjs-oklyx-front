@@ -14,6 +14,10 @@ import type {
   PushSyncRequest,
   PushSyncResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
+import type {
+  DetailPreviewResponse,
+  DetailHtmlOverrideRequest,
+} from '@/domain/entities/DetailTemplateEntity';
 
 export class ListingRegistrationUseCase {
   constructor(private repository: ListingRegistrationRepository) {}
@@ -60,5 +64,20 @@ export class ListingRegistrationUseCase {
 
   pushSync(data: PushSyncRequest): Promise<PushSyncResponse> {
     return this.repository.pushSync(data);
+  }
+
+  previewDetail(listingId: number): Promise<DetailPreviewResponse> {
+    return this.repository.previewDetail(listingId);
+  }
+
+  overrideDetailHtml(
+    listingId: number,
+    data: DetailHtmlOverrideRequest,
+  ): Promise<GeneratedProductResponse> {
+    return this.repository.overrideDetailHtml(listingId, data);
+  }
+
+  clearDetailHtml(listingId: number): Promise<GeneratedProductResponse> {
+    return this.repository.clearDetailHtml(listingId);
   }
 }

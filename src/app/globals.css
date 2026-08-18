@@ -177,3 +177,10 @@ body {
   min-width: var(--list-table-min-w);
   white-space: nowrap;
 }
+
+/* Native <input type="color"> shows the swatch inset by browser padding/border.
+   .color-swatch-fill removes that so the color fills the whole control area. */
+.color-swatch-fill { padding: 0; }
+.color-swatch-fill::-webkit-color-swatch-wrapper { padding: 0; }
+.color-swatch-fill::-webkit-color-swatch { border: none; border-radius: 0.25rem; }
+.color-swatch-fill::-moz-color-swatch { border: none; border-radius: 0.25rem; }
