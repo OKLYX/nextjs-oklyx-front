@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/config/routes';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -14,6 +14,12 @@ import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import { BlockRow } from './BlockRow';
 
 type AppendableType = 'text' | 'spacer' | 'imageZone';
+
+// Reserved keys are dev-facing; show their Korean label in the preview, never the raw key.
+const BUILTIN_FIELD_LABELS: Record<string, string> = {
+  brandName: '브랜드명',
+  productName: '상품명',
+};
 
 // Initial block objects per type (SSOT = prompt 18 / backend 17). src=null keeps
 // the DetailBlock shape complete for text/spacer/imageZone.
@@ -45,6 +51,21 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
   const [error, setError] = useState('');
   const [nameError, setNameError] = useState('');
   const [blockErrors, setBlockErrors] = useState<Record<number, string>>({});
+  // Preview-only sample text per block (not saved). null = untouched (shows the block's
+  // default: defaultValue or the bind label); a string is the user's override. Kept
+  // parallel to `blocks` (synced on append/move/delete).
+  const [previewTexts, setPreviewTexts] = useState<(string | null)[]>([]);
+
+  const setPreviewTextAt = (index: number, value: string | null) => {
+    setPreviewTexts((prev) => {
+      const next = prev.length === blocks.length ? [...prev] : blocks.map((_, i) => prev[i] ?? null);
+      next[index] = value;
+      return next;
+    });
+  };
+
+  // Only the block picked in the structure preview is shown in the edit panel. null = none.
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!templateId || !isAdmin) return;
@@ -81,14 +102,30 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+    setPreviewTexts((prev) => {
+      if (target < 0 || target >= blocks.length) return prev;
+      const next = blocks.map((_, i) => prev[i] ?? null);
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+    setSelectedIndex((sel) => {
+      if (target < 0 || target >= blocks.length) return sel;
+      if (sel === index) return target;
+      if (sel === target) return index;
+      return sel;
+    });
   };
 
   const deleteBlock = (index: number) => {
     setBlocks((prev) => prev.filter((_, i) => i !== index));
+    setPreviewTexts((prev) => blocks.map((_, i) => prev[i] ?? null).filter((_, i) => i !== index));
+    setSelectedIndex((sel) => (sel == null ? null : sel === index ? null : sel > index ? sel - 1 : sel));
   };
 
   const appendBlock = (type: AppendableType) => {
     setBlocks((prev) => [...prev, createBlock(type)]);
+    setPreviewTexts((prev) => [...blocks.map((_, i) => prev[i] ?? null), null]);
+    setSelectedIndex(blocks.length); // new block = last index; select it for editing
   };
 
   // Local validation mirroring backend 17 rules. Returns per-index errors.
@@ -115,6 +152,10 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
     const violations = (nameErr ? 1 : 0) + Object.keys(errs).length;
     if (violations > 0) {
       setError(`${violations}개 항목 확인이 필요합니다.`);
+      const firstErr = Object.keys(errs)
+        .map(Number)
+        .sort((a, b) => a - b)[0];
+      if (firstErr != null) setSelectedIndex(firstErr); // reveal the first offending block
       return;
     }
     setError('');
@@ -201,29 +242,9 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
         </label>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
         {/* Block list */}
         <div className="space-y-3">
-          {blocks.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
-              블록이 없습니다. 아래에서 추가하세요.
-            </div>
-          ) : (
-            blocks.map((block, index) => (
-              <BlockRow
-                key={index}
-                block={block}
-                index={index}
-                total={blocks.length}
-                error={blockErrors[index]}
-                onChange={(patch) => patchBlock(index, patch)}
-                onMoveUp={() => moveBlock(index, -1)}
-                onMoveDown={() => moveBlock(index, 1)}
-                onDelete={() => deleteBlock(index)}
-              />
-            ))
-          )}
-
           <div className="flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-3">
             <span className="self-center text-xs font-medium text-gray-500">블록 추가:</span>
             <button
@@ -245,9 +266,30 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
               onClick={() => appendBlock('imageZone')}
               className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
             >
-              + 이미지 존
+              + 이미지
             </button>
           </div>
+
+          {blocks.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+              블록이 없습니다. 위에서 추가하세요.
+            </div>
+          ) : selectedIndex == null || selectedIndex >= blocks.length ? (
+            <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+              구조 미리보기에서 블록을 선택하면 여기서 편집합니다.
+            </div>
+          ) : (
+            <BlockRow
+              key={selectedIndex}
+              block={blocks[selectedIndex]}
+              index={selectedIndex}
+              error={blockErrors[selectedIndex]}
+              previewText={previewTexts[selectedIndex] ?? null}
+              onPreviewTextChange={(v) => setPreviewTextAt(selectedIndex, v)}
+              onChange={(patch) => patchBlock(selectedIndex, patch)}
+              onDelete={() => deleteBlock(selectedIndex)}
+            />
+          )}
         </div>
 
         {/* Structure preview (derived from edit state, no fetch) */}
@@ -256,30 +298,27 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
           <div className="space-y-2">
             {blocks.length === 0 && <p className="text-sm text-gray-400">블록 없음</p>}
             {blocks.map((block, index) => {
+              let content: ReactNode;
               if (block.type === 'spacer') {
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center justify-center rounded bg-gray-100 text-xs text-gray-500"
-                    style={{ height: Math.max(8, Math.min(120, block.heightPx ?? 24)) }}
-                  >
-                    여백 {block.heightPx ?? 24}px
+                content = (
+                  <div className="rounded border border-gray-200 px-3 py-2">
+                    <div
+                      className="flex items-center justify-center rounded text-xs text-gray-500"
+                      style={{ height: block.heightPx ?? 24 }}
+                    >
+                      여백 {block.heightPx ?? 24}px
+                    </div>
                   </div>
                 );
-              }
-              if (block.type === 'imageZone') {
-                return (
-                  <div
-                    key={index}
-                    className="rounded border border-dashed border-gray-300 p-4 text-center text-xs text-gray-500"
-                  >
-                    이미지 존: {block.bind || '(미지정)'}
+              } else if (block.type === 'imageZone') {
+                content = (
+                  <div className="rounded border border-dashed border-gray-300 p-4 text-center text-xs text-gray-500">
+                    이미지: {block.bind || '(미지정)'}
                   </div>
                 );
-              }
-              if (block.type === 'asset') {
-                return (
-                  <div key={index} className="flex justify-center">
+              } else if (block.type === 'asset') {
+                content = (
+                  <div className="flex justify-center">
                     {block.src ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -292,14 +331,74 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
                     )}
                   </div>
                 );
+              } else {
+                // s = textStyle overrides; approximate preview (backend render is SSOT).
+                const s = block.textStyle ?? {};
+                const bindLabel = block.bind ? (BUILTIN_FIELD_LABELS[block.bind] ?? block.bind) : null;
+                // Preview override (if the user typed one) else the block's default text.
+                const previewText = previewTexts[index] ?? (block.defaultValue || bindLabel || '');
+                content = (
+                  <div
+                    className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-800"
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      // line-height = 1 so the text box height equals the font size, matching a
+                      // spacer whose inner bar height equals its heightPx (both + same chrome).
+                      lineHeight: 1,
+                      textAlign: (block.align as 'left' | 'center' | 'right') ?? 'left',
+                      fontSize: s.fontSize ? `${s.fontSize}px` : undefined,
+                      color: s.color || undefined,
+                      fontWeight: s.bold === 'true' ? 700 : undefined,
+                      fontStyle: s.italic === 'true' ? 'italic' : undefined,
+                    }}
+                  >
+                    {previewText || '텍스트를 입력해 주세요'}
+                  </div>
+                );
               }
               return (
                 <div
                   key={index}
-                  className="rounded border border-gray-200 px-3 py-2 text-sm text-gray-800"
-                  style={{ textAlign: (block.align as 'left' | 'center' | 'right') ?? 'left' }}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedIndex(index)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedIndex(index);
+                    }
+                  }}
+                  className={`relative cursor-pointer rounded ${
+                    selectedIndex === index ? 'ring-2 ring-blue-400' : ''
+                  }`}
                 >
-                  {block.defaultValue || (block.bind ? `{${block.bind}}` : '(빈 텍스트)')}
+                  {content}
+                  <div className="absolute right-1 top-1 flex gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveBlock(index, -1);
+                      }}
+                      disabled={index === 0}
+                      className="h-6 w-6 rounded border border-gray-300 bg-white text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                      aria-label="위로 이동"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveBlock(index, 1);
+                      }}
+                      disabled={index === blocks.length - 1}
+                      className="h-6 w-6 rounded border border-gray-300 bg-white text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                      aria-label="아래로 이동"
+                    >
+                      ↓
+                    </button>
+                  </div>
                 </div>
               );
             })}

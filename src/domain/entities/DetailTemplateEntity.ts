@@ -15,6 +15,7 @@ export interface DetailBlock {
   widthPercent: number | null;
   align: string | null; // 'left' | 'center' | 'right'
   heightPx: number | null; // spacer=vertical gap in px
+  textStyle?: Record<string, string> | null; // text = inline style overrides (fontSize/color/bold/italic ...)
 }
 
 export interface DetailTemplateResponse {
