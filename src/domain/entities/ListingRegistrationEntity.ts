@@ -44,7 +44,11 @@ export interface GeneratedProductResponse {
   productListingId: number;
   thumbnailUrl: string | null;
   detailHtml: string | null;
+  // Detail-HTML override state (detail badge). Distinct from thumbnailSource below.
   source: GeneratedSource;
+  // Thumbnail override state (thumbnail badge, prompt 25/26). Kept separate from
+  // `source` — never conflate the two.
+  thumbnailSource: GeneratedSource;
   // Per-channel field-value override (prompt 12). Empty {} -> reserved keys render
   // from the product value, custom keys from the template defaultValue.
   fieldValues: Record<string, string>;

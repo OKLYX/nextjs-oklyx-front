@@ -65,6 +65,20 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     return response.data.data;
   }
 
+  async overrideThumbnail(listingId: number, file: File): Promise<GeneratedProductResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await axiosInstance.post(`${listingBase}/${listingId}/thumbnail`, formData, {
+      headers: { 'Content-Type': undefined },
+    });
+    return response.data.data;
+  }
+
+  async clearThumbnail(listingId: number): Promise<GeneratedProductResponse> {
+    const response = await axiosInstance.delete(`${listingBase}/${listingId}/thumbnail`);
+    return response.data.data;
+  }
+
   async updateFieldValues(
     listingId: number,
     data: FieldValuesUpdateRequest,
