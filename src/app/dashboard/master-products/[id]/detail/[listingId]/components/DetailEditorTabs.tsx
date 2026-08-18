@@ -8,6 +8,7 @@ import type { DetailContentUseCase } from '@/application/usecases/DetailContentU
 import { AutoPreviewPane } from './AutoPreviewPane';
 import { StructuredDataPane } from './StructuredDataPane';
 import { RawHtmlPane } from './RawHtmlPane';
+import { ThumbnailPane } from './ThumbnailPane';
 
 // The page owns `generated`; children lift updates via onGenerated.
 export type OnGenerated = (next: GeneratedProductResponse) => void;
@@ -22,12 +23,13 @@ interface DetailEditorTabsProps {
   onGenerated: OnGenerated;
 }
 
-type TabKey = 'preview' | 'structure' | 'raw';
+type TabKey = 'preview' | 'structure' | 'raw' | 'thumbnail';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'preview', label: '자동 미리보기' },
   { key: 'structure', label: '구조 데이터' },
   { key: 'raw', label: 'HTML 직접 수정' },
+  { key: 'thumbnail', label: '썸네일' },
 ];
 
 /**
@@ -88,6 +90,14 @@ export function DetailEditorTabs({
             listingId={listingId}
             generated={generated}
             listingUseCase={listingUseCase}
+            onGenerated={onGenerated}
+          />
+        )}
+        {tab === 'thumbnail' && (
+          <ThumbnailPane
+            listingId={listingId}
+            generated={generated}
+            useCase={listingUseCase}
             onGenerated={onGenerated}
           />
         )}

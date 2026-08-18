@@ -26,6 +26,8 @@ export interface ListingRegistrationRepository {
   syncApprovals(): Promise<ListingSyncResponse>;
   getGenerated(listingId: number): Promise<GeneratedProductResponse>;
   regenerate(listingId: number): Promise<GeneratedProductResponse>;
+  overrideThumbnail(listingId: number, file: File): Promise<GeneratedProductResponse>;
+  clearThumbnail(listingId: number): Promise<GeneratedProductResponse>;
   updateFieldValues(listingId: number, data: FieldValuesUpdateRequest): Promise<GeneratedProductResponse>;
   propagate(masterId: number): Promise<PropagateResponse>;
   pendingSync(): Promise<PendingSyncResponse[]>;

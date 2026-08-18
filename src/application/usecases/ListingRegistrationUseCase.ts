@@ -50,6 +50,14 @@ export class ListingRegistrationUseCase {
     return this.repository.regenerate(listingId);
   }
 
+  overrideThumbnail(listingId: number, file: File): Promise<GeneratedProductResponse> {
+    return this.repository.overrideThumbnail(listingId, file);
+  }
+
+  clearThumbnail(listingId: number): Promise<GeneratedProductResponse> {
+    return this.repository.clearThumbnail(listingId);
+  }
+
   updateFieldValues(listingId: number, data: FieldValuesUpdateRequest): Promise<GeneratedProductResponse> {
     return this.repository.updateFieldValues(listingId, data);
   }

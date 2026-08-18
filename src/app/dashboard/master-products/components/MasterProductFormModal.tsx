@@ -7,11 +7,15 @@ import type { MasterProductUseCase } from '@/application/usecases/MasterProductU
 import type { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import type { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
 import type { PackageUseCase } from '@/application/usecases/PackageUseCase';
+import type { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
+import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import type { Product } from '@/domain/entities/Product';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { Package } from '@/domain/entities/PackageEntity';
+import { BUILTIN_FIELD_KEYS, type TemplateField } from '@/domain/entities/ThumbnailEntity';
 import { MasterOptionEditor } from './MasterOptionEditor';
+import { MasterDetailImagesSection } from './MasterDetailImagesSection';
 
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
@@ -21,6 +25,8 @@ interface MasterProductFormModalProps {
   productsUseCase: GetProductsUseCase;
   carrierRateUseCase: CarrierRateUseCase;
   packageUseCase: PackageUseCase;
+  thumbnailTemplateUseCase: ThumbnailTemplateUseCase;
+  detailUseCase: DetailContentUseCase;
   onClose: () => void;
   onDataChanged: () => Promise<void> | void; // reload parent list
 }
@@ -36,6 +42,8 @@ export function MasterProductFormModal({
   productsUseCase,
   carrierRateUseCase,
   packageUseCase,
+  thumbnailTemplateUseCase,
+  detailUseCase,
   onClose,
   onDataChanged,
 }: MasterProductFormModalProps) {
@@ -56,6 +64,14 @@ export function MasterProductFormModal({
   );
   const [defaultPackageId, setDefaultPackageId] = useState<number | ''>(
     initialMaster?.defaultPackageId ?? ''
+  );
+
+  // Create mode only: zone images buffered here (single source), uploaded after create().
+  const [pendingZoneImages, setPendingZoneImages] = useState<Record<string, File[]>>({});
+
+  const [fields, setFields] = useState<TemplateField[]>([]);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(
+    initialMaster?.fieldValues ?? {}
   );
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -82,11 +98,18 @@ export function MasterProductFormModal({
       } catch {
         if (alive) setError('구성상품·택배/박스 후보를 불러오지 못했습니다.');
       }
+      // Template fields are a secondary input — a load failure must not block the form.
+      try {
+        const templates = await thumbnailTemplateUseCase.list();
+        if (alive) setFields(templates.find((t) => t.isDefault)?.fields ?? []);
+      } catch {
+        if (alive) setFields([]);
+      }
     })();
     return () => {
       alive = false;
     };
-  }, [productsUseCase, carrierRateUseCase, packageUseCase]);
+  }, [productsUseCase, carrierRateUseCase, packageUseCase, thumbnailTemplateUseCase]);
 
   const reloadMaster = useCallback(async () => {
     if (!master) return;
@@ -115,6 +138,11 @@ export function MasterProductFormModal({
       return;
     }
     setIsSubmitting(true);
+    // Omit blank values so the backend falls back to product/template defaults.
+    const cleaned: Record<string, string> = {};
+    for (const [k, v] of Object.entries(fieldValues)) {
+      if (v.trim() !== '') cleaned[k] = v;
+    }
     try {
       if (!isEdit) {
         // Create the master first to obtain an id, then upload the image override.
@@ -122,10 +150,25 @@ export function MasterProductFormModal({
           name: name.trim(),
           componentProductIds: selectedIds,
           detailSource: detailSource.trim() || undefined,
+          fieldValues: Object.keys(cleaned).length ? cleaned : undefined,
           defaultDeliveryId: defaultDeliveryId === '' ? undefined : Number(defaultDeliveryId),
           defaultPackageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
         });
         if (imageFile) await useCase.uploadImage(created.id, imageFile);
+        // Sequential await preserves selection order (backend sortOrder = upload order).
+        // The master already exists; a zone upload failure surfaces a distinct banner.
+        try {
+          for (const [zoneId, files] of Object.entries(pendingZoneImages)) {
+            for (const file of files) {
+              await detailUseCase.uploadImage(created.id, file, zoneId);
+            }
+          }
+        } catch {
+          setError('상세 이미지 일부 업로드에 실패했습니다. 마스터는 생성되었습니다.');
+          await onDataChanged();
+          setIsSubmitting(false);
+          return;
+        }
         await onDataChanged();
         onClose();
       } else {
@@ -134,6 +177,9 @@ export function MasterProductFormModal({
           componentProductIds: selectedIds,
           detailSource: detailSource.trim(),
           active,
+          // Always send the (possibly empty) map: backend treats non-null as a full
+          // replace, so cleared fields are reflected; null would keep the old values.
+          fieldValues: cleaned,
           defaultDeliveryId: defaultDeliveryId === '' ? undefined : Number(defaultDeliveryId),
           defaultPackageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
         });
@@ -209,6 +255,46 @@ export function MasterProductFormModal({
               )}
             </div>
           </div>
+
+          {fields.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                템플릿 필드값 (선택)
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {fields.map((f) => (
+                  <div key={f.key}>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
+                    <input
+                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                      value={fieldValues[f.key] ?? ''}
+                      placeholder={
+                        (BUILTIN_FIELD_KEYS as readonly string[]).includes(f.key)
+                          ? '등록상품값 사용'
+                          : '템플릿 기본값 사용'
+                      }
+                      onChange={(e) =>
+                        setFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-gray-500">
+                비우면 예약 필드는 등록상품 정보, 커스텀 필드는 템플릿 기본값으로 채워집니다. 채널마다
+                다르게 하려면 등록 후 셀의 [필드값 편집]에서 조정하세요.
+              </p>
+            </div>
+          )}
+
+          <MasterDetailImagesSection
+            masterId={master?.id ?? null}
+            detailUseCase={detailUseCase}
+            pendingByZone={pendingZoneImages}
+            onPendingChange={(zoneId, files) =>
+              setPendingZoneImages((prev) => ({ ...prev, [zoneId]: files }))
+            }
+          />
 
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">상세 설명 (detailSource)</label>
