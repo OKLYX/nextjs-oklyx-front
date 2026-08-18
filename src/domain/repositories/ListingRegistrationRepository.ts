@@ -13,6 +13,10 @@ import type {
   PushSyncRequest,
   PushSyncResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
+import type {
+  DetailPreviewResponse,
+  DetailHtmlOverrideRequest,
+} from '@/domain/entities/DetailTemplateEntity';
 
 export interface ListingRegistrationRepository {
   addChannel(masterId: number, data: ChannelAddRequest): Promise<ChannelAddResponse>;
@@ -26,4 +30,11 @@ export interface ListingRegistrationRepository {
   propagate(masterId: number): Promise<PropagateResponse>;
   pendingSync(): Promise<PendingSyncResponse[]>;
   pushSync(data: PushSyncRequest): Promise<PushSyncResponse>;
+  // Detail-page (prompt 11): AUTO preview + raw HTML override / clear.
+  previewDetail(listingId: number): Promise<DetailPreviewResponse>;
+  overrideDetailHtml(
+    listingId: number,
+    data: DetailHtmlOverrideRequest,
+  ): Promise<GeneratedProductResponse>;
+  clearDetailHtml(listingId: number): Promise<GeneratedProductResponse>;
 }

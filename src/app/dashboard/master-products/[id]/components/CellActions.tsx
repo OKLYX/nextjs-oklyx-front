@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Spinner } from '@/presentation/components/Spinner';
+import { ROUTES } from '@/config/routes';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { ChannelFieldValuesModal } from './ChannelFieldValuesModal';
@@ -17,6 +19,7 @@ interface CellListing {
 }
 
 interface CellActionsProps {
+  masterId: number;
   listing: CellListing;
   options: MasterOptionResponse[];
   onReload: () => void;
@@ -30,7 +33,8 @@ type Busy = 'register' | 'fetch' | 'regenerate' | null;
  *
  * 마켓 호출은 비동기(즉시 반환) — 승인은 이후 [승인 새로고침]으로 확인.
  */
-export function CellActions({ listing, options, onReload }: CellActionsProps) {
+export function CellActions({ masterId, listing, options, onReload }: CellActionsProps) {
+  const router = useRouter();
   const useCase = useMemo(
     () => new ListingRegistrationUseCase(new ListingRegistrationRepositoryImpl()),
     [],
@@ -125,6 +129,15 @@ export function CellActions({ listing, options, onReload }: CellActionsProps) {
           className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
         >
           필드값 편집
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push(ROUTES.MASTER_PRODUCT_DETAIL_EDIT(masterId, listing.id))}
+          disabled={busy !== null}
+          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+        >
+          상세 편집
         </button>
       </div>
 

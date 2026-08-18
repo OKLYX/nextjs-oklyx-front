@@ -17,6 +17,10 @@ import type {
   PushSyncRequest,
   PushSyncResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
+import type {
+  DetailPreviewResponse,
+  DetailHtmlOverrideRequest,
+} from '@/domain/entities/DetailTemplateEntity';
 
 const masterBase = '/api/admin/master-products';
 const listingBase = '/api/admin/product-listings';
@@ -81,6 +85,24 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async pushSync(data: PushSyncRequest): Promise<PushSyncResponse> {
     const response = await axiosInstance.post(`${listingsBase}/push-sync`, data);
+    return response.data.data;
+  }
+
+  async previewDetail(listingId: number): Promise<DetailPreviewResponse> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/detail-preview`);
+    return response.data.data;
+  }
+
+  async overrideDetailHtml(
+    listingId: number,
+    data: DetailHtmlOverrideRequest,
+  ): Promise<GeneratedProductResponse> {
+    const response = await axiosInstance.put(`${listingBase}/${listingId}/detail-html`, data);
+    return response.data.data;
+  }
+
+  async clearDetailHtml(listingId: number): Promise<GeneratedProductResponse> {
+    const response = await axiosInstance.delete(`${listingBase}/${listingId}/detail-html`);
     return response.data.data;
   }
 }
