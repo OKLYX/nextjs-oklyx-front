@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MarketplaceAccountRepositoryImpl } from '@/infrastructure/repositories/MarketplaceAccountRepositoryImpl';
 import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAccountUseCase';
-import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 import type { UpdateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
 import { ChannelEditForm } from './ChannelEditForm';
 
@@ -13,6 +13,9 @@ interface EditChannelModalProps {
   sellerName: string;
   onClose: () => void;
   onSuccess: () => Promise<void>;
+  thumbTemplates: TemplateOption[];
+  detailTemplates: TemplateOption[];
+  templatesLoading: boolean;
 }
 
 /**
@@ -29,6 +32,9 @@ export function EditChannelModal({
   sellerName,
   onClose,
   onSuccess,
+  thumbTemplates,
+  detailTemplates,
+  templatesLoading,
 }: EditChannelModalProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -65,6 +71,10 @@ export function EditChannelModal({
         accessKey: data.accessKey,
         // Blank secretKey is omitted → backend keeps the existing key.
         secretKey: data.secretKey ? data.secretKey : undefined,
+        // Blank template id = omitted → backend keeps existing (no clearing to
+        // default); a value = replace.
+        thumbnailTemplateId: data.thumbnailTemplateId ? Number(data.thumbnailTemplateId) : undefined,
+        detailTemplateId: data.detailTemplateId ? Number(data.detailTemplateId) : undefined,
       });
       onClose();
       await onSuccess();
@@ -95,6 +105,9 @@ export function EditChannelModal({
             isLoading={isLoading}
             onSubmit={handleSubmit}
             onCancel={onClose}
+            thumbTemplates={thumbTemplates}
+            detailTemplates={detailTemplates}
+            templatesLoading={templatesLoading}
           />
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { ChannelRegistrationForm } from './ChannelRegistrationForm';
 import type { CreateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
+import type { TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 
 interface CreateChannelModalProps {
   isOpen: boolean;
@@ -10,6 +11,9 @@ interface CreateChannelModalProps {
   onClose: () => void;
   onSubmit: (data: CreateMarketplaceAccountForm) => Promise<void>;
   isLoading: boolean;
+  thumbTemplates: TemplateOption[];
+  detailTemplates: TemplateOption[];
+  templatesLoading: boolean;
 }
 
 export function CreateChannelModal({
@@ -18,6 +22,9 @@ export function CreateChannelModal({
   onClose,
   onSubmit,
   isLoading,
+  thumbTemplates,
+  detailTemplates,
+  templatesLoading,
 }: CreateChannelModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -55,6 +62,9 @@ export function CreateChannelModal({
             isLoading={isLoading}
             onSubmit={onSubmit}
             onCancel={onClose}
+            thumbTemplates={thumbTemplates}
+            detailTemplates={detailTemplates}
+            templatesLoading={templatesLoading}
           />
         </div>
       </div>

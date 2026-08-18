@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 
 // Mirror of ChannelRegistrationForm's PLATFORM_OPTIONS for display labels.
 const PLATFORM_LABELS: Record<string, string> = {
@@ -18,6 +18,15 @@ interface ChannelDetailsModalProps {
   onClose: () => void;
   onEditClick?: (channel: MarketplaceAccount) => void;
   onDeleteClick?: (channel: MarketplaceAccount) => void;
+  thumbTemplates: TemplateOption[];
+  detailTemplates: TemplateOption[];
+}
+
+// Resolve an assigned template id to a display name. null id = tenant default;
+// a miss (list not yet loaded) falls back to "#<id>".
+function templateLabel(id: number | null, templates: TemplateOption[]): string {
+  if (id == null) return '기본값 사용';
+  return templates.find((t) => t.id === id)?.name ?? `#${id}`;
 }
 
 /**
@@ -34,6 +43,8 @@ export function ChannelDetailsModal({
   onClose,
   onEditClick,
   onDeleteClick,
+  thumbTemplates,
+  detailTemplates,
 }: ChannelDetailsModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -101,6 +112,20 @@ export function ChannelDetailsModal({
             >
               {channel.isActive ? '활성' : '비활성'}
             </span>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">썸네일 템플릿</label>
+            <p className="text-sm text-gray-900">
+              {templateLabel(channel.thumbnailTemplateId, thumbTemplates)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">상세 템플릿</label>
+            <p className="text-sm text-gray-900">
+              {templateLabel(channel.detailTemplateId, detailTemplates)}
+            </p>
           </div>
 
           <div>

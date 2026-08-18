@@ -16,6 +16,10 @@ export const createMarketplaceAccountSchema = z.object({
   secretKey: z.string()
     .min(1, 'Secret Key를 입력하세요')
     .max(255, 'Secret Key는 255자 이하여야 합니다'),
+  // native <select> value is a string; converted to Number at the submit boundary.
+  // '' = unassigned = tenant-default fallback.
+  thumbnailTemplateId: z.string().optional(),
+  detailTemplateId: z.string().optional(),
 });
 
 export type CreateMarketplaceAccountForm = z.infer<typeof createMarketplaceAccountSchema>;
@@ -38,6 +42,9 @@ export const updateMarketplaceAccountSchema = z.object({
   secretKey: z.string()
     .max(255, 'Secret Key는 255자 이하여야 합니다')
     .optional(),
+  // '' = keep existing assignment (no clearing to default); a value = replace.
+  thumbnailTemplateId: z.string().optional(),
+  detailTemplateId: z.string().optional(),
 });
 
 export type UpdateMarketplaceAccountForm = z.infer<typeof updateMarketplaceAccountSchema>;

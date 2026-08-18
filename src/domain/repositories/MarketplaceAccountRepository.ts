@@ -8,6 +8,9 @@ export interface CreateMarketplaceAccountRequest {
   accessKey: string;
   secretKey: string;
   isActive?: boolean;
+  // Channel template assignment. Omit = tenant-default fallback (create).
+  thumbnailTemplateId?: number;
+  detailTemplateId?: number;
 }
 
 // secretKey is optional — omit/blank keeps the existing key on the backend.
@@ -19,6 +22,10 @@ export interface UpdateMarketplaceAccountRequest {
   accessKey: string;
   secretKey?: string;
   isActive?: boolean;
+  // Channel template assignment. Omit = keep existing (backend does not support
+  // clearing an override back to default — assign/replace only).
+  thumbnailTemplateId?: number;
+  detailTemplateId?: number;
 }
 
 export interface MarketplaceAccountRepository {
