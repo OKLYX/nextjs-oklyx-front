@@ -15,6 +15,10 @@ import { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
 import { CarrierRateRepositoryImpl } from '@/infrastructure/repositories/CarrierRateRepositoryImpl';
 import { PackageUseCase } from '@/application/usecases/PackageUseCase';
 import { PackageRepositoryImpl } from '@/infrastructure/repositories/PackageRepositoryImpl';
+import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
+import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
+import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
+import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import { MasterProductFormModal } from './MasterProductFormModal';
 
@@ -31,6 +35,14 @@ export function MasterProductList() {
   const productsUseCase = useMemo(() => new GetProductsUseCase(new ProductRepositoryImpl()), []);
   const carrierRateUseCase = useMemo(() => new CarrierRateUseCase(new CarrierRateRepositoryImpl()), []);
   const packageUseCase = useMemo(() => new PackageUseCase(new PackageRepositoryImpl()), []);
+  const thumbnailTemplateUseCase = useMemo(
+    () => new ThumbnailTemplateUseCase(new ThumbnailTemplateRepositoryImpl()),
+    [],
+  );
+  const detailUseCase = useMemo(
+    () => new DetailContentUseCase(new DetailContentRepositoryImpl()),
+    [],
+  );
 
   const [masters, setMasters] = useState<MasterProductResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -213,6 +225,8 @@ export function MasterProductList() {
           productsUseCase={productsUseCase}
           carrierRateUseCase={carrierRateUseCase}
           packageUseCase={packageUseCase}
+          thumbnailTemplateUseCase={thumbnailTemplateUseCase}
+          detailUseCase={detailUseCase}
           onClose={() => setModalOpen(false)}
           onDataChanged={load}
         />
