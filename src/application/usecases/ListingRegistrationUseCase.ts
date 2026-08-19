@@ -9,11 +9,13 @@ import type {
   ListingSyncResponse,
   GeneratedProductResponse,
   FieldValuesUpdateRequest,
+  DisplayNameUpdateRequest,
   PropagateResponse,
   PendingSyncResponse,
   PushSyncRequest,
   PushSyncResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
+import type { TagsUpdateRequest } from '@/domain/entities/MasterProductEntity';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -61,6 +63,14 @@ export class ListingRegistrationUseCase {
 
   updateFieldValues(listingId: number, data: FieldValuesUpdateRequest): Promise<GeneratedProductResponse> {
     return this.repository.updateFieldValues(listingId, data);
+  }
+
+  updateDisplayName(listingId: number, data: DisplayNameUpdateRequest): Promise<void> {
+    return this.repository.updateDisplayName(listingId, data);
+  }
+
+  updateTags(listingId: number, data: TagsUpdateRequest): Promise<GeneratedProductResponse> {
+    return this.repository.updateTags(listingId, data);
   }
 
   propagate(masterId: number): Promise<PropagateResponse> {

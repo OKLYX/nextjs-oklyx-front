@@ -8,6 +8,7 @@ import type {
   MasterCategoryRequest,
   MasterCategoryResponse,
   ListingMatrixResponse,
+  TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
 
 export class MasterProductUseCase {
@@ -63,5 +64,9 @@ export class MasterProductUseCase {
 
   deleteCategory(id: number, platform: string): Promise<void> {
     return this.repository.deleteCategory(id, platform);
+  }
+
+  updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {
+    return this.repository.updateTags(id, data);
   }
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
+import { TagChipsInput } from '@/presentation/components/TagChipsInput';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import type { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
@@ -81,6 +82,10 @@ export function MasterProductFormModal({
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(
     initialMaster?.fieldValues ?? {}
   );
+
+  // Master tag pool (backend 33). Not part of the create/update DTO, so it is saved
+  // via a separate updateTags PATCH after the master exists.
+  const [tags, setTags] = useState<string[]>(initialMaster?.tags ?? []);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
@@ -210,6 +215,7 @@ export function MasterProductFormModal({
           defaultPackageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
           options,
         });
+        if (tags.length > 0) await useCase.updateTags(created.id, { tags });
         if (imageFile) await useCase.uploadImage(created.id, imageFile);
         // Sequential await preserves selection order (backend sortOrder = upload order).
         // The master already exists; a zone upload failure surfaces a distinct banner.
@@ -238,6 +244,8 @@ export function MasterProductFormModal({
           defaultDeliveryId: defaultDeliveryId === '' ? undefined : Number(defaultDeliveryId),
           defaultPackageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
         });
+        // Always send tags on edit so clearing to an empty list is honored.
+        await useCase.updateTags(master!.id, { tags });
         if (imageFile) await useCase.uploadImage(master!.id, imageFile);
         await onDataChanged();
         onClose();
@@ -341,6 +349,14 @@ export function MasterProductFormModal({
               </p>
             </div>
           )}
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">태그 (선택)</label>
+            <TagChipsInput tags={tags} onChange={setTags} disabled={isSubmitting} />
+            <p className="mt-1 text-[11px] text-gray-500">
+              마켓 전송 시 채널 태그와 결합됩니다(백엔드 처리). Enter 또는 콤마로 추가하세요.
+            </p>
+          </div>
 
           <MasterDetailImagesSection
             masterId={master?.id ?? null}

@@ -7,6 +7,7 @@ import type {
   MasterCategoryRequest,
   MasterCategoryResponse,
   ListingMatrixResponse,
+  TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
 
 export interface MasterProductRepository {
@@ -23,4 +24,5 @@ export interface MasterProductRepository {
   upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
   getCategories(id: number): Promise<MasterCategoryResponse[]>;
   deleteCategory(id: number, platform: string): Promise<void>;
+  updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
 }

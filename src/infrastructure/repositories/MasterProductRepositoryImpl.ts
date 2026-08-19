@@ -11,6 +11,7 @@ import type {
   MasterCategoryRequest,
   MasterCategoryResponse,
   ListingMatrixResponse,
+  TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
 
 const base = '/api/admin/master-products';
@@ -80,5 +81,10 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
 
   async deleteCategory(id: number, platform: string): Promise<void> {
     await axiosInstance.delete(`${base}/${id}/categories/${platform}`);
+  }
+
+  async updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {
+    const response = await axiosInstance.patch(`${base}/${id}/tags`, data);
+    return response.data.data;
   }
 }

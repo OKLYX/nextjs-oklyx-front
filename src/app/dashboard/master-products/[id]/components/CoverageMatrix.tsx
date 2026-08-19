@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
@@ -21,7 +21,9 @@ import {
   type ChannelPreviewData,
 } from '@/presentation/components/DetailHtmlPreview';
 import { MasterCategoryPanel } from './MasterCategoryPanel';
+import { MasterTagsPanel } from './MasterTagsPanel';
 import { CellActions } from './CellActions';
+import { DisplayNameRow } from './DisplayNameRow';
 
 interface CoverageMatrixProps {
   id: string;
@@ -304,6 +306,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
+      {isAdmin && <MasterTagsPanel masterId={masterId} useCase={masterUseCase} />}
+
       {isAdmin && (
         <MasterCategoryPanel
           masterId={masterId}
@@ -356,8 +360,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     ? '등록됨'
                     : 'DRAFT';
                 return (
+                  <Fragment key={row.accountId}>
                   <tr
-                    key={row.accountId}
                     className="border-b border-gray-100 text-sm text-gray-900"
                   >
                     <td className="px-4 py-3">
@@ -464,6 +468,15 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       )}
                     </td>
                   </tr>
+                  {isAdmin && row.registered && row.cell && (
+                    <DisplayNameRow
+                      listingId={row.cell.productListingId}
+                      name={row.cell.name}
+                      tags={generated[row.cell.productListingId]?.tags ?? []}
+                      onSaved={load}
+                    />
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>

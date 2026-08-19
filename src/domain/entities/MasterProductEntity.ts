@@ -30,6 +30,15 @@ export interface MasterProductResponse {
   defaultPackageId: number | null; // default box for the price engine
   components: MasterComponent[];
   options: MasterOptionResponse[];
+  tags: string[]; // master tag pool (backend null -> treat as [] in the UI)
+  // Computed registration name (prompt 32). Present only on getById (single fetch);
+  // the list response omits the field entirely, so it is undefined there.
+  registrationName?: string | null;
+}
+
+// Tags PATCH body, shared by master pool and channel raw endpoints.
+export interface TagsUpdateRequest {
+  tags: string[];
 }
 
 // Requests
@@ -78,6 +87,8 @@ export interface MasterCategoryRequest {
 // Coverage matrix (accounts × listings)
 export interface MatrixCell {
   productListingId: number;
+  // Display name (노출상품명) = ProductListing.name, channel-scoped, always present (35).
+  name: string;
   platformProductId: string | null;
   sellingPrice: number | null;
 }

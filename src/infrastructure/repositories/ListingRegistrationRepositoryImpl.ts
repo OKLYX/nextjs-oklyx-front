@@ -12,11 +12,13 @@ import type {
   ListingSyncResponse,
   GeneratedProductResponse,
   FieldValuesUpdateRequest,
+  DisplayNameUpdateRequest,
   PropagateResponse,
   PendingSyncResponse,
   PushSyncRequest,
   PushSyncResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
+import type { TagsUpdateRequest } from '@/domain/entities/MasterProductEntity';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -85,6 +87,15 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     data: FieldValuesUpdateRequest,
   ): Promise<GeneratedProductResponse> {
     const response = await axiosInstance.patch(`${listingBase}/${listingId}/field-values`, data);
+    return response.data.data;
+  }
+
+  async updateDisplayName(listingId: number, data: DisplayNameUpdateRequest): Promise<void> {
+    await axiosInstance.patch(`${listingBase}/${listingId}/name`, data);
+  }
+
+  async updateTags(listingId: number, data: TagsUpdateRequest): Promise<GeneratedProductResponse> {
+    const response = await axiosInstance.patch(`${listingBase}/${listingId}/tags`, data);
     return response.data.data;
   }
 
