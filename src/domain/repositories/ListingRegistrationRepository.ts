@@ -16,6 +16,7 @@ import type {
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
+  DetailTemplateResponse,
 } from '@/domain/entities/DetailTemplateEntity';
 
 export interface ListingRegistrationRepository {
@@ -39,4 +40,7 @@ export interface ListingRegistrationRepository {
     data: DetailHtmlOverrideRequest,
   ): Promise<GeneratedProductResponse>;
   clearDetailHtml(listingId: number): Promise<GeneratedProductResponse>;
+  // Detail-page (prompt 30): resolve the template actually applied to this cell
+  // (account-assigned ?? tenant default) so upload zones match the generator.
+  getResolvedDetailTemplate(listingId: number): Promise<DetailTemplateResponse>;
 }

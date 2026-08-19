@@ -59,14 +59,14 @@ export default function MasterProductDetailEditPage() {
       setIsLoading(true);
       setError('');
       try {
-        const [gen, templates, master] = await Promise.all([
+        const [gen, resolvedTemplate, master] = await Promise.all([
           listingUseCase.getGenerated(listingId),
-          detailUseCase.listTemplates(),
+          listingUseCase.getResolvedDetailTemplate(listingId),
           masterUseCase.getById(masterId),
         ]);
         if (!alive) return;
         setGenerated(gen);
-        setTemplate(templates.find((t) => t.isDefault) ?? templates[0] ?? null);
+        setTemplate(resolvedTemplate);
         setMasterName(master.name);
       } catch {
         if (alive) setError('상세 편집 정보를 불러오지 못했습니다.');
