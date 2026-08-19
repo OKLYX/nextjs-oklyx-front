@@ -12,8 +12,13 @@ import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegist
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
+import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
+import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
 import type { ListingMatrixResponse, MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type { ListingStatus } from '@/domain/entities/ListingRegistrationEntity';
+import type { MasterProductImageResponse } from '@/domain/entities/DetailTemplateEntity';
+import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
+import { ImageLightbox } from '@/presentation/components/ImageLightbox';
 import { MasterCategoryPanel } from './MasterCategoryPanel';
 import { CellActions } from './CellActions';
 
@@ -46,11 +51,21 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     [],
   );
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
+  const detailUseCase = useMemo(
+    () => new DetailContentUseCase(new DetailContentRepositoryImpl()),
+    [],
+  );
 
   const [matrix, setMatrix] = useState<ListingMatrixResponse | null>(null);
   const [options, setOptions] = useState<MasterOptionResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Read-only image gallery (channel thumbnails + master detail images).
+  const [detailImages, setDetailImages] = useState<MasterProductImageResponse[]>([]);
+  const [thumbs, setThumbs] = useState<Record<number, string | null>>({});
+  const [thumbsLoading, setThumbsLoading] = useState(false);
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
 
   // Selection of unregistered channels, keyed by accountId.
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -64,23 +79,48 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [isPropagating, setIsPropagating] = useState(false);
   const [banner, setBanner] = useState<{ text: string; tone: 'green' | 'amber' } | null>(null);
 
+  // Fetch per-channel thumbnails (N calls) without blocking the table render.
+  // Each failure is absorbed as null so one bad channel never stalls the rest.
+  const fetchThumbs = useCallback(
+    async (m: ListingMatrixResponse) => {
+      const registered = m.rows.filter((r) => r.cell).map((r) => r.cell!.productListingId);
+      setThumbsLoading(true);
+      const entries = await Promise.all(
+        registered.map(async (lid) => {
+          try {
+            return [lid, (await listingUseCase.getGenerated(lid)).thumbnailUrl] as const;
+          } catch {
+            return [lid, null] as const;
+          }
+        }),
+      );
+      setThumbs(Object.fromEntries(entries));
+      setThumbsLoading(false);
+    },
+    [listingUseCase],
+  );
+
   const load = useCallback(async () => {
     setIsLoading(true);
     setError('');
     try {
-      const [m, master] = await Promise.all([
+      const [m, master, images] = await Promise.all([
         masterUseCase.getMatrix(masterId),
         masterUseCase.getById(masterId),
+        // Detail images are secondary data — never block the matrix on their failure.
+        detailUseCase.listImages(masterId).catch(() => [] as MasterProductImageResponse[]),
       ]);
       setMatrix(m);
       setOptions(master.options);
+      setDetailImages(images);
       setSelected(new Set());
+      void fetchThumbs(m); // fire-and-forget; table draws immediately, thumbs fill in after
     } catch {
       setError('커버리지 매트릭스를 불러오지 못했습니다.');
     } finally {
       setIsLoading(false);
     }
-  }, [masterUseCase, masterId]);
+  }, [masterUseCase, masterId, detailUseCase, fetchThumbs]);
 
   useEffect(() => {
     void (async () => {
@@ -262,6 +302,27 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         />
       )}
 
+      {detailImages.length > 0 && (
+        <div className="rounded-lg bg-white p-4 shadow">
+          <h2 className="mb-3 text-sm font-semibold text-gray-900">상세페이지 이미지 (전 채널 공유)</h2>
+          <div className="flex flex-wrap gap-2">
+            {[...detailImages]
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((img) => (
+                // imageUrl is already a complete URL → use directly (no resolveThumbUrl).
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={img.id}
+                  src={img.imageUrl}
+                  alt={`${img.zoneId} 이미지`}
+                  onClick={() => setLightbox({ src: img.imageUrl, alt: `${img.zoneId} 이미지` })}
+                  className="h-16 w-16 cursor-pointer rounded border border-gray-200 object-contain hover:opacity-80"
+                />
+              ))}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg bg-white shadow list-table-scroll">
         {isLoading ? (
           <div className="flex min-h-32 items-center justify-center">
@@ -288,6 +349,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     </label>
                   ) : null}
                 </th>
+                <th className="px-4 py-3">썸네일</th>
                 <th className="px-4 py-3">판매자</th>
                 <th className="px-4 py-3">플랫폼</th>
                 <th className="px-4 py-3">계정</th>
@@ -317,6 +379,32 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           disabled={busy}
                         />
                       ) : null}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        if (!row.cell) return <span className="text-gray-400">–</span>;
+                        const url = thumbs[row.cell.productListingId];
+                        if (url === undefined) {
+                          return thumbsLoading ? (
+                            <Spinner size={14} />
+                          ) : (
+                            <span className="text-gray-400">–</span>
+                          );
+                        }
+                        if (!url) return <span className="text-gray-400">–</span>;
+                        const resolved = resolveThumbUrl(url);
+                        return (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={resolved}
+                            alt={`${row.sellerName} 썸네일`}
+                            onClick={() =>
+                              setLightbox({ src: resolved, alt: `${row.sellerName} 썸네일` })
+                            }
+                            className="h-10 w-10 cursor-pointer rounded border border-gray-200 object-contain hover:opacity-80"
+                          />
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">{row.sellerName}</td>
                     <td className="px-4 py-3">{row.platform}</td>
@@ -370,6 +458,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           </table>
         )}
       </div>
+
+      <ImageLightbox
+        src={lightbox?.src ?? null}
+        alt={lightbox?.alt ?? ''}
+        onClose={() => setLightbox(null)}
+      />
     </PageContainer>
   );
 }
