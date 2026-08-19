@@ -17,6 +17,7 @@ import type {
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
+  DetailTemplateResponse,
 } from '@/domain/entities/DetailTemplateEntity';
 
 export class ListingRegistrationUseCase {
@@ -87,5 +88,9 @@ export class ListingRegistrationUseCase {
 
   clearDetailHtml(listingId: number): Promise<GeneratedProductResponse> {
     return this.repository.clearDetailHtml(listingId);
+  }
+
+  getResolvedDetailTemplate(listingId: number): Promise<DetailTemplateResponse> {
+    return this.repository.getResolvedDetailTemplate(listingId);
   }
 }

@@ -20,6 +20,7 @@ import type {
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
+  DetailTemplateResponse,
 } from '@/domain/entities/DetailTemplateEntity';
 
 const masterBase = '/api/admin/master-products';
@@ -117,6 +118,11 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async clearDetailHtml(listingId: number): Promise<GeneratedProductResponse> {
     const response = await axiosInstance.delete(`${listingBase}/${listingId}/detail-html`);
+    return response.data.data;
+  }
+
+  async getResolvedDetailTemplate(listingId: number): Promise<DetailTemplateResponse> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/detail-template`);
     return response.data.data;
   }
 }
