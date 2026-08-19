@@ -44,19 +44,31 @@ export interface DetailHtmlOverrideRequest {
   html: string;
 }
 
-// Master-owned zone image (shared across all channels of the same master).
-// `imageUrl` is an already-complete URL → use directly in <img src>, never
-// resolveThumbUrl (double-wrapping breaks the path).
-export interface MasterProductImageResponse {
+// Reserved field key for the cover photo (master source image). Mirrors the
+// backend constant SOURCE_ZONE = "__source__". Single definition on the front.
+export const SOURCE_ZONE = '__source__';
+
+// A master pool image with its field-mapping state (backend 37).
+// One pool image is reusable across many detail zones + the cover photo (M:N).
+// ⚠️ `imageUrl` is an already-complete URL → use directly in <img src>, never
+// resolveThumbUrl (double-wrapping breaks the path). Same rule everywhere.
+// `assignedZones` = the detail zones this image is mapped to (excludes the
+// cover-photo key); `isSource` = true if it is the master's cover photo.
+export interface MasterPoolImage {
   id: number;
-  zoneId: string;
-  sortOrder: number;
   imageUrl: string;
+  sortOrder: number;
+  assignedZones: string[];
+  isSource: boolean;
 }
 
-// `imageIds` = the full set of ids in `zoneId`, in the new order. The backend
-// validates the set matches; a partial payload is rejected (400).
-export interface MasterImageReorderRequest {
-  zoneId: string;
+// Idempotent replace: `imageIds` = the full ordered set mapped to a zone
+// (empty clears). Order = sortOrder within the zone.
+export interface SetZoneImagesRequest {
   imageIds: number[];
+}
+
+// imageId = null clears the cover photo (→ derived from BOM); a value sets it.
+export interface SetSourceImageRequest {
+  imageId: number | null;
 }

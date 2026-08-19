@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { TagChipsInput } from '@/presentation/components/TagChipsInput';
-import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import type { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import type { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
@@ -19,8 +18,9 @@ import type { Product } from '@/domain/entities/Product';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { Package } from '@/domain/entities/PackageEntity';
 import { BUILTIN_FIELD_KEYS, type TemplateField } from '@/domain/entities/ThumbnailEntity';
+import { SOURCE_ZONE } from '@/domain/entities/DetailTemplateEntity';
 import { MasterOptionEditor } from './MasterOptionEditor';
-import { MasterDetailImagesSection } from './MasterDetailImagesSection';
+import { MasterImagePool, type ImageField, type MasterImageBuffer } from './MasterImagePool';
 
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
@@ -60,12 +60,12 @@ export function MasterProductFormModal({
     initialMaster?.components.map((c) => c.productId) ?? []
   );
   const [active, setActive] = useState(initialMaster?.active ?? true);
-  const [imageFile, setImageFile] = useState<File | null>(null);
 
   // Create mode: options are entered in the wizard and created atomically with the master.
   const [options, setOptions] = useState<MasterOptionRequest[]>([]);
-  // Zones the default detail template requires (reported by MasterDetailImagesSection).
-  const [requiredZones, setRequiredZones] = useState<string[]>([]);
+
+  // Image fields = cover photo (always first) + detail imageZones from the default template.
+  const [imageFields, setImageFields] = useState<ImageField[]>([]);
 
   // Default carrier/box for the price engine (options may override individually).
   const [defaultDeliveryId, setDefaultDeliveryId] = useState<number | ''>(
@@ -75,8 +75,9 @@ export function MasterProductFormModal({
     initialMaster?.defaultPackageId ?? ''
   );
 
-  // Create mode only: zone images buffered here (single source), uploaded after create().
-  const [pendingZoneImages, setPendingZoneImages] = useState<Record<string, File[]>>({});
+  // Create mode only: pool uploads + field mappings buffered here (single source),
+  // applied after create() (sequential upload → mapping).
+  const [imageBuffer, setImageBuffer] = useState<MasterImageBuffer>({ files: [], assignments: {} });
 
   const [fields, setFields] = useState<TemplateField[]>([]);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(
@@ -93,7 +94,6 @@ export function MasterProductFormModal({
   const [productFilter, setProductFilter] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -160,9 +160,28 @@ export function MasterProductFormModal({
     [selectedIds, products],
   );
 
-  const handleRequiredZonesChange = useCallback((zones: string[]) => {
-    setRequiredZones(zones);
-  }, []);
+  // Derive image fields = cover photo (always first) + default template imageZones.
+  // A template load failure just yields the cover-photo-only field set (non-blocking).
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let zones: ImageField[] = [];
+      try {
+        const templates = await detailUseCase.listTemplates();
+        const def = templates.find((t) => t.isDefault);
+        zones = (def?.blocks ?? [])
+          .filter((b) => b.type === 'imageZone' && b.bind)
+          .map((b) => ({ key: b.bind as string, label: b.bind as string }));
+      } catch {
+        zones = [];
+      }
+      if (!alive) return;
+      setImageFields([{ key: SOURCE_ZONE, label: '대표사진' }, ...zones]);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [detailUseCase]);
 
   const handleSubmit = async () => {
     setError('');
@@ -190,10 +209,11 @@ export function MasterProductFormModal({
           return;
         }
       }
-      // Every required detail zone needs at least one image (buffered before create).
-      for (const zoneId of requiredZones) {
-        if (!(pendingZoneImages[zoneId]?.length >= 1)) {
-          setError(`상세 이미지(${zoneId})를 1장 이상 추가하세요.`);
+      // Every detail zone (non-source field) needs at least one mapped image.
+      for (const field of imageFields) {
+        if (field.key === SOURCE_ZONE) continue;
+        if (!(imageBuffer.assignments[field.key]?.length >= 1)) {
+          setError(`상세 이미지(${field.label})를 1장 이상 매핑하세요.`);
           return;
         }
       }
@@ -216,17 +236,27 @@ export function MasterProductFormModal({
           options,
         });
         if (tags.length > 0) await useCase.updateTags(created.id, { tags });
-        if (imageFile) await useCase.uploadImage(created.id, imageFile);
-        // Sequential await preserves selection order (backend sortOrder = upload order).
-        // The master already exists; a zone upload failure surfaces a distinct banner.
+        // Buffer: upload pool files sequentially (index → real id) then apply mappings.
+        // Sequential await preserves pool sortOrder (backend = upload order); Promise.all
+        // would race it. The master already exists → a failure surfaces a distinct banner.
         try {
-          for (const [zoneId, files] of Object.entries(pendingZoneImages)) {
-            for (const file of files) {
-              await detailUseCase.uploadImage(created.id, file, zoneId);
+          const idByIndex: number[] = [];
+          for (const file of imageBuffer.files) {
+            const uploaded = await detailUseCase.uploadPoolImage(created.id, file);
+            idByIndex.push(uploaded.id);
+          }
+          for (const [fieldKey, idxs] of Object.entries(imageBuffer.assignments)) {
+            const ids = idxs
+              .map((i) => idByIndex[i])
+              .filter((v): v is number => v != null);
+            if (fieldKey === SOURCE_ZONE) {
+              await detailUseCase.setSourceImage(created.id, ids[0] ?? null);
+            } else {
+              await detailUseCase.setZoneImages(created.id, fieldKey, ids);
             }
           }
         } catch {
-          setError('마스터·옵션은 생성되었습니다. 상세 이미지 일부 업로드에 실패했습니다.');
+          setError('마스터·옵션은 생성되었습니다. 이미지 일부 업로드/매핑에 실패했습니다.');
           await onDataChanged();
           setIsSubmitting(false);
           return;
@@ -246,7 +276,7 @@ export function MasterProductFormModal({
         });
         // Always send tags on edit so clearing to an empty list is honored.
         await useCase.updateTags(master!.id, { tags });
-        if (imageFile) await useCase.uploadImage(master!.id, imageFile);
+        // Cover photo + zone images commit immediately via MasterImagePool (no work here).
         await onDataChanged();
         onClose();
       }
@@ -257,8 +287,6 @@ export function MasterProductFormModal({
       setIsSubmitting(false);
     }
   };
-
-  const currentImageUrl = master?.sourceImageUrl ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
@@ -358,15 +386,23 @@ export function MasterProductFormModal({
             </p>
           </div>
 
-          <MasterDetailImagesSection
-            masterId={master?.id ?? null}
-            detailUseCase={detailUseCase}
-            pendingByZone={pendingZoneImages}
-            onPendingChange={(zoneId, files) =>
-              setPendingZoneImages((prev) => ({ ...prev, [zoneId]: files }))
-            }
-            onRequiredZonesChange={handleRequiredZonesChange}
-          />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              이미지 (대표사진 + 상세페이지)
+            </label>
+            <MasterImagePool
+              masterId={master?.id ?? null}
+              detailUseCase={detailUseCase}
+              fields={imageFields}
+              buffer={isEdit ? undefined : imageBuffer}
+              onBufferChange={isEdit ? undefined : setImageBuffer}
+            />
+            <p className="mt-1 text-[11px] text-gray-500">
+              업로드는 풀에 먼저 쌓이고, 풀 이미지를 필드로 드래그하거나 [선택]으로 매핑합니다. 한
+              이미지를 대표사진·여러 zone 에 재사용할 수 있습니다.
+              {isEdit ? ' 수정 모드에서는 매핑이 즉시 저장됩니다.' : ' 생성 시 저장 후 반영됩니다.'}
+            </p>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -402,40 +438,6 @@ export function MasterProductFormModal({
             <p className="col-span-2 text-[11px] text-gray-500">
               옵션에서 개별 지정하지 않으면 이 값이 모든 옵션 판매가 계산에 쓰입니다.
             </p>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">대표사진 override</label>
-            <div className="flex items-center gap-3">
-              <div className="h-16 w-16 overflow-hidden rounded bg-gray-100">
-                {imageFile ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={URL.createObjectURL(imageFile)}
-                    alt="preview"
-                    className="h-full w-full object-contain"
-                  />
-                ) : currentImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={resolveThumbUrl(currentImageUrl)}
-                    alt="current"
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">
-                    없음
-                  </span>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png"
-                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-                className="text-sm text-gray-700"
-              />
-            </div>
           </div>
 
           {isEdit && (

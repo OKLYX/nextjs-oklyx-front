@@ -2,8 +2,7 @@ import type { DetailContentRepository } from '@/domain/repositories/DetailConten
 import type {
   DetailTemplateResponse,
   DetailTemplateRequest,
-  MasterProductImageResponse,
-  MasterImageReorderRequest,
+  MasterPoolImage,
 } from '@/domain/entities/DetailTemplateEntity';
 
 export class DetailContentUseCase {
@@ -29,22 +28,23 @@ export class DetailContentUseCase {
     return this.repository.deleteTemplate(id);
   }
 
-  listImages(masterId: number): Promise<MasterProductImageResponse[]> {
-    return this.repository.listImages(masterId);
+  uploadPoolImage(masterId: number, file: File): Promise<MasterPoolImage> {
+    return this.repository.uploadPoolImage(masterId, file);
   }
 
-  uploadImage(masterId: number, file: File, zoneId: string): Promise<MasterProductImageResponse> {
-    return this.repository.uploadImage(masterId, file, zoneId);
+  listPoolImages(masterId: number): Promise<MasterPoolImage[]> {
+    return this.repository.listPoolImages(masterId);
   }
 
-  reorderImages(
-    masterId: number,
-    data: MasterImageReorderRequest,
-  ): Promise<MasterProductImageResponse[]> {
-    return this.repository.reorderImages(masterId, data);
+  deletePoolImage(masterId: number, imageId: number): Promise<void> {
+    return this.repository.deletePoolImage(masterId, imageId);
   }
 
-  deleteImage(masterId: number, imageId: number): Promise<void> {
-    return this.repository.deleteImage(masterId, imageId);
+  setZoneImages(masterId: number, zoneId: string, imageIds: number[]): Promise<MasterPoolImage[]> {
+    return this.repository.setZoneImages(masterId, zoneId, imageIds);
+  }
+
+  setSourceImage(masterId: number, imageId: number | null): Promise<MasterPoolImage | void> {
+    return this.repository.setSourceImage(masterId, imageId);
   }
 }
