@@ -9,7 +9,11 @@ import type { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCa
 import type { PackageUseCase } from '@/application/usecases/PackageUseCase';
 import type { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
-import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
+import type {
+  MasterProductResponse,
+  MasterOptionRequest,
+  MasterComponent,
+} from '@/domain/entities/MasterProductEntity';
 import type { Product } from '@/domain/entities/Product';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { Package } from '@/domain/entities/PackageEntity';
@@ -54,9 +58,13 @@ export function MasterProductFormModal({
   const [selectedIds, setSelectedIds] = useState<number[]>(
     initialMaster?.components.map((c) => c.productId) ?? []
   );
-  const [detailSource, setDetailSource] = useState(initialMaster?.detailSource ?? '');
   const [active, setActive] = useState(initialMaster?.active ?? true);
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // Create mode: options are entered in the wizard and created atomically with the master.
+  const [options, setOptions] = useState<MasterOptionRequest[]>([]);
+  // Zones the default detail template requires (reported by MasterDetailImagesSection).
+  const [requiredZones, setRequiredZones] = useState<string[]>([]);
 
   // Default carrier/box for the price engine (options may override individually).
   const [defaultDeliveryId, setDefaultDeliveryId] = useState<number | ''>(
@@ -127,6 +135,30 @@ export function MasterProductFormModal({
     return products.filter((p) => (p.productName ?? '').toLowerCase().includes(q));
   }, [products, productFilter]);
 
+  // Master defaults feed the option editor's carrier/box prefill (SSOT = this form's state,
+  // so changing a default here updates option prefill live).
+  const masterDefaults = useMemo(
+    () => ({
+      deliveryId: defaultDeliveryId === '' ? undefined : Number(defaultDeliveryId),
+      packageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
+    }),
+    [defaultDeliveryId, defaultPackageId],
+  );
+
+  // Create mode: the option editor renders a quantity row per selected component.
+  const createComponents = useMemo<MasterComponent[]>(
+    () =>
+      selectedIds.map((id) => ({
+        productId: id,
+        productName: products.find((p) => p.id === id)?.productName ?? `#${id}`,
+      })),
+    [selectedIds, products],
+  );
+
+  const handleRequiredZonesChange = useCallback((zones: string[]) => {
+    setRequiredZones(zones);
+  }, []);
+
   const handleSubmit = async () => {
     setError('');
     if (!name.trim()) {
@@ -136,6 +168,30 @@ export function MasterProductFormModal({
     if (selectedIds.length === 0) {
       setError('구성상품을 1개 이상 선택하세요.');
       return;
+    }
+    if (!isEdit) {
+      // Options are created atomically with the master → at least one, each with a name + items.
+      if (options.length === 0) {
+        setError('옵션을 1개 이상 추가하세요.');
+        return;
+      }
+      for (const opt of options) {
+        if (!opt.name.trim()) {
+          setError('옵션 이름을 입력하세요.');
+          return;
+        }
+        if (opt.items.length === 0) {
+          setError('각 옵션에 구성상품 수량을 입력하세요.');
+          return;
+        }
+      }
+      // Every required detail zone needs at least one image (buffered before create).
+      for (const zoneId of requiredZones) {
+        if (!(pendingZoneImages[zoneId]?.length >= 1)) {
+          setError(`상세 이미지(${zoneId})를 1장 이상 추가하세요.`);
+          return;
+        }
+      }
     }
     setIsSubmitting(true);
     // Omit blank values so the backend falls back to product/template defaults.
@@ -149,10 +205,10 @@ export function MasterProductFormModal({
         const created = await useCase.create({
           name: name.trim(),
           componentProductIds: selectedIds,
-          detailSource: detailSource.trim() || undefined,
           fieldValues: Object.keys(cleaned).length ? cleaned : undefined,
           defaultDeliveryId: defaultDeliveryId === '' ? undefined : Number(defaultDeliveryId),
           defaultPackageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
+          options,
         });
         if (imageFile) await useCase.uploadImage(created.id, imageFile);
         // Sequential await preserves selection order (backend sortOrder = upload order).
@@ -164,7 +220,7 @@ export function MasterProductFormModal({
             }
           }
         } catch {
-          setError('상세 이미지 일부 업로드에 실패했습니다. 마스터는 생성되었습니다.');
+          setError('마스터·옵션은 생성되었습니다. 상세 이미지 일부 업로드에 실패했습니다.');
           await onDataChanged();
           setIsSubmitting(false);
           return;
@@ -175,7 +231,6 @@ export function MasterProductFormModal({
         await useCase.update(master!.id, {
           name: name.trim(),
           componentProductIds: selectedIds,
-          detailSource: detailSource.trim(),
           active,
           // Always send the (possibly empty) map: backend treats non-null as a full
           // replace, so cleared fields are reflected; null would keep the old values.
@@ -294,16 +349,8 @@ export function MasterProductFormModal({
             onPendingChange={(zoneId, files) =>
               setPendingZoneImages((prev) => ({ ...prev, [zoneId]: files }))
             }
+            onRequiredZonesChange={handleRequiredZonesChange}
           />
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">상세 설명 (detailSource)</label>
-            <textarea
-              className="h-24 w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-              value={detailSource}
-              onChange={(e) => setDetailSource(e.target.value)}
-            />
-          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -402,20 +449,30 @@ export function MasterProductFormModal({
           </button>
         </div>
 
-        {isEdit && master && (
-          <div className="mt-6 border-t border-gray-200 pt-6">
+        <div className="mt-6 border-t border-gray-200 pt-6">
+          {isEdit && master ? (
             <MasterOptionEditor
               master={master}
               useCase={useCase}
               carrierRates={carrierRates}
               packages={packages}
+              masterDefaults={masterDefaults}
               onChanged={async () => {
                 await reloadMaster();
                 await onDataChanged();
               }}
             />
-          </div>
-        )}
+          ) : (
+            <MasterOptionEditor
+              components={createComponents}
+              options={options}
+              onOptionsChange={setOptions}
+              carrierRates={carrierRates}
+              packages={packages}
+              masterDefaults={masterDefaults}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

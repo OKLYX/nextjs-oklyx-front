@@ -25,7 +25,6 @@ export interface MasterProductResponse {
   name: string;
   active: boolean;
   sourceImageUrl: string | null;
-  detailSource: string | null;
   fieldValues: Record<string, string>;
   defaultDeliveryId: number | null; // default carrier for the price engine
   defaultPackageId: number | null; // default box for the price engine
@@ -37,15 +36,14 @@ export interface MasterProductResponse {
 export interface MasterProductRequest {
   name: string;
   componentProductIds: number[];
-  detailSource?: string;
   fieldValues?: Record<string, string>;
   defaultDeliveryId?: number;
   defaultPackageId?: number;
+  options?: MasterOptionRequest[]; // atomic create; each option covers the full component set
 }
 
 export interface MasterProductUpdateRequest {
   name?: string;
-  detailSource?: string;
   fieldValues?: Record<string, string>;
   active?: boolean;
   componentProductIds?: number[];

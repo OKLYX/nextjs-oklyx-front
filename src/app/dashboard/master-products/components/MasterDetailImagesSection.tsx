@@ -10,6 +10,8 @@ interface MasterDetailImagesSectionProps {
   // Create mode only: buffered files kept by the parent (modal) → uploaded after create.
   pendingByZone: Record<string, File[]>;
   onPendingChange: (zoneId: string, files: File[]) => void;
+  // Notify the parent which zones the default template requires (empty = skip image validation).
+  onRequiredZonesChange?: (zoneIds: string[]) => void;
 }
 
 /**
@@ -26,27 +28,31 @@ export function MasterDetailImagesSection({
   detailUseCase,
   pendingByZone,
   onPendingChange,
+  onRequiredZonesChange,
 }: MasterDetailImagesSectionProps) {
   const [zoneIds, setZoneIds] = useState<string[]>([]);
 
   useEffect(() => {
     let alive = true;
     (async () => {
+      let zones: string[] = [];
       try {
         const templates = await detailUseCase.listTemplates();
         const def = templates.find((t) => t.isDefault);
-        const zones = (def?.blocks ?? [])
+        zones = (def?.blocks ?? [])
           .filter((b) => b.type === 'imageZone' && b.bind)
           .map((b) => b.bind as string);
-        if (alive) setZoneIds(zones);
       } catch {
-        if (alive) setZoneIds([]);
+        zones = [];
       }
+      if (!alive) return;
+      setZoneIds(zones);
+      onRequiredZonesChange?.(zones);
     })();
     return () => {
       alive = false;
     };
-  }, [detailUseCase]);
+  }, [detailUseCase, onRequiredZonesChange]);
 
   if (zoneIds.length === 0) return null;
 
