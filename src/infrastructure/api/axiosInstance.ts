@@ -2,9 +2,10 @@
 
 import axios from 'axios';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
+import { resolveBaseUrl } from '@/infrastructure/api/apiBaseUrl';
 
 export const axiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_SERVER_API_URL || 'http://localhost:8083',
+  baseURL: resolveBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
