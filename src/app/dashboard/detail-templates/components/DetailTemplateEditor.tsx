@@ -9,7 +9,10 @@ import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
+import { ProcessingPresetUseCase } from '@/application/usecases/ProcessingPresetUseCase';
+import { ProcessingPresetRepositoryImpl } from '@/infrastructure/repositories/ProcessingPresetRepositoryImpl';
 import type { DetailBlock } from '@/domain/entities/DetailTemplateEntity';
+import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity';
 import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import { BlockRow } from './BlockRow';
 
@@ -42,9 +45,20 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
   const router = useRouter();
   const isAdmin = useAuthStore((state) => state.user?.role === 'ADMIN');
   const useCase = useMemo(() => new DetailContentUseCase(new DetailContentRepositoryImpl()), []);
+  const presetUseCase = useMemo(
+    () => new ProcessingPresetUseCase(new ProcessingPresetRepositoryImpl()),
+    [],
+  );
 
   const [name, setName] = useState('');
   const [isDefault, setIsDefault] = useState(false);
+  // Image-processing preset dropdown (secondary data — never blocks the CRUD).
+  const [presets, setPresets] = useState<ProcessingPreset[]>([]);
+  const [presetsLoading, setPresetsLoading] = useState(true);
+  const [presetId, setPresetId] = useState(''); // '' = 미지정 (없음)
+  // Once a preset is assigned, v1 has no clear path (backend keeps null/absent).
+  // Lock the "없음" option so users can't try to revert (교체 only).
+  const [presetLocked, setPresetLocked] = useState(false);
   const [blocks, setBlocks] = useState<DetailBlock[]>([]);
   const [isLoading, setIsLoading] = useState(!!templateId);
   const [isSaving, setIsSaving] = useState(false);
@@ -79,6 +93,9 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
         setName(tpl.name);
         setIsDefault(tpl.isDefault);
         setBlocks(tpl.blocks ?? []);
+        const hasPreset = tpl.imageProcessingPresetId != null;
+        setPresetId(hasPreset ? String(tpl.imageProcessingPresetId) : '');
+        setPresetLocked(hasPreset);
       } catch {
         if (alive) setError('템플릿을 불러오지 못했습니다.');
       } finally {
@@ -89,6 +106,26 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
       alive = false;
     };
   }, [templateId, isAdmin, useCase]);
+
+  // Preset list is secondary data: failure falls back to [] and never blocks the CRUD.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let alive = true;
+    (async () => {
+      setPresetsLoading(true);
+      try {
+        const list = await presetUseCase.list();
+        if (alive) setPresets(list);
+      } catch {
+        if (alive) setPresets([]);
+      } finally {
+        if (alive) setPresetsLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [isAdmin, presetUseCase]);
 
   const patchBlock = (index: number, patch: Partial<DetailBlock>) => {
     setBlocks((prev) => prev.map((b, i) => (i === index ? { ...b, ...patch } : b)));
@@ -161,7 +198,14 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
     setError('');
     setIsSaving(true);
     try {
-      const payload = { name: name.trim(), blocks, active: true, isDefault };
+      // Empty preset value = omit the field (backend keeps existing; no clear in v1).
+      const payload = {
+        name: name.trim(),
+        blocks,
+        active: true,
+        isDefault,
+        ...(presetId ? { imageProcessingPresetId: Number(presetId) } : {}),
+      };
       if (templateId) await useCase.updateTemplate(templateId, payload);
       else await useCase.createTemplate(payload);
       router.push(ROUTES.DETAIL_TEMPLATES);
@@ -239,6 +283,30 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
             className="h-4 w-4"
           />
           <span className="text-sm text-gray-700">기본 템플릿으로 지정</span>
+        </label>
+
+        <label className="mt-3 block">
+          <span className="block text-xs font-medium text-gray-600">이미지 처리 프리셋</span>
+          <select
+            value={presetId}
+            onChange={(e) => setPresetId(e.target.value)}
+            disabled={presetsLoading}
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+          >
+            <option value="" disabled={presetLocked}>
+              없음 (합성 안 함)
+            </option>
+            {presets.map((p) => (
+              <option key={p.id} value={String(p.id)}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-gray-400">
+            {presetId
+              ? '해제는 추후 지원, 다른 프리셋으로 교체만 가능합니다.'
+              : '합성 안 함 (상세 이미지에 워터마크·배지 미적용).'}
+          </span>
         </label>
       </div>
 
