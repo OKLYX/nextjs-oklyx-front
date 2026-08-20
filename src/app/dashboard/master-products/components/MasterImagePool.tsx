@@ -18,7 +18,9 @@ import { MasterImagePickerModal, type PickerImage } from './MasterImagePickerMod
  *   - 필드 직접 업로드 <input> 을 만들지 말 것(업로드=풀 전용).
  *   - `imageUrl`(수정 모드) 은 완성 URL → <img src> 직접 사용(resolveThumbUrl 금지).
  *   - 대표사진 예약키 = `SOURCE_ZONE`(단일). zone 필드 = 다중.
- *   - `fields` 는 부모가 도출해 주입(대표사진 첫 필드 + imageZone 필드).
+ *   - `fields` 는 부모가 도출해 주입(대표사진 첫 필드 + imageZone 필드). 선택적 `fieldGroups` 를 주면
+ *     우측 필드 컬럼을 템플릿별 제목으로 묶어 렌더(공유 zone 은 각 그룹에 중복 표시, 매핑은 zoneId 로 일관).
+ *     `fields` 는 여전히 dedup 된 로직 단일 소스.
  *
  * **모드**:
  *   - 수정(`masterId != null`): 매핑 변경이 즉시 서버 반영(setZoneImages/setSourceImage) 후 재조회.
@@ -28,6 +30,11 @@ import { MasterImagePickerModal, type PickerImage } from './MasterImagePickerMod
  * ⚠️ zone 내 이미지 순서변경(드래그 정렬)은 out-of-scope — 선택/드롭 + 개별 해제만.
  */
 export type ImageField = { key: string; label: string };
+
+// Optional grouping for the field column: render field cards under a heading (e.g. per template).
+// A field key may repeat across groups (a zone shared by several templates) — the mapping is keyed
+// by zoneId so duplicated cards stay consistent. `fields` remains the deduped working set.
+export type ImageFieldGroup = { label: string; keys: string[] };
 
 export type MasterImageBuffer = {
   files: File[]; // upload queue (order = pool sortOrder)
@@ -41,6 +48,9 @@ interface MasterImagePoolProps {
   masterId: number | null;
   detailUseCase: DetailContentUseCase;
   fields: ImageField[];
+  // Optional: group the field column under headings (e.g. per detail template). When omitted,
+  // fields render as one flat list. `fields` is still the deduped source of truth for all logic.
+  fieldGroups?: ImageFieldGroup[];
   // Create mode only: parent holds the buffer as the single source of truth.
   buffer?: MasterImageBuffer;
   onBufferChange?: (next: MasterImageBuffer) => void;
@@ -52,6 +62,7 @@ export function MasterImagePool({
   masterId,
   detailUseCase,
   fields,
+  fieldGroups,
   buffer,
   onBufferChange,
   onDirty,
@@ -111,6 +122,12 @@ export function MasterImagePool({
     for (const e of entries) map.set(e.token, e);
     return map;
   }, [entries]);
+
+  const fieldByKey = useMemo(() => {
+    const map = new Map<string, ImageField>();
+    for (const f of fields) map.set(f.key, f);
+    return map;
+  }, [fields]);
 
   // Tokens currently mapped to a field (in mapping order).
   const fieldTokens = useCallback(
@@ -241,9 +258,77 @@ export function MasterImagePool({
     addToField(fieldKey, token);
   };
 
+  // ---- Group filter chips (null = 전체) ----
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+
   // ---- [선택] picker ----
   const [pickerField, setPickerField] = useState<ImageField | null>(null);
   const pickerImages: PickerImage[] = entries.map((e) => ({ token: e.token, url: e.url }));
+
+  // One field drop-zone card. `reactKey` disambiguates a zone shared across groups.
+  const renderFieldCard = (field: ImageField, reactKey: string) => {
+    const tokens = fieldTokens(field.key);
+    const isSource = field.key === SOURCE_ZONE;
+    return (
+      <div
+        key={reactKey}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOverField(field.key);
+        }}
+        onDragLeave={() => setDragOverField((f) => (f === field.key ? null : f))}
+        onDrop={(e) => handleDrop(field.key, e)}
+        className={`rounded-lg border p-3 ${
+          dragOverField === field.key ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
+        }`}
+      >
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-600">
+            {field.label}
+            {isSource && <span className="ml-1 text-gray-400">(단일)</span>}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPickerField(field)}
+            disabled={busy}
+            className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          >
+            선택
+          </button>
+        </div>
+        {tokens.length === 0 ? (
+          <p className="py-3 text-center text-[11px] text-gray-400">
+            풀 이미지를 여기로 드래그하거나 [선택]으로 매핑하세요.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {tokens.map((token) => {
+              const entry = entryByToken.get(token);
+              if (!entry) return null;
+              return (
+                <div
+                  key={token}
+                  className="relative h-16 w-16 overflow-hidden rounded border border-gray-200 bg-gray-100"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={entry.url} alt="매핑 이미지" className="h-full w-full object-contain" />
+                  <button
+                    type="button"
+                    onClick={() => removeFromField(field.key, token)}
+                    disabled={busy}
+                    aria-label="매핑 해제"
+                    className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center bg-red-600/90 text-[10px] text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (isEdit && isLoading) {
     return (
@@ -274,6 +359,8 @@ export function MasterImagePool({
               />
             </label>
           </div>
+          {/* Fixed-height pool: thumbnails scroll within; the upload header stays put. */}
+          <div className="h-72 overflow-y-auto pr-1">
           {entries.length === 0 ? (
             <p className="py-6 text-center text-xs text-gray-500">
               이미지를 업로드하면 여기에 쌓입니다. 오른쪽 필드로 드래그하거나 [선택]으로 매핑하세요.
@@ -318,75 +405,57 @@ export function MasterImagePool({
               })}
             </div>
           )}
+          </div>
         </div>
 
-        {/* ---- Right: field drop zones ---- */}
+        {/* ---- Right: field drop zones (optionally grouped by template + chip filter) ---- */}
         <div className="space-y-3">
-          {fields.map((field) => {
-            const tokens = fieldTokens(field.key);
-            const isSource = field.key === SOURCE_ZONE;
-            return (
-              <div
-                key={field.key}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOverField(field.key);
-                }}
-                onDragLeave={() => setDragOverField((f) => (f === field.key ? null : f))}
-                onDrop={(e) => handleDrop(field.key, e)}
-                className={`rounded-lg border p-3 ${
-                  dragOverField === field.key
-                    ? 'border-blue-400 bg-blue-50'
-                    : 'border-gray-200'
-                }`}
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-600">
-                    {field.label}
-                    {isSource && <span className="ml-1 text-gray-400">(단일)</span>}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPickerField(field)}
-                    disabled={busy}
-                    className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                  >
-                    선택
-                  </button>
-                </div>
-                {tokens.length === 0 ? (
-                  <p className="py-3 text-center text-[11px] text-gray-400">
-                    풀 이미지를 여기로 드래그하거나 [선택]으로 매핑하세요.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {tokens.map((token) => {
-                      const entry = entryByToken.get(token);
-                      if (!entry) return null;
-                      return (
-                        <div
-                          key={token}
-                          className="relative h-16 w-16 overflow-hidden rounded border border-gray-200 bg-gray-100"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={entry.url} alt="매핑 이미지" className="h-full w-full object-contain" />
-                          <button
-                            type="button"
-                            onClick={() => removeFromField(field.key, token)}
-                            disabled={busy}
-                            aria-label="매핑 해제"
-                            className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center bg-red-600/90 text-[10px] text-white hover:bg-red-700 disabled:opacity-50"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      );
+          {fieldGroups ? (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                {[{ label: '전체', value: null as string | null }, ...fieldGroups.map((g) => ({
+                  label: g.label,
+                  value: g.label as string | null,
+                }))].map((chip) => {
+                  const isActive = activeGroup === chip.value;
+                  return (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      onClick={() => setActiveGroup(chip.value)}
+                      className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+                        isActive
+                          ? 'border-blue-500 bg-blue-500 text-white'
+                          : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Fixed-height field area: cards scroll within, so switching chips never resizes the modal. */}
+              <div className="h-72 space-y-3 overflow-y-auto pr-1">
+                {(activeGroup == null
+                  ? fieldGroups
+                  : fieldGroups.filter((g) => g.label === activeGroup)
+                ).map((group) => (
+                  <div key={group.label} className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                      {group.label}
+                    </p>
+                    {group.keys.map((key) => {
+                      const field = fieldByKey.get(key);
+                      if (!field) return null;
+                      return renderFieldCard(field, `${group.label}:${key}`);
                     })}
                   </div>
-                )}
+                ))}
               </div>
-            );
-          })}
+            </>
+          ) : (
+            fields.map((field) => renderFieldCard(field, field.key))
+          )}
         </div>
       </div>
 

@@ -20,7 +20,12 @@ import type { Package } from '@/domain/entities/PackageEntity';
 import { BUILTIN_FIELD_KEYS, type TemplateField } from '@/domain/entities/ThumbnailEntity';
 import { SOURCE_ZONE } from '@/domain/entities/DetailTemplateEntity';
 import { MasterOptionEditor } from './MasterOptionEditor';
-import { MasterImagePool, type ImageField, type MasterImageBuffer } from './MasterImagePool';
+import {
+  MasterImagePool,
+  type ImageField,
+  type ImageFieldGroup,
+  type MasterImageBuffer,
+} from './MasterImagePool';
 
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
@@ -64,8 +69,13 @@ export function MasterProductFormModal({
   // Create mode: options are entered in the wizard and created atomically with the master.
   const [options, setOptions] = useState<MasterOptionRequest[]>([]);
 
-  // Image fields = cover photo (always first) + detail imageZones from the default template.
+  // Image fields = cover photo (always first) + the union of detail imageZones across ALL templates
+  // (a master's mapped image is reusable by whichever template a channel ends up resolving to).
   const [imageFields, setImageFields] = useState<ImageField[]>([]);
+  // Field cards grouped by template (cover photo first), so each zone shows its template membership.
+  const [imageFieldGroups, setImageFieldGroups] = useState<ImageFieldGroup[]>([]);
+  // Zones the default template requires (create-mode validation only — not the full union above).
+  const [requiredZoneKeys, setRequiredZoneKeys] = useState<string[]>([]);
 
   // Default carrier/box for the price engine (options may override individually).
   const [defaultDeliveryId, setDefaultDeliveryId] = useState<number | ''>(
@@ -160,23 +170,44 @@ export function MasterProductFormModal({
     [selectedIds, products],
   );
 
-  // Derive image fields = cover photo (always first) + default template imageZones.
-  // A template load failure just yields the cover-photo-only field set (non-blocking).
+  // Derive image fields = cover photo (always first) + the union of imageZone binds across ALL
+  // detail templates (deduped, first-seen order). Required zones (create validation) stay scoped to
+  // the default template. A template load failure yields the cover-photo-only set (non-blocking).
   useEffect(() => {
     let alive = true;
     (async () => {
       let zones: ImageField[] = [];
+      let required: string[] = [];
+      // Cover photo is a template-independent group, always first.
+      const groups: ImageFieldGroup[] = [{ label: '대표사진', keys: [SOURCE_ZONE] }];
       try {
         const templates = await detailUseCase.listTemplates();
-        const def = templates.find((t) => t.isDefault);
-        zones = (def?.blocks ?? [])
+        const seen = new Set<string>();
+        for (const t of templates) {
+          const zoneKeys = (t.blocks ?? [])
+            .filter((b) => b.type === 'imageZone' && b.bind)
+            .map((b) => b.bind as string);
+          if (zoneKeys.length > 0) {
+            groups.push({ label: t.name + (t.isDefault ? ' (기본)' : ''), keys: zoneKeys });
+          }
+          for (const key of zoneKeys) {
+            if (!seen.has(key)) {
+              seen.add(key);
+              zones.push({ key, label: key });
+            }
+          }
+        }
+        required = (templates.find((t) => t.isDefault)?.blocks ?? [])
           .filter((b) => b.type === 'imageZone' && b.bind)
-          .map((b) => ({ key: b.bind as string, label: b.bind as string }));
+          .map((b) => b.bind as string);
       } catch {
         zones = [];
+        required = [];
       }
       if (!alive) return;
       setImageFields([{ key: SOURCE_ZONE, label: '대표사진' }, ...zones]);
+      setImageFieldGroups(groups);
+      setRequiredZoneKeys(required);
     })();
     return () => {
       alive = false;
@@ -209,11 +240,10 @@ export function MasterProductFormModal({
           return;
         }
       }
-      // Every detail zone (non-source field) needs at least one mapped image.
-      for (const field of imageFields) {
-        if (field.key === SOURCE_ZONE) continue;
-        if (!(imageBuffer.assignments[field.key]?.length >= 1)) {
-          setError(`상세 이미지(${field.label})를 1장 이상 매핑하세요.`);
+      // Only the default template's zones are required; other templates' zones are optional.
+      for (const zoneKey of requiredZoneKeys) {
+        if (!(imageBuffer.assignments[zoneKey]?.length >= 1)) {
+          setError(`상세 이미지(${zoneKey})를 1장 이상 매핑하세요.`);
           return;
         }
       }
@@ -394,6 +424,7 @@ export function MasterProductFormModal({
               masterId={master?.id ?? null}
               detailUseCase={detailUseCase}
               fields={imageFields}
+              fieldGroups={imageFieldGroups}
               buffer={isEdit ? undefined : imageBuffer}
               onBufferChange={isEdit ? undefined : setImageBuffer}
             />
