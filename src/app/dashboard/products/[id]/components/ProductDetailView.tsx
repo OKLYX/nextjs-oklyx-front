@@ -4,18 +4,18 @@ import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
-import { ProductImageSection } from './ProductImageSection';
+import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
+import { ProductImageGallery } from './ProductImageGallery';
 import { ProductThumbnailSection } from './ProductThumbnailSection';
 import { StockCard } from './StockCard';
 
 interface ProductDetailViewProps {
   product: Product;
   onDelete: () => Promise<void>;
-  onImageUpload: (file: File) => Promise<void>;
-  onImageDelete: () => Promise<void>;
+  imageUseCase: ProductImageUseCase;
 }
 
-export function ProductDetailView({ product, onDelete, onImageUpload, onImageDelete }: ProductDetailViewProps) {
+export function ProductDetailView({ product, onDelete, imageUseCase }: ProductDetailViewProps) {
   const router = useRouter();
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -133,8 +133,8 @@ export function ProductDetailView({ product, onDelete, onImageUpload, onImageDel
       {/* Stock Card */}
       {product.barcodeId && <StockCard barcodeId={product.barcodeId} productName={product.productName} />}
 
-      {/* Image */}
-      <ProductImageSection imageUrl={product.imageUrl || null} productId={product.id} onUpload={onImageUpload} onDelete={onImageDelete} isViewMode={false} />
+      {/* Image gallery */}
+      <ProductImageGallery productId={product.id} useCase={imageUseCase} />
 
       {/* Per-seller generated thumbnails */}
       <ProductThumbnailSection

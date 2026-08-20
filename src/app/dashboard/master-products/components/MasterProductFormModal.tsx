@@ -9,6 +9,7 @@ import type { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCa
 import type { PackageUseCase } from '@/application/usecases/PackageUseCase';
 import type { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
+import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import type {
   MasterProductResponse,
   MasterOptionRequest,
@@ -37,6 +38,7 @@ interface MasterProductFormModalProps {
   packageUseCase: PackageUseCase;
   thumbnailTemplateUseCase: ThumbnailTemplateUseCase;
   detailUseCase: DetailContentUseCase;
+  productImageUseCase: ProductImageUseCase;
   onClose: () => void;
   onDataChanged: () => Promise<void> | void; // reload parent list
 }
@@ -54,6 +56,7 @@ export function MasterProductFormModal({
   packageUseCase,
   thumbnailTemplateUseCase,
   detailUseCase,
+  productImageUseCase,
   onClose,
   onDataChanged,
 }: MasterProductFormModalProps) {
@@ -160,6 +163,17 @@ export function MasterProductFormModal({
     [defaultDeliveryId, defaultPackageId],
   );
 
+  // BOM components → { id, name } for the reference-import picker (backend 40).
+  // Empty (no components selected) → import button stays hidden (graceful degrade).
+  const sourceProducts = useMemo(
+    () =>
+      selectedIds
+        .map((id) => products.find((p) => p.id === id))
+        .filter((p): p is Product => p != null)
+        .map((p) => ({ id: p.id, name: p.productName })),
+    [selectedIds, products],
+  );
+
   // Create mode: the option editor renders a quantity row per selected component.
   const createComponents = useMemo<MasterComponent[]>(
     () =>
@@ -241,8 +255,11 @@ export function MasterProductFormModal({
         }
       }
       // Only the default template's zones are required; other templates' zones are optional.
+      // A zone is satisfied by uploaded files OR mapped product-image references.
       for (const zoneKey of requiredZoneKeys) {
-        if (!(imageBuffer.assignments[zoneKey]?.length >= 1)) {
+        const fileCount = imageBuffer.assignments[zoneKey]?.length ?? 0;
+        const productCount = imageBuffer.productAssignments?.[zoneKey]?.length ?? 0;
+        if (fileCount + productCount < 1) {
           setError(`상세 이미지(${zoneKey})를 1장 이상 매핑하세요.`);
           return;
         }
@@ -275,10 +292,30 @@ export function MasterProductFormModal({
             const uploaded = await detailUseCase.uploadPoolImage(created.id, file);
             idByIndex.push(uploaded.id);
           }
-          for (const [fieldKey, idxs] of Object.entries(imageBuffer.assignments)) {
-            const ids = idxs
+          // Import product-image references (create pool entries) → map productImageId to pool id.
+          const poolIdByProductId = new Map<number, number>();
+          const productIds = [
+            ...new Set(Object.values(imageBuffer.productAssignments ?? {}).flat()),
+          ];
+          if (productIds.length > 0) {
+            const refs = await detailUseCase.importProductImages(created.id, productIds);
+            for (const r of refs) {
+              if (r.productImageId != null) poolIdByProductId.set(r.productImageId, r.id);
+            }
+          }
+          // Apply each field = uploaded file pool ids + imported product pool ids.
+          const fieldKeys = new Set([
+            ...Object.keys(imageBuffer.assignments),
+            ...Object.keys(imageBuffer.productAssignments ?? {}),
+          ]);
+          for (const fieldKey of fieldKeys) {
+            const fileIds = (imageBuffer.assignments[fieldKey] ?? [])
               .map((i) => idByIndex[i])
               .filter((v): v is number => v != null);
+            const productPoolIds = (imageBuffer.productAssignments?.[fieldKey] ?? [])
+              .map((id) => poolIdByProductId.get(id))
+              .filter((v): v is number => v != null);
+            const ids = [...fileIds, ...productPoolIds];
             if (fieldKey === SOURCE_ZONE) {
               await detailUseCase.setSourceImage(created.id, ids[0] ?? null);
             } else {
@@ -427,6 +464,8 @@ export function MasterProductFormModal({
               fieldGroups={imageFieldGroups}
               buffer={isEdit ? undefined : imageBuffer}
               onBufferChange={isEdit ? undefined : setImageBuffer}
+              productImageUseCase={productImageUseCase}
+              sourceProducts={sourceProducts}
             />
             <p className="mt-1 text-[11px] text-gray-500">
               업로드는 풀에 먼저 쌓이고, 풀 이미지를 필드로 드래그하거나 [선택]으로 매핑합니다. 한

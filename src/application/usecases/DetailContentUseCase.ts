@@ -47,4 +47,8 @@ export class DetailContentUseCase {
   setSourceImage(masterId: number, imageId: number | null): Promise<MasterPoolImage | void> {
     return this.repository.setSourceImage(masterId, imageId);
   }
+
+  importProductImages(masterId: number, productImageIds: number[]): Promise<MasterPoolImage[]> {
+    return this.repository.importProductImages(masterId, productImageIds);
+  }
 }

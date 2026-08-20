@@ -70,4 +70,14 @@ export class DetailContentRepositoryImpl implements DetailContentRepository {
     const response = await axiosInstance.put(`${masterBase}/${masterId}/source-image`, { imageId });
     return response.data?.data;
   }
+
+  async importProductImages(
+    masterId: number,
+    productImageIds: number[],
+  ): Promise<MasterPoolImage[]> {
+    const response = await axiosInstance.post(`${masterBase}/${masterId}/images/import`, {
+      productImageIds,
+    });
+    return response.data.data;
+  }
 }
