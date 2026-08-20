@@ -25,6 +25,8 @@ export interface DetailTemplateResponse {
   active: boolean;
   isDefault: boolean;
   blockCount?: number;
+  // Attached image-processing preset (FEATURE_2608_08). null = no compositing.
+  imageProcessingPresetId?: number | null;
 }
 
 // Create/update payload for the tenant-shared detail template (prompt 17).
@@ -33,6 +35,9 @@ export interface DetailTemplateRequest {
   blocks: DetailBlock[];
   active: boolean;
   isDefault: boolean;
+  // FEATURE_2608_08: attach a processing preset. Omit (undefined) = keep existing
+  // (backend PATCH treats null/absent as "keep"); no clear path in v1.
+  imageProcessingPresetId?: number;
 }
 
 export interface DetailPreviewResponse {

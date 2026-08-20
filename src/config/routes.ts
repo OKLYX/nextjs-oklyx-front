@@ -37,4 +37,7 @@ export const ROUTES = {
   DETAIL_TEMPLATES: '/dashboard/detail-templates' as const,
   DETAIL_TEMPLATE_NEW: '/dashboard/detail-templates/new' as const,
   DETAIL_TEMPLATE_EDIT: (id: number | string) => `/dashboard/detail-templates/${id}` as const,
+  PROCESSING_PRESETS: '/dashboard/processing-presets' as const,
+  PROCESSING_PRESET_NEW: '/dashboard/processing-presets/new' as const,
+  PROCESSING_PRESET_EDIT: (id: number | string) => `/dashboard/processing-presets/${id}` as const,
 } as const;
