@@ -52,6 +52,9 @@ export interface GeneratedProductResponse {
   // Per-channel field-value override (prompt 12). Empty {} -> reserved keys render
   // from the product value, custom keys from the template defaultValue.
   fieldValues: Record<string, string>;
+  // Channel raw tags (prompt 33). Filled by the same mapper on GET and PATCH; may be
+  // null when the cell is ungenerated, so treat as [] in the UI.
+  tags: string[];
   optionPrices: OptionPrice[];
 }
 
@@ -118,4 +121,10 @@ export interface PushSyncResponse {
 // Field-value override save (prompt 12)
 export interface FieldValuesUpdateRequest {
   fieldValues: Record<string, string>;
+}
+
+// Display-name (노출상품명) save (prompt 35). Backend responds ResponseDTO<Void>
+// (no body) — internal only, no market push; caller refetches the matrix.
+export interface DisplayNameUpdateRequest {
+  name: string;
 }

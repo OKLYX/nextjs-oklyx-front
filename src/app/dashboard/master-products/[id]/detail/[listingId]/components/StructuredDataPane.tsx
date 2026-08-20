@@ -8,7 +8,10 @@ import type { DetailTemplateResponse } from '@/domain/entities/DetailTemplateEnt
 import type { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import type { OnGenerated } from './DetailEditorTabs';
-import { ZoneImageManager } from './ZoneImageManager';
+import {
+  MasterImagePool,
+  type ImageField,
+} from '@/app/dashboard/master-products/components/MasterImagePool';
 
 interface StructuredDataPaneProps {
   masterId: number;
@@ -43,6 +46,11 @@ export function StructuredDataPane({
 
   const textDirty = JSON.stringify(draft) !== JSON.stringify(generated.fieldValues);
   const canSave = textDirty || zoneDirty;
+
+  // Detail zones only (no cover-photo field — that lives in the master form).
+  const zoneFields: ImageField[] = template.blocks
+    .filter((b) => b.type === 'imageZone' && b.bind)
+    .map((b) => ({ key: b.bind as string, label: b.bind as string }));
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -103,17 +111,8 @@ export function StructuredDataPane({
               </div>
             );
           }
-          if (block.type === 'imageZone' && block.bind) {
-            return (
-              <ZoneImageManager
-                key={`zone-${block.bind}-${idx}`}
-                masterId={masterId}
-                zoneId={block.bind}
-                detailUseCase={detailUseCase}
-                onDirty={() => setZoneDirty(true)}
-              />
-            );
-          }
+          // imageZone blocks render together in one MasterImagePool below.
+          if (block.type === 'imageZone') return null;
           if (block.type === 'asset' && block.src) {
             return (
               <div key={`asset-${idx}`}>
@@ -131,6 +130,20 @@ export function StructuredDataPane({
           }
           return null;
         })}
+
+        {zoneFields.length > 0 && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              상세페이지 이미지 (마스터 공유)
+            </label>
+            <MasterImagePool
+              masterId={masterId}
+              detailUseCase={detailUseCase}
+              fields={zoneFields}
+              onDirty={() => setZoneDirty(true)}
+            />
+          </div>
+        )}
       </div>
 
       <div className="border-t border-gray-100 pt-3">

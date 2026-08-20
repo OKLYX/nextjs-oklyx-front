@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
@@ -13,9 +13,17 @@ import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories
 import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
 import type { ListingMatrixResponse, MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
-import type { ListingStatus } from '@/domain/entities/ListingRegistrationEntity';
+import type { ListingStatus, GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
+import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
+import {
+  DetailHtmlThumb,
+  ChannelPreviewModal,
+  type ChannelPreviewData,
+} from '@/presentation/components/DetailHtmlPreview';
 import { MasterCategoryPanel } from './MasterCategoryPanel';
+import { MasterTagsPanel } from './MasterTagsPanel';
 import { CellActions } from './CellActions';
+import { DisplayNameRow } from './DisplayNameRow';
 
 interface CoverageMatrixProps {
   id: string;
@@ -52,6 +60,27 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Read-only preview gallery: per-channel generated assets (thumbnail image +
+  // detail-page HTML). undefined = still loading, null = fetch failed.
+  const [generated, setGenerated] = useState<Record<number, GeneratedProductResponse | null>>({});
+  const [genLoading, setGenLoading] = useState(false);
+  const [preview, setPreview] = useState<ChannelPreviewData | null>(null);
+
+  // Open the tabbed preview modal for a channel, on the given initial tab.
+  const openPreview = (
+    gen: GeneratedProductResponse | null,
+    sellerName: string,
+    platform: string,
+    initialTab: 'image' | 'detail',
+  ) => {
+    setPreview({
+      imageSrc: gen?.thumbnailUrl ? resolveThumbUrl(gen.thumbnailUrl) : null,
+      html: gen?.detailHtml ?? null,
+      title: `${sellerName} · ${platform}`,
+      initialTab,
+    });
+  };
+
   // Selection of unregistered channels, keyed by accountId.
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [isBatchAdding, setIsBatchAdding] = useState(false);
@@ -64,6 +93,28 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [isPropagating, setIsPropagating] = useState(false);
   const [banner, setBanner] = useState<{ text: string; tone: 'green' | 'amber' } | null>(null);
 
+  // Fetch per-channel generated assets (thumbnail + detail HTML) in one call each,
+  // N calls total, without blocking the table render. Each failure is absorbed as
+  // null so one bad channel never stalls the rest.
+  const fetchGenerated = useCallback(
+    async (m: ListingMatrixResponse) => {
+      const registered = m.rows.filter((r) => r.cell).map((r) => r.cell!.productListingId);
+      setGenLoading(true);
+      const entries = await Promise.all(
+        registered.map(async (lid) => {
+          try {
+            return [lid, await listingUseCase.getGenerated(lid)] as const;
+          } catch {
+            return [lid, null] as const;
+          }
+        }),
+      );
+      setGenerated(Object.fromEntries(entries));
+      setGenLoading(false);
+    },
+    [listingUseCase],
+  );
+
   const load = useCallback(async () => {
     setIsLoading(true);
     setError('');
@@ -75,12 +126,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       setMatrix(m);
       setOptions(master.options);
       setSelected(new Set());
+      void fetchGenerated(m); // fire-and-forget; table draws immediately, previews fill in after
     } catch {
       setError('커버리지 매트릭스를 불러오지 못했습니다.');
     } finally {
       setIsLoading(false);
     }
-  }, [masterUseCase, masterId]);
+  }, [masterUseCase, masterId, fetchGenerated]);
 
   useEffect(() => {
     void (async () => {
@@ -254,6 +306,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
+      {isAdmin && <MasterTagsPanel masterId={masterId} useCase={masterUseCase} />}
+
       {isAdmin && (
         <MasterCategoryPanel
           masterId={masterId}
@@ -288,6 +342,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     </label>
                   ) : null}
                 </th>
+                <th className="px-4 py-3">썸네일</th>
+                <th className="px-4 py-3">상세페이지</th>
                 <th className="px-4 py-3">판매자</th>
                 <th className="px-4 py-3">플랫폼</th>
                 <th className="px-4 py-3">계정</th>
@@ -304,8 +360,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     ? '등록됨'
                     : 'DRAFT';
                 return (
+                  <Fragment key={row.accountId}>
                   <tr
-                    key={row.accountId}
                     className="border-b border-gray-100 text-sm text-gray-900"
                   >
                     <td className="px-4 py-3">
@@ -317,6 +373,54 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           disabled={busy}
                         />
                       ) : null}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {(() => {
+                        if (!row.cell) return <span className="text-gray-400">–</span>;
+                        const gen = generated[row.cell.productListingId];
+                        if (gen === undefined) {
+                          return genLoading ? (
+                            <Spinner size={14} />
+                          ) : (
+                            <span className="text-gray-400">–</span>
+                          );
+                        }
+                        const url = gen?.thumbnailUrl;
+                        if (!url) return <span className="text-gray-400">–</span>;
+                        const resolved = resolveThumbUrl(url);
+                        return (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={resolved}
+                            alt={`${row.sellerName} 썸네일`}
+                            onClick={() => openPreview(gen, row.sellerName, row.platform, 'image')}
+                            className="h-24 w-24 cursor-pointer rounded border border-gray-200 object-contain hover:opacity-80"
+                          />
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {(() => {
+                        if (!row.cell) return <span className="text-gray-400">–</span>;
+                        const gen = generated[row.cell.productListingId];
+                        if (gen === undefined) {
+                          return genLoading ? (
+                            <Spinner size={14} />
+                          ) : (
+                            <span className="text-gray-400">–</span>
+                          );
+                        }
+                        const html = gen?.detailHtml;
+                        if (!html) return <span className="text-xs text-gray-400">미생성</span>;
+                        return (
+                          <DetailHtmlThumb
+                            html={html}
+                            width={96}
+                            height={96}
+                            onClick={() => openPreview(gen, row.sellerName, row.platform, 'detail')}
+                          />
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">{row.sellerName}</td>
                     <td className="px-4 py-3">{row.platform}</td>
@@ -364,12 +468,23 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       )}
                     </td>
                   </tr>
+                  {isAdmin && row.registered && row.cell && (
+                    <DisplayNameRow
+                      listingId={row.cell.productListingId}
+                      name={row.cell.name}
+                      tags={generated[row.cell.productListingId]?.tags ?? []}
+                      onSaved={load}
+                    />
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>
           </table>
         )}
       </div>
+
+      <ChannelPreviewModal data={preview} onClose={() => setPreview(null)} />
     </PageContainer>
   );
 }

@@ -8,11 +8,13 @@ import type {
   ListingSyncResponse,
   GeneratedProductResponse,
   FieldValuesUpdateRequest,
+  DisplayNameUpdateRequest,
   PropagateResponse,
   PendingSyncResponse,
   PushSyncRequest,
   PushSyncResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
+import type { TagsUpdateRequest } from '@/domain/entities/MasterProductEntity';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -30,6 +32,9 @@ export interface ListingRegistrationRepository {
   overrideThumbnail(listingId: number, file: File): Promise<GeneratedProductResponse>;
   clearThumbnail(listingId: number): Promise<GeneratedProductResponse>;
   updateFieldValues(listingId: number, data: FieldValuesUpdateRequest): Promise<GeneratedProductResponse>;
+  // Display name (35): internal-only PATCH, backend returns no body -> void.
+  updateDisplayName(listingId: number, data: DisplayNameUpdateRequest): Promise<void>;
+  updateTags(listingId: number, data: TagsUpdateRequest): Promise<GeneratedProductResponse>;
   propagate(masterId: number): Promise<PropagateResponse>;
   pendingSync(): Promise<PendingSyncResponse[]>;
   pushSync(data: PushSyncRequest): Promise<PushSyncResponse>;

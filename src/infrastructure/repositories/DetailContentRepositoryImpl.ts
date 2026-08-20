@@ -5,8 +5,7 @@ import type { DetailContentRepository } from '@/domain/repositories/DetailConten
 import type {
   DetailTemplateResponse,
   DetailTemplateRequest,
-  MasterProductImageResponse,
-  MasterImageReorderRequest,
+  MasterPoolImage,
 } from '@/domain/entities/DetailTemplateEntity';
 
 const templatesBase = '/api/admin/detail-templates';
@@ -37,34 +36,38 @@ export class DetailContentRepositoryImpl implements DetailContentRepository {
     await axiosInstance.delete(`${templatesBase}/${id}`);
   }
 
-  async listImages(masterId: number): Promise<MasterProductImageResponse[]> {
-    const response = await axiosInstance.get(`${masterBase}/${masterId}/images`);
-    return response.data.data;
-  }
-
-  async uploadImage(
-    masterId: number,
-    file: File,
-    zoneId: string,
-  ): Promise<MasterProductImageResponse> {
+  async uploadPoolImage(masterId: number, file: File): Promise<MasterPoolImage> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('zoneId', zoneId);
     const response = await axiosInstance.post(`${masterBase}/${masterId}/images`, formData, {
       headers: { 'Content-Type': undefined },
     });
     return response.data.data;
   }
 
-  async reorderImages(
-    masterId: number,
-    data: MasterImageReorderRequest,
-  ): Promise<MasterProductImageResponse[]> {
-    const response = await axiosInstance.put(`${masterBase}/${masterId}/images/reorder`, data);
+  async listPoolImages(masterId: number): Promise<MasterPoolImage[]> {
+    const response = await axiosInstance.get(`${masterBase}/${masterId}/images`);
     return response.data.data;
   }
 
-  async deleteImage(masterId: number, imageId: number): Promise<void> {
+  async deletePoolImage(masterId: number, imageId: number): Promise<void> {
     await axiosInstance.delete(`${masterBase}/${masterId}/images/${imageId}`);
+  }
+
+  async setZoneImages(
+    masterId: number,
+    zoneId: string,
+    imageIds: number[],
+  ): Promise<MasterPoolImage[]> {
+    const response = await axiosInstance.put(`${masterBase}/${masterId}/zones/${zoneId}/images`, {
+      imageIds,
+    });
+    return response.data.data;
+  }
+
+  async setSourceImage(masterId: number, imageId: number | null): Promise<MasterPoolImage | void> {
+    // imageId != null → 200 with the set cover image; null → 204 (cleared).
+    const response = await axiosInstance.put(`${masterBase}/${masterId}/source-image`, { imageId });
+    return response.data?.data;
   }
 }
