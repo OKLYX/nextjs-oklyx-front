@@ -6,7 +6,9 @@ import axios from 'axios';
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import { GetProductDetailUseCase } from '@/application/usecases/GetProductDetailUseCase';
 import { UpdateProductUseCase } from '@/application/usecases/UpdateProductUseCase';
+import { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
+import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
@@ -34,6 +36,11 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
 
   const updateUseCase = useMemo(
     () => new UpdateProductUseCase(new ProductRepositoryImpl()),
+    []
+  );
+
+  const imageUseCase = useMemo(
+    () => new ProductImageUseCase(new ProductImageRepositoryImpl()),
     []
   );
 
@@ -88,29 +95,6 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
     router.push(ROUTES.PRODUCT_DETAIL(id));
   }, [id, router]);
 
-  const handleImageUpload = useCallback(
-    async (file: File) => {
-      try {
-        const updated = await updateUseCase.uploadImage(id, file);
-        setProduct(updated);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to upload image';
-        setError(errorMessage);
-      }
-    },
-    [id, updateUseCase]
-  );
-
-  const handleImageDelete = useCallback(async () => {
-    try {
-      await updateUseCase.deleteImage(id);
-      fetchProduct();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete image';
-      setError(errorMessage);
-    }
-  }, [id, updateUseCase, fetchProduct]);
-
   const handleCheckBarcode = useCallback(
     async (barcodeId: string) => {
       try {
@@ -153,8 +137,7 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
         onSave={handleSave}
         onCancel={handleCancel}
         onCheckBarcode={handleCheckBarcode}
-        onImageUpload={handleImageUpload}
-        onImageDelete={handleImageDelete}
+        imageUseCase={imageUseCase}
       />
     );
   }
@@ -163,8 +146,7 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
     <ProductDetailView
       product={product}
       onDelete={handleDelete}
-      onImageUpload={handleImageUpload}
-      onImageDelete={handleImageDelete}
+      imageUseCase={imageUseCase}
     />
   );
 }

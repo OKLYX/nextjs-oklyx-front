@@ -20,4 +20,6 @@ export interface DetailContentRepository {
   // Field mapping (idempotent replace).
   setZoneImages(masterId: number, zoneId: string, imageIds: number[]): Promise<MasterPoolImage[]>;
   setSourceImage(masterId: number, imageId: number | null): Promise<MasterPoolImage | void>;
+  // Import product gallery image slots into the pool as live-linked reference entries (backend 40).
+  importProductImages(masterId: number, productImageIds: number[]): Promise<MasterPoolImage[]>;
 }

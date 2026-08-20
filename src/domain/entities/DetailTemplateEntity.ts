@@ -60,6 +60,9 @@ export interface MasterPoolImage {
   sortOrder: number;
   assignedZones: string[];
   isSource: boolean;
+  // Linked product image slot id when this is a reference entry (backend 40);
+  // null for an edited (master-owned) entry.
+  productImageId?: number | null;
 }
 
 // Idempotent replace: `imageIds` = the full ordered set mapped to a zone

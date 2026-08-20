@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { CreateProductUseCase } from '@/application/usecases/CreateProductUseCase';
+import { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
+import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 import { ROUTES } from '@/config/routes';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
@@ -16,8 +18,7 @@ export function ProductRegistrationContainer() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [imageBuffer, setImageBuffer] = useState<File[]>([]);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const useCase = useMemo(
@@ -25,10 +26,10 @@ export function ProductRegistrationContainer() {
     []
   );
 
-  const handleImageChange = useCallback((file: File | null, previewUrl: string | null) => {
-    setImageFile(file);
-    setImagePreviewUrl(previewUrl);
-  }, []);
+  const imageUseCase = useMemo(
+    () => new ProductImageUseCase(new ProductImageRepositoryImpl()),
+    []
+  );
 
   const handleCheckBarcode = useCallback(async (barcodeId: string): Promise<boolean> => {
     try {
@@ -46,11 +47,13 @@ export function ProductRegistrationContainer() {
       try {
         const product = await useCase.createProduct(data);
 
-        if (imageFile) {
+        if (imageBuffer.length > 0) {
           try {
-            await useCase.uploadImage(product.id, imageFile);
+            // Backend `add` takes all files in one POST → no Promise.all needed.
+            await imageUseCase.add(product.id, imageBuffer);
           } catch {
-            // Image upload failure is non-critical, product is already created
+            // Product is already created; surface a non-blocking image warning.
+            setError('상품은 등록되었으나 이미지 일부 업로드에 실패했습니다.');
           }
         }
 
@@ -74,12 +77,11 @@ export function ProductRegistrationContainer() {
         setIsLoading(false);
       }
     },
-    [useCase, imageFile, router]
+    [useCase, imageUseCase, imageBuffer, router]
   );
 
   const handleSubmitSuccess = useCallback(() => {
-    setImageFile(null);
-    setImagePreviewUrl(null);
+    setImageBuffer([]);
   }, []);
 
   const handleGoToList = useCallback(() => {
@@ -88,8 +90,7 @@ export function ProductRegistrationContainer() {
 
   const handleRegisterAnother = useCallback(() => {
     setShowSuccessDialog(false);
-    setImageFile(null);
-    setImagePreviewUrl(null);
+    setImageBuffer([]);
     setError(null);
   }, []);
 
@@ -118,9 +119,9 @@ export function ProductRegistrationContainer() {
       <ProductRegistrationForm
         onSubmit={handleSubmit}
         isLoading={isLoading}
-        imageFile={imageFile}
-        imagePreviewUrl={imagePreviewUrl}
-        onImageChange={handleImageChange}
+        imageUseCase={imageUseCase}
+        imageBuffer={imageBuffer}
+        onImageBufferChange={setImageBuffer}
         onCheckBarcode={handleCheckBarcode}
         onSubmitSuccess={handleSubmitSuccess}
       />

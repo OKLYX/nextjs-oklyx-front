@@ -4,7 +4,8 @@ import { useCallback, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import type { Product } from '@/domain/entities/Product';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
-import { ProductImageSection } from './ProductImageSection';
+import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
+import { ProductImageGallery } from './ProductImageGallery';
 
 interface ProductEditFormValues {
   productName: string;
@@ -25,8 +26,7 @@ interface ProductEditFormProps {
   onSave: (data: UpdateProductRequest) => Promise<void>;
   onCancel: () => void;
   onCheckBarcode: (barcodeId: string) => Promise<boolean>;
-  onImageUpload: (file: File) => Promise<void>;
-  onImageDelete: () => Promise<void>;
+  imageUseCase: ProductImageUseCase;
 }
 
 export function ProductEditForm({
@@ -34,13 +34,11 @@ export function ProductEditForm({
   onSave,
   onCancel,
   onCheckBarcode,
-  onImageUpload,
-  onImageDelete,
+  imageUseCase,
 }: ProductEditFormProps) {
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const [isCheckingBarcode, setIsCheckingBarcode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [productImage, setProductImage] = useState<string | null>(product.imageUrl || null);
 
   const {
     register,
@@ -305,19 +303,7 @@ export function ProductEditForm({
         </button>
       </div>
 
-      <ProductImageSection
-        imageUrl={productImage}
-        productId={product.id}
-        onUpload={async file => {
-          await onImageUpload(file);
-          setProductImage(URL.createObjectURL(file));
-        }}
-        onDelete={async () => {
-          await onImageDelete();
-          setProductImage(null);
-        }}
-        isViewMode={false}
-      />
+      <ProductImageGallery productId={product.id} useCase={imageUseCase} />
     </form>
   );
 }
