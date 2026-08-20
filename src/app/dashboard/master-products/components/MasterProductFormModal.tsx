@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { TagChipsInput } from '@/presentation/components/TagChipsInput';
+import { getImageUrl } from '@/infrastructure/utils/imageUrl';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import type { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import type { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
@@ -107,6 +108,8 @@ export function MasterProductFormModal({
   const [productFilter, setProductFilter] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Component-product detail popup (data already loaded — no extra fetch).
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -152,6 +155,27 @@ export function MasterProductFormModal({
     if (!q) return products;
     return products.filter((p) => (p.productName ?? '').toLowerCase().includes(q));
   }, [products, productFilter]);
+
+  // Edit mode: the locked BOM as full product rows (thumbnail/name/brand/price).
+  const selectedProducts = useMemo(
+    () =>
+      selectedIds
+        .map((id) => products.find((p) => p.id === id))
+        .filter((p): p is Product => p != null),
+    [selectedIds, products],
+  );
+
+  const renderThumb = (p: Product) => {
+    const src = getImageUrl(p.imageUrl, p.id);
+    return src ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={p.productName} className="h-10 w-10 rounded border border-gray-200 object-cover" />
+    ) : (
+      <div className="flex h-10 w-10 items-center justify-center rounded border border-gray-200 bg-gray-100 text-[10px] text-gray-400">
+        없음
+      </div>
+    );
+  };
 
   // Master defaults feed the option editor's carrier/box prefill (SSOT = this form's state,
   // so changing a default here updates option prefill live).
@@ -387,31 +411,111 @@ export function MasterProductFormModal({
             <label className="mb-1 block text-xs font-medium text-gray-600">
               구성상품 세트 ({selectedIds.length}개 선택)
             </label>
-            <input
-              className="mb-2 w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-              placeholder="상품명 검색"
-              value={productFilter}
-              onChange={(e) => setProductFilter(e.target.value)}
-            />
-            <div className="max-h-48 overflow-y-auto rounded border border-gray-200">
-              {filteredProducts.length === 0 ? (
-                <p className="px-3 py-2 text-sm text-gray-500">상품이 없습니다.</p>
-              ) : (
-                filteredProducts.map((p) => (
-                  <label
-                    key={p.id}
-                    className="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-3 py-1.5 text-sm text-gray-900 last:border-0 hover:bg-gray-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(p.id)}
-                      onChange={() => toggleProduct(p.id)}
-                    />
-                    <span>{p.productName}</span>
-                  </label>
-                ))
-              )}
-            </div>
+            {isEdit ? (
+              // Composition is locked after creation: show the current set read-only
+              // (no search, no add/remove) so the BOM stays fixed.
+              <>
+                <div className="max-h-64 overflow-y-auto rounded border border-gray-200 bg-gray-50">
+                  {selectedProducts.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-gray-500">구성상품이 없습니다.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100 text-xs text-gray-500">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-medium">이미지</th>
+                          <th className="px-2 py-1.5 text-left font-medium">제품명</th>
+                          <th className="px-2 py-1.5 text-left font-medium">브랜드</th>
+                          <th className="px-2 py-1.5 text-right font-medium">가격</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedProducts.map((p) => (
+                          <tr
+                            key={p.id}
+                            className="cursor-pointer border-t border-gray-200 hover:bg-gray-100"
+                            onClick={() => setDetailProduct(p)}
+                          >
+                            <td className="px-2 py-1.5">{renderThumb(p)}</td>
+                            <td className="px-2 py-1.5 text-gray-900">{p.productName}</td>
+                            <td className="px-2 py-1.5 text-gray-600">{p.brand || '—'}</td>
+                            <td className="px-2 py-1.5 text-right text-gray-900">
+                              {formatWon(p.price)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  생성 후에는 구성상품을 추가하거나 뺄 수 없습니다(고정).
+                </p>
+              </>
+            ) : (
+              <>
+                <input
+                  className="mb-2 w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                  placeholder="상품명 검색"
+                  value={productFilter}
+                  onChange={(e) => setProductFilter(e.target.value)}
+                />
+                <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
+                  {filteredProducts.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-gray-500">상품이 없습니다.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-gray-100 text-xs text-gray-500">
+                        <tr>
+                          <th className="w-8 px-2 py-1.5"></th>
+                          <th className="px-2 py-1.5 text-left font-medium">이미지</th>
+                          <th className="px-2 py-1.5 text-left font-medium">제품명</th>
+                          <th className="px-2 py-1.5 text-left font-medium">브랜드</th>
+                          <th className="px-2 py-1.5 text-right font-medium">가격</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredProducts.map((p) => (
+                          <tr
+                            key={p.id}
+                            className="cursor-pointer border-t border-gray-100 hover:bg-gray-50"
+                            onClick={() => toggleProduct(p.id)}
+                          >
+                            <td className="px-2 py-1.5">
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.includes(p.id)}
+                                onChange={() => toggleProduct(p.id)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </td>
+                            <td className="px-2 py-1.5">{renderThumb(p)}</td>
+                            <td className="px-2 py-1.5 text-gray-900">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDetailProduct(p);
+                                }}
+                                className="text-left text-blue-600 hover:underline"
+                              >
+                                {p.productName}
+                              </button>
+                            </td>
+                            <td className="px-2 py-1.5 text-gray-600">{p.brand || '—'}</td>
+                            <td className="px-2 py-1.5 text-right text-gray-900">
+                              {formatWon(p.price)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  제품명을 클릭하면 상세 정보를 볼 수 있습니다.
+                </p>
+              </>
+            )}
           </div>
 
           {fields.length > 0 && (
@@ -562,6 +666,92 @@ export function MasterProductFormModal({
           )}
         </div>
       </div>
+
+      {detailProduct && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setDetailProduct(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900">상품 상세</h3>
+              <button
+                type="button"
+                onClick={() => setDetailProduct(null)}
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex gap-4">
+              <div className="shrink-0">
+                {(() => {
+                  const src = getImageUrl(detailProduct.imageUrl, detailProduct.id);
+                  return src ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={src}
+                      alt={detailProduct.productName}
+                      className="h-24 w-24 rounded border border-gray-200 object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-24 w-24 items-center justify-center rounded border border-gray-200 bg-gray-100 text-xs text-gray-400">
+                      이미지 없음
+                    </div>
+                  );
+                })()}
+              </div>
+              <dl className="flex-1 space-y-1.5 text-sm">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-gray-500">제품명</dt>
+                  <dd className="text-right text-gray-900">{detailProduct.productName}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-gray-500">브랜드</dt>
+                  <dd className="text-right text-gray-900">{detailProduct.brand || '—'}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-gray-500">가격</dt>
+                  <dd className="text-right text-gray-900">{formatWon(detailProduct.price)}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-gray-500">스토어</dt>
+                  <dd className="text-right text-gray-900">{detailProduct.store || '—'}</dd>
+                </div>
+                {detailProduct.barcodeId && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-gray-500">바코드</dt>
+                    <dd className="text-right text-gray-900">{detailProduct.barcodeId}</dd>
+                  </div>
+                )}
+                {detailProduct.unit && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-gray-500">단위</dt>
+                    <dd className="text-right text-gray-900">{detailProduct.unit}</dd>
+                  </div>
+                )}
+                {detailProduct.weight && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-gray-500">무게</dt>
+                    <dd className="text-right text-gray-900">{detailProduct.weight}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+            {detailProduct.description && (
+              <div className="mt-4 border-t border-gray-200 pt-3">
+                <p className="mb-1 text-xs font-medium text-gray-500">설명</p>
+                <p className="whitespace-pre-wrap text-sm text-gray-700">
+                  {detailProduct.description}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
