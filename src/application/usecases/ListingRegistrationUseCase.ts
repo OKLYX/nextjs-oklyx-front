@@ -14,6 +14,8 @@ import type {
   PendingSyncResponse,
   PushSyncRequest,
   PushSyncResponse,
+  ListingOptionsResponse,
+  ActiveOptionsRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type { TagsUpdateRequest } from '@/domain/entities/MasterProductEntity';
 import type {
@@ -102,5 +104,13 @@ export class ListingRegistrationUseCase {
 
   getResolvedDetailTemplate(listingId: number): Promise<DetailTemplateResponse> {
     return this.repository.getResolvedDetailTemplate(listingId);
+  }
+
+  getListingOptions(listingId: number): Promise<ListingOptionsResponse> {
+    return this.repository.getListingOptions(listingId);
+  }
+
+  setActiveOptions(listingId: number, data: ActiveOptionsRequest): Promise<ListingOptionsResponse> {
+    return this.repository.setActiveOptions(listingId, data);
   }
 }

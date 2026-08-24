@@ -17,6 +17,8 @@ import type {
   PendingSyncResponse,
   PushSyncRequest,
   PushSyncResponse,
+  ListingOptionsResponse,
+  ActiveOptionsRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type { TagsUpdateRequest } from '@/domain/entities/MasterProductEntity';
 import type {
@@ -134,6 +136,19 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async getResolvedDetailTemplate(listingId: number): Promise<DetailTemplateResponse> {
     const response = await axiosInstance.get(`${listingBase}/${listingId}/detail-template`);
+    return response.data.data;
+  }
+
+  async getListingOptions(listingId: number): Promise<ListingOptionsResponse> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/options`);
+    return response.data.data;
+  }
+
+  async setActiveOptions(
+    listingId: number,
+    data: ActiveOptionsRequest,
+  ): Promise<ListingOptionsResponse> {
+    const response = await axiosInstance.put(`${listingBase}/${listingId}/options/active`, data);
     return response.data.data;
   }
 }

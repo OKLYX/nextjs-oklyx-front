@@ -13,6 +13,8 @@ import type {
   PendingSyncResponse,
   PushSyncRequest,
   PushSyncResponse,
+  ListingOptionsResponse,
+  ActiveOptionsRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type { TagsUpdateRequest } from '@/domain/entities/MasterProductEntity';
 import type {
@@ -48,4 +50,8 @@ export interface ListingRegistrationRepository {
   // Detail-page (prompt 30): resolve the template actually applied to this cell
   // (account-assigned ?? tenant default) so upload zones match the generator.
   getResolvedDetailTemplate(listingId: number): Promise<DetailTemplateResponse>;
+  // Per-channel option activation (prompt 42/43): read the full option set (with
+  // active flags) and save the active subset. Only active options are market-pushed.
+  getListingOptions(listingId: number): Promise<ListingOptionsResponse>;
+  setActiveOptions(listingId: number, data: ActiveOptionsRequest): Promise<ListingOptionsResponse>;
 }
