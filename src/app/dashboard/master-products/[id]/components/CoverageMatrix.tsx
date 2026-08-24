@@ -93,6 +93,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [isPropagating, setIsPropagating] = useState(false);
   const [banner, setBanner] = useState<{ text: string; tone: 'green' | 'amber' } | null>(null);
 
+  // Per-channel option activation (43): the listing id currently saving an active-set change.
+  const [optionBusyId, setOptionBusyId] = useState<number | null>(null);
+
   // Fetch per-channel generated assets (thumbnail + detail HTML) in one call each,
   // N calls total, without blocking the table render. Each failure is absorbed as
   // null so one bad channel never stalls the rest.
@@ -226,6 +229,52 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       setBanner({ text: '전파에 실패했습니다.', tone: 'amber' });
     } finally {
       setIsPropagating(false);
+    }
+  };
+
+  // Toggle one option's per-channel active flag inline (43). Sends the full active set (backend
+  // requires ≥1 active). On success we patch just this cell's optionPrices in place — no full
+  // reload — so the row doesn't flash. needsResync (already-pushed cell) shows the re-register hint.
+  const handleToggleOption = async (listingId: number, optionId: number) => {
+    const prices = generated[listingId]?.optionPrices ?? [];
+    const currentActive = prices.filter((p) => p.active !== false).map((p) => p.optionId);
+    const isActive = currentActive.includes(optionId);
+    if (isActive && currentActive.length === 1) {
+      setError('최소 1개 옵션은 활성 상태여야 합니다.');
+      return;
+    }
+    const nextActive = isActive
+      ? currentActive.filter((id) => id !== optionId)
+      : [...currentActive, optionId];
+    setOptionBusyId(listingId);
+    setError('');
+    try {
+      const res = await listingUseCase.setActiveOptions(listingId, { activeOptionIds: nextActive });
+      const activeById = new Map(res.options.map((o) => [o.optionId, o.active]));
+      setGenerated((prev) => {
+        const gen = prev[listingId];
+        if (!gen) return prev;
+        return {
+          ...prev,
+          [listingId]: {
+            ...gen,
+            optionPrices: gen.optionPrices.map((p) => ({
+              ...p,
+              active: activeById.get(p.optionId) ?? p.active,
+            })),
+          },
+        };
+      });
+      if (res.needsResync) {
+        setBanner({
+          text: '활성 옵션이 변경되었습니다. 마켓에 반영하려면 해당 채널의 [재생성]/[마켓 등록]으로 재등록하세요.',
+          tone: 'amber',
+        });
+      }
+    } catch {
+      setError('옵션 활성 상태 변경에 실패했습니다.');
+    } finally {
+      setOptionBusyId(null);
     }
   };
 
@@ -439,7 +488,55 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {row.cell?.sellingPrice != null ? formatWon(row.cell.sellingPrice) : '–'}
+                      {(() => {
+                        if (!row.cell) return <span className="text-gray-400">–</span>;
+                        // Prefer per-option prices (a master can have many options with
+                        // distinct prices); fall back to the single representative price.
+                        const prices = generated[row.cell.productListingId]?.optionPrices ?? [];
+                        if (prices.length === 0) {
+                          return row.cell.sellingPrice != null ? (
+                            formatWon(row.cell.sellingPrice)
+                          ) : (
+                            <span className="text-gray-400">–</span>
+                          );
+                        }
+                        // Inline per-option active toggle (43): checkbox = market inclusion, unchecked =
+                        // greyed. Non-admins see a plain read-only list (no checkbox).
+                        const listingId = row.cell.productListingId;
+                        return (
+                          <div className="space-y-0.5">
+                            {prices.map((p) => {
+                              const active = p.active !== false;
+                              const name = options.find((o) => o.id === p.optionId)?.name
+                                ?? `옵션 #${p.optionId}`;
+                              const label = (
+                                <span className={active ? '' : 'text-gray-400'}>
+                                  <span className={active ? 'text-gray-500' : ''}>{name}: </span>
+                                  {formatWon(p.sellingPrice)}
+                                </span>
+                              );
+                              return isAdmin ? (
+                                <label
+                                  key={p.optionId}
+                                  className="flex items-center gap-1.5 whitespace-nowrap text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={active}
+                                    disabled={optionBusyId === listingId}
+                                    onChange={() => handleToggleOption(listingId, p.optionId)}
+                                  />
+                                  {label}
+                                </label>
+                              ) : (
+                                <div key={p.optionId} className="whitespace-nowrap text-xs">
+                                  {label}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       {!isAdmin ? (

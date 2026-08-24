@@ -37,6 +37,9 @@ export interface BatchChannelAddResponse {
 export interface OptionPrice {
   optionId: number;
   sellingPrice: number;
+  // Per-channel active flag (42/43): only active options are pushed to the market.
+  // Toggled inline in the matrix price column; undefined (legacy) is treated as active.
+  active?: boolean;
 }
 
 // Auto-generated (or overridden) product assets for one channel/listing.
@@ -127,4 +130,28 @@ export interface FieldValuesUpdateRequest {
 // (no body) — internal only, no market push; caller refetches the matrix.
 export interface DisplayNameUpdateRequest {
   name: string;
+}
+
+// Per-channel option activation (prompt 42/43). A channel cell copies the master's
+// full option set; each option is toggled active/inactive per channel, and only the
+// active subset is pushed to the market on register/regenerate.
+export interface ListingOptionSummary {
+  optionId: number;
+  optionName: string;
+  sellingPrice: number;
+  active: boolean;
+  approvalStatus: ApprovalStatus; // DRAFT (unpushed) cells come back NOT_APPROVED.
+}
+
+export interface ListingOptionsResponse {
+  productListingId: number;
+  status: ListingStatus;
+  options: ListingOptionSummary[];
+  // PUT response only: true when the active set changed on an already-pushed cell
+  // (SUBMITTED/SELLING) -> a re-register is needed to reflect it on the market.
+  needsResync?: boolean;
+}
+
+export interface ActiveOptionsRequest {
+  activeOptionIds: number[];
 }
