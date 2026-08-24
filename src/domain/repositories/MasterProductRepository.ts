@@ -6,6 +6,8 @@ import type {
   MasterOptionResponse,
   MasterCategoryRequest,
   MasterCategoryResponse,
+  CategoryMetaResponse,
+  CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
@@ -24,5 +26,7 @@ export interface MasterProductRepository {
   getCategory(id: number): Promise<MasterCategoryResponse | null>;
   setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
   clearCategory(id: number): Promise<void>;
+  getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse>;
+  setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
 }

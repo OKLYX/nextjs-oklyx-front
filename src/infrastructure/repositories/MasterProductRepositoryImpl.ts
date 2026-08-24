@@ -10,6 +10,8 @@ import type {
   MasterOptionResponse,
   MasterCategoryRequest,
   MasterCategoryResponse,
+  CategoryMetaResponse,
+  CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
@@ -83,6 +85,15 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
 
   async clearCategory(id: number): Promise<void> {
     await axiosInstance.delete(`${base}/${id}/category`);
+  }
+
+  async getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse> {
+    const response = await axiosInstance.get(`${base}/${id}/category-meta`, { params: { platform } });
+    return response.data.data;
+  }
+
+  async setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void> {
+    await axiosInstance.patch(`${base}/${id}/category-attributes`, data);
   }
 
   async updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {

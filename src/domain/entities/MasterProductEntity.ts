@@ -84,6 +84,38 @@ export interface MasterCategoryRequest {
   categoryId: number;
 }
 
+// Category required-attributes / product-info notices (backend 47). Schema is
+// per (platform × category) and may be empty (empty = skip the input step).
+export interface CategoryAttribute {
+  name: string;
+  required: boolean;
+  inputType: 'TEXT' | 'SELECT' | 'NUMBER';
+  options: string[]; // SELECT candidates; empty for TEXT/NUMBER
+}
+
+export interface CategoryNotice {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
+export interface CategoryMetaValues {
+  attributes: Record<string, string>; // name -> current master value
+  notices: Record<string, string>; // key -> current master value
+}
+
+export interface CategoryMetaResponse {
+  attributes: CategoryAttribute[];
+  notices: CategoryNotice[];
+  values: CategoryMetaValues;
+}
+
+// PATCH body: raw useState maps sent as-is (NUMBER values also travel as strings).
+export interface CategoryAttributesRequest {
+  attributes: Record<string, string>;
+  notices: Record<string, string>;
+}
+
 // Coverage matrix (accounts × listings)
 export interface MatrixCell {
   productListingId: number;

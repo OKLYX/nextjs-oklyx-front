@@ -7,6 +7,8 @@ import type {
   MasterOptionResponse,
   MasterCategoryRequest,
   MasterCategoryResponse,
+  CategoryMetaResponse,
+  CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
@@ -64,6 +66,14 @@ export class MasterProductUseCase {
 
   clearCategory(id: number): Promise<void> {
     return this.repository.clearCategory(id);
+  }
+
+  getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse> {
+    return this.repository.getCategoryMeta(id, platform);
+  }
+
+  setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void> {
+    return this.repository.setCategoryAttributes(id, data);
   }
 
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {
