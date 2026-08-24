@@ -12,6 +12,10 @@ import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegist
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
+import { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUseCase';
+import { CategoryMappingRepositoryImpl } from '@/infrastructure/repositories/CategoryMappingRepositoryImpl';
+import { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
+import { CategoryLookupRepositoryImpl } from '@/infrastructure/repositories/CategoryLookupRepositoryImpl';
 import type { ListingMatrixResponse, MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type { ListingStatus, GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
@@ -54,6 +58,14 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     [],
   );
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
+  const mappingUseCase = useMemo(
+    () => new CategoryMappingUseCase(new CategoryMappingRepositoryImpl()),
+    [],
+  );
+  const lookupUseCase = useMemo(
+    () => new CategoryLookupUseCase(new CategoryLookupRepositoryImpl()),
+    [],
+  );
 
   const [matrix, setMatrix] = useState<ListingMatrixResponse | null>(null);
   const [options, setOptions] = useState<MasterOptionResponse[]>([]);
@@ -203,7 +215,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       const err = e as { response?: { status?: number; data?: { message?: string } } };
       if (err?.response?.status === 400) {
         setError(
-          '이 플랫폼의 카테고리가 마스터에 설정되지 않았습니다. 위 ‘플랫폼별 카테고리’에서 먼저 지정하세요.'
+          '표준 카테고리가 마스터에 설정되지 않았거나 이 플랫폼 매핑이 없습니다. 위 ‘표준 카테고리’에서 먼저 지정하세요.'
             + (err.response.data?.message ? ` (${err.response.data.message})` : ''),
         );
       } else {
@@ -362,6 +374,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           masterId={masterId}
           useCase={masterUseCase}
           categoryUseCase={categoryUseCase}
+          mappingUseCase={mappingUseCase}
+          lookupUseCase={lookupUseCase}
         />
       )}
 

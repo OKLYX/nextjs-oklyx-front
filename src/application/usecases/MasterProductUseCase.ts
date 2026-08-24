@@ -54,16 +54,16 @@ export class MasterProductUseCase {
     return this.repository.getMatrix(id);
   }
 
-  upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
-    return this.repository.upsertCategory(id, data);
+  getCategory(id: number): Promise<MasterCategoryResponse | null> {
+    return this.repository.getCategory(id);
   }
 
-  getCategories(id: number): Promise<MasterCategoryResponse[]> {
-    return this.repository.getCategories(id);
+  setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
+    return this.repository.setCategory(id, data);
   }
 
-  deleteCategory(id: number, platform: string): Promise<void> {
-    return this.repository.deleteCategory(id, platform);
+  clearCategory(id: number): Promise<void> {
+    return this.repository.clearCategory(id);
   }
 
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {

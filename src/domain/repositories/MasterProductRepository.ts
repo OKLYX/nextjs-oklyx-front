@@ -21,8 +21,8 @@ export interface MasterProductRepository {
   updateOption(id: number, optionId: number, data: MasterOptionRequest): Promise<MasterOptionResponse>;
   deleteOption(id: number, optionId: number): Promise<void>;
   getMatrix(id: number): Promise<ListingMatrixResponse>;
-  upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
-  getCategories(id: number): Promise<MasterCategoryResponse[]>;
-  deleteCategory(id: number, platform: string): Promise<void>;
+  getCategory(id: number): Promise<MasterCategoryResponse | null>;
+  setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
+  clearCategory(id: number): Promise<void>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
 }

@@ -69,18 +69,20 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
     return response.data.data;
   }
 
-  async upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
+  async getCategory(id: number): Promise<MasterCategoryResponse | null> {
+    const response = await axiosInstance.get(`${base}/${id}/category`);
+    const data = response.data.data;
+    // Backend returns { categoryId: null, categoryName: null } when unset.
+    return data && data.categoryId != null ? data : null;
+  }
+
+  async setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
     const response = await axiosInstance.put(`${base}/${id}/category`, data);
     return response.data.data;
   }
 
-  async getCategories(id: number): Promise<MasterCategoryResponse[]> {
-    const response = await axiosInstance.get(`${base}/${id}/categories`);
-    return response.data.data;
-  }
-
-  async deleteCategory(id: number, platform: string): Promise<void> {
-    await axiosInstance.delete(`${base}/${id}/categories/${platform}`);
+  async clearCategory(id: number): Promise<void> {
+    await axiosInstance.delete(`${base}/${id}/category`);
   }
 
   async updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {

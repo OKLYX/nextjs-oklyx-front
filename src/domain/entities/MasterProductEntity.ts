@@ -72,15 +72,15 @@ export interface MasterOptionRequest {
   packageId?: number;
 }
 
-// Master category (master × platform); backend 13.
+// Master standard category (single, backend 44). The per-platform market code is
+// resolved from CategoryMapping, not stored here. Repo normalizes the "unset" case
+// (backend returns null fields) to a null object.
 export interface MasterCategoryResponse {
-  platform: string;
   categoryId: number;
   categoryName: string;
 }
 
 export interface MasterCategoryRequest {
-  platform: string;
   categoryId: number;
 }
 
