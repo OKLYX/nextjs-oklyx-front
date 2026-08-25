@@ -21,6 +21,8 @@ import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCas
 import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
 import { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
+import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
+import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import { MasterProductFormModal } from './MasterProductFormModal';
 
@@ -49,6 +51,7 @@ export function MasterProductList() {
     () => new ProductImageUseCase(new ProductImageRepositoryImpl()),
     [],
   );
+  const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
 
   const [masters, setMasters] = useState<MasterProductResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -234,6 +237,7 @@ export function MasterProductList() {
           thumbnailTemplateUseCase={thumbnailTemplateUseCase}
           detailUseCase={detailUseCase}
           productImageUseCase={productImageUseCase}
+          categoryUseCase={categoryUseCase}
           onClose={() => setModalOpen(false)}
           onDataChanged={load}
         />

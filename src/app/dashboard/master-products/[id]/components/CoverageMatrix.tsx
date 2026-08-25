@@ -14,8 +14,6 @@ import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
 import { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUseCase';
 import { CategoryMappingRepositoryImpl } from '@/infrastructure/repositories/CategoryMappingRepositoryImpl';
-import { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
-import { CategoryLookupRepositoryImpl } from '@/infrastructure/repositories/CategoryLookupRepositoryImpl';
 import type { ListingMatrixResponse, MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type { ListingStatus, GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
@@ -60,10 +58,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
   const mappingUseCase = useMemo(
     () => new CategoryMappingUseCase(new CategoryMappingRepositoryImpl()),
-    [],
-  );
-  const lookupUseCase = useMemo(
-    () => new CategoryLookupUseCase(new CategoryLookupRepositoryImpl()),
     [],
   );
 
@@ -375,7 +369,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           useCase={masterUseCase}
           categoryUseCase={categoryUseCase}
           mappingUseCase={mappingUseCase}
-          lookupUseCase={lookupUseCase}
         />
       )}
 

@@ -5,14 +5,13 @@ import Link from 'next/link';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ROUTES } from '@/config/routes';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
-import { CategoryLookupPickerModal } from '@/app/dashboard/costs/category/components/CategoryLookupPickerModal';
+import { CategoryTreeColumns } from '@/presentation/components/CategoryTreeColumns';
 import { CategoryMetaPanel } from './CategoryMetaPanel';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import type { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import type { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUseCase';
-import type { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
 import type { MasterCategoryResponse } from '@/domain/entities/MasterProductEntity';
-import type { Category } from '@/domain/entities/CategoryEntity';
+import type { CategoryTreeNode } from '@/domain/entities/CategoryEntity';
 import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
 
 interface MasterCategoryPanelProps {
@@ -20,7 +19,6 @@ interface MasterCategoryPanelProps {
   useCase: MasterProductUseCase; // owned by parent container (CoverageMatrix)
   categoryUseCase: CategoryUseCase;
   mappingUseCase: CategoryMappingUseCase;
-  lookupUseCase: CategoryLookupUseCase;
 }
 
 /**
@@ -28,31 +26,30 @@ interface MasterCategoryPanelProps {
  * 몰별 마켓 코드는 매핑(CategoryMapping)이 해석한다 (백엔드 44).
  * File: src/app/dashboard/master-products/[id]/components/MasterCategoryPanel.tsx
  *
- * 지정 방식 2택: (1) 기존 표준 선택 (2) 조회 피커로 새 표준 즉시 생성.
- * 몰별 매핑 배지는 읽기 전용 — 매핑 채우기는 F1 카테고리 관리 화면으로 유도.
+ * 지정 = miller-columns 트리 드릴다운(공통 CategoryTreeColumns, 생성 모달과 동일). leaf
+ * 선택 시 즉시 setCategory. 몰별 매핑 배지는 읽기 전용 — 매핑 채우기는 F1 관리 화면 유도.
  */
 export function MasterCategoryPanel({
   masterId,
   useCase,
   categoryUseCase,
   mappingUseCase,
-  lookupUseCase,
 }: MasterCategoryPanelProps) {
   const [current, setCurrent] = useState<MasterCategoryResponse | null>(null);
   const [mappings, setMappings] = useState<CategoryMapping[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 'existing' shows the inline select for picking an already-created standard category.
-  const [action, setAction] = useState<'none' | 'existing'>('none');
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [catsLoading, setCatsLoading] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>('');
+  // Whether the tree drilldown is expanded for (re)assigning the standard category.
+  const [isTreeOpen, setIsTreeOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+
+  // Stable browse reference so CategoryTreeColumns' mount effect doesn't re-run every render.
+  const browseTree = useCallback(
+    (parentId?: number) => categoryUseCase.browseTree(parentId),
+    [categoryUseCase],
+  );
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -79,67 +76,18 @@ export function MasterCategoryPanel({
     })();
   }, [load]);
 
-  const handleChooseExisting = async () => {
-    setAction('existing');
-    setError('');
-    if (categories.length === 0) {
-      setCatsLoading(true);
-      try {
-        setCategories(await categoryUseCase.getCategories());
-      } catch (e) {
-        setError(extractErrorMessage(e, '표준 카테고리 목록을 불러오지 못했습니다.'));
-      } finally {
-        setCatsLoading(false);
-      }
-    }
-  };
-
-  const handleSaveExisting = async () => {
-    if (selectedCategoryId === '') return;
+  // Leaf picked in the tree → assign it to this master immediately, then reload.
+  const handleSelectLeaf = async (leaf: CategoryTreeNode) => {
     setIsSaving(true);
     setError('');
     try {
-      await useCase.setCategory(masterId, { categoryId: Number(selectedCategoryId) });
-      setAction('none');
-      setSelectedCategoryId('');
+      await useCase.setCategory(masterId, { categoryId: leaf.id });
+      setIsTreeOpen(false);
       await load();
     } catch (e) {
       setError(extractErrorMessage(e, '카테고리 지정에 실패했습니다.'));
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  // New standard from the lookup picker: create the standard category, seed its COUPANG
-  // mapping (F1 flow), then assign it to this master. Backend create still requires
-  // platform/code, so send the picker's selection with it (F1 §deviation).
-  const handleCreateFromPicker = async (sel: {
-    platformCategoryId: string;
-    name: string;
-    namePath: string;
-  }) => {
-    setIsCreating(true);
-    setError('');
-    try {
-      const created = await categoryUseCase.createCategory({
-        name: sel.name,
-        platform: 'COUPANG',
-        platformCategoryId: sel.platformCategoryId,
-        parentId: null,
-      });
-      await mappingUseCase.upsertMapping(created.id, {
-        platform: 'COUPANG',
-        platformCategoryId: sel.platformCategoryId,
-        platformCategoryName: sel.namePath || sel.name,
-      });
-      await useCase.setCategory(masterId, { categoryId: created.id });
-      setIsPickerOpen(false);
-      setAction('none');
-      await load();
-    } catch (e) {
-      setError(extractErrorMessage(e, '새 표준 카테고리 생성에 실패했습니다.'));
-    } finally {
-      setIsCreating(false);
     }
   };
 
@@ -157,7 +105,7 @@ export function MasterCategoryPanel({
     }
   };
 
-  const busy = isSaving || isCreating || isClearing;
+  const busy = isSaving || isClearing;
 
   return (
     <>
@@ -202,88 +150,46 @@ export function MasterCategoryPanel({
       )}
 
       {!isLoading && (
-        <div className="flex flex-wrap items-end gap-2">
-          {action === 'existing' ? (
-            <>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">표준 카테고리</label>
-                <select
-                  className="rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value ? Number(e.target.value) : '')}
-                  disabled={catsLoading || isSaving}
-                >
-                  <option value="">{catsLoading ? '불러오는 중...' : '선택'}</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsTreeOpen((v) => !v)}
+              disabled={busy}
+              className="rounded border border-blue-300 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+            >
+              {isTreeOpen ? '트리 닫기' : current ? '카테고리 변경' : '카테고리 지정'}
+            </button>
+            {current && (
               <button
                 type="button"
-                onClick={handleSaveExisting}
-                disabled={isSaving || selectedCategoryId === ''}
-                className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAction('none');
-                  setSelectedCategoryId('');
-                }}
-                disabled={isSaving}
-                className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-              >
-                취소
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={handleChooseExisting}
+                onClick={handleClear}
                 disabled={busy}
-                className="rounded border border-blue-300 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                className="rounded border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
               >
-                {current ? '기존 표준으로 변경' : '기존 표준 선택'}
+                {isClearing ? <Spinner label="해제 중..." /> : '해제'}
               </button>
-              <button
-                type="button"
-                onClick={() => setIsPickerOpen(true)}
-                disabled={busy}
-                className="rounded border border-green-300 px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
-              >
-                {isCreating ? <Spinner label="생성 중..." /> : '새 표준 만들기'}
-              </button>
-              {current && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  disabled={busy}
-                  className="rounded border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                >
-                  {isClearing ? <Spinner label="해제 중..." /> : '해제'}
-                </button>
-              )}
-            </>
+            )}
+            {isSaving && <Spinner size={16} label="저장 중..." />}
+          </div>
+
+          {isTreeOpen && (
+            <div className="space-y-1">
+              <CategoryTreeColumns
+                browse={browseTree}
+                selectedId={current?.categoryId ?? null}
+                onSelectLeaf={(leaf) => void handleSelectLeaf(leaf)}
+              />
+              <p className="text-[11px] text-gray-500">
+                세부(leaf) 카테고리를 선택하면 즉시 지정됩니다. 카테고리가 없으면{' '}
+                <Link href={ROUTES.COSTS_CATEGORY} className="text-blue-600 hover:underline">
+                  카테고리 관리
+                </Link>
+                에서 import·추가하세요.
+              </p>
+            </div>
           )}
         </div>
-      )}
-
-      {isPickerOpen && (
-        <CategoryLookupPickerModal
-          open={isPickerOpen}
-          platform="COUPANG"
-          lookupUseCase={lookupUseCase}
-          onSelect={(sel) => void handleCreateFromPicker(sel)}
-          onClose={() => {
-            if (!isCreating) setIsPickerOpen(false);
-          }}
-        />
       )}
     </div>
 

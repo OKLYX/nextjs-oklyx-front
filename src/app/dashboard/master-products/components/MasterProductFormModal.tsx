@@ -11,6 +11,7 @@ import type { PackageUseCase } from '@/application/usecases/PackageUseCase';
 import type { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
+import type { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import type {
   MasterProductResponse,
   MasterOptionRequest,
@@ -21,6 +22,8 @@ import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { Package } from '@/domain/entities/PackageEntity';
 import { BUILTIN_FIELD_KEYS, type TemplateField } from '@/domain/entities/ThumbnailEntity';
 import { SOURCE_ZONE } from '@/domain/entities/DetailTemplateEntity';
+import { CategoryTreeColumns } from '@/presentation/components/CategoryTreeColumns';
+import { ROUTES } from '@/config/routes';
 import { MasterOptionEditor } from './MasterOptionEditor';
 import {
   MasterImagePool,
@@ -29,7 +32,8 @@ import {
   type MasterImageBuffer,
 } from './MasterImagePool';
 
-const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
+const formatWon = (v: number | null | undefined) =>
+  v == null ? '—' : `${v.toLocaleString('ko-KR')}원`;
 
 interface MasterProductFormModalProps {
   master: MasterProductResponse | null; // null = create mode
@@ -40,6 +44,8 @@ interface MasterProductFormModalProps {
   thumbnailTemplateUseCase: ThumbnailTemplateUseCase;
   detailUseCase: DetailContentUseCase;
   productImageUseCase: ProductImageUseCase;
+  // Create-mode standard-category step: miller-columns tree drilldown (browseTree).
+  categoryUseCase: CategoryUseCase;
   onClose: () => void;
   onDataChanged: () => Promise<void> | void; // reload parent list
 }
@@ -58,6 +64,7 @@ export function MasterProductFormModal({
   thumbnailTemplateUseCase,
   detailUseCase,
   productImageUseCase,
+  categoryUseCase,
   onClose,
   onDataChanged,
 }: MasterProductFormModalProps) {
@@ -72,6 +79,16 @@ export function MasterProductFormModal({
 
   // Create mode: options are entered in the wizard and created atomically with the master.
   const [options, setOptions] = useState<MasterOptionRequest[]>([]);
+
+  // Create mode: a leaf standard category must be picked (miller-columns drilldown) before
+  // save (assigned via setCategory right after create). Edit mode uses MasterCategoryPanel.
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>('');
+  const [selectedCategoryName, setSelectedCategoryName] = useState('');
+  // Stable browse reference so CategoryTreeColumns' mount effect doesn't re-run every render.
+  const browseTree = useCallback(
+    (parentId?: number) => categoryUseCase.browseTree(parentId),
+    [categoryUseCase],
+  );
 
   // Image fields = cover photo (always first) + the union of detail imageZones across ALL templates
   // (a master's mapped image is reusable by whichever template a channel ends up resolving to).
@@ -263,6 +280,11 @@ export function MasterProductFormModal({
       return;
     }
     if (!isEdit) {
+      // A leaf standard category is mandatory in create mode (front-end gate; no API call).
+      if (selectedCategoryId === '') {
+        setError('세부 카테고리를 선택하세요.');
+        return;
+      }
       // Options are created atomically with the master → at least one, each with a name + items.
       if (options.length === 0) {
         setError('옵션을 1개 이상 추가하세요.');
@@ -306,6 +328,16 @@ export function MasterProductFormModal({
           defaultPackageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
           options,
         });
+        // Assign the picked standard category right after create (validation guarantees a value).
+        // Graceful: the master already exists → a failure surfaces a distinct banner, no rollback.
+        try {
+          await useCase.setCategory(created.id, { categoryId: Number(selectedCategoryId) });
+        } catch {
+          setError('마스터는 생성되었습니다. 카테고리 지정에 실패했습니다(상세에서 재지정).');
+          await onDataChanged();
+          setIsSubmitting(false);
+          return;
+        }
         if (tags.length > 0) await useCase.updateTags(created.id, { tags });
         // Buffer: upload pool files sequentially (index → real id) then apply mappings.
         // Sequential await preserves pool sortOrder (backend = upload order); Promise.all
@@ -517,6 +549,41 @@ export function MasterProductFormModal({
               </>
             )}
           </div>
+
+          {!isEdit && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                세부 카테고리 *
+              </label>
+              {selectedCategoryId !== '' ? (
+                <p className="mb-2 text-sm text-gray-900">
+                  선택된 카테고리: <span className="font-medium">{selectedCategoryName}</span>
+                </p>
+              ) : (
+                <p className="mb-2 text-[11px] text-amber-700">
+                  세부(leaf) 카테고리 필수 — 트리에서 선택하세요.
+                </p>
+              )}
+              <CategoryTreeColumns
+                browse={browseTree}
+                selectedId={selectedCategoryId === '' ? null : selectedCategoryId}
+                onSelectLeaf={(leaf) => {
+                  setSelectedCategoryId(leaf.id);
+                  setSelectedCategoryName(leaf.name);
+                }}
+              />
+              <p className="mt-1 text-[11px] text-gray-500">
+                카테고리가 없으면{' '}
+                <a
+                  href={ROUTES.COSTS_CATEGORY}
+                  className="text-blue-600 hover:underline"
+                >
+                  카테고리 관리
+                </a>
+                에서 import·추가하세요.
+              </p>
+            </div>
+          )}
 
           {fields.length > 0 && (
             <div>
