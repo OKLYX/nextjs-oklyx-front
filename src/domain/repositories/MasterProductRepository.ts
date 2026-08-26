@@ -7,6 +7,7 @@ import type {
   MasterCategoryRequest,
   MasterCategoryResponse,
   CategoryMetaResponse,
+  CategoryMetaSchemaResponse,
   CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
@@ -27,6 +28,8 @@ export interface MasterProductRepository {
   setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
   clearCategory(id: number): Promise<void>;
   getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse>;
+  // Schema only, keyed by (platform × categoryId) — used before a master exists.
+  getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse>;
   setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
 }

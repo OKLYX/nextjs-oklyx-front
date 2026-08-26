@@ -127,7 +127,7 @@ export function MasterProductList() {
           onClick={openCreate}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
-          새 마스터
+          마스터 추가
         </button>
       </div>
 

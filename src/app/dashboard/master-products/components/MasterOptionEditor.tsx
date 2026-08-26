@@ -1,18 +1,87 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
-import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
 import type {
   MasterProductResponse,
   MasterOptionResponse,
   MasterOptionRequest,
   MasterComponent,
+  CategoryAttribute,
+  CategoryNotice,
 } from '@/domain/entities/MasterProductEntity';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { Package } from '@/domain/entities/PackageEntity';
+import type { MeasurePair } from '../[id]/components/measureAttributes';
+import { CategoryMetaOverrideFields } from '../[id]/components/CategoryMetaOverrideFields';
+import { computeMissingOptionRequired } from '../[id]/components/categoryMetaValidation';
 
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
+
+type StringMapSetter = (updater: (prev: Record<string, string>) => Record<string, string>) => void;
+
+// Sum of an option's component quantities (a missing entry counts as the displayed default 1).
+function sumQuantitiesOf(components: MasterComponent[], quantities: Record<number, string>): number {
+  return components.reduce((sum, c) => {
+    const n = parseInt(quantities[c.productId] ?? '1', 10);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+}
+
+/**
+ * Auto-reflect the total component quantity into the 수량 category fields (개수 = 포장단위별
+ * 수량/총 수량). 중량/용량 필드는 건드리지 않는다(이름에 "수량" 이 든 필드만). 순수 모듈 함수라
+ * 이벤트 핸들러와 스키마 로드 effect 양쪽에서 안정적으로 호출된다(안정 참조 → exhaustive-deps 무경고).
+ */
+function applyQtyToMeta(
+  total: number,
+  attrs: CategoryAttribute[],
+  ntcs: CategoryNotice[],
+  setAttr: StringMapSetter,
+  setNotice: StringMapSetter,
+  // hideCategoryAttrs 이면 속성 fill(수량 속성)만 스킵하고 고시 fill 은 유지한다(값 자체는 비우지 않음).
+  hideCategoryAttrs = false,
+): void {
+  const value = total > 0 ? String(total) : '';
+  const attrNames = hideCategoryAttrs
+    ? []
+    : attrs.filter((a) => a.name.includes('수량')).map((a) => a.name);
+  const noticeKeys = ntcs.filter((n) => n.key.includes('수량')).map((n) => n.key);
+  if (attrNames.length > 0) {
+    setAttr((prev) => {
+      const next = { ...prev };
+      for (const k of attrNames) next[k] = value;
+      return next;
+    });
+  }
+  if (noticeKeys.length > 0) {
+    setNotice((prev) => {
+      const next = { ...prev };
+      for (const k of noticeKeys) next[k] = value;
+      return next;
+    });
+  }
+}
+
+/**
+ * 옵션 override 페이로드 계산: 빈값 제거 + 마스터값과 동일 key 제거(omit=상속).
+ * delivery/package omit 규칙(마스터 기본값과 같으면 생략)을 카테고리 속성/고시에 미러한다.
+ */
+function diffOverride(
+  values: Record<string, string>,
+  master: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(values)) {
+    if ((v ?? '').trim() === '') continue; // empty = inherit master
+    if ((v ?? '').trim() === (master[k] ?? '').trim()) continue; // same as master = inherit
+    out[k] = v;
+  }
+  return out;
+}
 
 export interface MasterDefaults {
   deliveryId?: number;
@@ -33,6 +102,10 @@ export function normalizeOptionPayload(
   optDeliveryId: number | '',
   optPackageId: number | '',
   masterDefaults: MasterDefaults,
+  optAttrValues: Record<string, string> = {},
+  optNoticeValues: Record<string, string> = {},
+  masterAttrs: Record<string, string> = {},
+  masterNotices: Record<string, string> = {},
 ): MasterOptionRequest {
   const items = components.map((c) => ({
     productId: c.productId,
@@ -46,7 +119,17 @@ export function normalizeOptionPayload(
     optPackageId === '' || optPackageId === masterDefaults.packageId
       ? undefined
       : Number(optPackageId);
-  return { name: name.trim(), items, deliveryId, packageId };
+  // Category overrides: keep only keys that differ from the master value (empty/same = inherit).
+  const categoryAttributes = diffOverride(optAttrValues, masterAttrs);
+  const categoryNotices = diffOverride(optNoticeValues, masterNotices);
+  return {
+    name: name.trim(),
+    items,
+    deliveryId,
+    packageId,
+    categoryAttributes: Object.keys(categoryAttributes).length ? categoryAttributes : undefined,
+    categoryNotices: Object.keys(categoryNotices).length ? categoryNotices : undefined,
+  };
 }
 
 interface MasterOptionEditorProps {
@@ -62,6 +145,15 @@ interface MasterOptionEditorProps {
   carrierRates: CarrierRate[];
   packages: Package[];
   masterDefaults?: MasterDefaults;
+  // Category attribute/notice override (60). categoryId==null hides the override section.
+  categoryId?: number | null;
+  platform?: string; // default 'COUPANG'
+  masterAttrValues?: Record<string, string>; // inherit-diff source (attributes)
+  masterNoticeValues?: Record<string, string>; // inherit-diff source (notices)
+  // 컨테이너(부모 모달)가 도출해 하달: 옵션-소유 속성 숨김/스킵(값 보존). 수량 자동채움도 속성만 스킵.
+  hideCategoryAttrs?: boolean;
+  // 옵션 추가/수정 폼이 열려 있는지 부모에 통지 → 부모가 구성상품 편집을 잠금.
+  onFormOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -84,11 +176,23 @@ export function MasterOptionEditor({
   carrierRates,
   packages,
   masterDefaults: masterDefaultsProp,
+  categoryId = null,
+  platform = 'COUPANG',
+  masterAttrValues = {},
+  masterNoticeValues = {},
+  hideCategoryAttrs = false,
+  onFormOpenChange,
 }: MasterOptionEditorProps) {
   const isEdit = master != null;
   const components = master?.components ?? propComponents ?? [];
   const masterDefaults = masterDefaultsProp ?? {};
   const nameById = new Map(components.map((c) => [c.productId, c.productName]));
+
+  // Internal use case for schema-only category attribute lookup (getCategorySchema).
+  const metaUseCase = useMemo(
+    () => new MasterProductUseCase(new MasterProductRepositoryImpl()),
+    [],
+  );
 
   const [showForm, setShowForm] = useState(false);
   // Edit mode: option id. Create mode: array index. null = adding a new option.
@@ -97,40 +201,143 @@ export function MasterOptionEditor({
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [optDeliveryId, setOptDeliveryId] = useState<number | ''>('');
   const [optPackageId, setOptPackageId] = useState<number | ''>('');
+  // Per-option category attribute/notice overrides (60). Empty = inherit master.
+  const [optAttrValues, setOptAttrValues] = useState<Record<string, string>>({});
+  const [optNoticeValues, setOptNoticeValues] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [busyOptionId, setBusyOptionId] = useState<number | null>(null);
+
+  // Category attribute + notice schema (backend-driven). Loaded per category.
+  // categoryId==null → override section hidden.
+  const [attributes, setAttributes] = useState<CategoryAttribute[]>([]);
+  const [notices, setNotices] = useState<CategoryNotice[]>([]);
+  const [attrLoading, setAttrLoading] = useState(false);
+  const [attrLoadError, setAttrLoadError] = useState('');
+
+  // Latest-value refs so the schema-load effect can reflect the current quantities into the
+  // 수량 fields without re-running on every keystroke (would re-fetch the schema).
+  const showFormRef = useRef(showForm);
+  const quantitiesRef = useRef(quantities);
+  const componentsRef = useRef(components);
+  const hideCategoryAttrsRef = useRef(hideCategoryAttrs);
+  useEffect(() => {
+    showFormRef.current = showForm;
+    quantitiesRef.current = quantities;
+    componentsRef.current = components;
+    hideCategoryAttrsRef.current = hideCategoryAttrs;
+  });
+
+  // Notify the parent so it can lock component editing while the option form is open.
+  useEffect(() => {
+    onFormOpenChange?.(showForm);
+  }, [showForm, onFormOpenChange]);
+
+  useEffect(() => {
+    let alive = true;
+    // Inline async IIFE defers setState past the sync effect body (set-state-in-effect lint).
+    void (async () => {
+      if (categoryId == null) {
+        setAttributes([]);
+        setNotices([]);
+        setAttrLoadError('');
+        return;
+      }
+      setAttrLoading(true);
+      setAttrLoadError('');
+      try {
+        const schema = await metaUseCase.getCategorySchema(categoryId, platform);
+        if (!alive) return;
+        setAttributes(schema.attributes);
+        setNotices(schema.notices);
+        // If the option form is already open when the schema arrives (form opened before the
+        // async fetch resolved), reflect the current component-quantity total into the 수량
+        // fields now — otherwise they stay empty until the user edits a quantity.
+        if (showFormRef.current) {
+          const total = sumQuantitiesOf(componentsRef.current, quantitiesRef.current);
+          applyQtyToMeta(
+            total,
+            schema.attributes,
+            schema.notices,
+            setOptAttrValues,
+            setOptNoticeValues,
+            hideCategoryAttrsRef.current,
+          );
+        }
+      } catch (e) {
+        if (!alive) return;
+        setAttributes([]);
+        setNotices([]);
+        setAttrLoadError(
+          extractErrorMessage(e, '카테고리 필수속성을 불러오지 못했습니다. override 없이 진행할 수 있습니다.'),
+        );
+      } finally {
+        if (alive) setAttrLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [categoryId, platform, metaUseCase]);
+
+  const sumQuantities = (q: Record<number, string>): number => sumQuantitiesOf(components, q);
+
+  // Auto-reflect the total component quantity into the 수량 category fields (delegates to the
+  // pure module helper with the currently-loaded schema).
+  const applyItemQtyToMeta = (total: number) =>
+    applyQtyToMeta(total, attributes, notices, setOptAttrValues, setOptNoticeValues, hideCategoryAttrs);
 
   const seedForm = (
     name: string,
     items: { productId: number; quantity: number }[],
     deliveryId: number | null | undefined,
     packageId: number | null | undefined,
+    categoryAttributes: Record<string, string> | null | undefined,
+    categoryNotices: Record<string, string> | null | undefined,
   ) => {
     setOptName(name);
     const byId = new Map(items.map((it) => [it.productId, it.quantity]));
-    setQuantities(
-      Object.fromEntries(components.map((c) => [c.productId, String(byId.get(c.productId) ?? 1)])),
+    const seededQuantities = Object.fromEntries(
+      components.map((c) => [c.productId, String(byId.get(c.productId) ?? 1)]),
     );
+    setQuantities(seededQuantities);
     setOptDeliveryId(deliveryId ?? masterDefaults.deliveryId ?? '');
     setOptPackageId(packageId ?? masterDefaults.packageId ?? '');
+    setOptAttrValues(categoryAttributes ?? {});
+    setOptNoticeValues(categoryNotices ?? {});
+    // Reflect the initial (default 1 each) quantity total into the 수량 meta fields on open,
+    // not only on later edits — layered on top of the seeded values above.
+    applyItemQtyToMeta(sumQuantities(seededQuantities));
     setFormError('');
     setShowForm(true);
   };
 
   const openAdd = () => {
     setEditingKey(null);
-    seedForm('', [], undefined, undefined);
+    seedForm('', [], undefined, undefined, undefined, undefined);
   };
 
   const openEditServer = (opt: MasterOptionResponse) => {
     setEditingKey(opt.id);
-    seedForm(opt.name, opt.items, opt.deliveryId, opt.packageId);
+    seedForm(opt.name, opt.items, opt.deliveryId, opt.packageId, opt.categoryAttributes, opt.categoryNotices);
   };
 
   const openEditBuffer = (opt: MasterOptionRequest, index: number) => {
     setEditingKey(index);
-    seedForm(opt.name, opt.items, opt.deliveryId, opt.packageId);
+    seedForm(opt.name, opt.items, opt.deliveryId, opt.packageId, opt.categoryAttributes, opt.categoryNotices);
+  };
+
+  // A picked measure unit clears the other side of the pair (only one of weight/volume carries a value).
+  const handleOptMeasureUnit = (p: MeasurePair, unit: string) => {
+    const clearName = unit === '중량' ? p.volume.name : unit === '용량' ? p.weight.name : '';
+    if (clearName) setOptAttrValues((prev) => ({ ...prev, [clearName]: '' }));
+  };
+
+  // Component quantity input change → update quantities + re-sum → auto-fill 수량 meta fields.
+  const handleQuantityChange = (productId: number, value: string) => {
+    const nextQuantities = { ...quantities, [productId]: value };
+    setQuantities(nextQuantities);
+    applyItemQtyToMeta(sumQuantities(nextQuantities));
   };
 
   const closeForm = () => {
@@ -144,6 +351,17 @@ export function MasterOptionEditor({
       setFormError('옵션 이름을 입력하세요.');
       return;
     }
+    // 개당 용량/중량·수량 중 **카테고리 스키마가 required 로 표시한 속성**만 옵션 필수(마스터에서 안 받음)
+    // → 비어 있으면 저장 차단. 필수 여부는 스키마(쿠팡 메타) 플래그만 따른다(이름 기반 강제 없음).
+    if (
+      categoryId != null &&
+      !attrLoading &&
+      computeMissingOptionRequired(attributes, optAttrValues, hideCategoryAttrs)
+    ) {
+      setFormError('이 옵션의 필수 항목(카테고리가 요구하는 개당 용량/중량·수량)을 입력하세요.');
+      return;
+    }
+
     const payload = normalizeOptionPayload(
       optName,
       components,
@@ -151,6 +369,10 @@ export function MasterOptionEditor({
       optDeliveryId,
       optPackageId,
       masterDefaults,
+      optAttrValues,
+      optNoticeValues,
+      masterAttrValues,
+      masterNoticeValues,
     );
     if (payload.items.length === 0) {
       setFormError('구성상품을 먼저 선택하세요.');
@@ -225,18 +447,31 @@ export function MasterOptionEditor({
         onDelete: () => handleDeleteBuffer(index),
       }));
 
+  // Create mode requires both a component set and a category before options can be added.
+  // Edit mode's master already carries a category (edited elsewhere), so only components matter.
+  const categoryRequired = !isEdit;
+  const canAddOption = components.length > 0 && (!categoryRequired || categoryId != null);
+  const addBlockedReason =
+    components.length === 0
+      ? '구성상품을 먼저 선택하면 옵션을 추가할 수 있습니다.'
+      : '카테고리를 먼저 선택하면 옵션을 추가할 수 있습니다.';
+
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
+        <h3 className="text-sm font-semibold text-gray-900">옵션</h3>
         <button
           type="button"
           onClick={openAdd}
-          className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+          disabled={!canAddOption}
+          title={canAddOption ? undefined : addBlockedReason}
+          className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           옵션 추가
         </button>
       </div>
+
+      {!canAddOption && <p className="mb-3 text-[11px] text-amber-700">{addBlockedReason}</p>}
 
       {rows.length === 0 ? (
         <p className="mb-3 text-sm text-gray-500">등록된 옵션이 없습니다.</p>
@@ -300,16 +535,14 @@ export function MasterOptionEditor({
                   step={1}
                   className="w-24 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
                   value={quantities[c.productId] ?? '1'}
-                  onChange={(e) =>
-                    setQuantities((prev) => ({ ...prev, [c.productId]: e.target.value }))
-                  }
+                  onChange={(e) => handleQuantityChange(c.productId, e.target.value)}
                 />
               </div>
             ))}
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">택배 override</label>
+              <label className="mb-1 block text-xs font-medium text-gray-600">택배비</label>
               <select
                 className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
                 value={optDeliveryId}
@@ -325,7 +558,7 @@ export function MasterOptionEditor({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">상자 override</label>
+              <label className="mb-1 block text-xs font-medium text-gray-600">상자비</label>
               <select
                 className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
                 value={optPackageId}
@@ -344,6 +577,58 @@ export function MasterOptionEditor({
               비우거나 마스터 기본값과 같으면 마스터 기본 택배/박스를 상속합니다.
             </p>
           </div>
+
+          {categoryId != null && (
+            <details open className="mt-3 rounded border border-gray-200 bg-white p-3">
+              <summary className="cursor-pointer text-xs font-semibold text-gray-700">
+                옵션별 설정 — 개당 용량/중량·수량
+              </summary>
+              <div className="mt-3">
+                {attrLoading ? (
+                  <div className="flex min-h-16 items-center justify-center">
+                    <Spinner size={20} label="불러오는 중..." />
+                  </div>
+                ) : (
+                  <>
+                    {attrLoadError && (
+                      <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+                        {attrLoadError}
+                      </p>
+                    )}
+                    {attributes.length > 0 || notices.length > 0 ? (
+                      <>
+                        <p className="mb-3 text-[11px] text-gray-500">
+                          개당 용량/중량·수량은 옵션마다 다르므로 마스터가 아닌 이 옵션에서 입력합니다.
+                          <span className="text-red-600"> *</span> 표시는 카테고리(쿠팡 메타)가 요구하는
+                          필수 항목입니다.
+                        </p>
+                        <CategoryMetaOverrideFields
+                          attributes={attributes}
+                          notices={notices}
+                          attrValues={optAttrValues}
+                          noticeValues={optNoticeValues}
+                          onAttrChange={(name, value) =>
+                            setOptAttrValues((prev) => ({ ...prev, [name]: value }))
+                          }
+                          onNoticeChange={(key, value) =>
+                            setOptNoticeValues((prev) => ({ ...prev, [key]: value }))
+                          }
+                          onMeasureUnit={handleOptMeasureUnit}
+                          disabled={isSubmitting}
+                          hideCategoryAttrs={hideCategoryAttrs}
+                        />
+                      </>
+                    ) : (
+                      <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                        이 카테고리에는 옵션별로 설정할 항목(용량/중량·수량)이 없습니다.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </details>
+          )}
+
           <div className="mt-3 flex gap-2">
             <button
               type="button"

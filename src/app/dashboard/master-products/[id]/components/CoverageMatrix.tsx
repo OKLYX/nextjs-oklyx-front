@@ -10,10 +10,6 @@ import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCas
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
-import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
-import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
-import { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUseCase';
-import { CategoryMappingRepositoryImpl } from '@/infrastructure/repositories/CategoryMappingRepositoryImpl';
 import type { ListingMatrixResponse, MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type { ListingStatus, GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
@@ -22,7 +18,6 @@ import {
   ChannelPreviewModal,
   type ChannelPreviewData,
 } from '@/presentation/components/DetailHtmlPreview';
-import { MasterCategoryPanel } from './MasterCategoryPanel';
 import { MasterTagsPanel } from './MasterTagsPanel';
 import { CellActions } from './CellActions';
 import { DisplayNameRow } from './DisplayNameRow';
@@ -55,12 +50,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new ListingRegistrationUseCase(new ListingRegistrationRepositoryImpl()),
     [],
   );
-  const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
-  const mappingUseCase = useMemo(
-    () => new CategoryMappingUseCase(new CategoryMappingRepositoryImpl()),
-    [],
-  );
-
   const [matrix, setMatrix] = useState<ListingMatrixResponse | null>(null);
   const [options, setOptions] = useState<MasterOptionResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -363,15 +352,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
       {isAdmin && <MasterTagsPanel masterId={masterId} useCase={masterUseCase} />}
 
-      {isAdmin && (
-        <MasterCategoryPanel
-          masterId={masterId}
-          useCase={masterUseCase}
-          categoryUseCase={categoryUseCase}
-          mappingUseCase={mappingUseCase}
-        />
-      )}
-
       <div className="rounded-lg bg-white shadow list-table-scroll">
         {isLoading ? (
           <div className="flex min-h-32 items-center justify-center">
@@ -514,7 +494,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           <div className="space-y-0.5">
                             {prices.map((p) => {
                               const active = p.active !== false;
-                              const name = options.find((o) => o.id === p.optionId)?.name
+                              // Prefer the name the backend sends with each price. Fall back to the
+                              // master option lookup (legacy responses), then the raw id.
+                              const name = p.optionName
+                                ?? options.find((o) => o.id === p.optionId)?.name
                                 ?? `옵션 #${p.optionId}`;
                               const label = (
                                 <span className={active ? '' : 'text-gray-400'}>

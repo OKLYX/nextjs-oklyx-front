@@ -18,6 +18,10 @@ export interface MasterOptionResponse {
   items: MasterOptionItem[];
   deliveryId: number | null; // carrier override; null = use master default
   packageId: number | null; // box override; null = use master default
+  // Per-option category attribute/notice overrides (60). Only keys that differ from the
+  // master value are stored; a missing/empty key inherits the master value. Nullable.
+  categoryAttributes?: Record<string, string> | null;
+  categoryNotices?: Record<string, string> | null;
 }
 
 export interface MasterProductResponse {
@@ -70,6 +74,10 @@ export interface MasterOptionRequest {
   items: MasterOptionRequestItem[];
   deliveryId?: number; // omit = keep existing; set = replace override
   packageId?: number;
+  // Per-option category attribute/notice overrides (60). Send only keys that differ from
+  // the master value; an empty map is omitted (undefined = no override, inherit master).
+  categoryAttributes?: Record<string, string>;
+  categoryNotices?: Record<string, string>;
 }
 
 // Master standard category (single, backend 44). The per-platform market code is
@@ -94,9 +102,10 @@ export interface CategoryAttribute {
 }
 
 export interface CategoryNotice {
-  key: string;
+  key: string; // === label (한글 개념어, 쿠팡 noticeCategoryDetailName)
   label: string;
   required: boolean;
+  groupName?: string | null; // 쿠팡 noticeCategoryName (품목군); null → "기타" 그룹 (backend 61)
 }
 
 export interface CategoryMetaValues {
@@ -108,6 +117,13 @@ export interface CategoryMetaResponse {
   attributes: CategoryAttribute[];
   notices: CategoryNotice[];
   values: CategoryMetaValues;
+}
+
+// Schema-only lookup (no values) for the create/registration screen, where a master
+// does not exist yet. Keyed by (platform × categoryId). Backend 57.
+export interface CategoryMetaSchemaResponse {
+  attributes: CategoryAttribute[];
+  notices: CategoryNotice[];
 }
 
 // PATCH body: raw useState maps sent as-is (NUMBER values also travel as strings).

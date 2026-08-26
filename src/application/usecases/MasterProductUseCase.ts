@@ -8,6 +8,7 @@ import type {
   MasterCategoryRequest,
   MasterCategoryResponse,
   CategoryMetaResponse,
+  CategoryMetaSchemaResponse,
   CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
@@ -70,6 +71,10 @@ export class MasterProductUseCase {
 
   getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse> {
     return this.repository.getCategoryMeta(id, platform);
+  }
+
+  getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse> {
+    return this.repository.getCategorySchema(categoryId, platform);
   }
 
   setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void> {

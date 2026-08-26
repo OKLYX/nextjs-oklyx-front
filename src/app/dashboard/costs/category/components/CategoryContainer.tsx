@@ -15,7 +15,6 @@ import { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUs
 import { CategoryMappingRepositoryImpl } from '@/infrastructure/repositories/CategoryMappingRepositoryImpl';
 import { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
 import { CategoryLookupRepositoryImpl } from '@/infrastructure/repositories/CategoryLookupRepositoryImpl';
-import { CategoryLookupPickerModal } from './CategoryLookupPickerModal';
 import { CategoryMappingModal } from './CategoryMappingModal';
 import { RenameCategoryModal } from './RenameCategoryModal';
 
@@ -53,8 +52,8 @@ export function CategoryContainer() {
   // Bump to remount the tree (reset to root) after a rename/delete mutates a node.
   const [treeReloadKey, setTreeReloadKey] = useState(0);
 
-  const [isAddPickerOpen, setIsAddPickerOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  // Add-mode: when on, each tree column shows a `+` to add a category at that layer.
+  const [addMode, setAddMode] = useState(false);
   const [renameTarget, setRenameTarget] = useState<Category | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [mappingTarget, setMappingTarget] = useState<Category | null>(null);
@@ -210,36 +209,18 @@ export function CategoryContainer() {
     if (hasSearched) await runSearch(committedQuery);
   }, [hasSearched, committedQuery, runSearch]);
 
-  const handleCreateFromPicker = async (sel: {
-    platformCategoryId: string;
-    name: string;
-    namePath: string;
-  }) => {
-    setError('');
-    setIsCreating(true);
-    try {
-      // 표준명 = 리프명. 백엔드 표준 CRUD 가 platform/코드를 요구하므로 첫 매핑값을 함께 전달.
-      const created = await categoryUseCase.createCategory({
-        name: sel.name,
-        platform: 'COUPANG',
-        platformCategoryId: sel.platformCategoryId,
-        parentId: null,
-      });
-      await mappingUseCase.upsertMapping(created.id, {
-        platform: 'COUPANG',
-        platformCategoryId: sel.platformCategoryId,
-        platformCategoryName: sel.namePath || sel.name,
-      });
-      setIsAddPickerOpen(false);
+  // Create a category under a tree column's parent (or root). Backend 55 accepts { name, parentId }.
+  // The tree refreshes its own affected column; here we only invalidate the search cache (and
+  // re-run the last search so the list reflects the new node). Throws on failure → tree shows it.
+  const handleCreateInTree = useCallback(
+    async (parentId: number | undefined, name: string) => {
+      setError('');
+      await categoryUseCase.createCategory({ name, parentId: parentId ?? null });
       allCategoriesRef.current = null;
-      setSearchInput(created.name);
-      await runSearch(created.name);
-    } catch (e) {
-      setError(extractErrorMessage(e, '표준 카테고리 생성에 실패했습니다.'));
-    } finally {
-      setIsCreating(false);
-    }
-  };
+      if (hasSearched) await runSearch(committedQuery);
+    },
+    [categoryUseCase, hasSearched, committedQuery, runSearch]
+  );
 
   const handleRename = async (name: string) => {
     if (!renameTarget) return;
@@ -291,19 +272,9 @@ export function CategoryContainer() {
 
   return (
     <PageContainer contentClassName="max-w-3xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">표준 카테고리</h1>
-          <p className="text-gray-600">표준 카테고리를 관리하고 몰별 마켓 코드에 매핑합니다.</p>
-        </div>
-        {isAdmin && (
-          <button
-            onClick={() => setIsAddPickerOpen(true)}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium whitespace-nowrap"
-          >
-            표준 카테고리 추가
-          </button>
-        )}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">표준 카테고리</h1>
+        <p className="text-gray-600">표준 카테고리를 관리하고 몰별 마켓 코드에 매핑합니다.</p>
       </div>
 
       {error && (
@@ -367,15 +338,39 @@ export function CategoryContainer() {
         )}
       </div>
 
-      {/* Always-visible tree (expands to the selected result) */}
+      {/* Always-visible tree (expands to the selected result); doubles as an add-position picker */}
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-gray-700">카테고리 트리</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-gray-700">카테고리 트리</h2>
+          {isAdmin && (
+            <button
+              onClick={() => setAddMode((v) => !v)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap ${
+                addMode
+                  ? 'border border-gray-300 hover:bg-gray-50'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              {addMode ? '추가 완료' : '카테고리 추가'}
+            </button>
+          )}
+        </div>
+
+        {isAdmin && addMode && (
+          <p className="text-xs text-gray-500">
+            각 층(컬럼) 상단의 <span className="font-medium text-green-700">+</span> 로 그 위치에 카테고리를
+            추가합니다. ⚠️ 세부(leaf) 카테고리 밑에 추가하면 그 카테고리는 더 이상 상품 선택 대상이 아니게 됩니다.
+          </p>
+        )}
+
         <CategoryTreeColumns
           key={treeReloadKey}
           browse={browseTree}
           selectedId={selected?.id ?? null}
           expandTo={expandChain}
           onSelectLeaf={(leaf) => void handleTreeSelectLeaf(leaf)}
+          addMode={isAdmin && addMode}
+          onCreateCategory={handleCreateInTree}
         />
       </div>
 
@@ -420,18 +415,6 @@ export function CategoryContainer() {
           </p>
         )}
       </div>
-
-      {isAddPickerOpen && (
-        <CategoryLookupPickerModal
-          open={isAddPickerOpen}
-          platform="COUPANG"
-          lookupUseCase={lookupUseCase}
-          onSelect={(sel) => void handleCreateFromPicker(sel)}
-          onClose={() => {
-            if (!isCreating) setIsAddPickerOpen(false);
-          }}
-        />
-      )}
 
       {renameTarget && (
         <RenameCategoryModal

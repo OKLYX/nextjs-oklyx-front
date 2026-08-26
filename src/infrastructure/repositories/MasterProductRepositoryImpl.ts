@@ -11,12 +11,14 @@ import type {
   MasterCategoryRequest,
   MasterCategoryResponse,
   CategoryMetaResponse,
+  CategoryMetaSchemaResponse,
   CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
 
 const base = '/api/admin/master-products';
+const lookupBase = '/api/admin/category-lookup';
 
 export class MasterProductRepositoryImpl implements MasterProductRepository {
   async list(): Promise<MasterProductResponse[]> {
@@ -89,6 +91,13 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
 
   async getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse> {
     const response = await axiosInstance.get(`${base}/${id}/category-meta`, { params: { platform } });
+    return response.data.data;
+  }
+
+  async getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse> {
+    const response = await axiosInstance.get(`${lookupBase}/${platform}/meta`, {
+      params: { categoryId },
+    });
     return response.data.data;
   }
 

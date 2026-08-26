@@ -6,7 +6,6 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { ROUTES } from '@/config/routes';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { CategoryTreeColumns } from '@/presentation/components/CategoryTreeColumns';
-import { CategoryMetaPanel } from './CategoryMetaPanel';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import type { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import type { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUseCase';
@@ -108,7 +107,6 @@ export function MasterCategoryPanel({
   const busy = isSaving || isClearing;
 
   return (
-    <>
     <div className="rounded-lg bg-white p-4 shadow">
       <h2 className="mb-3 text-sm font-semibold text-gray-900">표준 카테고리</h2>
 
@@ -192,10 +190,5 @@ export function MasterCategoryPanel({
         </div>
       )}
     </div>
-
-      {/* Category required-attributes / notices (backend 47). Renders only once a
-          standard category is assigned and the resolved schema is non-empty. */}
-      <CategoryMetaPanel masterId={masterId} categoryCode={current ? String(current.categoryId) : null} />
-    </>
   );
 }

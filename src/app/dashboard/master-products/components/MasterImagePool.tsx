@@ -762,7 +762,7 @@ export function MasterImagePool({
           {/* Active Image (bottom) = images in use anywhere (field-agnostic). */}
           <div className="rounded-lg border border-gray-200 p-3">
             <p className="mb-2 text-xs font-medium text-gray-600">
-              Active Image <span className="font-normal text-gray-400">(사용중)</span>
+              사용 중인 이미지
             </p>
             <div className="max-h-44 overflow-y-auto pr-1">
               {activeEntries.length === 0 ? (

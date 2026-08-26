@@ -27,12 +27,23 @@ import type { CategoryTreeNode } from '@/domain/entities/CategoryEntity';
  * - `onSelectLeaf` 는 leaf 에서만 발화한다(비-leaf 는 드릴다운만).
  * - `expandTo`(선택) = root→…→target 조상 id 체인. 넘기면 그 경로로 컬럼을 펼쳐 target 을 노출한다
  *   (검색 결과에서 항목을 골랐을 때 트리로 되짚어 보여주는 용도). 값이 바뀔 때마다 그 경로로 재구성한다.
+ *
+ * ⚠️ 카테고리 추가(관리 화면 전용, optional):
+ * - `addMode` + `onCreateCategory` 를 함께 넘기면 **각 컬럼(=layer) 최상단에 `+ 여기에 추가` 버튼**이
+ *   뜬다. 그 컬럼의 부모(=컬럼의 `parentId`) 밑에 새 카테고리를 만든다(root 컬럼 = 최상위 추가).
+ * - `addMode` 에서 leaf 를 클릭하면 빈 자식 컬럼이 펼쳐져 그 leaf 밑에 **첫 자식**도 추가할 수 있다
+ *   (leaf 는 자식이 생기면 비-leaf 로 전환 → 상품 선택 대상에서 빠짐).
+ * - `onCreateCategory(parentId, name)` 는 부모가 실제 생성(+검색 캐시 무효화)을 담당한다. 성공 후
+ *   컴포넌트가 해당 컬럼(과 부모 컬럼)만 재조회해 새 노드를 보여준다(전체 remount 안 함 → 위치 보존).
+ * - 두 prop 모두 optional → 넘기지 않는 기존 사용처(생성 모달 등)엔 `+` UI 가 없다.
  */
 interface CategoryTreeColumnsProps {
   browse: (parentId?: number) => Promise<CategoryTreeNode[]>;
   onSelectLeaf: (leaf: CategoryTreeNode, path: CategoryTreeNode[]) => void;
   selectedId?: number | null;
   expandTo?: number[] | null;
+  addMode?: boolean;
+  onCreateCategory?: (parentId: number | undefined, name: string) => Promise<void>;
 }
 
 type Column = {
@@ -47,6 +58,8 @@ export function CategoryTreeColumns({
   onSelectLeaf,
   selectedId,
   expandTo,
+  addMode,
+  onCreateCategory,
 }: CategoryTreeColumnsProps) {
   // Initial state = root column in a loading state (so the spinner shows before the first
   // browse resolves without a synchronous setState in the effect).
@@ -54,9 +67,18 @@ export function CategoryTreeColumns({
     { parentId: undefined, nodes: [], loading: true, error: null },
   ]); // 좌→우 컬럼 순서
   const [path, setPath] = useState<CategoryTreeNode[]>([]); // 선택 경로(대표→…→현재)
+  // The horizontal column strip (overflow-x-auto), scrolled right to reveal a newly appended column.
+  const containerRef = useRef<HTMLDivElement | null>(null);
   // The rendered button of the currently-selected node, scrolled into view (horizontal
   // columns + per-column vertical scroll) so an expanded/selected target is actually visible.
   const selectedRef = useRef<HTMLButtonElement | null>(null);
+
+  // Inline "add category" input state (management screen only). addingCol = which column's
+  // `+` input is currently open; null = none open.
+  const [addingCol, setAddingCol] = useState<number | null>(null);
+  const [addName, setAddName] = useState('');
+  const [addBusy, setAddBusy] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const errorColumn = (parentId: number | undefined, e: unknown): Column => ({
     parentId,
@@ -113,12 +135,19 @@ export function CategoryTreeColumns({
   }, [browse, expandTo]);
 
   const handleNodeClick = async (col: number, node: CategoryTreeNode) => {
+    // Navigating cancels any open add-input.
+    setAddingCol(null);
     // Truncate the path/columns to the right of the clicked column, then set this node.
     setPath((prev) => [...prev.slice(0, col), node]);
     const nextPath = [...path.slice(0, col), node];
 
     if (node.leaf) {
-      setColumns((prev) => prev.slice(0, col + 1));
+      // In add-mode, reveal an empty child column so the first child can be added under a leaf.
+      setColumns((prev) =>
+        addMode
+          ? [...prev.slice(0, col + 1), { parentId: node.id, nodes: [], loading: false, error: null }]
+          : prev.slice(0, col + 1)
+      );
       onSelectLeaf(node, nextPath);
       return;
     }
@@ -143,19 +172,120 @@ export function CategoryTreeColumns({
     }
   };
 
-  // After columns render, bring the selected node into view (scrolls both the horizontal
-  // column strip and the node's own column). Not setState → safe in an effect.
+  const startAdd = (col: number) => {
+    setAddingCol(col);
+    setAddName('');
+    setAddError(null);
+  };
+
+  const cancelAdd = () => {
+    setAddingCol(null);
+    setAddName('');
+    setAddError(null);
+  };
+
+  const submitAdd = async (col: number) => {
+    const name = addName.trim();
+    if (!name || !onCreateCategory) return;
+    const parentId = columns[col].parentId;
+    const parentColParentId = col > 0 ? columns[col - 1].parentId : undefined;
+    setAddBusy(true);
+    setAddError(null);
+    try {
+      await onCreateCategory(parentId, name);
+      // Refresh this column (show the new node) + the parent column (a leaf parent may have
+      // just become non-leaf, so its leaf marker needs updating).
+      const targetNodes = await browse(parentId);
+      const parentNodes = col > 0 ? await browse(parentColParentId) : null;
+      setColumns((prev) =>
+        prev.map((c, i) => {
+          if (i === col) return { ...c, nodes: targetNodes, loading: false, error: null };
+          if (i === col - 1 && parentNodes) return { ...c, nodes: parentNodes, loading: false, error: null };
+          return c;
+        })
+      );
+      setAddingCol(null);
+      setAddName('');
+    } catch (e) {
+      setAddError(extractErrorMessage(e, '카테고리 생성에 실패했습니다.'));
+    } finally {
+      setAddBusy(false);
+    }
+  };
+
+  // After columns render, keep the active edge visible. If a node is selected and rendered,
+  // bring it into view; otherwise (e.g. drilling into a non-leaf, which selects nothing yet)
+  // scroll the strip fully right so the newly appended column is revealed. Not setState → safe.
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    if (selectedRef.current) {
+      selectedRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    } else {
+      const container = containerRef.current;
+      container?.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
+    }
   }, [columns, selectedId]);
 
+  const canAdd = Boolean(addMode && onCreateCategory);
+
   return (
-    <div className="flex gap-2 overflow-x-auto rounded border border-gray-200 bg-gray-50 p-2">
+    <div
+      ref={containerRef}
+      className="flex gap-2 overflow-x-auto rounded border border-gray-200 bg-gray-50 p-2"
+    >
       {columns.map((column, col) => (
         <div
           key={col}
           className="min-w-[200px] shrink-0 rounded border border-gray-200 bg-white"
         >
+          {/* Add-category row at the top of each layer (management screen, add-mode). */}
+          {canAdd && !column.loading && (
+            <div className="border-b border-gray-100 p-1.5">
+              {addingCol === col ? (
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={addName}
+                    onChange={(e) => setAddName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && addName.trim() && !addBusy) void submitAdd(col);
+                      if (e.key === 'Escape' && !addBusy) cancelAdd();
+                    }}
+                    placeholder="새 카테고리 이름"
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void submitAdd(col)}
+                      disabled={!addName.trim() || addBusy}
+                      className="flex-1 rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:bg-gray-400"
+                    >
+                      {addBusy ? <Spinner size={14} label="저장" /> : '저장'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelAdd}
+                      disabled={addBusy}
+                      className="rounded border border-gray-300 px-2 py-1 text-xs font-medium hover:bg-gray-50"
+                    >
+                      취소
+                    </button>
+                  </div>
+                  {addError && <p className="text-xs text-red-700">{addError}</p>}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => startAdd(col)}
+                  className="w-full rounded px-2 py-1 text-left text-xs font-medium text-green-700 hover:bg-green-50"
+                >
+                  + {col === 0 ? '최상위에 추가' : '여기에 추가'}
+                </button>
+              )}
+            </div>
+          )}
+
           {column.loading ? (
             <div className="flex h-40 items-center justify-center">
               <Spinner size={20} />
