@@ -6,6 +6,9 @@ import type {
   MasterOptionResponse,
   MasterCategoryRequest,
   MasterCategoryResponse,
+  CategoryMetaResponse,
+  CategoryMetaSchemaResponse,
+  CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
@@ -21,8 +24,12 @@ export interface MasterProductRepository {
   updateOption(id: number, optionId: number, data: MasterOptionRequest): Promise<MasterOptionResponse>;
   deleteOption(id: number, optionId: number): Promise<void>;
   getMatrix(id: number): Promise<ListingMatrixResponse>;
-  upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
-  getCategories(id: number): Promise<MasterCategoryResponse[]>;
-  deleteCategory(id: number, platform: string): Promise<void>;
+  getCategory(id: number): Promise<MasterCategoryResponse | null>;
+  setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
+  clearCategory(id: number): Promise<void>;
+  getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse>;
+  // Schema only, keyed by (platform × categoryId) — used before a master exists.
+  getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse>;
+  setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
 }

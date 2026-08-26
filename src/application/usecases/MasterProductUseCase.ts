@@ -7,6 +7,9 @@ import type {
   MasterOptionResponse,
   MasterCategoryRequest,
   MasterCategoryResponse,
+  CategoryMetaResponse,
+  CategoryMetaSchemaResponse,
+  CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
@@ -54,16 +57,28 @@ export class MasterProductUseCase {
     return this.repository.getMatrix(id);
   }
 
-  upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
-    return this.repository.upsertCategory(id, data);
+  getCategory(id: number): Promise<MasterCategoryResponse | null> {
+    return this.repository.getCategory(id);
   }
 
-  getCategories(id: number): Promise<MasterCategoryResponse[]> {
-    return this.repository.getCategories(id);
+  setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
+    return this.repository.setCategory(id, data);
   }
 
-  deleteCategory(id: number, platform: string): Promise<void> {
-    return this.repository.deleteCategory(id, platform);
+  clearCategory(id: number): Promise<void> {
+    return this.repository.clearCategory(id);
+  }
+
+  getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse> {
+    return this.repository.getCategoryMeta(id, platform);
+  }
+
+  getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse> {
+    return this.repository.getCategorySchema(categoryId, platform);
+  }
+
+  setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void> {
+    return this.repository.setCategoryAttributes(id, data);
   }
 
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {

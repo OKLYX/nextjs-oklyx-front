@@ -36,6 +36,9 @@ export interface BatchChannelAddResponse {
 
 export interface OptionPrice {
   optionId: number;
+  // Channel option display name (matches the master option name). Prefer this over resolving
+  // optionId against master options — the ids are in different spaces. Legacy responses omit it.
+  optionName?: string | null;
   sellingPrice: number;
   // Per-channel active flag (42/43): only active options are pushed to the market.
   // Toggled inline in the matrix price column; undefined (legacy) is treated as active.

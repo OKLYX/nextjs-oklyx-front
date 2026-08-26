@@ -10,11 +10,15 @@ import type {
   MasterOptionResponse,
   MasterCategoryRequest,
   MasterCategoryResponse,
+  CategoryMetaResponse,
+  CategoryMetaSchemaResponse,
+  CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
 
 const base = '/api/admin/master-products';
+const lookupBase = '/api/admin/category-lookup';
 
 export class MasterProductRepositoryImpl implements MasterProductRepository {
   async list(): Promise<MasterProductResponse[]> {
@@ -69,18 +73,36 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
     return response.data.data;
   }
 
-  async upsertCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
+  async getCategory(id: number): Promise<MasterCategoryResponse | null> {
+    const response = await axiosInstance.get(`${base}/${id}/category`);
+    const data = response.data.data;
+    // Backend returns { categoryId: null, categoryName: null } when unset.
+    return data && data.categoryId != null ? data : null;
+  }
+
+  async setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse> {
     const response = await axiosInstance.put(`${base}/${id}/category`, data);
     return response.data.data;
   }
 
-  async getCategories(id: number): Promise<MasterCategoryResponse[]> {
-    const response = await axiosInstance.get(`${base}/${id}/categories`);
+  async clearCategory(id: number): Promise<void> {
+    await axiosInstance.delete(`${base}/${id}/category`);
+  }
+
+  async getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse> {
+    const response = await axiosInstance.get(`${base}/${id}/category-meta`, { params: { platform } });
     return response.data.data;
   }
 
-  async deleteCategory(id: number, platform: string): Promise<void> {
-    await axiosInstance.delete(`${base}/${id}/categories/${platform}`);
+  async getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse> {
+    const response = await axiosInstance.get(`${lookupBase}/${platform}/meta`, {
+      params: { categoryId },
+    });
+    return response.data.data;
+  }
+
+  async setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void> {
+    await axiosInstance.patch(`${base}/${id}/category-attributes`, data);
   }
 
   async updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {

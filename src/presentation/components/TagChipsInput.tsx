@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ClipboardEvent, type KeyboardEvent } from 'react';
+import { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 interface TagChipsInputProps {
   tags: string[];
@@ -55,8 +55,26 @@ export function TagChipsInput({ tags, onChange, disabled = false, placeholder }:
     onChange(tags.filter((_, i) => i !== index));
   };
 
+  // Detect the comma/newline delimiter here rather than in keydown. A comma only appears in the
+  // value after the IME finalizes the Korean composition, so there is no race (and no leftover
+  // composing char). Everything before the last delimiter becomes tags; the trailing text stays
+  // in the draft. This also covers pasted "a, b, c" strings.
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value.includes(',') || value.includes('\n')) {
+      const lastBreak = Math.max(value.lastIndexOf(','), value.lastIndexOf('\n'));
+      addTokens(value.slice(0, lastBreak));
+      setDraft(value.slice(lastBreak + 1));
+    } else {
+      setDraft(value);
+    }
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter') {
+      // Ignore the Enter that finalizes an IME composition (Korean/CJK); otherwise it also fires
+      // here and commits the word, registering it twice. A second Enter (not composing) adds it.
+      if (e.nativeEvent.isComposing) return;
       e.preventDefault();
       commit();
       return;
@@ -65,14 +83,6 @@ export function TagChipsInput({ tags, onChange, disabled = false, placeholder }:
       e.preventDefault();
       removeAt(tags.length - 1);
     }
-  };
-
-  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
-    const text = e.clipboardData.getData('text');
-    if (!/[,\n]/.test(text)) return; // no delimiter -> let the input handle it normally
-    e.preventDefault();
-    addTokens(draft + text);
-    setDraft('');
   };
 
   return (
@@ -99,9 +109,8 @@ export function TagChipsInput({ tags, onChange, disabled = false, placeholder }:
         value={draft}
         disabled={disabled}
         placeholder={placeholder ?? '태그 입력 후 Enter'}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
         onBlur={commit}
       />
     </div>
