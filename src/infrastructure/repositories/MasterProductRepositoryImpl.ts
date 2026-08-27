@@ -16,6 +16,7 @@ import type {
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
+import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 const base = '/api/admin/master-products';
 const lookupBase = '/api/admin/category-lookup';
@@ -108,5 +109,10 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
   async updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {
     const response = await axiosInstance.patch(`${base}/${id}/tags`, data);
     return response.data.data;
+  }
+
+  // ResponseDTO<Void> — no unwrap.
+  async updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
+    await axiosInstance.put(`${base}/${id}/registration-name-suffix`, data);
   }
 }

@@ -153,6 +153,9 @@ export interface ListingOptionsResponse {
   // PUT response only: true when the active set changed on an already-pushed cell
   // (SUBMITTED/SELLING) -> a re-register is needed to reflect it on the market.
   needsResync?: boolean;
+  // PUT response only (67/68): registration name recomputed from the new active option
+  // set. Used to patch just this cell's registrationName without a full matrix reload.
+  registrationName?: string;
 }
 
 export interface ActiveOptionsRequest {

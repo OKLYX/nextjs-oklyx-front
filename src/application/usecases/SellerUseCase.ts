@@ -1,5 +1,6 @@
 import { SellerRepository, CreateSellerRequest, UpdateSellerRequest, SellerPageResponse } from '@/domain/repositories/SellerRepository';
 import { Seller } from '@/domain/entities/SellerEntity';
+import { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 export class SellerUseCase {
   constructor(private repository: SellerRepository) {}
@@ -22,6 +23,10 @@ export class SellerUseCase {
 
   async update(id: number, data: UpdateSellerRequest): Promise<Seller> {
     return this.repository.update(id, data);
+  }
+
+  async updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
+    return this.repository.updateRegistrationNameSuffix(id, data);
   }
 
   async delete(id: number): Promise<void> {

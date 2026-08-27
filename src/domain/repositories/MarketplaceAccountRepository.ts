@@ -1,4 +1,5 @@
 import { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 export interface CreateMarketplaceAccountRequest {
   sellerId: number;
@@ -32,5 +33,6 @@ export interface MarketplaceAccountRepository {
   getBySeller(sellerId: number): Promise<MarketplaceAccount[]>;
   create(data: CreateMarketplaceAccountRequest): Promise<MarketplaceAccount>;
   update(id: number, data: UpdateMarketplaceAccountRequest): Promise<MarketplaceAccount>;
+  updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;
   delete(id: number): Promise<void>;
 }

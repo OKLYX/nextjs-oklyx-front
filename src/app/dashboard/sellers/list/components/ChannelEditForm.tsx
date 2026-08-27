@@ -9,6 +9,8 @@ import {
   type UpdateMarketplaceAccountForm,
 } from '@/application/dto/MarketplaceAccountDTOs';
 import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
+import type { OptionCheckSuffixConfig } from '@/domain/entities/OptionCheckSuffix';
+import { OptionCheckSuffixControl } from '@/presentation/components/OptionCheckSuffixControl';
 
 // Hardcoded for now; mirrors ChannelRegistrationForm's PLATFORM_OPTIONS.
 // Exported as SSOT so other features (e.g. carrier platform codes) can reuse it.
@@ -22,7 +24,9 @@ export const PLATFORM_OPTIONS = [
 interface ChannelEditFormProps {
   channel: MarketplaceAccount;
   isLoading?: boolean;
-  onSubmit: (data: UpdateMarketplaceAccountForm) => Promise<void>;
+  // Channel PATCH + suffix PUT run sequentially in the parent. Any failure
+  // throws here → inline banner + retry, modal stays open (see EditChannelModal).
+  onSubmit: (data: UpdateMarketplaceAccountForm, suffixConfig: OptionCheckSuffixConfig) => Promise<void>;
   onCancel: () => void;
   thumbTemplates?: TemplateOption[];
   detailTemplates?: TemplateOption[];
@@ -39,6 +43,10 @@ export function ChannelEditForm({
   templatesLoading = false,
 }: ChannelEditFormProps) {
   const [error, setError] = useState<string | null>(null);
+  const [suffixConfig, setSuffixConfig] = useState<OptionCheckSuffixConfig>({
+    optionCheckSuffixEnabled: channel.optionCheckSuffixEnabled ?? null,
+    optionCheckSuffix: channel.optionCheckSuffix ?? null,
+  });
 
   const { register, handleSubmit, formState } = useForm<UpdateMarketplaceAccountForm>({
     resolver: zodResolver(updateMarketplaceAccountSchema),
@@ -57,7 +65,7 @@ export function ChannelEditForm({
   const onSubmit = async (data: UpdateMarketplaceAccountForm) => {
     try {
       setError(null);
-      await externalOnSubmit(data);
+      await externalOnSubmit(data, suffixConfig);
     } catch (err) {
       const message = err instanceof Error ? err.message : '판매채널 수정에 실패했습니다';
       setError(message);
@@ -206,6 +214,19 @@ export function ChannelEditForm({
       <p className="text-xs text-gray-500">
         비워두면 기존 지정을 유지합니다(기본값으로 되돌리기는 지원하지 않음).
       </p>
+
+      <div className="border-t pt-4 space-y-2">
+        <div>
+          <label className="block text-sm font-medium">등록상품명 추가 문구</label>
+          <p className="text-xs text-gray-500">멀티 옵션 상품의 등록상품명에 추가될 문구를 채널단위로 설정합니다.</p>
+        </div>
+        <OptionCheckSuffixControl
+          value={suffixConfig}
+          onChange={setSuffixConfig}
+          inheritedHint="입력하지 않을 시 판매자의 등록상품명 추가 문구를 사용합니다."
+          disabled={isLoading}
+        />
+      </div>
 
       <div className="flex gap-2 pt-2">
         <button

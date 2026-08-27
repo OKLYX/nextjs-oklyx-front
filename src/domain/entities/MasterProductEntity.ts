@@ -38,6 +38,9 @@ export interface MasterProductResponse {
   // Computed registration name (prompt 32). Present only on getById (single fetch);
   // the list response omits the field entirely, so it is undefined there.
   registrationName?: string | null;
+  // "옵션확인" 접미사 마스터 override (69). null = 상속(채널 → 판매자 → 시스템).
+  optionCheckSuffixEnabled?: boolean | null;
+  optionCheckSuffix?: string | null;
 }
 
 // Tags PATCH body, shared by master pool and channel raw endpoints.
@@ -137,6 +140,9 @@ export interface MatrixCell {
   productListingId: number;
   // Display name (노출상품명) = ProductListing.name, channel-scoped, always present (35).
   name: string;
+  // Registration name (등록상품명) = always auto-computed from the channel's active options (67).
+  // Read-only in the UI; refreshed in place when the active option set is toggled (43/68).
+  registrationName: string;
   platformProductId: string | null;
   sellingPrice: number | null;
 }

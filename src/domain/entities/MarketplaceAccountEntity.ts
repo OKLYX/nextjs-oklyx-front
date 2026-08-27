@@ -10,6 +10,9 @@ export interface MarketplaceAccount {
   // template-list lookup). null = use the tenant default template.
   thumbnailTemplateId: number | null;
   detailTemplateId: number | null;
+  // "옵션확인" 접미사 채널 override (69). null = 상속(판매자 기본 → 시스템).
+  optionCheckSuffixEnabled?: boolean | null;
+  optionCheckSuffix?: string | null;
   createdAt: string;
   updatedAt: string;
 }

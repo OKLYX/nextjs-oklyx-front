@@ -5,6 +5,7 @@ import { MarketplaceAccountRepositoryImpl } from '@/infrastructure/repositories/
 import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAccountUseCase';
 import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 import type { UpdateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
+import type { OptionCheckSuffixConfig } from '@/domain/entities/OptionCheckSuffix';
 import { ChannelEditForm } from './ChannelEditForm';
 
 interface EditChannelModalProps {
@@ -60,7 +61,10 @@ export function EditChannelModal({
     return null;
   }
 
-  const handleSubmit = async (data: UpdateMarketplaceAccountForm) => {
+  const handleSubmit = async (
+    data: UpdateMarketplaceAccountForm,
+    suffixConfig: OptionCheckSuffixConfig,
+  ) => {
     try {
       setIsLoading(true);
       await useCase.update(channel.id, {
@@ -75,6 +79,13 @@ export function EditChannelModal({
         // default); a value = replace.
         thumbnailTemplateId: data.thumbnailTemplateId ? Number(data.thumbnailTemplateId) : undefined,
         detailTemplateId: data.detailTemplateId ? Number(data.detailTemplateId) : undefined,
+      });
+      // Channel save joins the suffix PUT. On partial failure (channel saved,
+      // suffix PUT failed) this throws → ChannelEditForm shows a banner and the
+      // modal stays open; retry re-runs both (channel PATCH is idempotent).
+      await useCase.updateRegistrationNameSuffix(channel.id, {
+        enabled: suffixConfig.optionCheckSuffixEnabled,
+        suffix: suffixConfig.optionCheckSuffix,
       });
       onClose();
       await onSuccess();

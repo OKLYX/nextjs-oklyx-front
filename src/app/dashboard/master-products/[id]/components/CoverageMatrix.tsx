@@ -19,6 +19,7 @@ import {
   type ChannelPreviewData,
 } from '@/presentation/components/DetailHtmlPreview';
 import { MasterTagsPanel } from './MasterTagsPanel';
+import { MasterRegistrationSuffixPanel } from './MasterRegistrationSuffixPanel';
 import { CellActions } from './CellActions';
 import { DisplayNameRow } from './DisplayNameRow';
 
@@ -260,6 +261,20 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           },
         };
       });
+      // Registration name is auto-recomputed from the active option set (67/68). Patch just
+      // this cell's registrationName from the response — no full reload (avoids thumbnail re-flash).
+      if (res.registrationName != null) {
+        setMatrix((prev) =>
+          prev && {
+            ...prev,
+            rows: prev.rows.map((r) =>
+              r.cell?.productListingId === listingId
+                ? { ...r, cell: { ...r.cell, registrationName: res.registrationName! } }
+                : r,
+            ),
+          },
+        );
+      }
       if (res.needsResync) {
         setBanner({
           text: '활성 옵션이 변경되었습니다. 마켓에 반영하려면 해당 채널의 [재생성]/[마켓 등록]으로 재등록하세요.',
@@ -351,6 +366,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       {isAdmin && <MasterTagsPanel masterId={masterId} useCase={masterUseCase} />}
+
+      {isAdmin && (
+        <MasterRegistrationSuffixPanel masterId={masterId} useCase={masterUseCase} onSaved={load} />
+      )}
 
       <div className="rounded-lg bg-white shadow list-table-scroll">
         {isLoading ? (
@@ -559,6 +578,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     <DisplayNameRow
                       listingId={row.cell.productListingId}
                       name={row.cell.name}
+                      registrationName={row.cell.registrationName}
                       tags={generated[row.cell.productListingId]?.tags ?? []}
                       onSaved={load}
                     />

@@ -1,4 +1,5 @@
 import { Seller } from '@/domain/entities/SellerEntity';
+import { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 export interface CreateSellerRequest {
   sellerName: string;
@@ -23,5 +24,6 @@ export interface SellerRepository {
   getAllPaginated(name: string, page: number, size: number): Promise<SellerPageResponse>;
   create(data: CreateSellerRequest): Promise<Seller>;
   update(id: number, data: UpdateSellerRequest): Promise<Seller>;
+  updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;
   delete(id: number): Promise<void>;
 }

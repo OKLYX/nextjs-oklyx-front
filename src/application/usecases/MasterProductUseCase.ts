@@ -13,6 +13,7 @@ import type {
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
+import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 export class MasterProductUseCase {
   constructor(private repository: MasterProductRepository) {}
@@ -83,5 +84,9 @@ export class MasterProductUseCase {
 
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {
     return this.repository.updateTags(id, data);
+  }
+
+  updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
+    return this.repository.updateRegistrationNameSuffix(id, data);
   }
 }

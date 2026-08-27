@@ -3,6 +3,7 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import { SellerRepository, CreateSellerRequest, UpdateSellerRequest, SellerPageResponse } from '@/domain/repositories/SellerRepository';
 import { Seller } from '@/domain/entities/SellerEntity';
+import { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 export class SellerRepositoryImpl implements SellerRepository {
   async getAll(): Promise<Seller[]> {
@@ -30,6 +31,11 @@ export class SellerRepositoryImpl implements SellerRepository {
   async update(id: number, data: UpdateSellerRequest): Promise<Seller> {
     const response = await axiosInstance.patch(`/api/admin/seller/${id}`, data);
     return response.data.data;
+  }
+
+  // ResponseDTO<Void> — no unwrap. Backend path uses singular `seller`.
+  async updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
+    await axiosInstance.put(`/api/admin/seller/${id}/registration-name-suffix`, data);
   }
 
   async delete(id: number): Promise<void> {

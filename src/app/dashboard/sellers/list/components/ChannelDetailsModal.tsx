@@ -29,6 +29,12 @@ function templateLabel(id: number | null, templates: TemplateOption[]): string {
   return templates.find((t) => t.id === id)?.name ?? `#${id}`;
 }
 
+// "옵션확인" 접미사 채널 override 표시 문구. 문구 없음 = 판매자 기본값 상속.
+function suffixLabel(suffix?: string | null): string {
+  if (suffix == null || suffix.trim() === '') return '미등록시 판매자 설정값 사용';
+  return `추가 문구 "${suffix}"`;
+}
+
 /**
  * Read-only details modal for a single sales channel (MarketplaceAccount).
  *
@@ -125,6 +131,13 @@ export function ChannelDetailsModal({
             <label className="block text-sm font-medium mb-1">상세 템플릿</label>
             <p className="text-sm text-gray-900">
               {templateLabel(channel.detailTemplateId, detailTemplates)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">등록상품명 추가 문구</label>
+            <p className="text-sm text-gray-900">
+              {suffixLabel(channel.optionCheckSuffix)}
             </p>
           </div>
 
