@@ -12,6 +12,7 @@ import type {
   ListingMatrixResponse,
   TagsUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
+import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 export interface MasterProductRepository {
   list(): Promise<MasterProductResponse[]>;
@@ -32,4 +33,5 @@ export interface MasterProductRepository {
   getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse>;
   setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
+  updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;
 }

@@ -122,6 +122,17 @@ export function SellerDetailsModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                등록상품명 추가 문구
+              </label>
+              <p className="text-sm text-gray-900">
+                {seller.optionCheckSuffix && seller.optionCheckSuffix.trim() !== ''
+                  ? `추가 문구 "${seller.optionCheckSuffix}"`
+                  : '미등록'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 등록일
               </label>
               <p className="text-sm text-gray-900">{formatDate(seller.createdAt)}</p>

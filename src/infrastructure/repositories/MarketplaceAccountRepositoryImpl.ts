@@ -7,6 +7,7 @@ import {
   UpdateMarketplaceAccountRequest,
 } from '@/domain/repositories/MarketplaceAccountRepository';
 import { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 export class MarketplaceAccountRepositoryImpl implements MarketplaceAccountRepository {
   async getBySeller(sellerId: number): Promise<MarketplaceAccount[]> {
@@ -24,6 +25,11 @@ export class MarketplaceAccountRepositoryImpl implements MarketplaceAccountRepos
   async update(id: number, data: UpdateMarketplaceAccountRequest): Promise<MarketplaceAccount> {
     const response = await axiosInstance.patch(`/api/admin/marketplace-account/${id}`, data);
     return response.data.data;
+  }
+
+  // ResponseDTO<Void> — no unwrap. Backend path uses singular `marketplace-account`.
+  async updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
+    await axiosInstance.put(`/api/admin/marketplace-account/${id}/registration-name-suffix`, data);
   }
 
   async delete(id: number): Promise<void> {

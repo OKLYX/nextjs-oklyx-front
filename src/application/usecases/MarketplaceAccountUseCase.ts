@@ -4,6 +4,7 @@ import {
   UpdateMarketplaceAccountRequest,
 } from '@/domain/repositories/MarketplaceAccountRepository';
 import { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 export class MarketplaceAccountUseCase {
   constructor(private repository: MarketplaceAccountRepository) {}
@@ -18,6 +19,10 @@ export class MarketplaceAccountUseCase {
 
   async update(id: number, data: UpdateMarketplaceAccountRequest): Promise<MarketplaceAccount> {
     return this.repository.update(id, data);
+  }
+
+  async updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
+    return this.repository.updateRegistrationNameSuffix(id, data);
   }
 
   async delete(id: number): Promise<void> {
