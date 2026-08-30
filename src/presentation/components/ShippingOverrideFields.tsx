@@ -42,7 +42,13 @@ const CUSTOM_MESSAGE = '__custom__';
 const COUPANG_DELIVERY_COMPANIES: { code: string; name: string }[] = [
   { code: 'CJGLS', name: 'CJ대한통운' },
   { code: 'HANJIN', name: '한진택배' },
-  { code: 'LOTTEGLOBAL', name: '롯데택배' },
+  // ⚠️ 롯데는 코드가 2개다 — 공식 표에 `HYUNDAI`·`LOTTEGLOBAL` 이 **둘 다** "Lotte Global Logistics"
+  // 로 등재돼 있다(`HYUNDAI` 는 현대택배 시절 코드가 그대로 남은 것). 계정마다 매칭되는 쪽이 달라
+  // 하나만 넣으면 "내 택배사가 목록에 없다"가 된다(실계정 확인 2026-08-30: WING 매칭은 `HYUNDAI`).
+  // 이름에 코드를 병기해 사용자가 자기 계정 값을 고르게 한다. 기존 저장값(LOTTEGLOBAL)도 계속
+  // 인식돼야 하므로 **둘 다 유지**할 것 — 목록에 없는 코드는 "직접 입력" 으로 떨어진다.
+  { code: 'HYUNDAI', name: '롯데택배 (HYUNDAI)' },
+  { code: 'LOTTEGLOBAL', name: '롯데택배 (LOTTEGLOBAL)' },
   { code: 'KGB', name: '로젠택배' },
   { code: 'EPOST', name: '우체국택배' },
   { code: 'KDEXP', name: '경동택배' },
