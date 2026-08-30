@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { CreateProductListingRequest } from '@/application/dto/ProductListingDTOs';
 
-const PLATFORMS = ['COUPANG', 'GMARKET', 'AUCTION', 'SMARTSTORE'];
+export const PLATFORMS = ['COUPANG', 'GMARKET', 'AUCTION', 'SMARTSTORE'];
 
 const PLATFORM_CATEGORIES: Record<string, Array<{ id: number; name: string }>> = {
   COUPANG: [

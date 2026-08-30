@@ -8,6 +8,7 @@ import {
   createMarketplaceAccountSchema,
   type CreateMarketplaceAccountForm,
 } from '@/application/dto/MarketplaceAccountDTOs';
+import type { TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 
 // Hardcoded for now; will be replaced with a managed platform list later.
 const PLATFORM_OPTIONS = [
@@ -21,12 +22,18 @@ interface ChannelRegistrationFormProps {
   isLoading?: boolean;
   onSubmit: (data: CreateMarketplaceAccountForm) => Promise<void>;
   onCancel: () => void;
+  thumbTemplates?: TemplateOption[];
+  detailTemplates?: TemplateOption[];
+  templatesLoading?: boolean;
 }
 
 export function ChannelRegistrationForm({
   isLoading = false,
   onSubmit: externalOnSubmit,
   onCancel,
+  thumbTemplates = [],
+  detailTemplates = [],
+  templatesLoading = false,
 }: ChannelRegistrationFormProps) {
   const [error, setError] = useState<string | null>(null);
 
@@ -114,6 +121,23 @@ export function ChannelRegistrationForm({
       </div>
 
       <div>
+        <label htmlFor="vendorUserId" className="block text-sm font-medium mb-1">
+          WING 로그인 ID
+        </label>
+        <input
+          {...register('vendorUserId')}
+          id="vendorUserId"
+          type="text"
+          placeholder="쿠팡 상품등록 시 사용 (선택)"
+          disabled={isLoading}
+          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {formState.errors.vendorUserId && (
+          <p className="mt-1 text-sm text-red-600">{formState.errors.vendorUserId.message}</p>
+        )}
+      </div>
+
+      <div>
         <label htmlFor="accessKey" className="block text-sm font-medium mb-1">
           Access Key <span className="text-red-600">*</span>
         </label>
@@ -145,6 +169,44 @@ export function ChannelRegistrationForm({
         {formState.errors.secretKey && (
           <p className="mt-1 text-sm text-red-600">{formState.errors.secretKey.message}</p>
         )}
+      </div>
+
+      <div>
+        <label htmlFor="thumbnailTemplateId" className="block text-sm font-medium mb-1">
+          썸네일 템플릿
+        </label>
+        <select
+          {...register('thumbnailTemplateId')}
+          id="thumbnailTemplateId"
+          disabled={isLoading || templatesLoading}
+          className="w-full px-3 py-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        >
+          <option value="">기본값 사용 (테넌트 기본 템플릿)</option>
+          {thumbTemplates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}{t.isDefault ? ' (기본)' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="detailTemplateId" className="block text-sm font-medium mb-1">
+          상세 템플릿
+        </label>
+        <select
+          {...register('detailTemplateId')}
+          id="detailTemplateId"
+          disabled={isLoading || templatesLoading}
+          className="w-full px-3 py-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        >
+          <option value="">기본값 사용 (테넌트 기본 템플릿)</option>
+          {detailTemplates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}{t.isDefault ? ' (기본)' : ''}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex gap-2 pt-2">

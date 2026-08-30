@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
@@ -8,6 +8,8 @@ import { createSellerSchema, type CreateSellerRequest } from '@/application/dto/
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import type { OptionCheckSuffixConfig } from '@/domain/entities/OptionCheckSuffix';
+import { OptionCheckSuffixControl } from '@/presentation/components/OptionCheckSuffixControl';
 
 interface EditSellerFormProps {
   seller: Seller | null;
@@ -24,6 +26,15 @@ export function EditSellerForm({
 }: EditSellerFormProps) {
   const [internalIsLoading, setInternalIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // "옵션확인" 접미사 판매자 기본값 — RHF 밖 독립 state·독립 저장.
+  const [suffixConfig, setSuffixConfig] = useState<OptionCheckSuffixConfig>({
+    optionCheckSuffixEnabled: seller?.optionCheckSuffixEnabled ?? null,
+    optionCheckSuffix: seller?.optionCheckSuffix ?? null,
+  });
+  const [isSavingSuffix, setIsSavingSuffix] = useState(false);
+  const [suffixError, setSuffixError] = useState<string | null>(null);
+  const [suffixSaved, setSuffixSaved] = useState(false);
 
   const isLoading = externalIsLoading || internalIsLoading;
 
@@ -69,7 +80,30 @@ export function EditSellerForm({
     }
   };
 
+  const handleSaveSuffix = async () => {
+    if (!seller) return;
+
+    try {
+      setIsSavingSuffix(true);
+      setSuffixError(null);
+      setSuffixSaved(false);
+      await useCase.updateRegistrationNameSuffix(seller.id, {
+        enabled: suffixConfig.optionCheckSuffixEnabled,
+        suffix: suffixConfig.optionCheckSuffix,
+      });
+      setSuffixSaved(true);
+      // Transient confirmation — auto-dismiss (project has no toast system).
+      setTimeout(() => setSuffixSaved(false), 2500);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '추가 문구 저장에 실패했습니다';
+      setSuffixError(message);
+    } finally {
+      setIsSavingSuffix(false);
+    }
+  };
+
   return (
+    <div className="space-y-6">
     <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
       {error && (
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
@@ -137,5 +171,53 @@ export function EditSellerForm({
         </button>
       </div>
     </form>
+
+    {seller && (
+      <div className="border-t pt-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">등록상품명 추가 문구</h3>
+          <p className="text-xs text-gray-500">
+            옵션 2개 이상 등록상품명에 붙는 추가 문구의 판매자 기본값입니다.
+          </p>
+        </div>
+
+        <OptionCheckSuffixControl
+          value={suffixConfig}
+          onChange={(next) => {
+            setSuffixConfig(next);
+            setSuffixSaved(false);
+          }}
+          inheritedHint="입력하지 않으면 등록상품명에 추가 문구가 붙지 않습니다."
+          disabled={isSavingSuffix}
+        />
+
+        {suffixError && (
+          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <div>{suffixError}</div>
+          </div>
+        )}
+        {suffixSaved && !suffixError && (
+          <p className="text-sm text-green-700">추가 문구를 저장했습니다.</p>
+        )}
+
+        <button
+          type="button"
+          onClick={handleSaveSuffix}
+          disabled={isSavingSuffix}
+          className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+        >
+          {isSavingSuffix ? (
+            <>
+              <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              저장 중...
+            </>
+          ) : (
+            '추가 문구 저장'
+          )}
+        </button>
+      </div>
+    )}
+    </div>
   );
 }

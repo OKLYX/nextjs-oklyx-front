@@ -8,11 +8,11 @@ export interface Product {
   createdDate: string;
   modifiedDate?: string;
   barcodeId?: string;
-  unit?: string;
-  volumeHeight?: string;
-  volumeLong?: string;
-  volumeShort?: string;
-  weight?: string;
+  netContentUnit?: string;
+  packageHeight?: string;
+  packageLength?: string;
+  packageWidth?: string;
+  netContent?: string;
   description?: string;
   name?: string;
   imageUrl?: string;

@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MarketplaceAccountRepositoryImpl } from '@/infrastructure/repositories/MarketplaceAccountRepositoryImpl';
 import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAccountUseCase';
-import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 import type { UpdateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
+import type { OptionCheckSuffixConfig } from '@/domain/entities/OptionCheckSuffix';
 import { ChannelEditForm } from './ChannelEditForm';
 
 interface EditChannelModalProps {
@@ -13,6 +14,9 @@ interface EditChannelModalProps {
   sellerName: string;
   onClose: () => void;
   onSuccess: () => Promise<void>;
+  thumbTemplates: TemplateOption[];
+  detailTemplates: TemplateOption[];
+  templatesLoading: boolean;
 }
 
 /**
@@ -29,6 +33,9 @@ export function EditChannelModal({
   sellerName,
   onClose,
   onSuccess,
+  thumbTemplates,
+  detailTemplates,
+  templatesLoading,
 }: EditChannelModalProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -54,7 +61,10 @@ export function EditChannelModal({
     return null;
   }
 
-  const handleSubmit = async (data: UpdateMarketplaceAccountForm) => {
+  const handleSubmit = async (
+    data: UpdateMarketplaceAccountForm,
+    suffixConfig: OptionCheckSuffixConfig,
+  ) => {
     try {
       setIsLoading(true);
       await useCase.update(channel.id, {
@@ -62,9 +72,21 @@ export function EditChannelModal({
         platform: data.platform,
         accountAlias: data.accountAlias,
         vendorId: data.vendorId,
+        vendorUserId: data.vendorUserId || undefined,
         accessKey: data.accessKey,
         // Blank secretKey is omitted → backend keeps the existing key.
         secretKey: data.secretKey ? data.secretKey : undefined,
+        // Blank template id = omitted → backend keeps existing (no clearing to
+        // default); a value = replace.
+        thumbnailTemplateId: data.thumbnailTemplateId ? Number(data.thumbnailTemplateId) : undefined,
+        detailTemplateId: data.detailTemplateId ? Number(data.detailTemplateId) : undefined,
+      });
+      // Channel save joins the suffix PUT. On partial failure (channel saved,
+      // suffix PUT failed) this throws → ChannelEditForm shows a banner and the
+      // modal stays open; retry re-runs both (channel PATCH is idempotent).
+      await useCase.updateRegistrationNameSuffix(channel.id, {
+        enabled: suffixConfig.optionCheckSuffixEnabled,
+        suffix: suffixConfig.optionCheckSuffix,
       });
       onClose();
       await onSuccess();
@@ -95,6 +117,9 @@ export function EditChannelModal({
             isLoading={isLoading}
             onSubmit={handleSubmit}
             onCancel={onClose}
+            thumbTemplates={thumbTemplates}
+            detailTemplates={detailTemplates}
+            templatesLoading={templatesLoading}
           />
         </div>
       </div>

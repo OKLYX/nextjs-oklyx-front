@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 
 // Mirror of ChannelRegistrationForm's PLATFORM_OPTIONS for display labels.
 const PLATFORM_LABELS: Record<string, string> = {
@@ -18,6 +18,22 @@ interface ChannelDetailsModalProps {
   onClose: () => void;
   onEditClick?: (channel: MarketplaceAccount) => void;
   onDeleteClick?: (channel: MarketplaceAccount) => void;
+  onShippingClick?: (channel: MarketplaceAccount) => void;
+  thumbTemplates: TemplateOption[];
+  detailTemplates: TemplateOption[];
+}
+
+// Resolve an assigned template id to a display name. null id = tenant default;
+// a miss (list not yet loaded) falls back to "#<id>".
+function templateLabel(id: number | null, templates: TemplateOption[]): string {
+  if (id == null) return '기본값 사용';
+  return templates.find((t) => t.id === id)?.name ?? `#${id}`;
+}
+
+// "옵션확인" 접미사 채널 override 표시 문구. 문구 없음 = 판매자 기본값 상속.
+function suffixLabel(suffix?: string | null): string {
+  if (suffix == null || suffix.trim() === '') return '미등록시 판매자 설정값 사용';
+  return `추가 문구 "${suffix}"`;
 }
 
 /**
@@ -34,6 +50,9 @@ export function ChannelDetailsModal({
   onClose,
   onEditClick,
   onDeleteClick,
+  onShippingClick,
+  thumbTemplates,
+  detailTemplates,
 }: ChannelDetailsModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -86,6 +105,11 @@ export function ChannelDetailsModal({
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-1">WING 로그인 ID</label>
+            <p className="text-sm text-gray-900">{channel.vendorUserId || '-'}</p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-1">Access Key</label>
             <p className="text-sm text-gray-900 break-all">{channel.accessKey}</p>
           </div>
@@ -104,6 +128,27 @@ export function ChannelDetailsModal({
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-1">썸네일 템플릿</label>
+            <p className="text-sm text-gray-900">
+              {templateLabel(channel.thumbnailTemplateId, thumbTemplates)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">상세 템플릿</label>
+            <p className="text-sm text-gray-900">
+              {templateLabel(channel.detailTemplateId, detailTemplates)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">등록상품명 추가 문구</label>
+            <p className="text-sm text-gray-900">
+              {suffixLabel(channel.optionCheckSuffix)}
+            </p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-1">등록일</label>
             <p className="text-sm text-gray-900">{formatDate(channel.createdAt)}</p>
           </div>
@@ -116,8 +161,16 @@ export function ChannelDetailsModal({
           )}
         </div>
 
-        {(onEditClick || onDeleteClick) && (
+        {(onEditClick || onDeleteClick || onShippingClick) && (
           <div className="border-t p-4 flex gap-2">
+            {onShippingClick && (
+              <button
+                onClick={() => onShippingClick(channel)}
+                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
+              >
+                배송관리
+              </button>
+            )}
             {onEditClick && (
               <button
                 onClick={() => onEditClick(channel)}

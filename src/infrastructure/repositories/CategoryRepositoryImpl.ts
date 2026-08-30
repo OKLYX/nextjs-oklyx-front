@@ -1,5 +1,5 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
-import type { Category } from '@/domain/entities/CategoryEntity';
+import type { Category, CategoryTreeNode } from '@/domain/entities/CategoryEntity';
 import type { CategoryRepository } from '@/domain/repositories/CategoryRepository';
 import type { CreateCategoryRequest } from '@/application/dto/CreateCategoryRequest';
 import type { UpdateCategoryRequest } from '@/application/dto/UpdateCategoryRequest';
@@ -27,5 +27,13 @@ export class CategoryRepositoryImpl implements CategoryRepository {
 
   async deleteCategory(id: number): Promise<void> {
     await axiosInstance.delete(`/api/admin/category/${id}`);
+  }
+
+  async browseTree(parentId?: number): Promise<CategoryTreeNode[]> {
+    const response = await axiosInstance.get(
+      '/api/admin/category/tree',
+      parentId != null ? { params: { parentId } } : undefined
+    );
+    return response.data.data || [];
   }
 }

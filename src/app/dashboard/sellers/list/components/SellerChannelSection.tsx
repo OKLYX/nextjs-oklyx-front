@@ -4,12 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { MarketplaceAccountRepositoryImpl } from '@/infrastructure/repositories/MarketplaceAccountRepositoryImpl';
 import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAccountUseCase';
-import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
+import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
+import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
+import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
+import { ShippingRepositoryImpl } from '@/infrastructure/repositories/ShippingRepositoryImpl';
+import { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
+import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 import type { CreateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
 import { CreateChannelModal } from './CreateChannelModal';
 import { ChannelDetailsModal } from './ChannelDetailsModal';
 import { EditChannelModal } from './EditChannelModal';
 import { DeleteChannelConfirmation } from './DeleteChannelConfirmation';
+import { ShippingConfigModal } from './ShippingConfigModal';
 
 interface SellerChannelSectionProps {
   sellerId: number;
@@ -32,11 +39,25 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
   const [editChannel, setEditChannel] = useState<MarketplaceAccount | null>(null);
   const [deleteChannel, setDeleteChannel] = useState<MarketplaceAccount | null>(null);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  const [shippingChannel, setShippingChannel] = useState<MarketplaceAccount | null>(null);
+  const [thumbTemplates, setThumbTemplates] = useState<TemplateOption[]>([]);
+  const [detailTemplates, setDetailTemplates] = useState<TemplateOption[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
 
   const useCase = useMemo(() => {
     const repository = new MarketplaceAccountRepositoryImpl();
     return new MarketplaceAccountUseCase(repository);
   }, []);
+
+  const thumbnailTemplateUseCase = useMemo(
+    () => new ThumbnailTemplateUseCase(new ThumbnailTemplateRepositoryImpl()),
+    [],
+  );
+  const detailContentUseCase = useMemo(
+    () => new DetailContentUseCase(new DetailContentRepositoryImpl()),
+    [],
+  );
+  const shippingUseCase = useMemo(() => new ShippingUseCase(new ShippingRepositoryImpl()), []);
 
   const loadChannels = useCallback(async () => {
     try {
@@ -59,10 +80,49 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
     run();
   }, [loadChannels]);
 
+  // Template lists are secondary data: failures degrade the dropdowns to
+  // "use default" only (console.error), they never block channel CRUD.
+  useEffect(() => {
+    let cancelled = false;
+    const loadTemplates = async () => {
+      setTemplatesLoading(true);
+      const [thumb, detail] = await Promise.all([
+        thumbnailTemplateUseCase.list().catch((err) => {
+          console.error('썸네일 템플릿 목록 조회 실패', err);
+          return [] as TemplateOption[];
+        }),
+        detailContentUseCase.listTemplates().catch((err) => {
+          console.error('상세 템플릿 목록 조회 실패', err);
+          return [] as TemplateOption[];
+        }),
+      ]);
+      if (!cancelled) {
+        setThumbTemplates(thumb);
+        setDetailTemplates(detail);
+        setTemplatesLoading(false);
+      }
+    };
+    loadTemplates();
+    return () => {
+      cancelled = true;
+    };
+  }, [thumbnailTemplateUseCase, detailContentUseCase]);
+
   const handleCreateSubmit = async (data: CreateMarketplaceAccountForm) => {
     try {
       setIsModalLoading(true);
-      await useCase.create({ sellerId, ...data });
+      await useCase.create({
+        sellerId,
+        platform: data.platform,
+        accountAlias: data.accountAlias,
+        vendorId: data.vendorId,
+        vendorUserId: data.vendorUserId || undefined,
+        accessKey: data.accessKey,
+        secretKey: data.secretKey,
+        // '' = unassigned = tenant-default fallback (not sent to backend).
+        thumbnailTemplateId: data.thumbnailTemplateId ? Number(data.thumbnailTemplateId) : undefined,
+        detailTemplateId: data.detailTemplateId ? Number(data.detailTemplateId) : undefined,
+      });
       setIsCreateModalOpen(false);
       await loadChannels();
     } catch (err) {
@@ -165,6 +225,9 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateSubmit}
         isLoading={isModalLoading}
+        thumbTemplates={thumbTemplates}
+        detailTemplates={detailTemplates}
+        templatesLoading={templatesLoading}
       />
 
       <ChannelDetailsModal
@@ -174,6 +237,16 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         onClose={() => setSelectedChannel(null)}
         onEditClick={(channel) => setEditChannel(channel)}
         onDeleteClick={(channel) => setDeleteChannel(channel)}
+        onShippingClick={(channel) => setShippingChannel(channel)}
+        thumbTemplates={thumbTemplates}
+        detailTemplates={detailTemplates}
+      />
+
+      <ShippingConfigModal
+        isOpen={shippingChannel !== null}
+        account={shippingChannel}
+        onClose={() => setShippingChannel(null)}
+        useCase={shippingUseCase}
       />
 
       <EditChannelModal
@@ -182,6 +255,9 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         sellerName={sellerName}
         onClose={() => setEditChannel(null)}
         onSuccess={handleEditSuccess}
+        thumbTemplates={thumbTemplates}
+        detailTemplates={detailTemplates}
+        templatesLoading={templatesLoading}
       />
 
       <DeleteChannelConfirmation

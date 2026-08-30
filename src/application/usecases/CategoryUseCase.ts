@@ -1,4 +1,4 @@
-import type { Category } from '@/domain/entities/CategoryEntity';
+import type { Category, CategoryTreeNode } from '@/domain/entities/CategoryEntity';
 import type { CreateCategoryRequest } from '../dto/CreateCategoryRequest';
 import type { UpdateCategoryRequest } from '../dto/UpdateCategoryRequest';
 import type { CategoryRepository } from '@/domain/repositories/CategoryRepository';
@@ -24,5 +24,9 @@ export class CategoryUseCase {
 
   async deleteCategory(id: number): Promise<void> {
     return this.repository.deleteCategory(id);
+  }
+
+  async browseTree(parentId?: number): Promise<CategoryTreeNode[]> {
+    return this.repository.browseTree(parentId);
   }
 }

@@ -20,6 +20,12 @@ export const ROUTES = {
   SALES_PRODUCTS_RETRIEVE: '/dashboard/sales-products/retrieve' as const,
   SALES_PRODUCTS_RETRIEVE_DETAILS: (id: number | string) => `/dashboard/sales-products/retrieve/${id}` as const,
   SALES_PRODUCTS_RETRIEVE_EDIT: (id: number | string) => `/dashboard/sales-products/retrieve/${id}/edit` as const,
+  MASTER_PRODUCTS: '/dashboard/master-products' as const,
+  MASTER_PRODUCT_DETAIL: (id: number | string) => `/dashboard/master-products/${id}` as const,
+  MASTER_PRODUCT_DETAIL_EDIT: (masterId: number | string, listingId: number | string) =>
+    `/dashboard/master-products/${masterId}/detail/${listingId}` as const,
+  MARGIN_POLICIES: '/dashboard/margin-policies' as const,
+  LISTINGS_SYNC: '/dashboard/listings/sync' as const,
   SELLERS_LIST: '/dashboard/sellers/list' as const,
   SELLERS_MANAGE: '/dashboard/sellers/manage' as const,
   ORDERS_RETRIEVE: '/dashboard/orders' as const,
@@ -28,4 +34,10 @@ export const ROUTES = {
   THUMBNAIL_TEMPLATES: '/dashboard/thumbnail-templates' as const,
   THUMBNAIL_TEMPLATE_NEW: '/dashboard/thumbnail-templates/new' as const,
   THUMBNAIL_TEMPLATE_EDIT: (id: number | string) => `/dashboard/thumbnail-templates/${id}` as const,
+  DETAIL_TEMPLATES: '/dashboard/detail-templates' as const,
+  DETAIL_TEMPLATE_NEW: '/dashboard/detail-templates/new' as const,
+  DETAIL_TEMPLATE_EDIT: (id: number | string) => `/dashboard/detail-templates/${id}` as const,
+  PROCESSING_PRESETS: '/dashboard/processing-presets' as const,
+  PROCESSING_PRESET_NEW: '/dashboard/processing-presets/new' as const,
+  PROCESSING_PRESET_EDIT: (id: number | string) => `/dashboard/processing-presets/${id}` as const,
 } as const;

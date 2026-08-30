@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { ROUTES } from '@/config/routes';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
+import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
+import { ProductImageGallery } from '@/app/dashboard/products/[id]/components/ProductImageGallery';
 
 interface ProductRegistrationFormValues {
   productName: string;
@@ -12,20 +12,20 @@ interface ProductRegistrationFormValues {
   brand?: string;
   price?: string;
   store?: string;
-  unit?: string;
-  volumeHeight?: string;
-  volumeLong?: string;
-  volumeShort?: string;
-  weight?: string;
+  netContentUnit?: string;
+  packageHeight?: string;
+  packageLength?: string;
+  packageWidth?: string;
+  netContent?: string;
   description?: string;
 }
 
 interface ProductRegistrationFormProps {
-  onSubmit: (data: CreateProductRequest, imageFile: File | null) => Promise<void>;
+  onSubmit: (data: CreateProductRequest) => Promise<void>;
   isLoading: boolean;
-  imageFile: File | null;
-  imagePreviewUrl: string | null;
-  onImageChange: (file: File | null, previewUrl: string | null) => void;
+  imageUseCase: ProductImageUseCase;
+  imageBuffer: File[];
+  onImageBufferChange: (files: File[]) => void;
   onCheckBarcode: (barcodeId: string) => Promise<boolean>;
   onSubmitSuccess: () => void;
 }
@@ -33,19 +33,15 @@ interface ProductRegistrationFormProps {
 export function ProductRegistrationForm({
   onSubmit,
   isLoading,
-  imageFile,
-  imagePreviewUrl,
-  onImageChange,
+  imageUseCase,
+  imageBuffer,
+  onImageBufferChange,
   onCheckBarcode,
   onSubmitSuccess,
 }: ProductRegistrationFormProps) {
-  const router = useRouter();
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const [isCheckingBarcode, setIsCheckingBarcode] = useState(false);
   const [validatedBarcode, setValidatedBarcode] = useState<string | null>(null);
-  const [imageValidationError, setImageValidationError] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -62,11 +58,11 @@ export function ProductRegistrationForm({
       brand: '',
       price: '',
       store: '',
-      unit: '',
-      volumeHeight: '',
-      volumeLong: '',
-      volumeShort: '',
-      weight: '',
+      netContentUnit: '',
+      packageHeight: '',
+      packageLength: '',
+      packageWidth: '',
+      netContent: '',
       description: '',
     },
   });
@@ -102,69 +98,6 @@ export function ProductRegistrationForm({
     setValidatedBarcode(null);
   }, [setValue]);
 
-  const processFile = useCallback(
-    (file: File | undefined) => {
-      setImageValidationError(null);
-
-      if (!file) {
-        onImageChange(null, null);
-        return;
-      }
-
-      const validTypes = ['image/jpeg', 'image/png'];
-      if (!validTypes.includes(file.type)) {
-        setImageValidationError('JPEG와 PNG 이미지만 업로드할 수 있습니다.');
-        onImageChange(null, null);
-        return;
-      }
-
-      const maxSize = 20 * 1024 * 1024;
-      if (file.size > maxSize) {
-        setImageValidationError('이미지 크기는 20MB를 초과할 수 없습니다.');
-        onImageChange(null, null);
-        return;
-      }
-
-      const previewUrl = URL.createObjectURL(file);
-      onImageChange(file, previewUrl);
-    },
-    [onImageChange]
-  );
-
-  const handleImageFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      processFile(e.target.files?.[0]);
-    },
-    [processFile]
-  );
-
-  const handleDragOver = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      if (isLoading) return;
-      setIsDragging(true);
-    },
-    [isLoading]
-  );
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      if (isLoading) return;
-      processFile(e.dataTransfer.files?.[0]);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    },
-    [isLoading, processFile]
-  );
-
   const handleFormSubmit = useCallback(
     async (data: ProductRegistrationFormValues) => {
       if (!data.productName || data.productName.trim() === '') {
@@ -181,12 +114,12 @@ export function ProductRegistrationForm({
           ...data,
           barcodeId: data.barcodeId || undefined,
           price: data.price ? Number(data.price) : undefined,
-          volumeHeight: data.volumeHeight ? Number(data.volumeHeight) : undefined,
-          volumeLong: data.volumeLong ? Number(data.volumeLong) : undefined,
-          volumeShort: data.volumeShort ? Number(data.volumeShort) : undefined,
-          weight: data.weight ? Number(data.weight) : undefined,
+          packageHeight: data.packageHeight ? Number(data.packageHeight) : undefined,
+          packageLength: data.packageLength ? Number(data.packageLength) : undefined,
+          packageWidth: data.packageWidth ? Number(data.packageWidth) : undefined,
+          netContent: data.netContent ? Number(data.netContent) : undefined,
         };
-        await onSubmit(payload, imageFile);
+        await onSubmit(payload);
         reset();
         setValidatedBarcode(null);
         onSubmitSuccess();
@@ -194,7 +127,7 @@ export function ProductRegistrationForm({
         // Error is handled in container, form state preserved
       }
     },
-    [onSubmit, imageFile, reset, onSubmitSuccess, setError, validatedBarcode]
+    [onSubmit, reset, onSubmitSuccess, setError, validatedBarcode]
   );
 
   useEffect(() => {
@@ -211,14 +144,6 @@ export function ProductRegistrationForm({
       return () => clearTimeout(timer);
     }
   }, [barcodeError]);
-
-  useEffect(() => {
-    return () => {
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
-    };
-  }, [imagePreviewUrl]);
 
   const hasProductName = watch('productName') && watch('productName').trim() !== '';
   const hasBarcodeWithoutValidation = !!(barcodeValue && barcodeValue.trim() !== '' && validatedBarcode !== barcodeValue.trim());
@@ -356,13 +281,13 @@ export function ProductRegistrationForm({
             </div>
 
             <div>
-              <label htmlFor="unit" className="block text-sm font-medium text-gray-900 mb-1">
+              <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
                 단위
               </label>
               <select
-                id="unit"
+                id="netContentUnit"
                 disabled={isLoading}
-                {...register('unit')}
+                {...register('netContentUnit')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">단위 선택</option>
@@ -376,73 +301,73 @@ export function ProductRegistrationForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="volumeHeight" className="block text-sm font-medium text-gray-900 mb-1">
+              <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
                 높이
               </label>
               <input
-                id="volumeHeight"
+                id="packageHeight"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('volumeHeight')}
+                {...register('packageHeight')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
-              {errors.volumeHeight && <p className="text-red-600 text-sm mt-1">{errors.volumeHeight.message}</p>}
+              {errors.packageHeight && <p className="text-red-600 text-sm mt-1">{errors.packageHeight.message}</p>}
             </div>
 
             <div>
-              <label htmlFor="volumeLong" className="block text-sm font-medium text-gray-900 mb-1">
-                가로
+              <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
+                길이
               </label>
               <input
-                id="volumeLong"
+                id="packageLength"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('volumeLong')}
+                {...register('packageLength')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
-              {errors.volumeLong && <p className="text-red-600 text-sm mt-1">{errors.volumeLong.message}</p>}
+              {errors.packageLength && <p className="text-red-600 text-sm mt-1">{errors.packageLength.message}</p>}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="volumeShort" className="block text-sm font-medium text-gray-900 mb-1">
-                세로
+              <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
+                너비
               </label>
               <input
-                id="volumeShort"
+                id="packageWidth"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('volumeShort')}
+                {...register('packageWidth')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
-              {errors.volumeShort && <p className="text-red-600 text-sm mt-1">{errors.volumeShort.message}</p>}
+              {errors.packageWidth && <p className="text-red-600 text-sm mt-1">{errors.packageWidth.message}</p>}
             </div>
 
             <div>
-              <label htmlFor="weight" className="block text-sm font-medium text-gray-900 mb-1">
-                무게
+              <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
+                내용물 양
               </label>
               <input
-                id="weight"
+                id="netContent"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('weight')}
+                {...register('netContent')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
-              {errors.weight && <p className="text-red-600 text-sm mt-1">{errors.weight.message}</p>}
+              {errors.netContent && <p className="text-red-600 text-sm mt-1">{errors.netContent.message}</p>}
             </div>
           </div>
 
@@ -462,66 +387,13 @@ export function ProductRegistrationForm({
         </div>
       </fieldset>
 
-      {/* Image Upload */}
-      <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
-        <legend className="text-lg font-semibold text-gray-900 px-2">상품 이미지 (선택)</legend>
-        <div className="space-y-4">
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`flex flex-col items-center justify-center gap-2 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-              isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-            } ${isLoading ? 'pointer-events-none opacity-60' : ''}`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png"
-              onChange={handleImageFileChange}
-              disabled={isLoading}
-              className="hidden"
-            />
-            <p className="text-sm text-gray-600">
-              이미지를 드래그하여 추가하거나 클릭하여 선택하세요
-            </p>
-            <p className="text-xs text-gray-400">JPEG, PNG · 최대 20MB</p>
-          </div>
-
-          {imageValidationError && <p className="text-red-600 text-sm">{imageValidationError}</p>}
-
-          {imagePreviewUrl && (
-            <div className="space-y-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imagePreviewUrl}
-                alt="미리보기"
-                className="max-h-48 rounded-lg border border-gray-300"
-              />
-              {imageFile && (
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600">
-                    {imageFile.name} ({(imageFile.size / 1024 / 1024).toFixed(2)}MB)
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onImageChange(null, null);
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = '';
-                      }
-                    }}
-                    className="text-sm text-red-600 hover:text-red-700 font-medium"
-                  >
-                    삭제
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </fieldset>
+      {/* Image gallery (register mode = local buffer; uploaded after the product is created) */}
+      <ProductImageGallery
+        productId={null}
+        useCase={imageUseCase}
+        buffer={imageBuffer}
+        onBufferChange={onImageBufferChange}
+      />
 
       {/* Submit Button (sticky - 스크롤해도 하단에 고정) */}
       <div className="sticky bottom-0 -mb-6 bg-page border-t border-gray-200 p-4 -mx-6 px-6">
