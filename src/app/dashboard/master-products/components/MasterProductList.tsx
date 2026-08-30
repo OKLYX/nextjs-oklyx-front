@@ -27,8 +27,11 @@ import type { MasterProductResponse } from '@/domain/entities/MasterProductEntit
 import { MasterProductFormModal } from './MasterProductFormModal';
 
 /**
- * 판매상품 마스터 목록 + 생성/수정 모달 진입점.
+ * 판매상품 마스터 목록 + **생성** 모달 진입점 (83B).
  * File: src/app/dashboard/master-products/components/MasterProductList.tsx
+ *
+ * ⚠️ 행 액션은 [삭제] 하나뿐이다 — 행 클릭이 상세로 이동하고 **수정은 전부 상세 페이지**에서 한다
+ * (편집 지점 단일화). [상세]·[수정] 버튼을 다시 추가하지 말 것.
  */
 export function MasterProductList() {
   const router = useRouter();
@@ -59,7 +62,6 @@ export function MasterProductList() {
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingMaster, setEditingMaster] = useState<MasterProductResponse | null>(null);
 
   const load = useCallback(async () => {
     const list = await useCase.list();
@@ -86,15 +88,7 @@ export function MasterProductList() {
     };
   }, [useCase, isAdmin]);
 
-  const openCreate = () => {
-    setEditingMaster(null);
-    setModalOpen(true);
-  };
-
-  const openEdit = (m: MasterProductResponse) => {
-    setEditingMaster(m);
-    setModalOpen(true);
-  };
+  const openCreate = () => setModalOpen(true);
 
   const handleDelete = async (m: MasterProductResponse) => {
     if (!confirm(`마스터 "${m.name}" 을(를) 삭제하시겠습니까?`)) return;
@@ -196,21 +190,6 @@ export function MasterProductList() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => router.push(ROUTES.MASTER_PRODUCT_DETAIL(m.id))}
-                          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
-                        >
-                          상세
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(m)}
-                          disabled={busyId === m.id}
-                          className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
-                        >
-                          수정
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => handleDelete(m)}
                           disabled={busyId === m.id}
                           className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
@@ -229,7 +208,6 @@ export function MasterProductList() {
 
       {modalOpen && (
         <MasterProductFormModal
-          master={editingMaster}
           useCase={useCase}
           productsUseCase={productsUseCase}
           carrierRateUseCase={carrierRateUseCase}

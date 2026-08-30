@@ -6,11 +6,11 @@ export interface CreateProductRequest {
   brand?: string;
   price?: number;
   store?: string;
-  unit?: string;
-  volumeHeight?: number;
-  volumeLong?: number;
-  volumeShort?: number;
-  weight?: number;
+  netContentUnit?: string;
+  packageHeight?: number;
+  packageLength?: number;
+  packageWidth?: number;
+  netContent?: number;
   description?: string;
 }
 
@@ -20,11 +20,11 @@ export interface UpdateProductRequest {
   brand?: string | null;
   price?: number | null;
   store?: string | null;
-  unit?: string | null;
-  volumeHeight?: string | number | null;
-  volumeLong?: string | number | null;
-  volumeShort?: string | number | null;
-  weight?: string | number | null;
+  netContentUnit?: string | null;
+  packageHeight?: string | number | null;
+  packageLength?: string | number | null;
+  packageWidth?: string | number | null;
+  netContent?: string | number | null;
   description?: string | null;
 }
 

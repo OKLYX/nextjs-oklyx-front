@@ -8,7 +8,7 @@ import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/Maste
 import type { CategoryAttribute, CategoryNotice } from '@/domain/entities/MasterProductEntity';
 import type { MeasurePair } from './measureAttributes';
 import { CategoryMetaFields } from './CategoryMetaFields';
-import { computeMissingRequired, noticesToSubmit } from './categoryMetaValidation';
+import { computeMissingRequired, noticesToSubmit, submitNoticeGroup } from './categoryMetaValidation';
 
 interface CategoryMetaPanelProps {
   masterId: number;
@@ -30,6 +30,10 @@ interface CategoryMetaPanelProps {
  * - COUPANG: getCategoryMeta(스키마+값) 로드 → 편집 + 저장(setCategoryAttributes).
  * - 그 외: getCategorySchema(스키마만) 로드 → 읽기전용(값 저장은 57 아웃 오브 스코프).
  *   master 단일 Map 덮어쓰기 방지를 위해 저장 버튼 disabled + 인라인 안내.
+ *
+ * ⚠️ 이 패널은 [상품 기본 정보] 토글 **안의 하위 블록**이다(사용자 요청 2026-08-29) → 제목 `<h3>` 를
+ * 스스로 렌더하고(옛 단독 `DetailSection` 의 title 을 대체) 카드 껍데기(rounded/shadow) 없이
+ * `border-t + p-4` 를 쓴다. 단독 섹션으로 되돌리지 말 것.
  */
 export function CategoryMetaPanel({
   masterId,
@@ -72,12 +76,15 @@ export function CategoryMetaPanel({
         setNotices(schema.notices);
         setAttrValues({});
         setNoticeValues({});
+        setNoticeGroup(null);
       } else {
         const meta = await useCase.getCategoryMeta(masterId, platform);
         setAttributes(meta.attributes);
         setNotices(meta.notices);
         setAttrValues(meta.values.attributes ?? {});
         setNoticeValues(meta.values.notices ?? {});
+        // 저장된 품목군으로 복원(91). 공백만/미필드 = 미지정 → null 로 두고 폴백에 맡긴다.
+        setNoticeGroup(meta.values.noticeGroup?.trim() ? meta.values.noticeGroup : null);
       }
     } catch (e) {
       // Attribute lookup failed (e.g. mapping not set -> 400): show inline guidance.
@@ -121,10 +128,15 @@ export function CategoryMetaPanel({
     setSaved(false);
     try {
       // Send only the selected 품목군's notices (user picks one group). Attributes unchanged.
+      // 실효 그룹을 **한 번만** 계산해 전송값과 전송 그룹이 같은 값에서 나오게 한다 —
+      // state 가 null 이어도 폴백 결과를 명시 전송해야 다음 조회에서 또 추론하지 않는다.
+      const group = submitNoticeGroup(notices, noticeValues, noticeGroup);
       await useCase.setCategoryAttributes(masterId, {
         attributes: attrValues,
-        notices: noticesToSubmit(notices, noticeValues, noticeGroup),
+        notices: noticesToSubmit(notices, noticeValues, group),
+        noticeGroup: group,
       });
+      setNoticeGroup(group);
       setSaved(true);
       onSaved?.();
     } catch (e) {
@@ -136,7 +148,8 @@ export function CategoryMetaPanel({
 
   if (isLoading) {
     return (
-      <div className="rounded-lg bg-white p-4 shadow">
+      <div className="border-t border-gray-200 p-4">
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">카테고리 필수속성 · 고시</h3>
         <div className="flex min-h-16 items-center justify-center">
           <Spinner size={20} label="불러오는 중..." />
         </div>
@@ -145,7 +158,9 @@ export function CategoryMetaPanel({
   }
 
   return (
-    <div className="rounded-lg bg-white p-4 shadow">
+    <div className="border-t border-gray-200 p-4">
+      <h3 className="mb-3 text-sm font-semibold text-gray-900">카테고리 필수속성 · 고시</h3>
+
       {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {saved && <p className="mb-3 rounded bg-green-50 px-3 py-2 text-sm text-green-700">저장되었습니다.</p>}
 

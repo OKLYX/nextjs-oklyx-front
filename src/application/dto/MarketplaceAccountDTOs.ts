@@ -10,6 +10,10 @@ export const createMarketplaceAccountSchema = z.object({
   vendorId: z.string()
     .min(1, '판매자(벤더) ID를 입력하세요')
     .max(100, '판매자(벤더) ID는 100자 이하여야 합니다'),
+  // WING 로그인 ID (쿠팡 상품등록 필수). optional — 미설정 허용.
+  vendorUserId: z.string()
+    .max(100, 'WING 로그인 ID는 100자 이하여야 합니다')
+    .optional(),
   accessKey: z.string()
     .min(1, 'Access Key를 입력하세요')
     .max(255, 'Access Key는 255자 이하여야 합니다'),
@@ -36,6 +40,10 @@ export const updateMarketplaceAccountSchema = z.object({
   vendorId: z.string()
     .min(1, '판매자(벤더) ID를 입력하세요')
     .max(100, '판매자(벤더) ID는 100자 이하여야 합니다'),
+  // WING 로그인 ID (쿠팡 상품등록 필수). optional — 미설정 허용.
+  vendorUserId: z.string()
+    .max(100, 'WING 로그인 ID는 100자 이하여야 합니다')
+    .optional(),
   accessKey: z.string()
     .min(1, 'Access Key를 입력하세요')
     .max(255, 'Access Key는 255자 이하여야 합니다'),

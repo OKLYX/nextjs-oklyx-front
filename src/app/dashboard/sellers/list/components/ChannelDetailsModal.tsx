@@ -18,6 +18,7 @@ interface ChannelDetailsModalProps {
   onClose: () => void;
   onEditClick?: (channel: MarketplaceAccount) => void;
   onDeleteClick?: (channel: MarketplaceAccount) => void;
+  onShippingClick?: (channel: MarketplaceAccount) => void;
   thumbTemplates: TemplateOption[];
   detailTemplates: TemplateOption[];
 }
@@ -49,6 +50,7 @@ export function ChannelDetailsModal({
   onClose,
   onEditClick,
   onDeleteClick,
+  onShippingClick,
   thumbTemplates,
   detailTemplates,
 }: ChannelDetailsModalProps) {
@@ -103,6 +105,11 @@ export function ChannelDetailsModal({
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-1">WING 로그인 ID</label>
+            <p className="text-sm text-gray-900">{channel.vendorUserId || '-'}</p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-1">Access Key</label>
             <p className="text-sm text-gray-900 break-all">{channel.accessKey}</p>
           </div>
@@ -154,8 +161,16 @@ export function ChannelDetailsModal({
           )}
         </div>
 
-        {(onEditClick || onDeleteClick) && (
+        {(onEditClick || onDeleteClick || onShippingClick) && (
           <div className="border-t p-4 flex gap-2">
+            {onShippingClick && (
+              <button
+                onClick={() => onShippingClick(channel)}
+                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
+              >
+                배송관리
+              </button>
+            )}
             {onEditClick && (
               <button
                 onClick={() => onEditClick(channel)}

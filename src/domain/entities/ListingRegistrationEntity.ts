@@ -43,6 +43,9 @@ export interface OptionPrice {
   // Per-channel active flag (42/43): only active options are pushed to the market.
   // Toggled inline in the matrix price column; undefined (legacy) is treated as active.
   active?: boolean;
+  // Backend-computed (87): the option physically exists on the market, so it can't be removed
+  // (approved marketplace options can't be deleted). undefined (legacy) = not on the market.
+  onMarket?: boolean;
 }
 
 // Auto-generated (or overridden) product assets for one channel/listing.
@@ -62,6 +65,12 @@ export interface GeneratedProductResponse {
   // null when the cell is ungenerated, so treat as [] in the UI.
   tags: string[];
   optionPrices: OptionPrice[];
+  // Channel (listing) shipping override (75). Backend key→string map; null = none.
+  shippingOverride?: Record<string, string> | null;
+  // Backend-resolved shipping readiness (77) — SSOT for the [마켓 등록] guard.
+  // false = 배송 설정 미완료(등록 차단). null/undefined = 미지원 플랫폼·레거시 응답 → 가드 안 함.
+  // ⚠️ 프론트에서 재계산하지 말 것.
+  shippingReady?: boolean | null;
 }
 
 export interface ChannelAddResponse {
@@ -102,6 +111,41 @@ export interface PropagateResponse {
   propagated: number;
   skipped: number;
   failed: number;
+}
+
+/**
+ * Master ↔ channel difference preview (89, GET /api/admin/master-products/{id}/channel-sync-preview).
+ * Read-only: it answers "what would [채널에 반영하기] change?" before the button is pressed.
+ *
+ * ⚠️ `marketOrphanOptions` is NOT counted in `totals` / `inSync` — a propagation run leaves those
+ * options alone (the operator must stop them on the marketplace), so counting them would keep the
+ * banner up forever. Never use it for the badge count or the disabled check.
+ */
+export interface ChannelSyncPreview {
+  inSync: boolean;
+  totals: ChannelSyncTotals;
+  channels: ChannelSyncChannel[];
+}
+
+/** Option-count sums across all channels — except `affectedChannels`, which counts cells. */
+export interface ChannelSyncTotals {
+  affectedChannels: number;
+  missingOptions: number;
+  orphanOptions: number;
+  quantityMismatch: number;
+}
+
+export interface ChannelSyncChannel {
+  listingId: number;
+  sellerName: string;
+  platform: string;
+  /** Already on the marketplace → needs a re-register after the change is applied. */
+  onMarket: boolean;
+  missingOptions: string[];
+  orphanOptions: string[];
+  /** Informational only (see ChannelSyncPreview) — excluded from totals/inSync. */
+  marketOrphanOptions: string[];
+  quantityMismatchOptions: string[];
 }
 
 // Pending market-sync (dirty) rows

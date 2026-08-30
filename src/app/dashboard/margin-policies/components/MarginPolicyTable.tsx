@@ -39,6 +39,8 @@ export function MarginPolicyTable() {
   const [formSellerId, setFormSellerId] = useState<number | ''>('');
   const [formPlatform, setFormPlatform] = useState('');
   const [formPct, setFormPct] = useState('');
+  // 표시 할인율은 0~0.5 decimal 로 그대로 입력 (originalPrice 역산은 백엔드).
+  const [formDiscount, setFormDiscount] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -77,6 +79,7 @@ export function MarginPolicyTable() {
     setFormSellerId('');
     setFormPlatform('');
     setFormPct('');
+    setFormDiscount('');
     setFormError('');
     setShowForm(true);
   };
@@ -86,6 +89,7 @@ export function MarginPolicyTable() {
     setFormSellerId(p.sellerId);
     setFormPlatform(p.platform);
     setFormPct(String(toPercent(p.marginRate)));
+    setFormDiscount(p.displayDiscountRate != null ? String(p.displayDiscountRate) : '');
     setFormError('');
     setShowForm(true);
   };
@@ -110,7 +114,21 @@ export function MarginPolicyTable() {
       setFormError('마진율은 0~100 사이의 숫자여야 합니다.');
       return;
     }
-    const payload = { sellerId: formSellerId, platform: formPlatform, marginRate: toRate(pct) };
+    let discount: number | undefined;
+    if (formDiscount !== '') {
+      const d = Number(formDiscount);
+      if (Number.isNaN(d) || d < 0 || d > 0.5) {
+        setFormError('표시 할인율은 0~0.5 사이의 숫자여야 합니다.');
+        return;
+      }
+      discount = d;
+    }
+    const payload = {
+      sellerId: formSellerId,
+      platform: formPlatform,
+      marginRate: toRate(pct),
+      displayDiscountRate: discount,
+    };
     setIsSubmitting(true);
     try {
       if (editingId == null) await useCase.create(payload);
@@ -172,7 +190,7 @@ export function MarginPolicyTable() {
           {formError && (
             <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
           )}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">판매자</label>
               <select
@@ -215,7 +233,23 @@ export function MarginPolicyTable() {
                 onChange={(e) => setFormPct(e.target.value)}
               />
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">표시 할인율 (0~0.5)</label>
+              <input
+                type="number"
+                min={0}
+                max={0.5}
+                step={0.01}
+                placeholder="0 = 할인 없음"
+                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                value={formDiscount}
+                onChange={(e) => setFormDiscount(e.target.value)}
+              />
+            </div>
           </div>
+          <p className="mt-2 text-xs text-gray-500">
+            originalPrice를 이 할인율로 역산해 표시가로 노출합니다. 실판매가·마진은 변하지 않습니다.
+          </p>
           <div className="mt-4 flex gap-2">
             <button
               type="button"
@@ -251,13 +285,14 @@ export function MarginPolicyTable() {
                 <th className="px-4 py-3">판매자</th>
                 <th className="px-4 py-3">플랫폼</th>
                 <th className="px-4 py-3">마진율</th>
+                <th className="px-4 py-3">표시 할인율</th>
                 <th className="px-4 py-3">액션</th>
               </tr>
             </thead>
             <tbody>
               {policies.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500">
                     등록된 마진 프리셋이 없습니다.
                   </td>
                 </tr>
@@ -267,6 +302,11 @@ export function MarginPolicyTable() {
                     <td className="px-4 py-3">{p.sellerName || sellerName(p.sellerId)}</td>
                     <td className="px-4 py-3">{p.platform}</td>
                     <td className="px-4 py-3">{toPercent(p.marginRate)}%</td>
+                    <td className="px-4 py-3">
+                      {p.displayDiscountRate != null && p.displayDiscountRate > 0
+                        ? p.displayDiscountRate
+                        : '-'}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button

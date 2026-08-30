@@ -12,11 +12,11 @@ interface ProductRegistrationFormValues {
   brand?: string;
   price?: string;
   store?: string;
-  unit?: string;
-  volumeHeight?: string;
-  volumeLong?: string;
-  volumeShort?: string;
-  weight?: string;
+  netContentUnit?: string;
+  packageHeight?: string;
+  packageLength?: string;
+  packageWidth?: string;
+  netContent?: string;
   description?: string;
 }
 
@@ -58,11 +58,11 @@ export function ProductRegistrationForm({
       brand: '',
       price: '',
       store: '',
-      unit: '',
-      volumeHeight: '',
-      volumeLong: '',
-      volumeShort: '',
-      weight: '',
+      netContentUnit: '',
+      packageHeight: '',
+      packageLength: '',
+      packageWidth: '',
+      netContent: '',
       description: '',
     },
   });
@@ -114,10 +114,10 @@ export function ProductRegistrationForm({
           ...data,
           barcodeId: data.barcodeId || undefined,
           price: data.price ? Number(data.price) : undefined,
-          volumeHeight: data.volumeHeight ? Number(data.volumeHeight) : undefined,
-          volumeLong: data.volumeLong ? Number(data.volumeLong) : undefined,
-          volumeShort: data.volumeShort ? Number(data.volumeShort) : undefined,
-          weight: data.weight ? Number(data.weight) : undefined,
+          packageHeight: data.packageHeight ? Number(data.packageHeight) : undefined,
+          packageLength: data.packageLength ? Number(data.packageLength) : undefined,
+          packageWidth: data.packageWidth ? Number(data.packageWidth) : undefined,
+          netContent: data.netContent ? Number(data.netContent) : undefined,
         };
         await onSubmit(payload);
         reset();
@@ -281,13 +281,13 @@ export function ProductRegistrationForm({
             </div>
 
             <div>
-              <label htmlFor="unit" className="block text-sm font-medium text-gray-900 mb-1">
+              <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
                 단위
               </label>
               <select
-                id="unit"
+                id="netContentUnit"
                 disabled={isLoading}
-                {...register('unit')}
+                {...register('netContentUnit')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">단위 선택</option>
@@ -301,73 +301,73 @@ export function ProductRegistrationForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="volumeHeight" className="block text-sm font-medium text-gray-900 mb-1">
+              <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
                 높이
               </label>
               <input
-                id="volumeHeight"
+                id="packageHeight"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('volumeHeight')}
+                {...register('packageHeight')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
-              {errors.volumeHeight && <p className="text-red-600 text-sm mt-1">{errors.volumeHeight.message}</p>}
+              {errors.packageHeight && <p className="text-red-600 text-sm mt-1">{errors.packageHeight.message}</p>}
             </div>
 
             <div>
-              <label htmlFor="volumeLong" className="block text-sm font-medium text-gray-900 mb-1">
-                가로
+              <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
+                길이
               </label>
               <input
-                id="volumeLong"
+                id="packageLength"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('volumeLong')}
+                {...register('packageLength')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
-              {errors.volumeLong && <p className="text-red-600 text-sm mt-1">{errors.volumeLong.message}</p>}
+              {errors.packageLength && <p className="text-red-600 text-sm mt-1">{errors.packageLength.message}</p>}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="volumeShort" className="block text-sm font-medium text-gray-900 mb-1">
-                세로
+              <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
+                너비
               </label>
               <input
-                id="volumeShort"
+                id="packageWidth"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('volumeShort')}
+                {...register('packageWidth')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
-              {errors.volumeShort && <p className="text-red-600 text-sm mt-1">{errors.volumeShort.message}</p>}
+              {errors.packageWidth && <p className="text-red-600 text-sm mt-1">{errors.packageWidth.message}</p>}
             </div>
 
             <div>
-              <label htmlFor="weight" className="block text-sm font-medium text-gray-900 mb-1">
-                무게
+              <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
+                내용물 양
               </label>
               <input
-                id="weight"
+                id="netContent"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('weight')}
+                {...register('netContent')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
-              {errors.weight && <p className="text-red-600 text-sm mt-1">{errors.weight.message}</p>}
+              {errors.netContent && <p className="text-red-600 text-sm mt-1">{errors.netContent.message}</p>}
             </div>
           </div>
 

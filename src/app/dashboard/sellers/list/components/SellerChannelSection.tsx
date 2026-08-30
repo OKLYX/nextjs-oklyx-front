@@ -8,12 +8,15 @@ import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/T
 import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
 import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
+import { ShippingRepositoryImpl } from '@/infrastructure/repositories/ShippingRepositoryImpl';
+import { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 import type { CreateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
 import { CreateChannelModal } from './CreateChannelModal';
 import { ChannelDetailsModal } from './ChannelDetailsModal';
 import { EditChannelModal } from './EditChannelModal';
 import { DeleteChannelConfirmation } from './DeleteChannelConfirmation';
+import { ShippingConfigModal } from './ShippingConfigModal';
 
 interface SellerChannelSectionProps {
   sellerId: number;
@@ -36,6 +39,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
   const [editChannel, setEditChannel] = useState<MarketplaceAccount | null>(null);
   const [deleteChannel, setDeleteChannel] = useState<MarketplaceAccount | null>(null);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  const [shippingChannel, setShippingChannel] = useState<MarketplaceAccount | null>(null);
   const [thumbTemplates, setThumbTemplates] = useState<TemplateOption[]>([]);
   const [detailTemplates, setDetailTemplates] = useState<TemplateOption[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -53,6 +57,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
     () => new DetailContentUseCase(new DetailContentRepositoryImpl()),
     [],
   );
+  const shippingUseCase = useMemo(() => new ShippingUseCase(new ShippingRepositoryImpl()), []);
 
   const loadChannels = useCallback(async () => {
     try {
@@ -111,6 +116,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         platform: data.platform,
         accountAlias: data.accountAlias,
         vendorId: data.vendorId,
+        vendorUserId: data.vendorUserId || undefined,
         accessKey: data.accessKey,
         secretKey: data.secretKey,
         // '' = unassigned = tenant-default fallback (not sent to backend).
@@ -231,8 +237,16 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         onClose={() => setSelectedChannel(null)}
         onEditClick={(channel) => setEditChannel(channel)}
         onDeleteClick={(channel) => setDeleteChannel(channel)}
+        onShippingClick={(channel) => setShippingChannel(channel)}
         thumbTemplates={thumbTemplates}
         detailTemplates={detailTemplates}
+      />
+
+      <ShippingConfigModal
+        isOpen={shippingChannel !== null}
+        account={shippingChannel}
+        onClose={() => setShippingChannel(null)}
+        useCase={shippingUseCase}
       />
 
       <EditChannelModal

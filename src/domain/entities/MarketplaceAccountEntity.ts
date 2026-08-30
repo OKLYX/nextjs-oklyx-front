@@ -4,6 +4,8 @@ export interface MarketplaceAccount {
   platform: string;
   accountAlias: string | null;
   vendorId: string;
+  // WING login ID (쿠팡 상품등록 필수). Distinct from vendorId (벤더 코드). null = 미설정.
+  vendorUserId: string | null;
   accessKey: string;
   isActive: boolean;
   // Channel template assignment (id only; display name resolved via a separate

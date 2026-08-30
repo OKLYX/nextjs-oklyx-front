@@ -55,6 +55,7 @@ export function ChannelEditForm({
       platform: channel.platform,
       accountAlias: channel.accountAlias ?? '',
       vendorId: channel.vendorId,
+      vendorUserId: channel.vendorUserId ?? '',
       accessKey: channel.accessKey,
       secretKey: '',
       thumbnailTemplateId: channel.thumbnailTemplateId != null ? String(channel.thumbnailTemplateId) : '',
@@ -136,6 +137,23 @@ export function ChannelEditForm({
         />
         {formState.errors.vendorId && (
           <p className="mt-1 text-sm text-red-600">{formState.errors.vendorId.message}</p>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor="vendorUserId" className="block text-sm font-medium mb-1">
+          WING 로그인 ID
+        </label>
+        <input
+          {...register('vendorUserId')}
+          id="vendorUserId"
+          type="text"
+          placeholder="쿠팡 상품등록 시 사용 (선택)"
+          disabled={isLoading}
+          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {formState.errors.vendorUserId && (
+          <p className="mt-1 text-sm text-red-600">{formState.errors.vendorUserId.message}</p>
         )}
       </div>
 

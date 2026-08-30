@@ -11,6 +11,9 @@ import type {
   CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
+  ShippingOverrideUpdateRequest,
+  ShippingForceApplyRequest,
+  ShippingForceApplyResponse,
 } from '@/domain/entities/MasterProductEntity';
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
@@ -34,4 +37,9 @@ export interface MasterProductRepository {
   setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
   updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;
+  updateShippingOverride(id: number, data: ShippingOverrideUpdateRequest): Promise<MasterProductResponse>;
+  applyShippingOverrideToChannels(
+    id: number,
+    data?: ShippingForceApplyRequest,
+  ): Promise<ShippingForceApplyResponse>;
 }

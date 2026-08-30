@@ -72,6 +72,7 @@ export function EditChannelModal({
         platform: data.platform,
         accountAlias: data.accountAlias,
         vendorId: data.vendorId,
+        vendorUserId: data.vendorUserId || undefined,
         accessKey: data.accessKey,
         // Blank secretKey is omitted → backend keeps the existing key.
         secretKey: data.secretKey ? data.secretKey : undefined,
