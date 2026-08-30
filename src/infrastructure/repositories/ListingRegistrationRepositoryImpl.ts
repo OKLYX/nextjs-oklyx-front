@@ -14,13 +14,18 @@ import type {
   FieldValuesUpdateRequest,
   DisplayNameUpdateRequest,
   PropagateResponse,
+  ChannelSyncPreview,
   PendingSyncResponse,
   PushSyncRequest,
   PushSyncResponse,
   ListingOptionsResponse,
   ActiveOptionsRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
-import type { TagsUpdateRequest } from '@/domain/entities/MasterProductEntity';
+import type {
+  TagsUpdateRequest,
+  ShippingOverrideUpdateRequest,
+} from '@/domain/entities/MasterProductEntity';
+import type { ShippingConfig } from '@/domain/entities/ShippingEntity';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -101,8 +106,26 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     return response.data.data;
   }
 
+  async updateShippingOverride(
+    listingId: number,
+    data: ShippingOverrideUpdateRequest,
+  ): Promise<GeneratedProductResponse> {
+    const response = await axiosInstance.patch(`${listingBase}/${listingId}/shipping-override`, data);
+    return response.data.data;
+  }
+
+  async getInheritedShipping(listingId: number): Promise<ShippingConfig> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/shipping-inherited`);
+    return response.data.data;
+  }
+
   async propagate(masterId: number): Promise<PropagateResponse> {
     const response = await axiosInstance.post(`${masterBase}/${masterId}/propagate`);
+    return response.data.data;
+  }
+
+  async getChannelSyncPreview(masterId: number): Promise<ChannelSyncPreview> {
+    const response = await axiosInstance.get(`${masterBase}/${masterId}/channel-sync-preview`);
     return response.data.data;
   }
 

@@ -6,6 +6,7 @@ export interface CreateMarketplaceAccountRequest {
   platform: string;
   accountAlias?: string;
   vendorId: string;
+  vendorUserId?: string;
   accessKey: string;
   secretKey: string;
   isActive?: boolean;
@@ -20,6 +21,7 @@ export interface UpdateMarketplaceAccountRequest {
   platform: string;
   accountAlias?: string;
   vendorId: string;
+  vendorUserId?: string;
   accessKey: string;
   secretKey?: string;
   isActive?: boolean;

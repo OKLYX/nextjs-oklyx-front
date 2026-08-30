@@ -7,11 +7,14 @@ import { ROUTES } from '@/config/routes';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { ChannelFieldValuesModal } from './ChannelFieldValuesModal';
+import { ChannelShippingOverrideModal } from './ChannelShippingOverrideModal';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type {
   ListingStatus,
   ListingStatusResponse,
+  GeneratedProductResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
+import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 
 interface CellListing {
   id: number;
@@ -23,6 +26,16 @@ interface CellActionsProps {
   listing: CellListing;
   options: MasterOptionResponse[];
   onReload: () => void;
+  // Channel shipping override (75): the cell's account + current override for the modal.
+  accountId: number;
+  platform: string;
+  channelLabel: string;
+  shippingOverride: Record<string, string> | null | undefined;
+  // Backend-resolved shipping readiness (77). false = [마켓 등록] 가드(비활성 + 사유).
+  // null/undefined(미지원 플랫폼·레거시) = 가드 안 함 — 백엔드 400 이 최종 방어.
+  shippingReady: boolean | null | undefined;
+  shippingUseCase: ShippingUseCase; // parent-owned lookup (outbound/return)
+  onShippingSaved: (updated: GeneratedProductResponse) => void;
 }
 
 type Busy = 'register' | 'fetch' | 'regenerate' | null;
@@ -33,7 +46,19 @@ type Busy = 'register' | 'fetch' | 'regenerate' | null;
  *
  * 마켓 호출은 비동기(즉시 반환) — 승인은 이후 [승인 새로고침]으로 확인.
  */
-export function CellActions({ masterId, listing, options, onReload }: CellActionsProps) {
+export function CellActions({
+  masterId,
+  listing,
+  options,
+  onReload,
+  accountId,
+  platform,
+  channelLabel,
+  shippingOverride,
+  shippingReady,
+  shippingUseCase,
+  onShippingSaved,
+}: CellActionsProps) {
   const router = useRouter();
   const useCase = useMemo(
     () => new ListingRegistrationUseCase(new ListingRegistrationRepositoryImpl()),
@@ -44,6 +69,7 @@ export function CellActions({ masterId, listing, options, onReload }: CellAction
   const [error, setError] = useState('');
   const [statusResult, setStatusResult] = useState<ListingStatusResponse | null>(null);
   const [showFieldValues, setShowFieldValues] = useState(false);
+  const [showShipping, setShowShipping] = useState(false);
 
   const optionName = (id: number) => options.find((o) => o.id === id)?.name ?? `옵션 #${id}`;
 
@@ -82,6 +108,13 @@ export function CellActions({ masterId, listing, options, onReload }: CellAction
   // (when present) is the source of truth and reveals the SELLING regenerate action.
   const status: ListingStatus = statusResult?.status ?? listing.status;
 
+  // This channel has a stored shipping override → highlight the button.
+  const hasShippingOverride = !!shippingOverride && Object.keys(shippingOverride).length > 0;
+
+  // Guard the register action only (77). Strict false — undefined/null means "not judged" → allow.
+  const shippingBlocked = shippingReady === false;
+  const shippingBlockedReason = '배송 설정 미완료 — 마스터/채널/계정 중 한 곳에서 배송 설정 필요';
+
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-1.5">
@@ -89,7 +122,8 @@ export function CellActions({ masterId, listing, options, onReload }: CellAction
           <button
             type="button"
             onClick={handleRegister}
-            disabled={busy !== null}
+            disabled={busy !== null || shippingBlocked}
+            title={shippingBlocked ? shippingBlockedReason : undefined}
             className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
           >
             {busy === 'register' ? <Spinner label="요청 중..." /> : '마켓 등록'}
@@ -139,7 +173,24 @@ export function CellActions({ masterId, listing, options, onReload }: CellAction
         >
           상세 편집
         </button>
+
+        <button
+          type="button"
+          onClick={() => setShowShipping(true)}
+          disabled={busy !== null}
+          className={`rounded border px-2 py-1 text-xs font-medium disabled:opacity-50 ${
+            hasShippingOverride
+              ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+              : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          채널 배송 설정{hasShippingOverride ? ' ✓' : ''}
+        </button>
       </div>
+
+      {status === 'DRAFT' && shippingBlocked && (
+        <p className="text-[11px] text-gray-500">{shippingBlockedReason}</p>
+      )}
 
       {status === 'SUBMITTED' && !statusResult && (
         <p className="text-[11px] text-amber-600">승인 대기중</p>
@@ -175,6 +226,20 @@ export function CellActions({ masterId, listing, options, onReload }: CellAction
           listingId={listing.id}
           onSaved={() => onReload()}
           onClose={() => setShowFieldValues(false)}
+        />
+      )}
+
+      {showShipping && (
+        <ChannelShippingOverrideModal
+          listingId={listing.id}
+          accountId={accountId}
+          platform={platform}
+          channelLabel={channelLabel}
+          initialOverride={shippingOverride}
+          shippingUseCase={shippingUseCase}
+          listingUseCase={useCase}
+          onSaved={onShippingSaved}
+          onClose={() => setShowShipping(false)}
         />
       )}
     </div>

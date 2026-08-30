@@ -139,7 +139,7 @@ export function EnvBadge() {
             </p>
             <p>
               API: <span className="font-medium text-gray-700">{apiEnv}</span> — {activeUrl}
-              {hasOverride && ' (override)'}
+              {hasOverride && ' (직접 지정)'}
             </p>
             {diverges && (
               <p className="text-amber-600">⚠ 웹 환경과 API 대상이 다릅니다</p>

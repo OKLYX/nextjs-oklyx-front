@@ -11,13 +11,18 @@ import type {
   FieldValuesUpdateRequest,
   DisplayNameUpdateRequest,
   PropagateResponse,
+  ChannelSyncPreview,
   PendingSyncResponse,
   PushSyncRequest,
   PushSyncResponse,
   ListingOptionsResponse,
   ActiveOptionsRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
-import type { TagsUpdateRequest } from '@/domain/entities/MasterProductEntity';
+import type {
+  TagsUpdateRequest,
+  ShippingOverrideUpdateRequest,
+} from '@/domain/entities/MasterProductEntity';
+import type { ShippingConfig } from '@/domain/entities/ShippingEntity';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -75,8 +80,23 @@ export class ListingRegistrationUseCase {
     return this.repository.updateTags(listingId, data);
   }
 
+  updateShippingOverride(
+    listingId: number,
+    data: ShippingOverrideUpdateRequest,
+  ): Promise<GeneratedProductResponse> {
+    return this.repository.updateShippingOverride(listingId, data);
+  }
+
+  getInheritedShipping(listingId: number): Promise<ShippingConfig> {
+    return this.repository.getInheritedShipping(listingId);
+  }
+
   propagate(masterId: number): Promise<PropagateResponse> {
     return this.repository.propagate(masterId);
+  }
+
+  getChannelSyncPreview(masterId: number): Promise<ChannelSyncPreview> {
+    return this.repository.getChannelSyncPreview(masterId);
   }
 
   pendingSync(): Promise<PendingSyncResponse[]> {

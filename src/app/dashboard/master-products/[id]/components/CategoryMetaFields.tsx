@@ -16,6 +16,7 @@ import {
   type MeasurePair,
 } from './measureAttributes';
 import { isOptionField, isOptionNotice } from './optionMetaFields';
+import { unitPlaceholder, unitSuffix } from './basicUnit';
 
 const GROUP_ETC = '기타';
 
@@ -149,6 +150,8 @@ export function CategoryMetaFields({
           {visiblePairs.map((p) => {
             const unit = unitOf(p);
             const activeName = unit === '용량' ? p.volume.name : p.weight.name;
+            // 미선택이면 undefined (override 페어와 동일 — activeName 의 weight 폴백을 쓰지 않는다).
+            const activeAttr = unit === '용량' ? p.volume : unit === '중량' ? p.weight : undefined;
             return (
               <div key={p.base}>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -170,7 +173,7 @@ export function CategoryMetaFields({
                   <input
                     type="text"
                     className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
-                    placeholder={unit === '용량' ? '예: 500mL' : unit === '중량' ? '예: 500g' : '구분 먼저 선택'}
+                    placeholder={unit ? unitPlaceholder(activeAttr) || '값 입력' : '구분 먼저 선택'}
                     value={unit ? (attrValues[activeName] ?? '') : ''}
                     onChange={(e) => onAttrChange(activeName, e.target.value)}
                     disabled={disabled || !unit}
@@ -183,6 +186,7 @@ export function CategoryMetaFields({
             <div key={a.name}>
               <label className="mb-1 block text-xs font-medium text-gray-600">
                 {a.name}
+                {unitSuffix(a) && <span className="ml-1 font-normal text-gray-400">{unitSuffix(a)}</span>}
                 {a.required && <span className="text-red-600"> *</span>}
               </label>
               {a.inputType === 'SELECT' ? (
@@ -203,6 +207,7 @@ export function CategoryMetaFields({
                 <input
                   type={a.inputType === 'NUMBER' ? 'number' : 'text'}
                   className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                  placeholder={unitPlaceholder(a)}
                   value={attrValues[a.name] ?? ''}
                   onChange={(e) => onAttrChange(a.name, e.target.value)}
                   disabled={disabled}

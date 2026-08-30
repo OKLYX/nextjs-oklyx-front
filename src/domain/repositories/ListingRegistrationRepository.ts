@@ -10,13 +10,18 @@ import type {
   FieldValuesUpdateRequest,
   DisplayNameUpdateRequest,
   PropagateResponse,
+  ChannelSyncPreview,
   PendingSyncResponse,
   PushSyncRequest,
   PushSyncResponse,
   ListingOptionsResponse,
   ActiveOptionsRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
-import type { TagsUpdateRequest } from '@/domain/entities/MasterProductEntity';
+import type {
+  TagsUpdateRequest,
+  ShippingOverrideUpdateRequest,
+} from '@/domain/entities/MasterProductEntity';
+import type { ShippingConfig } from '@/domain/entities/ShippingEntity';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -37,7 +42,16 @@ export interface ListingRegistrationRepository {
   // Display name (35): internal-only PATCH, backend returns no body -> void.
   updateDisplayName(listingId: number, data: DisplayNameUpdateRequest): Promise<void>;
   updateTags(listingId: number, data: TagsUpdateRequest): Promise<GeneratedProductResponse>;
+  // Channel shipping override (75): PATCH replaces this cell's override (no regenerate).
+  updateShippingOverride(
+    listingId: number,
+    data: ShippingOverrideUpdateRequest,
+  ): Promise<GeneratedProductResponse>;
+  // Inherited shipping baseline (76): master ?? account, own channel override excluded — placeholders.
+  getInheritedShipping(listingId: number): Promise<ShippingConfig>;
   propagate(masterId: number): Promise<PropagateResponse>;
+  // Channel sync preview (89): what a propagate run would change, read-only.
+  getChannelSyncPreview(masterId: number): Promise<ChannelSyncPreview>;
   pendingSync(): Promise<PendingSyncResponse[]>;
   pushSync(data: PushSyncRequest): Promise<PushSyncResponse>;
   // Detail-page (prompt 11): AUTO preview + raw HTML override / clear.

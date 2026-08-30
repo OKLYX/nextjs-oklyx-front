@@ -12,6 +12,9 @@ import type {
   CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
+  ShippingOverrideUpdateRequest,
+  ShippingForceApplyRequest,
+  ShippingForceApplyResponse,
 } from '@/domain/entities/MasterProductEntity';
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
@@ -88,5 +91,19 @@ export class MasterProductUseCase {
 
   updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
     return this.repository.updateRegistrationNameSuffix(id, data);
+  }
+
+  updateShippingOverride(
+    id: number,
+    data: ShippingOverrideUpdateRequest,
+  ): Promise<MasterProductResponse> {
+    return this.repository.updateShippingOverride(id, data);
+  }
+
+  applyShippingOverrideToChannels(
+    id: number,
+    data?: ShippingForceApplyRequest,
+  ): Promise<ShippingForceApplyResponse> {
+    return this.repository.applyShippingOverrideToChannels(id, data);
   }
 }

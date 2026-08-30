@@ -18,6 +18,9 @@ interface MasterCategoryPanelProps {
   useCase: MasterProductUseCase; // owned by parent container (CoverageMatrix)
   categoryUseCase: CategoryUseCase;
   mappingUseCase: CategoryMappingUseCase;
+  // 지정/해제 결과를 부모 컨테이너에 통지 → 형제 섹션(카테고리 메타·옵션)이 새 카테고리 기준으로 바뀐다.
+  // 지정 = setCategory 응답 그대로, 해제 = null. 패널은 계속 자기 표시 상태를 스스로 들고 있다.
+  onCategoryChanged?: (next: MasterCategoryResponse | null) => void;
 }
 
 /**
@@ -27,12 +30,20 @@ interface MasterCategoryPanelProps {
  *
  * 지정 = miller-columns 트리 드릴다운(공통 CategoryTreeColumns, 생성 모달과 동일). leaf
  * 선택 시 즉시 setCategory. 몰별 매핑 배지는 읽기 전용 — 매핑 채우기는 F1 관리 화면 유도.
+ *
+ * ⚠️ 카테고리는 형제 섹션(카테고리 메타·옵션 상속값)의 입력이기도 하다 → 변경 시 `onCategoryChanged`
+ * 로 부모에 알린다. 부모는 그 값만 갈아끼우고 **상세 전체를 재조회하지 않는다**(83A 규칙).
+ *
+ * ⚠️ 이 패널은 [상품 기본 정보] 토글 **안의 하위 블록**이다(사용자 요청 2026-08-29) → 자체 카드
+ * 껍데기(rounded/shadow) 없이 형제 블록(옵션·이미지)과 같은 `border-t + p-4`·`<h3>` 를 쓴다.
+ * 단독 섹션으로 되돌리지 말 것.
  */
 export function MasterCategoryPanel({
   masterId,
   useCase,
   categoryUseCase,
   mappingUseCase,
+  onCategoryChanged,
 }: MasterCategoryPanelProps) {
   const [current, setCurrent] = useState<MasterCategoryResponse | null>(null);
   const [mappings, setMappings] = useState<CategoryMapping[]>([]);
@@ -80,9 +91,10 @@ export function MasterCategoryPanel({
     setIsSaving(true);
     setError('');
     try {
-      await useCase.setCategory(masterId, { categoryId: leaf.id });
+      const next = await useCase.setCategory(masterId, { categoryId: leaf.id });
       setIsTreeOpen(false);
       await load();
+      onCategoryChanged?.(next);
     } catch (e) {
       setError(extractErrorMessage(e, '카테고리 지정에 실패했습니다.'));
     } finally {
@@ -97,6 +109,7 @@ export function MasterCategoryPanel({
     try {
       await useCase.clearCategory(masterId);
       await load();
+      onCategoryChanged?.(null);
     } catch (e) {
       setError(extractErrorMessage(e, '해제에 실패했습니다.'));
     } finally {
@@ -107,8 +120,8 @@ export function MasterCategoryPanel({
   const busy = isSaving || isClearing;
 
   return (
-    <div className="rounded-lg bg-white p-4 shadow">
-      <h2 className="mb-3 text-sm font-semibold text-gray-900">표준 카테고리</h2>
+    <div className="border-t border-gray-200 p-4">
+      <h3 className="mb-3 text-sm font-semibold text-gray-900">표준 카테고리</h3>
 
       {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 

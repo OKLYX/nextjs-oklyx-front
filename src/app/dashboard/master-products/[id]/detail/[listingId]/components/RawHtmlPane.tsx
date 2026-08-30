@@ -35,7 +35,7 @@ export function RawHtmlPane({ listingId, generated, listingUseCase, onGenerated 
       setHtml(res.detailHtml ?? '');
       onGenerated(res);
     } catch {
-      setError('override 저장에 실패했습니다.');
+      setError('직접 작성한 내용을 저장하지 못했습니다.');
     } finally {
       setIsSaving(false);
     }
@@ -59,7 +59,7 @@ export function RawHtmlPane({ listingId, generated, listingUseCase, onGenerated 
   return (
     <div className="space-y-3">
       <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">
-        저장 시 이 채널은 수동 수정(MANUAL_OVERRIDE) 상태가 되어, 재생성해도 이 HTML 이 보존됩니다.
+        저장하면 이 채널은 직접 수정한 상태가 되어, 재생성해도 여기 작성한 HTML 이 그대로 유지됩니다.
       </p>
 
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -89,7 +89,7 @@ export function RawHtmlPane({ listingId, generated, listingUseCase, onGenerated 
           disabled={busy}
           className="flex items-center gap-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {isSaving ? <Spinner label="저장 중..." /> : 'override 저장'}
+          {isSaving ? <Spinner label="저장 중..." /> : '직접 작성본 저장'}
         </button>
         <button
           type="button"

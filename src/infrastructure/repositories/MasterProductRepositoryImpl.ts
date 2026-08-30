@@ -15,6 +15,9 @@ import type {
   CategoryAttributesRequest,
   ListingMatrixResponse,
   TagsUpdateRequest,
+  ShippingOverrideUpdateRequest,
+  ShippingForceApplyRequest,
+  ShippingForceApplyResponse,
 } from '@/domain/entities/MasterProductEntity';
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
@@ -114,5 +117,26 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
   // ResponseDTO<Void> — no unwrap.
   async updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
     await axiosInstance.put(`${base}/${id}/registration-name-suffix`, data);
+  }
+
+  async updateShippingOverride(
+    id: number,
+    data: ShippingOverrideUpdateRequest,
+  ): Promise<MasterProductResponse> {
+    const response = await axiosInstance.patch(`${base}/${id}/shipping-override`, data);
+    return response.data.data;
+  }
+
+  // Overwrite the selected channels with this master's shipping settings (77/79).
+  // No body / empty listingIds = every linked channel.
+  async applyShippingOverrideToChannels(
+    id: number,
+    data?: ShippingForceApplyRequest,
+  ): Promise<ShippingForceApplyResponse> {
+    const response = await axiosInstance.post(
+      `${base}/${id}/shipping-override/apply-to-channels`,
+      data ?? {},
+    );
+    return response.data.data;
   }
 }

@@ -48,19 +48,36 @@ export function noticeGroupsOf(notices: CategoryNotice[]): string[] {
   return seen.sort((a, b) => (a === NOTICE_GROUP_ETC ? 1 : b === NOTICE_GROUP_ETC ? -1 : 0));
 }
 
-// 실효 선택 그룹: 명시 선택(selected)이 아직 유효하면 그대로, 아니면 값이 입력된 그룹(저장된
-// 마스터를 그 품목군으로 유지), 그마저 없으면 첫 그룹. 그룹이 없으면 ''.
+// 실효 선택 그룹: ① 명시 선택(selected)이 아직 유효하면 그대로 → ② 값이 **가장 많이 채워진**
+// 그룹(저장된 마스터를 그 품목군으로 유지) → ③ 첫 그룹. 그룹이 없으면 ''.
+//
+// ⚠️ ②가 "값이 하나라도 있는 첫 그룹"이 아니라 최다 채움인 이유: 품목군끼리 고시 key 를 공유한다
+// (`제조연월일`·`소비자상담관련 전화번호` 등). 첫 그룹 규칙은 공유 key 몇 개만 보고 엉뚱한 그룹을
+// 골라, 그 상태로 저장하면 원래 그룹의 값이 지워진다(dev master 10 실측 2026-08-29).
+// 동수면 groups 순서상 먼저 나오는 그룹(안정적 — 화면이 흔들리지 않는다).
+//
+// ⚠️ 공유 헬퍼다. 렌더 그룹(CategoryMetaFields) · 필수검증 그룹(computeMissingRequired) ·
+// 전송 그룹(noticesToSubmit) 셋이 이 결과를 함께 본다(의도된 것 — 셋이 같은 그룹을 봐야 한다).
 export function resolveNoticeGroup(
   notices: CategoryNotice[],
   values: Record<string, string>,
   selected: string | null,
 ): string {
   const groups = noticeGroupsOf(notices);
+  // 저장된 그룹이 현재 스키마에 없으면(카테고리 변경) 여기서 false → ②·③으로 내려간다.
   if (selected != null && groups.includes(selected)) return selected;
-  const withValue = groups.find((g) =>
-    notices.some((n) => noticeGroupName(n) === g && (values[n.key] ?? '').trim() !== ''),
-  );
-  return withValue ?? groups[0] ?? '';
+  const filledCount = (g: string): number =>
+    notices.filter((n) => noticeGroupName(n) === g && (values[n.key] ?? '').trim() !== '').length;
+  let best = '';
+  let bestCount = 0;
+  for (const g of groups) {
+    const c = filledCount(g);
+    if (c > bestCount) {
+      best = g;
+      bestCount = c;
+    }
+  }
+  return bestCount > 0 ? best : (groups[0] ?? '');
 }
 
 // 선택된 그룹의 고시 key/값만 추린 맵(저장/전송 대상). 값에 없는 key 는 제외.

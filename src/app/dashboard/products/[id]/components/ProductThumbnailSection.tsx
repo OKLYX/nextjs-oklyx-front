@@ -135,7 +135,7 @@ export function ProductThumbnailSection({ productId, productBrand, productName }
       await loadThumbnails();
       bust(sellerId);
     } catch {
-      setError('이미지 업로드(오버라이드)에 실패했습니다.');
+      setError('이미지 업로드에 실패했습니다.');
     } finally {
       setBusySellerId(null);
     }

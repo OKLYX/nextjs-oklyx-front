@@ -164,7 +164,7 @@ export function ThumbnailPane({ listingId, generated, useCase, onGenerated }: Th
           )}
           <p className="max-w-md text-xs text-gray-500">
             {isOverridden
-              ? 'override 상태에선 [저장 후 재생성]해도 썸네일은 유지되고 필드값·상세만 갱신됩니다. 자동으로 되돌리려면 [override 해제]를 누르세요.'
+              ? '직접 올린 이미지가 적용된 상태입니다. [저장 후 재생성]해도 썸네일은 그대로 유지되고 필드값·상세만 갱신됩니다. 자동 생성으로 되돌리려면 [자동 생성으로 되돌리기]를 누르세요.'
               : '아래 필드값을 채우고 [저장 후 재생성]하면 썸네일·상세에 반영됩니다.'}
           </p>
         </div>
@@ -226,7 +226,7 @@ export function ThumbnailPane({ listingId, generated, useCase, onGenerated }: Th
             disabled={busy}
             className="flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           >
-            {isClearing ? <Spinner label="해제 중..." /> : 'override 해제'}
+            {isClearing ? <Spinner label="되돌리는 중..." /> : '자동 생성으로 되돌리기'}
           </button>
         )}
       </div>
