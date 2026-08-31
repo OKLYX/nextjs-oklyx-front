@@ -152,8 +152,22 @@ export function CellActions({
           </button>
         )}
 
+        {status === 'REJECTED' && (
+          <button
+            type="button"
+            onClick={handleFetch}
+            disabled={busy !== null}
+            className="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          >
+            {busy === 'fetch' ? <Spinner label="확인 중..." /> : '승인 새로고침'}
+          </button>
+        )}
+
+        {/* ⚠️ enum 원문을 노출하지 않는다(UI 용어 규칙). 반려는 막다른 길이 아니라 재확인이 가능해야 한다. */}
         {(status === 'REJECTED' || status === 'SUSPENDED') && (
-          <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">{status}</span>
+          <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">
+            {status === 'REJECTED' ? '승인 반려' : '판매 중지'}
+          </span>
         )}
 
         <button
