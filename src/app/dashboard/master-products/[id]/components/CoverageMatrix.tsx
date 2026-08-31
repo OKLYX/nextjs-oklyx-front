@@ -27,6 +27,7 @@ import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/Detai
 import { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
 import type {
+  MatrixCell,
   ListingMatrixResponse,
   MasterCategoryResponse,
   MasterOptionResponse,
@@ -122,6 +123,15 @@ const channelDiffText = (c: ChannelSyncChannel): string => {
   if (c.quantityMismatchOptions.length > 0)
     parts.push(`수량이 다른 옵션: ${c.quantityMismatchOptions.join(', ')}`);
   return parts.join(' · ');
+};
+
+// 상태 enum → 화면 문구. ⚠️ enum 원문(`SELLING` 등)을 사용자에게 노출하지 않는다(UI 용어 규칙).
+const STATUS_LABEL: Record<ListingStatus, string> = {
+  DRAFT: '미전송',
+  SUBMITTED: '승인 대기중',
+  SELLING: '판매중',
+  REJECTED: '승인 반려',
+  SUSPENDED: '판매 중지',
 };
 
 export function CoverageMatrix({ id }: CoverageMatrixProps) {
@@ -659,10 +669,16 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     setGenerated((prev) => ({ ...prev, [listingId]: updated }));
   };
 
-  // Matrix cell can't distinguish SUBMITTED/SELLING; map registered+platformProductId
-  // to an initial status. CellActions upgrades it after a fetch-status refresh.
-  const initialStatus = (platformProductId: string | null): ListingStatus =>
-    platformProductId ? 'SUBMITTED' : 'DRAFT';
+  /**
+   * 셀의 등록 상태. **백엔드가 준 값이 진실**이고, 없을 때만(구버전 응답) 옛 추정으로 폴백한다.
+   *
+   * ⚠️ 종전에는 추정만 있었다 — `platformProductId` 가 있으면 무조건 `SUBMITTED` 로 넘겨서,
+   * 승인완료(SELLING)·반려(REJECTED)된 셀이 화면에서 계속 **"승인 대기중"** 으로 보였다.
+   * DB 에는 `fetchStatus` 가 이미 실제 상태를 저장하고 있었고 노출만 빠져 있었다.
+   * 폴백을 남기는 이유 = 프론트가 백엔드보다 먼저 배포돼도 회귀하지 않게.
+   */
+  const cellStatus = (cell: MatrixCell | null | undefined): ListingStatus =>
+    cell?.status ?? (cell?.platformProductId ? 'SUBMITTED' : 'DRAFT');
 
   const busy = isBatchAdding || rowBusyId !== null;
 
@@ -979,11 +995,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
             </thead>
             <tbody>
               {matrix.rows.map((row) => {
-                const badge = !row.registered
-                  ? '미등록'
-                  : row.cell?.platformProductId
-                    ? '등록됨'
-                    : 'DRAFT';
+                const badge = !row.registered ? '미등록' : STATUS_LABEL[cellStatus(row.cell)];
                 return (
                   <Fragment key={row.accountId}>
                   <tr
@@ -1159,7 +1171,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           masterId={masterId}
                           listing={{
                             id: row.cell.productListingId,
-                            status: initialStatus(row.cell.platformProductId),
+                            status: cellStatus(row.cell),
                           }}
                           options={options}
                           onReload={load}

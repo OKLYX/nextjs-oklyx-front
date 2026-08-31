@@ -1,4 +1,5 @@
 // MasterProduct (판매상품 마스터) domain types — mirror of the backend confirmed fields.
+import type { ListingStatus } from './ListingRegistrationEntity';
 // Backend endpoints are all /api/admin/master-products/** (ADMIN-only).
 
 export interface MasterComponent {
@@ -179,6 +180,10 @@ export interface MatrixCell {
   registrationName: string;
   platformProductId: string | null;
   sellingPrice: number | null;
+  // 이 셀의 실제 등록 상태(백엔드 enum 이름 그대로). ⚠️ **optional** — 백엔드 미배포 응답에는 없다.
+  // 종전엔 이 값이 없어서 프론트가 `platformProductId` 유무로 DRAFT/SUBMITTED 를 **추정**했고,
+  // 그래서 승인완료·반려된 셀이 계속 "승인 대기중"으로 보였다.
+  status?: ListingStatus;
 }
 
 export interface MatrixRow {
