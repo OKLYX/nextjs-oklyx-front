@@ -1107,10 +1107,21 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                               const name = p.optionName
                                 ?? options.find((o) => o.id === p.optionId)?.name
                                 ?? `옵션 #${p.optionId}`;
+                              // 재고 표시(103/D5): 실효값 = 채널 override ?? 마스터 상한(백엔드 SSOT).
+                              // 상속이면 회색 — "이 채널만 다르다" 가 눈에 보여야 한다. 편집은
+                              // [재고 설정] 모달 전용(여기엔 입력 컨트롤을 두지 않는다).
+                              const inherited = p.stockQuantity == null;
                               const label = (
                                 <span className={active ? '' : 'text-gray-400'}>
                                   <span className={active ? 'text-gray-500' : ''}>{name}: </span>
                                   {formatWon(p.sellingPrice)}
+                                  <span
+                                    className={
+                                      active && !inherited ? 'ml-1' : 'ml-1 text-gray-400'
+                                    }
+                                  >
+                                    재고 {p.stockQuantity ?? p.maxStock}
+                                  </span>
                                 </span>
                               );
                               return isAdmin ? (

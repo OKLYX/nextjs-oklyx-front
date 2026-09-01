@@ -17,6 +17,7 @@ import type {
   PushSyncResponse,
   ListingOptionsResponse,
   ActiveOptionsRequest,
+  OptionStocksRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -136,5 +137,9 @@ export class ListingRegistrationUseCase {
 
   setActiveOptions(listingId: number, data: ActiveOptionsRequest): Promise<ListingOptionsResponse> {
     return this.repository.setActiveOptions(listingId, data);
+  }
+
+  setOptionStocks(listingId: number, data: OptionStocksRequest): Promise<ListingOptionsResponse> {
+    return this.repository.setOptionStocks(listingId, data);
   }
 }
