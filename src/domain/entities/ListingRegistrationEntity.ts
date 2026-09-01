@@ -46,6 +46,11 @@ export interface OptionPrice {
   // Backend-computed (87): the option physically exists on the market, so it can't be removed
   // (approved marketplace options can't be deleted). undefined (legacy) = not on the market.
   onMarket?: boolean;
+  // 102: per-channel stock override; null = inherit the master option's stock.
+  stockQuantity: number | null;
+  // 102/D5: upper bound for this option's channel stock = master stock ?? 9999; also the
+  // effective value while stockQuantity is null. Backend is the SSOT — never recompute it.
+  maxStock: number;
 }
 
 // Auto-generated (or overridden) product assets for one channel/listing.
@@ -188,6 +193,10 @@ export interface ListingOptionSummary {
   sellingPrice: number;
   active: boolean;
   approvalStatus: ApprovalStatus; // DRAFT (unpushed) cells come back NOT_APPROVED.
+  // 102: per-channel stock override; null = inherit the master option's stock.
+  stockQuantity: number | null;
+  // 102/D5: upper bound (master stock ?? 9999); also the inherited value. Backend SSOT.
+  maxStock: number;
 }
 
 export interface ListingOptionsResponse {
@@ -204,4 +213,10 @@ export interface ListingOptionsResponse {
 
 export interface ActiveOptionsRequest {
   activeOptionIds: number[];
+}
+
+// Per-channel option stock (102). Partial update, NOT a whole-set replace: only the
+// listed options are touched. stockQuantity null = clear the override (inherit master).
+export interface OptionStocksRequest {
+  stocks: { optionId: number; stockQuantity: number | null }[];
 }

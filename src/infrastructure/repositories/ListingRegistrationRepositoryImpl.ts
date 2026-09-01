@@ -20,6 +20,7 @@ import type {
   PushSyncResponse,
   ListingOptionsResponse,
   ActiveOptionsRequest,
+  OptionStocksRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -177,6 +178,14 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     data: ActiveOptionsRequest,
   ): Promise<ListingOptionsResponse> {
     const response = await axiosInstance.put(`${listingBase}/${listingId}/options/active`, data);
+    return response.data.data;
+  }
+
+  async setOptionStocks(
+    listingId: number,
+    data: OptionStocksRequest,
+  ): Promise<ListingOptionsResponse> {
+    const response = await axiosInstance.put(`${listingBase}/${listingId}/options/stock`, data);
     return response.data.data;
   }
 }

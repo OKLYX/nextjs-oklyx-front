@@ -165,6 +165,10 @@ export interface MasterDefaults {
  *
  * ⚠️ 택배/상자 override 규칙: `'' → undefined` + **마스터 기본값과 동일하면 omit(상속)**.
  * 마스터 기본값을 명시 복사하지 않아야 마스터 기본값 변경이 옵션에 자동 반영된다.
+ *
+ * ⚠️ 재고(102)는 그 규칙을 따르지 않는다 — 상속 대상이 아니라 옵션 자체의 값이라
+ * "마스터 기본값과 같으면 omit" 을 적용하지 않는다. 빈칸 → 키 생략은 deliveryId 의
+ * "omit = 기존 유지" 와 달리 **null 저장 = 미지정으로 되돌리기** 를 뜻한다.
  */
 export function normalizeOptionPayload(
   name: string,
@@ -172,6 +176,7 @@ export function normalizeOptionPayload(
   quantities: Record<number, string>,
   optDeliveryId: number | '',
   optPackageId: number | '',
+  optStock: number | '',
   masterDefaults: MasterDefaults,
   optAttrValues: Record<string, string> = {},
   optNoticeValues: Record<string, string> = {},
@@ -190,6 +195,9 @@ export function normalizeOptionPayload(
     optPackageId === '' || optPackageId === masterDefaults.packageId
       ? undefined
       : Number(optPackageId);
+  // 재고(102): 빈칸 = 미지정(키 생략 → 백엔드가 null 저장). 0 은 품절이라 유효한 값이므로
+  // falsy 축약(`optStock || undefined`)을 쓰면 안 된다 — 비교는 항상 `=== ''`.
+  const stockQuantity = optStock === '' ? undefined : Number(optStock);
   // Category overrides: keep only keys that differ from the master value (empty/same = inherit).
   const categoryAttributes = diffOverride(optAttrValues, masterAttrs);
   const categoryNotices = diffOverride(optNoticeValues, masterNotices);
@@ -198,6 +206,7 @@ export function normalizeOptionPayload(
     items,
     deliveryId,
     packageId,
+    stockQuantity,
     categoryAttributes: Object.keys(categoryAttributes).length ? categoryAttributes : undefined,
     categoryNotices: Object.keys(categoryNotices).length ? categoryNotices : undefined,
   };
@@ -275,6 +284,8 @@ export function MasterOptionEditor({
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [optDeliveryId, setOptDeliveryId] = useState<number | ''>('');
   const [optPackageId, setOptPackageId] = useState<number | ''>('');
+  // 마스터 옵션 재고(102). '' = 미지정(백엔드 기본 9999), 0 = 품절 — 둘은 다른 값이다.
+  const [optStock, setOptStock] = useState<number | ''>('');
   // Per-option category attribute/notice overrides (60). Empty = inherit master.
   const [optAttrValues, setOptAttrValues] = useState<Record<string, string>>({});
   const [optNoticeValues, setOptNoticeValues] = useState<Record<string, string>>({});
@@ -291,6 +302,9 @@ export function MasterOptionEditor({
   // 목록 레벨 에러(삭제 실패 등). formError 는 {showForm && ...} 안에서만 렌더되므로 폼이 닫힌
   // 상태에서 일어나는 목록 액션 에러는 반드시 이 채널로 보여준다.
   const [listError, setListError] = useState('');
+  // 102/D6: 마스터 재고를 낮춰 채널 override 가 함께 내려간 경우의 안내(실패가 아니므로 formError
+  // 와 분리). 폼이 닫힌 뒤에도 보여야 해서 목록 레벨에서 렌더한다.
+  const [clampNotice, setClampNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [busyOptionId, setBusyOptionId] = useState<number | null>(null);
 
@@ -422,6 +436,7 @@ export function MasterOptionEditor({
     items: { productId: number; quantity: number }[],
     deliveryId: number | null | undefined,
     packageId: number | null | undefined,
+    stockQuantity: number | null | undefined,
     categoryAttributes: Record<string, string> | null | undefined,
     categoryNotices: Record<string, string> | null | undefined,
   ) => {
@@ -433,6 +448,8 @@ export function MasterOptionEditor({
     setQuantities(seededQuantities);
     setOptDeliveryId(deliveryId ?? masterDefaults.deliveryId ?? '');
     setOptPackageId(packageId ?? masterDefaults.packageId ?? '');
+    // ⚠️ `?? ''` 만 쓸 것 — `|| ''` 면 저장된 0(품절)이 빈칸(미지정)으로 보인다.
+    setOptStock(stockQuantity ?? '');
     const seededAttrs = categoryAttributes ?? {};
     const seededNotices = categoryNotices ?? {};
     setOptAttrValues(seededAttrs);
@@ -457,17 +474,33 @@ export function MasterOptionEditor({
 
   const openAdd = () => {
     setEditingKey(null);
-    seedForm('', [], undefined, undefined, undefined, undefined);
+    seedForm('', [], undefined, undefined, undefined, undefined, undefined);
   };
 
   const openEditServer = (opt: MasterOptionResponse) => {
     setEditingKey(opt.id);
-    seedForm(opt.name, opt.items, opt.deliveryId, opt.packageId, opt.categoryAttributes, opt.categoryNotices);
+    seedForm(
+      opt.name,
+      opt.items,
+      opt.deliveryId,
+      opt.packageId,
+      opt.stockQuantity,
+      opt.categoryAttributes,
+      opt.categoryNotices,
+    );
   };
 
   const openEditBuffer = (opt: MasterOptionRequest, index: number) => {
     setEditingKey(index);
-    seedForm(opt.name, opt.items, opt.deliveryId, opt.packageId, opt.categoryAttributes, opt.categoryNotices);
+    seedForm(
+      opt.name,
+      opt.items,
+      opt.deliveryId,
+      opt.packageId,
+      opt.stockQuantity,
+      opt.categoryAttributes,
+      opt.categoryNotices,
+    );
   };
 
   // A picked measure unit clears the other side of the pair (only one of weight/volume carries a value).
@@ -520,6 +553,9 @@ export function MasterOptionEditor({
 
   const handleSubmit = async () => {
     setFormError('');
+    // 안내 초기화는 closeForm 이 아니라 **다음 저장 시작 시** 한다 — closeForm 에서 비우면
+    // 저장 직후 폼이 닫히며 방금 띄운 clamp 안내가 같이 사라진다.
+    setClampNotice('');
     if (!optName.trim()) {
       setFormError('옵션 이름을 입력하세요.');
       return;
@@ -547,6 +583,7 @@ export function MasterOptionEditor({
       quantities,
       optDeliveryId,
       optPackageId,
+      optStock,
       masterDefaults,
       optAttrValues,
       optNoticeValues,
@@ -565,8 +602,17 @@ export function MasterOptionEditor({
     if (isEdit) {
       setIsSubmitting(true);
       try {
-        if (editingKey == null) await useCase!.addOption(master!.id, payload);
-        else await useCase!.updateOption(master!.id, editingKey, payload);
+        const res =
+          editingKey == null
+            ? await useCase!.addOption(master!.id, payload)
+            : await useCase!.updateOption(master!.id, editingKey, payload);
+        // 102/D6: 마스터 재고를 낮추면 그보다 큰 채널 override 가 백엔드에서 함께 내려간다.
+        // 마켓 반영은 사용자가 [수정 요청]을 눌러야 한다 — 여기서 자동 전송하지 않는다.
+        if (res?.clampedChannels) {
+          setClampNotice(
+            `채널 ${res.clampedChannels}곳의 재고가 마스터 값으로 낮춰졌습니다. 마켓 반영은 [수정 요청]이 필요합니다.`,
+          );
+        }
         await onChanged?.();
         closeForm();
       } catch (e: unknown) {
@@ -689,6 +735,10 @@ export function MasterOptionEditor({
         <p className="mb-2 rounded bg-red-50 px-3 py-1.5 text-sm text-red-700">{listError}</p>
       )}
 
+      {clampNotice && (
+        <p className="mb-2 rounded bg-green-50 px-3 py-1.5 text-sm text-green-700">{clampNotice}</p>
+      )}
+
       {rows.length === 0 ? (
         <p className="mb-3 text-sm text-gray-500">등록된 옵션이 없습니다.</p>
       ) : (
@@ -754,6 +804,22 @@ export function MasterOptionEditor({
               onChange={(e) => setOptName(e.target.value)}
               disabled={lockedEditing}
             />
+          </div>
+          <div className="mb-3">
+            <label className="mb-1 block text-xs font-medium text-gray-600">재고수량</label>
+            {/* ⚠️ 84 lock 대상이 아니다 — 판매 중 옵션도 재고는 고칠 수 있어야 한다. */}
+            <input
+              type="number"
+              min={0}
+              max={99999}
+              step={1}
+              className="w-32 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+              value={optStock}
+              onChange={(e) => setOptStock(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+            <p className="mt-1 text-[11px] text-gray-500">
+              비우면 9999개, 0은 품절로 전송됩니다. 채널에서 더 낮게 조정할 수 있습니다.
+            </p>
           </div>
           <div className="space-y-2">
             {components.map((c) => (

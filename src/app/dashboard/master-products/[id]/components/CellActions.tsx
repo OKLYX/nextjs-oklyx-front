@@ -8,6 +8,7 @@ import { ROUTES } from '@/config/routes';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { ChannelFieldValuesModal } from './ChannelFieldValuesModal';
+import { ChannelStockModal } from './ChannelStockModal';
 import { ChannelShippingOverrideModal } from './ChannelShippingOverrideModal';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type {
@@ -74,6 +75,7 @@ export function CellActions({
   const [pushedBanner, setPushedBanner] = useState('');
   const [showFieldValues, setShowFieldValues] = useState(false);
   const [showShipping, setShowShipping] = useState(false);
+  const [showStock, setShowStock] = useState(false);
 
   const optionName = (id: number) => options.find((o) => o.id === id)?.name ?? `옵션 #${id}`;
 
@@ -237,6 +239,16 @@ export function CellActions({
         >
           채널 배송 설정{hasShippingOverride ? ' ✓' : ''}
         </button>
+
+        {/* 재고는 등록 전에도 정해두는 값이라 DRAFT 를 포함한 모든 셀에서 노출한다(103/D3). */}
+        <button
+          type="button"
+          onClick={() => setShowStock(true)}
+          disabled={busy !== null}
+          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+        >
+          재고 설정
+        </button>
       </div>
 
       {status === 'DRAFT' && shippingBlocked && (
@@ -293,6 +305,14 @@ export function CellActions({
           listingUseCase={useCase}
           onSaved={onShippingSaved}
           onClose={() => setShowShipping(false)}
+        />
+      )}
+
+      {showStock && (
+        <ChannelStockModal
+          listingId={listing.id}
+          onSaved={() => onReload()}
+          onClose={() => setShowStock(false)}
         />
       )}
     </div>

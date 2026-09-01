@@ -16,6 +16,7 @@ import type {
   PushSyncResponse,
   ListingOptionsResponse,
   ActiveOptionsRequest,
+  OptionStocksRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -70,4 +71,6 @@ export interface ListingRegistrationRepository {
   // active flags) and save the active subset. Only active options are market-pushed.
   getListingOptions(listingId: number): Promise<ListingOptionsResponse>;
   setActiveOptions(listingId: number, data: ActiveOptionsRequest): Promise<ListingOptionsResponse>;
+  // Per-channel option stock (102): partial bulk save of the cell's stock overrides.
+  setOptionStocks(listingId: number, data: OptionStocksRequest): Promise<ListingOptionsResponse>;
 }

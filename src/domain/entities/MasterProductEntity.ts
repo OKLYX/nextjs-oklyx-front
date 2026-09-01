@@ -30,6 +30,12 @@ export interface MasterOptionResponse {
   // 쿠팡에 등록돼 판매 중 = 수량·이름 수정/삭제 불가 (84). Backend flag is the single source of
   // truth — never recompute it on the front. legacy/미지원 응답은 undefined = 잠그지 않음.
   marketRegistered?: boolean;
+  // Master default stock (102). null = 미지정 (channels fall back to 9999). 0 = 품절 —
+  // never treat this as falsy/absent.
+  stockQuantity?: number | null;
+  // 102/D5: how many channel overrides the backend clamped down to this option's new stock
+  // on the last save. Only ever > 0 on an update response; create always returns 0.
+  clampedChannels?: number;
 }
 
 export interface MasterProductResponse {
@@ -110,6 +116,9 @@ export interface MasterOptionRequest {
   // the master value; an empty map is omitted (undefined = no override, inherit master).
   categoryAttributes?: Record<string, string>;
   categoryNotices?: Record<string, string>;
+  // Master default stock (102). 생략 = 미지정으로 지움(null 저장), 0 = 품절.
+  // ⚠️ Unlike deliveryId/packageId, omitting this does NOT keep the existing value.
+  stockQuantity?: number;
 }
 
 // Master standard category (single, backend 44). The per-platform market code is
