@@ -71,12 +71,9 @@ export interface ThumbnailTemplate {
   isDefault: boolean; // tenant default template (only one per tenant)
 }
 
-export interface FontAsset {
-  id: number;
-  displayName: string;
-  familyKey: string;
-  source: 'BUNDLED' | 'UPLOADED';
-}
+// Font type moved to FontEntity.ts (fonts are a tenant-wide asset, not thumbnail-only).
+// Re-exported here so existing thumbnail imports keep working. Do not redefine.
+export type { FontAsset } from './FontEntity';
 
 // A tenant-shared fixed image (watermark, free-shipping badge, ...) reusable
 // across templates. `storageKey` = uploadBytes return value (local path / S3

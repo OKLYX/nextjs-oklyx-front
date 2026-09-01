@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/config/routes';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -11,8 +11,11 @@ import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCas
 import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
 import { ProcessingPresetUseCase } from '@/application/usecases/ProcessingPresetUseCase';
 import { ProcessingPresetRepositoryImpl } from '@/infrastructure/repositories/ProcessingPresetRepositoryImpl';
+import { FontUseCase } from '@/application/usecases/FontUseCase';
+import { FontRepositoryImpl } from '@/infrastructure/repositories/FontRepositoryImpl';
 import type { DetailBlock } from '@/domain/entities/DetailTemplateEntity';
 import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity';
+import type { FontAsset } from '@/domain/entities/FontEntity';
 import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import { BlockRow } from './BlockRow';
 
@@ -49,6 +52,7 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
     () => new ProcessingPresetUseCase(new ProcessingPresetRepositoryImpl()),
     [],
   );
+  const fontUseCase = useMemo(() => new FontUseCase(new FontRepositoryImpl()), []);
 
   const [name, setName] = useState('');
   const [isDefault, setIsDefault] = useState(false);
@@ -59,6 +63,12 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
   // Once a preset is assigned, v1 has no clear path (backend keeps null/absent).
   // Lock the "없음" option so users can't try to revert (교체 only).
   const [presetLocked, setPresetLocked] = useState(false);
+  // Tenant font library for the text-block font select (secondary data, same as presets).
+  const [fonts, setFonts] = useState<FontAsset[]>([]);
+  const [fontsLoading, setFontsLoading] = useState(true);
+  const [isUploadingFont, setIsUploadingFont] = useState(false);
+  const [fontsError, setFontsError] = useState(''); // inline notice only — never blocks the editor
+  const fontInputRef = useRef<HTMLInputElement>(null);
   const [blocks, setBlocks] = useState<DetailBlock[]>([]);
   const [isLoading, setIsLoading] = useState(!!templateId);
   const [isSaving, setIsSaving] = useState(false);
@@ -126,6 +136,75 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
       alive = false;
     };
   }, [isAdmin, presetUseCase]);
+
+  // Font list is secondary data: failure falls back to [] and never blocks the CRUD.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let alive = true;
+    (async () => {
+      setFontsLoading(true);
+      try {
+        const list = await fontUseCase.list();
+        if (alive) setFonts(list);
+      } catch (e) {
+        console.error(e);
+        // Secondary data: keep [] and surface one inline line — never block the editor.
+        if (alive) setFontsError('폰트 목록을 불러오지 못했습니다. 폰트 지정 없이 저장할 수 있습니다.');
+      } finally {
+        if (alive) setFontsLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [isAdmin, fontUseCase]);
+
+  // Register uploaded fonts so the local preview matches the rendered detail page.
+  // Non-fatal: the fallback stack still shows. ⚠️ But a load failure here is a SIGNAL, not noise —
+  // the buyer-facing @font-face uses the same URL, so it fails the same way. Most likely cause is a
+  // missing S3 bucket CORS rule; check that before assuming the local profile's disk-path
+  // storageKey is to blame.
+  useEffect(() => {
+    fonts.forEach((f) => {
+      if (!f.webUrl) return;
+      try {
+        const face = new FontFace(`oclyx-font-${f.id}`, `url(${f.webUrl})`);
+        face
+          .load()
+          .then((loaded) => document.fonts.add(loaded))
+          .catch(() => console.warn(`[detail-font] ${f.displayName} 로드 실패 — S3 CORS 설정을 확인하세요`));
+      } catch {
+        /* ignore */
+      }
+    });
+  }, [fonts]);
+
+  const handleFontFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    if (ext !== '.ttf' && ext !== '.otf') {
+      alert('폰트는 .ttf 또는 .otf 파일만 업로드할 수 있습니다.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('폰트 파일은 5MB 이하만 업로드할 수 있습니다.');
+      e.target.value = '';
+      return;
+    }
+    setIsUploadingFont(true);
+    try {
+      const uploaded = await fontUseCase.upload(file);
+      setFonts((prev) => [...prev, uploaded]); // no refetch: the response is the new item
+      setFontsError('');
+    } catch {
+      setFontsError('폰트 업로드에 실패했습니다.');
+    } finally {
+      setIsUploadingFont(false);
+      e.target.value = '';
+    }
+  };
 
   const patchBlock = (index: number, patch: Partial<DetailBlock>) => {
     setBlocks((prev) => prev.map((b, i) => (i === index ? { ...b, ...patch } : b)));
@@ -308,6 +387,24 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
               : '합성 안 함 (상세 이미지에 워터마크·배지 미적용).'}
           </span>
         </label>
+
+        <label className="mt-3 block">
+          <span className="block text-xs font-medium text-gray-600">폰트</span>
+          <button
+            type="button"
+            onClick={() => fontInputRef.current?.click()}
+            disabled={isUploadingFont}
+            className="mt-1 rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          >
+            {isUploadingFont ? '업로드 중...' : '폰트 업로드 (.ttf/.otf)'}
+          </button>
+          <input ref={fontInputRef} type="file" accept=".ttf,.otf" onChange={handleFontFile} hidden />
+          <span className="mt-1 block text-xs text-gray-400">
+            업로드한 폰트는 상세 HTML에 폰트 파일 링크로 포함됩니다. 마켓이 이를 제거하면 구매자
+            화면에는 기본 폰트로 표시될 수 있습니다.
+          </span>
+          {fontsError && <span className="mt-1 block text-xs text-red-600">{fontsError}</span>}
+        </label>
       </div>
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
@@ -352,6 +449,8 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
               block={blocks[selectedIndex]}
               index={selectedIndex}
               error={blockErrors[selectedIndex]}
+              fonts={fonts}
+              fontsLoading={fontsLoading}
               previewText={previewTexts[selectedIndex] ?? null}
               onPreviewTextChange={(v) => setPreviewTextAt(selectedIndex, v)}
               onChange={(patch) => patchBlock(selectedIndex, patch)}
@@ -414,6 +513,14 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
                       // spacer whose inner bar height equals its heightPx (both + same chrome).
                       lineHeight: 1,
                       textAlign: (block.align as 'left' | 'center' | 'right') ?? 'left',
+                      // Mirrors backend DetailFontResolver: @font-face family first, then the stack.
+                      fontFamily: (() => {
+                        const f = fonts.find((x) => String(x.id) === s.fontFamily);
+                        if (!f) return undefined;
+                        return f.webUrl
+                          ? `'oclyx-font-${f.id}',${f.webStack ?? 'sans-serif'}`
+                          : (f.webStack ?? undefined);
+                      })(),
                       fontSize: s.fontSize ? `${s.fontSize}px` : undefined,
                       color: s.color || undefined,
                       fontWeight: s.bold === 'true' ? 700 : undefined,
