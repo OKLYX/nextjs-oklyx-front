@@ -20,6 +20,10 @@ export class ShippingLabelUseCase {
     return this.repository.previewRows(sellerId);
   }
 
+  async previewRowsByOrder(orderItemId: number): Promise<ShippingLabelPreviewRow[]> {
+    return this.repository.previewRowsByOrder(orderItemId);
+  }
+
   async exportSpreadsheet(rows: ShippingLabelExportRow[]): Promise<Blob> {
     return this.repository.exportSpreadsheet(rows);
   }
