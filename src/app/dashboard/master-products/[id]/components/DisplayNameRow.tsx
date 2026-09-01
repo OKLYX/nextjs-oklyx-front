@@ -148,6 +148,8 @@ export function DisplayNameRow({
               </>
             )}
             {nameError && <span className="text-xs text-red-600">{nameError}</span>}
+            {/* 109: saving is local only — the market copy changes on [수정 요청]. */}
+            <span className="text-[11px] text-gray-500">마켓 반영은 [수정 요청]</span>
           </div>
 
           {/* 등록상품명 (67/68): 읽기 전용 — 채널 활성옵션 기준 자동값 */}

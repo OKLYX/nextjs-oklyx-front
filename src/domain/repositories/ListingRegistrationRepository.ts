@@ -32,6 +32,8 @@ export interface ListingRegistrationRepository {
   addChannel(masterId: number, data: ChannelAddRequest): Promise<ChannelAddResponse>;
   addChannelsBatch(masterId: number, data: BatchChannelAddRequest): Promise<BatchChannelAddResponse>;
   register(listingId: number): Promise<ListingRegisterResponse>;
+  // Update request (109): forced re-push of an already-registered cell -> re-review (SUBMITTED).
+  updateRequest(listingId: number): Promise<ListingRegisterResponse>;
   fetchStatus(listingId: number): Promise<ListingStatusResponse>;
   syncApprovals(): Promise<ListingSyncResponse>;
   getGenerated(listingId: number): Promise<GeneratedProductResponse>;
@@ -39,7 +41,7 @@ export interface ListingRegistrationRepository {
   overrideThumbnail(listingId: number, file: File): Promise<GeneratedProductResponse>;
   clearThumbnail(listingId: number): Promise<GeneratedProductResponse>;
   updateFieldValues(listingId: number, data: FieldValuesUpdateRequest): Promise<GeneratedProductResponse>;
-  // Display name (35): internal-only PATCH, backend returns no body -> void.
+  // Display name (35): 로컬 저장 PATCH(마켓 반영은 [수정 요청]), backend returns no body -> void.
   updateDisplayName(listingId: number, data: DisplayNameUpdateRequest): Promise<void>;
   updateTags(listingId: number, data: TagsUpdateRequest): Promise<GeneratedProductResponse>;
   // Channel shipping override (75): PATCH replaces this cell's override (no regenerate).
