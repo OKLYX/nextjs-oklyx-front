@@ -55,6 +55,11 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     return response.data.data;
   }
 
+  async updateRequest(listingId: number): Promise<ListingRegisterResponse> {
+    const response = await axiosInstance.post(`${listingBase}/${listingId}/update-request`);
+    return response.data.data;
+  }
+
   async fetchStatus(listingId: number): Promise<ListingStatusResponse> {
     const response = await axiosInstance.post(`${listingBase}/${listingId}/fetch-status`);
     return response.data.data;

@@ -44,6 +44,10 @@ export class ListingRegistrationUseCase {
     return this.repository.register(listingId);
   }
 
+  updateRequest(listingId: number): Promise<ListingRegisterResponse> {
+    return this.repository.updateRequest(listingId);
+  }
+
   fetchStatus(listingId: number): Promise<ListingStatusResponse> {
     return this.repository.fetchStatus(listingId);
   }
