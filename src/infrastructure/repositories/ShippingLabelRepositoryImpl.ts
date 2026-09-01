@@ -38,6 +38,15 @@ export class ShippingLabelRepositoryImpl implements ShippingLabelRepository {
     return response.data.data;
   }
 
+  // Single-order preview — same JSON envelope as previewRows, so unwrap `response.data.data`.
+  // orderItemId is our order_item PK, not the Coupang orderId.
+  async previewRowsByOrder(orderItemId: number): Promise<ShippingLabelPreviewRow[]> {
+    const response = await axiosInstance.get('/api/admin/shipping-labels/v2/preview/by-order', {
+      params: { orderItemId },
+    });
+    return response.data.data;
+  }
+
   // V2 export posts edited rows and returns the xlsx binary — responseType 'blob', no unwrapping.
   async exportSpreadsheet(rows: ShippingLabelExportRow[]): Promise<Blob> {
     const response = await axiosInstance.post(

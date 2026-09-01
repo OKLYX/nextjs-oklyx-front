@@ -260,7 +260,15 @@ export function OrderContainer() {
           onPageChange={handlePageChange}
         />
 
-        <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+        {/* key remount resets the modal's sheet state when the order changes or the modal closes
+            (it is always rendered, so it never unmounts on its own). */}
+        <OrderDetailsModal
+          key={selectedOrder?.id ?? 'none'}
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          isAdmin={isAdmin}
+          useCase={shippingLabelUseCase}
+        />
 
         <ShipmentConfirmModal
           isOpen={isConfirmOpen}
