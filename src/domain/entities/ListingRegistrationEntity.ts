@@ -174,7 +174,7 @@ export interface FieldValuesUpdateRequest {
 }
 
 // Display-name (노출상품명) save (prompt 35). Backend responds ResponseDTO<Void>
-// (no body) — internal only, no market push; caller refetches the matrix.
+// (no body) — 저장은 로컬만; 마켓 반영은 [수정 요청](109) 필요. Caller refetches the matrix.
 export interface DisplayNameUpdateRequest {
   name: string;
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ROUTES } from '@/config/routes';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
@@ -38,13 +39,14 @@ interface CellActionsProps {
   onShippingSaved: (updated: GeneratedProductResponse) => void;
 }
 
-type Busy = 'register' | 'fetch' | 'regenerate' | null;
+type Busy = 'register' | 'fetch' | 'regenerate' | 'update' | null;
 
 /**
- * 등록됨/DRAFT 셀의 상태별 액션 버튼 (register / fetch-status / regenerate / 필드값 편집).
+ * 등록됨/DRAFT 셀의 상태별 액션 버튼 (register / update-request / fetch-status / regenerate / 필드값 편집).
  * File: src/app/dashboard/master-products/[id]/components/CellActions.tsx
  *
  * 마켓 호출은 비동기(즉시 반환) — 승인은 이후 [승인 새로고침]으로 확인.
+ * [수정 요청](109): 등록된 셀(DRAFT 아님)의 현재 값을 마켓에 강제 재전송 → 재심사(SUBMITTED).
  */
 export function CellActions({
   masterId,
@@ -68,6 +70,8 @@ export function CellActions({
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState('');
   const [statusResult, setStatusResult] = useState<ListingStatusResponse | null>(null);
+  // [수정 요청] success notice (109). Cleared whenever another action starts.
+  const [pushedBanner, setPushedBanner] = useState('');
   const [showFieldValues, setShowFieldValues] = useState(false);
   const [showShipping, setShowShipping] = useState(false);
 
@@ -76,6 +80,7 @@ export function CellActions({
   const run = async (kind: Exclude<Busy, null>, fn: () => Promise<void>) => {
     setBusy(kind);
     setError('');
+    setPushedBanner('');
     try {
       await fn();
     } catch {
@@ -90,6 +95,27 @@ export function CellActions({
       await useCase.register(listing.id);
       onReload();
     });
+
+  // Forced re-push of an already-registered cell (109). Not routed through run():
+  // the backend's 400 message (미등록 / 비활성 계정 / 자동생성 먼저 / 활성 옵션 없음)
+  // must surface as-is, and run() overwrites every failure with a fixed string.
+  const handleUpdateRequest = async () => {
+    if (!window.confirm('수정한 값을 마켓에 다시 보내고 재심사를 요청합니다. 계속하시겠습니까?')) return;
+    setBusy('update');
+    setError('');
+    setPushedBanner('');
+    try {
+      await useCase.updateRequest(listing.id); // response unused: the reload is the source of truth
+      setPushedBanner('승인 대기중으로 전환됨');
+      setStatusResult(null); // the previous fetch-status result is stale now
+      onReload();
+    } catch (e) {
+      const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
+      setError(msg ?? '수정 요청에 실패했습니다.');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const handleFetch = () =>
     run('fetch', async () => {
@@ -127,6 +153,17 @@ export function CellActions({
             className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
           >
             {busy === 'register' ? <Spinner label="요청 중..." /> : '마켓 등록'}
+          </button>
+        )}
+
+        {status !== 'DRAFT' && (
+          <button
+            type="button"
+            onClick={handleUpdateRequest}
+            disabled={busy !== null}
+            className="flex items-center gap-1 rounded border border-amber-300 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+          >
+            {busy === 'update' ? <Spinner label="요청 중..." /> : '수정 요청'}
           </button>
         )}
 
@@ -209,6 +246,8 @@ export function CellActions({
       {status === 'SUBMITTED' && !statusResult && (
         <p className="text-[11px] text-amber-600">승인 대기중</p>
       )}
+
+      {pushedBanner && <p className="text-[11px] text-green-700">{pushedBanner}</p>}
 
       {statusResult && (
         <div className="space-y-1">
