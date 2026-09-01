@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, Bold, Italic } from 'lucide-react';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import type { DetailBlock } from '@/domain/entities/DetailTemplateEntity';
+import type { FontAsset } from '@/domain/entities/FontEntity';
 
 // Reserved field keys auto-derive their value from the product (brandName/productName).
 // Custom keys fall back to the template's defaultValue. Reused from the thumbnail model.
@@ -25,11 +26,12 @@ const TYPE_LABELS: Record<DetailBlock['type'], string> = {
 interface StyleControl {
   key: string; // textStyle map key (same as backend registry key)
   label: string;
-  kind: 'number' | 'color' | 'bool';
+  kind: 'number' | 'color' | 'bool' | 'select';
   min?: number; // kind='number' only
   max?: number;
   def?: string; // value prefilled when the control is activated (number/color)
   icon?: ReactNode; // kind='bool': shown as a Word-style toggle button glyph
+  options?: { value: string; label: string; disabled?: boolean }[]; // kind='select' only
 }
 
 const ALIGN_OPTIONS: { value: string; label: string; icon: ReactNode }[] = [
@@ -38,7 +40,25 @@ const ALIGN_OPTIONS: { value: string; label: string; icon: ReactNode }[] = [
   { value: 'right', label: '오른쪽', icon: <AlignRight size={16} /> },
 ];
 
-const TEXT_STYLE_CONTROLS: StyleControl[] = [
+// Font options come from the tenant font library, so the descriptor list is built per render.
+// Adding a new style attribute is still one entry here.
+// ⚠️ The stored fontFamily value is the FontAsset id as a string ("12"), never a CSS stack —
+// the backend parses it as an id and drops anything else.
+const buildTextStyleControls = (fonts: FontAsset[]): StyleControl[] => [
+  {
+    key: 'fontFamily',
+    label: '폰트',
+    kind: 'select',
+    options: fonts.map((f) => ({
+      value: String(f.id),
+      // System fonts are labelled '(시스템)' exactly like the thumbnail editor.
+      // Fonts unusable in a detail page stay listed but disabled, so the reason is visible.
+      label: `${f.displayName}${f.source === 'BUNDLED' ? ' (시스템)' : ''}${
+        !f.webUrl && !f.webStack ? ' — 상세 미지원' : ''
+      }`,
+      disabled: !f.webUrl && !f.webStack,
+    })),
+  },
   { key: 'fontSize', label: '크기', kind: 'number', min: 8, max: 200, def: '16' },
   { key: 'color', label: '색상', kind: 'color' },
   { key: 'bold', label: '굵게', kind: 'bool', icon: <Bold size={16} /> },
@@ -49,6 +69,8 @@ interface BlockRowProps {
   block: DetailBlock;
   index: number;
   error?: string;
+  fonts: FontAsset[]; // tenant font library (font select options)
+  fontsLoading: boolean;
   previewText?: string | null; // preview-only override (null = show block default), editor-managed
   onPreviewTextChange?: (value: string | null) => void;
   onChange: (patch: Partial<DetailBlock>) => void;
@@ -63,11 +85,14 @@ export function BlockRow({
   block,
   index,
   error,
+  fonts,
+  fontsLoading,
   previewText,
   onPreviewTextChange,
   onChange,
   onDelete,
 }: BlockRowProps) {
+  const controls = useMemo(() => buildTextStyleControls(fonts), [fonts]);
   const isBuiltinBind = (BUILTIN_FIELD_KEYS as readonly string[]).includes(block.bind ?? '');
   // "직접 입력" chosen but key not yet typed: bind is empty so the value can't be
   // derived from data alone, hence a local flag distinguishing it from the placeholder.
@@ -235,7 +260,7 @@ export function BlockRow({
             <div className="sm:col-span-2">
               <span className={labelCls}>텍스트 스타일</span>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                {TEXT_STYLE_CONTROLS.map((c) => {
+                {controls.map((c) => {
                   const current = block.textStyle?.[c.key];
                   if (c.kind === 'number') {
                     // No checkbox: the input shows the default (c.def) and only stores an
@@ -269,6 +294,27 @@ export function BlockRow({
                         aria-label={c.label}
                         title={c.label}
                       />
+                    );
+                  }
+                  if (c.kind === 'select') {
+                    // '' = 지정 안 함 → key 제거(기본 폰트 상속). 값은 FontAsset id 문자열.
+                    return (
+                      <select
+                        key={c.key}
+                        value={current ?? ''}
+                        onChange={(e) => setStyle(c.key, e.target.value === '' ? null : e.target.value)}
+                        disabled={fontsLoading}
+                        className="h-8 max-w-40 rounded border border-gray-300 px-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                        aria-label={c.label}
+                        title={c.label}
+                      >
+                        <option value="">기본 폰트</option>
+                        {(c.options ?? []).map((o) => (
+                          <option key={o.value} value={o.value} disabled={o.disabled}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
                     );
                   }
                   return (
