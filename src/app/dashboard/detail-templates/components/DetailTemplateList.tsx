@@ -8,17 +8,26 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
+import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
+import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import type { DetailTemplateResponse } from '@/domain/entities/DetailTemplateEntity';
+import { DetailImageGroupModal } from './DetailImageGroupModal';
 
 export function DetailTemplateList() {
   const router = useRouter();
   const isAdmin = useAuthStore((state) => state.user?.role === 'ADMIN');
   const useCase = useMemo(() => new DetailContentUseCase(new DetailContentRepositoryImpl()), []);
+  const groupUseCase = useMemo(
+    () => new DetailImageGroupUseCase(new DetailImageGroupRepositoryImpl()),
+    [],
+  );
 
   const [templates, setTemplates] = useState<DetailTemplateResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  // 이미지 그룹 카탈로그 관리는 전용 라우트 없이 이 헤더의 모달로 끝낸다.
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
 
   // On-mount refetch: navigating back after save re-mounts this container, so the
   // single-default reassignment (backend un-sets the previous default) is reflected.
@@ -70,14 +79,27 @@ export function DetailTemplateList() {
     <PageContainer>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">상세 템플릿</h1>
-        <button
-          type="button"
-          onClick={() => router.push(ROUTES.DETAIL_TEMPLATE_NEW)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          + 새 템플릿
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setGroupModalOpen(true)}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            이미지 그룹 관리
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push(ROUTES.DETAIL_TEMPLATE_NEW)}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + 새 템플릿
+          </button>
+        </div>
       </div>
+
+      {groupModalOpen && (
+        <DetailImageGroupModal useCase={groupUseCase} onClose={() => setGroupModalOpen(false)} />
+      )}
 
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 

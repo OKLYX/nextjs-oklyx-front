@@ -52,9 +52,11 @@ import { MasterOptionEditor } from '../../components/MasterOptionEditor';
 import {
   MasterImagePool,
   type ImageField,
-  type ImageFieldGroup,
+  type ImageFieldFilter,
 } from '../../components/MasterImagePool';
 import { deriveMasterImageFields } from '../../components/masterImageFields';
+import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
+import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import { submitNoticeGroup } from './categoryMetaValidation';
 import { DetailSection } from './DetailSection';
 import { MasterCategoryPanel } from './MasterCategoryPanel';
@@ -173,6 +175,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new DetailContentUseCase(new DetailContentRepositoryImpl()),
     [],
   );
+  const groupUseCase = useMemo(
+    () => new DetailImageGroupUseCase(new DetailImageGroupRepositoryImpl()),
+    [],
+  );
   const productImageUseCase = useMemo(
     () => new ProductImageUseCase(new ProductImageRepositoryImpl()),
     [],
@@ -196,9 +202,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // 옵션 고시 노출·검증 범위 = 마스터가 저장/선택한 실효 품목군(submitNoticeGroup 단일 해석).
   const [masterNoticeGroup, setMasterNoticeGroup] = useState<string | null>(null);
   const [metaBaseError, setMetaBaseError] = useState('');
-  // MasterImagePool field derivation (대표사진 + 전 템플릿 imageZone union).
+  // MasterImagePool field derivation (대표사진 + 이미지 그룹 카탈로그).
   const [imageFields, setImageFields] = useState<ImageField[]>([]);
-  const [imageFieldGroups, setImageFieldGroups] = useState<ImageFieldGroup[]>([]);
+  const [imageFieldFilters, setImageFieldFilters] = useState<ImageFieldFilter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -430,19 +436,19 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     };
   }, [masterUseCase, masterId, categoryId, metaVersion]);
 
-  // 이미지 필드(대표사진 + 전 템플릿 imageZone union). 생성 모달과 같은 도출 헬퍼를 쓴다.
+  // 이미지 필드(대표사진 + 이미지 그룹 카탈로그). 생성 모달과 같은 도출 헬퍼를 쓴다.
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const { fields, fieldGroups } = await deriveMasterImageFields(detailUseCase);
+      const { fields, fieldFilters } = await deriveMasterImageFields(detailUseCase, groupUseCase);
       if (!alive) return;
       setImageFields(fields);
-      setImageFieldGroups(fieldGroups);
+      setImageFieldFilters(fieldFilters);
     })();
     return () => {
       alive = false;
     };
-  }, [detailUseCase]);
+  }, [detailUseCase, groupUseCase]);
 
   const unregisteredRows = useMemo(
     () => matrix?.rows.filter((r) => !r.registered) ?? [],
@@ -899,7 +905,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
               masterId={masterId}
               detailUseCase={detailUseCase}
               fields={imageFields}
-              fieldGroups={imageFieldGroups}
+              fieldFilters={imageFieldFilters}
               productImageUseCase={productImageUseCase}
               sourceProducts={sourceProducts}
             />
