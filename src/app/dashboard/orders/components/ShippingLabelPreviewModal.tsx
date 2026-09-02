@@ -110,8 +110,10 @@ export function ShippingLabelPreviewModal({
       const blob = await useCase.exportSpreadsheet(rows);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
+      // Same filename convention as the V1 download (OrderContainer) — keep both in sync.
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       anchor.href = url;
-      anchor.download = 'shipping-labels.xlsx';
+      anchor.download = `주문목록_${today}.xlsx`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (err) {
