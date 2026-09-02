@@ -3,7 +3,7 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { OrderRepository } from '@/domain/repositories/OrderRepository';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
-import type { OrderSyncResponse } from '@/application/dto/OrderDTOs';
+import type { OrderSyncResponse, SyncTarget } from '@/application/dto/OrderDTOs';
 
 export class OrderRepositoryImpl implements OrderRepository {
   async getOrders(sellerId?: number): Promise<OrderItem[]> {
@@ -15,6 +15,13 @@ export class OrderRepositoryImpl implements OrderRepository {
 
   async syncOrders(params?: { sellerId?: number; accountId?: number }): Promise<OrderSyncResponse> {
     const response = await axiosInstance.post('/api/orders/sync', null, { params });
+    return response.data.data;
+  }
+
+  async getSyncTargets(sellerId?: number): Promise<SyncTarget[]> {
+    const response = await axiosInstance.get('/api/orders/sync/targets', {
+      params: sellerId != null ? { sellerId } : undefined,
+    });
     return response.data.data;
   }
 }
