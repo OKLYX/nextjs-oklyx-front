@@ -311,6 +311,7 @@ export function CellActions({
       {showStock && (
         <ChannelStockModal
           listingId={listing.id}
+          channelLabel={channelLabel}
           onSaved={() => onReload()}
           onClose={() => setShowStock(false)}
         />
