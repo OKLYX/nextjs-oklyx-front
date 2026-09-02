@@ -1,5 +1,36 @@
 'use client';
 
+/**
+ * 목록 화면 공통 페이지네이션 컴포넌트
+ *
+ * 서버 페이징 목록의 페이지 이동 UI는 이 컴포넌트를 반드시 사용.
+ * 화면마다 화살표/번호 버튼을 새로 만들면 안됨 (규칙 위반).
+ *
+ * **파일**: src/presentation/components/Pagination.tsx
+ *
+ * @component
+ * @param {number} currentPage - 현재 페이지 인덱스 (0-based)
+ * @param {number} totalPages - 전체 페이지 수
+ * @param {(page: number) => void} onPageChange - 페이지 버튼 클릭 핸들러 (0-based 인덱스 전달)
+ *
+ * @example
+ * // 총 페이지가 2 이상일 때만 렌더 (호출부 관행)
+ * {totalPages > 1 && (
+ *   <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => updateQuery({ page: p })} />
+ * )}
+ *
+ * @example
+ * // 로컬 state 기반 목록
+ * <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+ *
+ * ⚠️ 주의:
+ * - 페이지 인덱스는 0-based (표시만 +1). 서버 Page 응답의 `number` 와 같은 축.
+ * - `totalPages <= 1` 일 때 숨기는 판단은 호출부 담당 (이 컴포넌트는 항상 렌더).
+ *
+ * ❌ 금지 패턴:
+ * - 페이지별로 페이지네이션 UI 재구현 → 이 컴포넌트 사용
+ * - 1-based 인덱스로 호출 → 서버 응답과 어긋남
+ */
 interface PaginationProps {
   currentPage: number;
   totalPages: number;

@@ -210,3 +210,22 @@ export interface ListingMatrixResponse {
   masterName: string;
   rows: MatrixRow[];
 }
+
+// ── List query (110/111) ─────────────────────────────────────────────────────
+// API vocabulary. The URL uses `q`; the conversion happens once in
+// `master-products/masterListQuery.ts#toApiParams` — never rename inside the repo/usecase.
+export interface MasterProductListParams {
+  page: number;
+  size: number;
+  sort: string; // `field,direction` e.g. createdAt,desc — unknown fields are a 400 on the server
+  search?: string; // omitted key = no name filter
+}
+
+// Spring `Page<MasterProductResponse>` — only the fields the UI reads.
+export interface MasterProductPageResponse {
+  content: MasterProductResponse[];
+  totalElements: number;
+  totalPages: number;
+  number: number; // current page index (0-based)
+  size: number;
+}
