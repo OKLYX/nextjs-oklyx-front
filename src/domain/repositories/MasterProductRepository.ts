@@ -1,5 +1,7 @@
 import type {
   MasterProductResponse,
+  MasterProductListParams,
+  MasterProductPageResponse,
   MasterProductRequest,
   MasterProductUpdateRequest,
   MasterOptionRequest,
@@ -18,7 +20,7 @@ import type {
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 export interface MasterProductRepository {
-  list(): Promise<MasterProductResponse[]>;
+  list(params: MasterProductListParams): Promise<MasterProductPageResponse>;
   getById(id: number): Promise<MasterProductResponse>;
   create(data: MasterProductRequest): Promise<MasterProductResponse>;
   update(id: number, data: MasterProductUpdateRequest): Promise<MasterProductResponse>;
