@@ -6,7 +6,7 @@ import axios from 'axios';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { SearchBar } from './SearchBar';
 import { ProductTable } from './ProductTable';
-import { Pagination } from './Pagination';
+import { Pagination } from '@/presentation/components/Pagination';
 import { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';

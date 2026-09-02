@@ -4,6 +4,8 @@ import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { MasterProductRepository } from '@/domain/repositories/MasterProductRepository';
 import type {
   MasterProductResponse,
+  MasterProductListParams,
+  MasterProductPageResponse,
   MasterProductRequest,
   MasterProductUpdateRequest,
   MasterOptionRequest,
@@ -25,8 +27,16 @@ const base = '/api/admin/master-products';
 const lookupBase = '/api/admin/category-lookup';
 
 export class MasterProductRepositoryImpl implements MasterProductRepository {
-  async list(): Promise<MasterProductResponse[]> {
-    const response = await axiosInstance.get(base);
+  // Paged list (110). `search` undefined => axios drops the key entirely.
+  async list(params: MasterProductListParams): Promise<MasterProductPageResponse> {
+    const response = await axiosInstance.get(base, {
+      params: {
+        page: params.page,
+        size: params.size,
+        sort: params.sort,
+        search: params.search,
+      },
+    });
     return response.data.data;
   }
 

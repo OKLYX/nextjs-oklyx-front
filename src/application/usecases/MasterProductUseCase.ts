@@ -1,6 +1,8 @@
 import type { MasterProductRepository } from '@/domain/repositories/MasterProductRepository';
 import type {
   MasterProductResponse,
+  MasterProductListParams,
+  MasterProductPageResponse,
   MasterProductRequest,
   MasterProductUpdateRequest,
   MasterOptionRequest,
@@ -21,8 +23,8 @@ import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuff
 export class MasterProductUseCase {
   constructor(private repository: MasterProductRepository) {}
 
-  list(): Promise<MasterProductResponse[]> {
-    return this.repository.list();
+  list(params: MasterProductListParams): Promise<MasterProductPageResponse> {
+    return this.repository.list(params);
   }
 
   getById(id: number): Promise<MasterProductResponse> {
