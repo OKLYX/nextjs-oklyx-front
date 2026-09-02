@@ -38,10 +38,12 @@ import { MasterOptionEditor } from './MasterOptionEditor';
 import {
   MasterImagePool,
   type ImageField,
-  type ImageFieldGroup,
+  type ImageFieldFilter,
   type MasterImageBuffer,
 } from './MasterImagePool';
 import { deriveMasterImageFields } from './masterImageFields';
+import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
+import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import { MetaPlatformTabs } from '../[id]/components/MetaPlatformTabs';
 import {
   CategoryMetaCreateFields,
@@ -102,6 +104,11 @@ export function MasterProductFormModal({
   onClose,
   onDataChanged,
 }: MasterProductFormModalProps) {
+  // 이미지 그룹 카탈로그(공용 목록)는 이 모달이 직접 만든다 — 부모 props 계약을 넓히지 않는다.
+  const groupUseCase = useMemo(
+    () => new DetailImageGroupUseCase(new DetailImageGroupRepositoryImpl()),
+    [],
+  );
   const [name, setName] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
@@ -308,8 +315,8 @@ export function MasterProductFormModal({
   // Image fields = cover photo (always first) + the union of detail imageZones across ALL templates
   // (a master's mapped image is reusable by whichever template a channel ends up resolving to).
   const [imageFields, setImageFields] = useState<ImageField[]>([]);
-  // Field cards grouped by template (cover photo first), so each zone shows its template membership.
-  const [imageFieldGroups, setImageFieldGroups] = useState<ImageFieldGroup[]>([]);
+  // Filter-only grouping (cover photo + per template); the render order is always `imageFields`.
+  const [imageFieldFilters, setImageFieldFilters] = useState<ImageFieldFilter[]>([]);
   // Zones the default template requires (create-mode validation only — not the full union above).
   const [requiredZoneKeys, setRequiredZoneKeys] = useState<string[]>([]);
 
@@ -513,21 +520,21 @@ export function MasterProductFormModal({
     [selectedIds, products],
   );
 
-  // Image fields = cover photo + the union of every template's imageZone binds. 도출 규칙은 상세
+  // Image fields = cover photo + the shared detail image group catalog. 도출 규칙은 상세
   // 페이지와 공유하는 헬퍼(deriveMasterImageFields)가 소유한다.
   useEffect(() => {
     let alive = true;
     (async () => {
-      const derived = await deriveMasterImageFields(detailUseCase);
+      const derived = await deriveMasterImageFields(detailUseCase, groupUseCase);
       if (!alive) return;
       setImageFields(derived.fields);
-      setImageFieldGroups(derived.fieldGroups);
+      setImageFieldFilters(derived.fieldFilters);
       setRequiredZoneKeys(derived.requiredZoneKeys);
     })();
     return () => {
       alive = false;
     };
-  }, [detailUseCase]);
+  }, [detailUseCase, groupUseCase]);
 
   const handleSubmit = async () => {
     setError('');
@@ -1078,7 +1085,7 @@ export function MasterProductFormModal({
               masterId={null}
               detailUseCase={detailUseCase}
               fields={imageFields}
-              fieldGroups={imageFieldGroups}
+              fieldFilters={imageFieldFilters}
               buffer={imageBuffer}
               onBufferChange={setImageBuffer}
               productImageUseCase={productImageUseCase}

@@ -39,7 +39,8 @@ const PRODUCT_OFFSET = 1_000_000_000;
  *   - 풀 이미지 `imageUrl` 은 완성 URL → <img src> 직접(resolveThumbUrl 금지).
  *     ⚠️ [제품 이미지] 탭의 `ProductImage.imageUrl` 은 저장값 → `resolveThumbUrl` 사용(갤러리와 동일).
  *   - 대표사진 예약키 = `SOURCE_ZONE`(단일). zone 필드 = 다중.
- *   - `fields` 는 부모가 도출해 주입. `fieldGroups` 를 주면 우측 필드 컬럼을 템플릿별 제목으로 묶어 렌더.
+ *   - `fields` 는 부모가 도출해 주입. 렌더는 **항상 평면**(`fields` 순서 그대로).
+ *     `fieldFilters` 를 주면 상단 필터바(전체/썸네일 템플릿/상세 템플릿)를 그린다 — 묶어 그리는 용도가 아니다.
  *
  * **모드**:
  *   - 수정(`masterId != null`): 매핑/참조가 즉시 서버 반영.
@@ -47,8 +48,12 @@ const PRODUCT_OFFSET = 1_000_000_000;
  */
 export type ImageField = { key: string; label: string };
 
-// Optional grouping for the field column: render field cards under a heading (e.g. per template).
-export type ImageFieldGroup = { label: string; keys: string[] };
+// 필터 전용. 렌더 순서는 언제나 `fields` 가 결정한다 — 이 타입으로 묶어 그리지 말 것.
+export type ImageFieldFilter = {
+  label: string; // 셀렉트에 표시(템플릿 이름 / '대표사진')
+  keys: string[]; // 이 필터가 통과시키는 field.key 집합
+  kind: 'cover' | 'detail'; // 어느 셀렉트에 들어갈지
+};
 
 export type MasterImageBuffer = {
   files: File[]; // upload queue (order = pool sortOrder)
@@ -69,7 +74,7 @@ interface MasterImagePoolProps {
   masterId: number | null;
   detailUseCase: DetailContentUseCase;
   fields: ImageField[];
-  fieldGroups?: ImageFieldGroup[];
+  fieldFilters?: ImageFieldFilter[];
   // Create mode only: parent holds the buffer as the single source of truth.
   buffer?: MasterImageBuffer;
   onBufferChange?: (next: MasterImageBuffer) => void;
@@ -85,7 +90,7 @@ export function MasterImagePool({
   masterId,
   detailUseCase,
   fields,
-  fieldGroups,
+  fieldFilters,
   buffer,
   onBufferChange,
   onDirty,
@@ -217,12 +222,6 @@ export function MasterImagePool({
     for (const img of pool) if (img.productImageId != null) map.set(img.productImageId, img);
     return map;
   }, [pool]);
-
-  const fieldByKey = useMemo(() => {
-    const map = new Map<string, ImageField>();
-    for (const f of fields) map.set(f.key, f);
-    return map;
-  }, [fields]);
 
   // Tokens currently mapped to a field (in mapping order).
   const fieldTokens = useCallback(
@@ -459,24 +458,31 @@ export function MasterImagePool({
   const masterEntries = entries.filter((e) => !e.isReference);
 
   // Right-column filter: 전체 chip + 썸네일 템플릿 select (cover) + 상세 템플릿 select (detail).
-  const coverGroups = (fieldGroups ?? []).filter((g) => g.keys.includes(SOURCE_ZONE));
-  const templateGroups = (fieldGroups ?? []).filter((g) => !g.keys.includes(SOURCE_ZONE));
-  const coverCurrent = activeGroup === COVER_ALL || coverGroups.some((g) => g.label === activeGroup);
+  // ⚠️ 필터는 어느 카드를 "보일지"만 정한다 — 렌더 순서/그룹핑은 언제나 `fields` 가 소유한다.
+  const keysOf = (filters: ImageFieldFilter[]) => new Set(filters.flatMap((f) => f.keys));
+  const coverFilters = (fieldFilters ?? []).filter((f) => f.kind === 'cover');
+  const detailFilters = (fieldFilters ?? []).filter((f) => f.kind === 'detail');
+  const coverCurrent =
+    activeGroup === COVER_ALL || coverFilters.some((f) => f.label === activeGroup);
   const detailCurrent =
-    activeGroup === DETAIL_ALL || templateGroups.some((g) => g.label === activeGroup);
-  const visibleGroups =
-    activeGroup === COVER_ALL
-      ? coverGroups
-      : activeGroup === DETAIL_ALL
-        ? templateGroups
-        : activeGroup == null
-          ? fieldGroups ?? []
-          : (fieldGroups ?? []).filter((g) => g.label === activeGroup);
+    activeGroup === DETAIL_ALL || detailFilters.some((f) => f.label === activeGroup);
+  const visibleKeys: Set<string> | null =
+    activeGroup == null
+      ? null // 전체
+      : activeGroup === COVER_ALL
+        ? keysOf(coverFilters)
+        : activeGroup === DETAIL_ALL
+          ? keysOf(detailFilters)
+          : keysOf((fieldFilters ?? []).filter((f) => f.label === activeGroup));
+  const visibleFields = visibleKeys == null ? fields : fields.filter((f) => visibleKeys.has(f.key));
+  // 필터바가 있는 화면(마스터 생성/상세)만 카드 목록을 자체 스크롤 영역에 담는다.
+  // `StructuredDataPane` 은 필터 없이 부모 흐름에 그대로 얹혀야 해서 wrapper 를 투명하게(`contents`) 둔다.
+  const hasFilters = (fieldFilters?.length ?? 0) > 0;
 
   // Reveal a field card on the right (switch filter to 전체 if it's currently hidden) and
   // highlight it for 2s. Used by the clickable field tags on Active-card thumbnails.
   const highlightField = (fieldKey: string) => {
-    if (fieldGroups && !visibleGroups.some((g) => g.keys.includes(fieldKey))) {
+    if (visibleKeys != null && !visibleKeys.has(fieldKey)) {
       setActiveGroup(null); // 전체 → ensure the target card is rendered
     }
     setHighlightedField(fieldKey);
@@ -498,14 +504,14 @@ export function MasterImagePool({
     };
   }, []);
 
-  // One field drop-zone card. `reactKey` disambiguates a zone shared across groups.
-  const renderFieldCard = (field: ImageField, reactKey: string) => {
+  // One field drop-zone card.
+  const renderFieldCard = (field: ImageField) => {
     const tokens = fieldTokens(field.key);
     const isSource = field.key === SOURCE_ZONE;
     const highlighted = field.key === highlightedField;
     return (
       <div
-        key={reactKey}
+        key={field.key}
         ref={(el) => {
           if (el) fieldCardRefs.current.set(field.key, el);
         }}
@@ -780,81 +786,68 @@ export function MasterImagePool({
 
         {/* ---- Right: field drop zones. Fills the column height to match the left. ---- */}
         <div className="flex h-full flex-col gap-3">
-          {fieldGroups ? (
-            <>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setActiveGroup(null)}
-                  className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
-                    activeGroup == null
+          {hasFilters && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveGroup(null)}
+                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+                  activeGroup == null
+                    ? 'border-blue-500 bg-blue-500 text-white'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                전체
+              </button>
+              {coverFilters.length > 0 && (
+                <select
+                  value={coverCurrent ? (activeGroup as string) : ''}
+                  onChange={(e) => setActiveGroup(e.target.value || null)}
+                  className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+                    coverCurrent
                       ? 'border-blue-500 bg-blue-500 text-white'
                       : 'border-gray-300 text-gray-600 hover:bg-gray-100'
                   }`}
                 >
-                  전체
-                </button>
-                {coverGroups.length > 0 && (
-                  <select
-                    value={coverCurrent ? (activeGroup as string) : ''}
-                    onChange={(e) => setActiveGroup(e.target.value || null)}
-                    className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
-                      coverCurrent
-                        ? 'border-blue-500 bg-blue-500 text-white'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    <option value="" hidden>
-                      썸네일 템플릿
+                  <option value="" hidden>
+                    썸네일 템플릿
+                  </option>
+                  <option value={COVER_ALL}>썸네일 템플릿 전체</option>
+                  {coverFilters.map((f) => (
+                    <option key={f.label} value={f.label}>
+                      {f.label}
                     </option>
-                    <option value={COVER_ALL}>썸네일 템플릿 전체</option>
-                    {coverGroups.map((g) => (
-                      <option key={g.label} value={g.label}>
-                        {g.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {templateGroups.length > 0 && (
-                  <select
-                    value={detailCurrent ? (activeGroup as string) : ''}
-                    onChange={(e) => setActiveGroup(e.target.value || null)}
-                    className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
-                      detailCurrent
-                        ? 'border-blue-500 bg-blue-500 text-white'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    <option value="" hidden>
-                      상세 템플릿
+                  ))}
+                </select>
+              )}
+              {detailFilters.length > 0 && (
+                <select
+                  value={detailCurrent ? (activeGroup as string) : ''}
+                  onChange={(e) => setActiveGroup(e.target.value || null)}
+                  className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+                    detailCurrent
+                      ? 'border-blue-500 bg-blue-500 text-white'
+                      : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <option value="" hidden>
+                    상세 템플릿
+                  </option>
+                  <option value={DETAIL_ALL}>상세 템플릿 전체</option>
+                  {detailFilters.map((f) => (
+                    <option key={f.label} value={f.label}>
+                      {f.label}
                     </option>
-                    <option value={DETAIL_ALL}>상세 템플릿 전체</option>
-                    {templateGroups.map((g) => (
-                      <option key={g.label} value={g.label}>
-                        {g.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-1">
-                {visibleGroups.map((group) => (
-                  <div key={group.label} className="space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                      {group.label}
-                    </p>
-                    {group.keys.map((key) => {
-                      const field = fieldByKey.get(key);
-                      if (!field) return null;
-                      return renderFieldCard(field, `${group.label}:${key}`);
-                    })}
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            fields.map((field) => renderFieldCard(field, field.key))
+                  ))}
+                </select>
+              )}
+            </div>
           )}
+          <div
+            className={hasFilters ? 'min-h-0 flex-1 space-y-3 overflow-y-auto px-1' : 'contents'}
+          >
+            {visibleFields.map((field) => renderFieldCard(field))}
+          </div>
         </div>
       </div>
 
