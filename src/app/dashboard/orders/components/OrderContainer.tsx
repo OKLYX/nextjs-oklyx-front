@@ -58,7 +58,6 @@ export function OrderContainer() {
   const [sortKey, setSortKey] = useState<keyof OrderItem | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [syncChannels, setSyncChannels] = useState<ChannelProgress[]>([]);
@@ -271,26 +270,6 @@ export function OrderContainer() {
     if (failed.length > 0) runSync(failed);
   };
 
-  // Server queries Coupang INSTRUCT orders live to build the sheet — unrelated to the on-screen filter.
-  const handleDownload = async () => {
-    try {
-      setIsDownloading(true);
-      setError('');
-      const blob = await shippingLabelUseCase.downloadSpreadsheet(selectedSellerId || undefined);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      anchor.href = url;
-      anchor.download = `주문목록_${today}.xlsx`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setError('주문목록 다운로드에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   const handleSort = (key: keyof OrderItem) => {
     if (sortKey === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -332,9 +311,7 @@ export function OrderContainer() {
           resultCount={orders.length}
           lastSyncedAt={lastSyncedAt}
           canDownload={isAdmin}
-          isDownloading={isDownloading}
-          onDownload={handleDownload}
-          onDownloadV2={() => setIsPreviewOpen(true)}
+          onDownload={() => setIsPreviewOpen(true)}
           onOpenConfirm={() => setIsConfirmOpen(true)}
         />
 

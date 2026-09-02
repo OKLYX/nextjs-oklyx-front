@@ -8,10 +8,6 @@ import type {
 export class ShippingLabelUseCase {
   constructor(private repository: ShippingLabelRepository) {}
 
-  async downloadSpreadsheet(sellerId?: number): Promise<Blob> {
-    return this.repository.downloadSpreadsheet(sellerId);
-  }
-
   async confirmShipment(file: File): Promise<ShipmentConfirmResult> {
     return this.repository.confirmShipment(file);
   }
