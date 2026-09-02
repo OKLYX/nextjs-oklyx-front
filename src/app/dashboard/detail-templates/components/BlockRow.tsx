@@ -1,10 +1,12 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
+import axios from 'axios';
 import { AlignCenter, AlignLeft, AlignRight, Bold, Italic } from 'lucide-react';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import type { DetailBlock } from '@/domain/entities/DetailTemplateEntity';
+import type { DetailImageGroup } from '@/domain/entities/DetailImageGroupEntity';
 import type { FontAsset } from '@/domain/entities/FontEntity';
 
 // Reserved field keys auto-derive their value from the product (brandName/productName).
@@ -71,6 +73,10 @@ interface BlockRowProps {
   error?: string;
   fonts: FontAsset[]; // tenant font library (font select options)
   fontsLoading: boolean;
+  // Detail image zone catalog (FEATURE_2609_03). imageZone blocks pick a group, never free text.
+  groups: DetailImageGroup[];
+  groupsLoadFailed: boolean;
+  onCreateGroup: (name: string) => Promise<DetailImageGroup>;
   previewText?: string | null; // preview-only override (null = show block default), editor-managed
   onPreviewTextChange?: (value: string | null) => void;
   onChange: (patch: Partial<DetailBlock>) => void;
@@ -87,6 +93,9 @@ export function BlockRow({
   error,
   fonts,
   fontsLoading,
+  groups,
+  groupsLoadFailed,
+  onCreateGroup,
   previewText,
   onPreviewTextChange,
   onChange,
@@ -97,6 +106,12 @@ export function BlockRow({
   // "직접 입력" chosen but key not yet typed: bind is empty so the value can't be
   // derived from data alone, hence a local flag distinguishing it from the placeholder.
   const [customChosen, setCustomChosen] = useState(false);
+  // Inline "+ 새 그룹 만들기" mode. ⚠️ `__new__` must NEVER reach block.bind — selecting it only
+  // flips this flag, so cancelling or failing leaves the previous bind untouched.
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [groupBusy, setGroupBusy] = useState(false);
+  const [groupError, setGroupError] = useState('');
   const bindValue = isBuiltinBind
     ? (block.bind as string)
     : block.bind
@@ -112,6 +127,26 @@ export function BlockRow({
     if (value === null || value === '') delete next[key];
     else next[key] = value;
     onChange({ textStyle: Object.keys(next).length ? next : null });
+  };
+
+  // Create a group inline and immediately select it. Failure keeps the previous bind + input open.
+  const submitNewGroup = async () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+    setGroupBusy(true);
+    setGroupError('');
+    try {
+      const created = await onCreateGroup(name);
+      onChange({ bind: created.code });
+      setNewGroupName('');
+      setCreatingGroup(false);
+    } catch (e) {
+      setGroupError(
+        axios.isAxiosError(e) ? (e.response?.data?.message ?? '그룹 생성에 실패했습니다') : '그룹 생성에 실패했습니다',
+      );
+    } finally {
+      setGroupBusy(false);
+    }
   };
 
   // Default preview text = defaultValue, else the bind label (브랜드명/상품명), else the raw bind.
@@ -368,19 +403,72 @@ export function BlockRow({
 
         {block.type === 'imageZone' && (
           <>
-            <label className="sm:col-span-2">
-              <span className={labelCls}>이미지 영역 이름</span>
-              <input
-                type="text"
-                value={block.bind ?? ''}
-                onChange={(e) => onChange({ bind: e.target.value })}
-                className={inputCls}
-                placeholder="예: main"
-              />
+            <div className="sm:col-span-2">
+              <span className={labelCls}>이미지 영역</span>
+              {groupsLoadFailed ? (
+                <p className="mt-1 text-xs text-red-600">
+                  그룹 목록을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.
+                </p>
+              ) : creatingGroup ? (
+                <>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      type="text"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+                      placeholder="새 그룹 이름 (예: 제품 사진)"
+                    />
+                    <button
+                      type="button"
+                      onClick={submitNewGroup}
+                      disabled={!newGroupName.trim() || groupBusy}
+                      className="shrink-0 rounded border border-blue-600 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                    >
+                      {groupBusy ? '만드는 중...' : '만들기'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreatingGroup(false);
+                        setNewGroupName('');
+                        setGroupError('');
+                      }}
+                      className="shrink-0 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                    >
+                      취소
+                    </button>
+                  </div>
+                  {groupError && <p className="mt-1 text-xs text-red-600">{groupError}</p>}
+                </>
+              ) : (
+                <select
+                  value={block.bind ?? ''}
+                  onChange={(e) => {
+                    // `__new__` is a UI-only sentinel — never let it become the mapping key.
+                    if (e.target.value === '__new__') {
+                      setCreatingGroup(true);
+                      return;
+                    }
+                    onChange({ bind: e.target.value });
+                  }}
+                  className={inputCls}
+                >
+                  <option value="" disabled>
+                    그룹 선택
+                  </option>
+                  {groups.map((g) => (
+                    <option key={g.code} value={g.code}>
+                      {g.name}
+                    </option>
+                  ))}
+                  <option value="__new__">+ 새 그룹 만들기</option>
+                </select>
+              )}
               <span className="mt-1 block text-xs text-gray-400">
                 이 존의 이미지는 마스터별로 업로드됩니다(상세 편집기). 여기선 존 정의만.
               </span>
-            </label>
+            </div>
             {alignControl('center')}
             {widthControl()}
           </>

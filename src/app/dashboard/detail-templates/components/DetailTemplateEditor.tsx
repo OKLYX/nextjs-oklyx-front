@@ -13,9 +13,12 @@ import { ProcessingPresetUseCase } from '@/application/usecases/ProcessingPreset
 import { ProcessingPresetRepositoryImpl } from '@/infrastructure/repositories/ProcessingPresetRepositoryImpl';
 import { FontUseCase } from '@/application/usecases/FontUseCase';
 import { FontRepositoryImpl } from '@/infrastructure/repositories/FontRepositoryImpl';
+import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
+import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import type { DetailBlock } from '@/domain/entities/DetailTemplateEntity';
 import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity';
 import type { FontAsset } from '@/domain/entities/FontEntity';
+import type { DetailImageGroup } from '@/domain/entities/DetailImageGroupEntity';
 import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import { BlockRow } from './BlockRow';
 
@@ -53,6 +56,10 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
     [],
   );
   const fontUseCase = useMemo(() => new FontUseCase(new FontRepositoryImpl()), []);
+  const groupUseCase = useMemo(
+    () => new DetailImageGroupUseCase(new DetailImageGroupRepositoryImpl()),
+    [],
+  );
 
   const [name, setName] = useState('');
   const [isDefault, setIsDefault] = useState(false);
@@ -69,6 +76,10 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
   const [isUploadingFont, setIsUploadingFont] = useState(false);
   const [fontsError, setFontsError] = useState(''); // inline notice only — never blocks the editor
   const fontInputRef = useRef<HTMLInputElement>(null);
+  // Detail image zone catalog (FEATURE_2609_03): imageZone blocks bind to a catalog code.
+  // ⚠️ An empty catalog is a valid state (create one); only a LOAD FAILURE blocks saving.
+  const [groups, setGroups] = useState<DetailImageGroup[]>([]);
+  const [groupsLoadFailed, setGroupsLoadFailed] = useState(false);
   const [blocks, setBlocks] = useState<DetailBlock[]>([]);
   const [isLoading, setIsLoading] = useState(!!templateId);
   const [isSaving, setIsSaving] = useState(false);
@@ -158,6 +169,35 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
       alive = false;
     };
   }, [isAdmin, fontUseCase]);
+
+  // Image group catalog. Unlike presets/fonts this one DOES gate saving on failure: an imageZone
+  // block cannot be validated without it, and blocking at submit time would throw away the edit.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let alive = true;
+    (async () => {
+      try {
+        const list = await groupUseCase.list();
+        if (alive) {
+          setGroups(list);
+          setGroupsLoadFailed(false);
+        }
+      } catch {
+        if (alive) setGroupsLoadFailed(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [isAdmin, groupUseCase]);
+
+  // Inline "+ 새 그룹 만들기" from a block row: create, then merge into the local catalog so the
+  // select shows it right away (the caller sets the returned code as the block's bind).
+  const handleCreateGroup = async (name: string): Promise<DetailImageGroup> => {
+    const created = await groupUseCase.create(name);
+    setGroups((prev) => [...prev, created].sort((a, b) => a.sortOrder - b.sortOrder));
+    return created;
+  };
 
   // Register uploaded fonts so the local preview matches the rendered detail page.
   // Non-fatal: the fallback stack still shows. ⚠️ But a load failure here is a SIGNAL, not noise —
@@ -254,7 +294,9 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
         if (!b.bind?.trim()) errs[i] = '필드키를 선택하세요';
         else if (!isBuiltin(b.bind) && !b.defaultValue?.trim())
           errs[i] = '커스텀 필드는 기본값이 필수입니다';
-      } else if (b.type === 'imageZone' && !b.bind?.trim()) errs[i] = '존 ID(bind)를 입력하세요';
+      } else if (b.type === 'imageZone' && !b.bind?.trim()) errs[i] = '이미지 그룹을 선택하세요';
+      else if (b.type === 'imageZone' && !groups.some((g) => g.code === b.bind))
+        errs[i] = '이미지 그룹을 선택하세요';
       else if (b.type === 'asset' && !b.src?.trim()) errs[i] = '고정 이미지(src)가 없습니다';
       else if (b.type === 'spacer' && (!b.heightPx || b.heightPx < 1)) errs[i] = '여백 높이는 1 이상이어야 합니다';
     });
@@ -328,10 +370,13 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
           >
             취소
           </button>
+          {groupsLoadFailed && (
+            <span className="text-xs text-red-600">이미지 그룹 목록을 불러오지 못해 저장할 수 없습니다</span>
+          )}
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || groupsLoadFailed}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Spinner label="저장 중..." /> : '저장'}
@@ -451,6 +496,9 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
               error={blockErrors[selectedIndex]}
               fonts={fonts}
               fontsLoading={fontsLoading}
+              groups={groups}
+              groupsLoadFailed={groupsLoadFailed}
+              onCreateGroup={handleCreateGroup}
               previewText={previewTexts[selectedIndex] ?? null}
               onPreviewTextChange={(v) => setPreviewTextAt(selectedIndex, v)}
               onChange={(patch) => patchBlock(selectedIndex, patch)}
