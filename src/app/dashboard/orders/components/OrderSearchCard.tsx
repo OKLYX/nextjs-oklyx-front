@@ -2,7 +2,6 @@
 
 import { Download, Upload } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
-import { Spinner } from '@/presentation/components/Spinner';
 
 interface OrderSearchCardProps {
   sellers: Seller[];
@@ -15,9 +14,7 @@ interface OrderSearchCardProps {
   resultCount: number;
   lastSyncedAt: string | null;
   canDownload: boolean;
-  isDownloading: boolean;
   onDownload: () => void;
-  onDownloadV2: () => void;
   onOpenConfirm: () => void;
 }
 
@@ -39,9 +36,7 @@ export function OrderSearchCard({
   resultCount,
   lastSyncedAt,
   canDownload,
-  isDownloading,
   onDownload,
-  onDownloadV2,
   onOpenConfirm,
 }: OrderSearchCardProps) {
   return (
@@ -72,26 +67,10 @@ export function OrderSearchCard({
             {canDownload && (
               <button
                 onClick={onDownload}
-                disabled={isDownloading}
-                className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isDownloading ? (
-                  <Spinner label="다운로드 중..." />
-                ) : (
-                  <>
-                    <Download size={16} />
-                    주문목록 다운로드
-                  </>
-                )}
-              </button>
-            )}
-            {canDownload && (
-              <button
-                onClick={onDownloadV2}
                 className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
               >
                 <Download size={16} />
-                주문목록 다운로드 V2
+                주문목록 다운로드
               </button>
             )}
             {canDownload && (
