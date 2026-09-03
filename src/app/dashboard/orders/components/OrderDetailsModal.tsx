@@ -63,8 +63,11 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
   const [hasLoaded, setHasLoaded] = useState(false);
   // Manual shipment section state. Reset is the parent's `key` remount, not an effect.
   const [carrierOptions, setCarrierOptions] = useState<CarrierOption[]>([]);
-  const [carrierId, setCarrierId] = useState<number | null>(null);
+  const [carrierCode, setCarrierCode] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  // 이미 발송처리된 주문은 입력칸을 감춰 둔다 — [송장 수정하기] 를 눌러야 열린다.
+  // 실수로 정상 송장을 덮어쓰는 경로를 한 번 막는 것이 목적이라 미발송 주문에는 영향이 없다.
+  const [isEditingInvoice, setIsEditingInvoice] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [result, setResult] = useState<ManualShipmentResult | null>(null);
@@ -72,11 +75,13 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
   // means "we could not ask". Collapsing the two shows the register notice to someone whose
   // carriers are already registered.
   const [carrierLoadFailed, setCarrierLoadFailed] = useState(false);
-  const [isLoadingCarriers, setIsLoadingCarriers] = useState(false);
+  // Starts true: the effect only flips it inside its async IIFE (after the first paint), so a
+  // `false` start shows the D16 register notice for a frame to someone who has carriers registered.
+  const [isLoadingCarriers, setIsLoadingCarriers] = useState(true);
   const [carrierReloadTick, setCarrierReloadTick] = useState(0);   // [다시 시도] re-runs the effect
 
-  // Carrier list load — a DB lookup (a handful of rows), not a Coupang call, so it runs on open
-  // without a button. The guard mirrors the section's render gate: hooks run even when the
+  // Carrier list load — the platform's code table (Coupang has no carrier-list API), served from
+  // our own backend, not a Coupang call, so it runs on open without a button. The guard mirrors the section's render gate: hooks run even when the
   // section is hidden, so without it a USER account would hammer an ADMIN-only endpoint for 403s.
   // Deps are the platform *string* and isAdmin — passing the order object refetches every render.
   useEffect(() => {
@@ -119,7 +124,11 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
   const isShipped = isAlreadyShipped(order.status);
   const isLocked = isSubmitting || result != null;                  // D14 — only after a 200
   const isInputDisabled = isLocked || carrierOptions.length === 0;  // load failure lands here too (empty list)
-  const isSubmitDisabled = isInputDisabled || carrierId == null || invoiceNumber.trim() === '';
+  const isSubmitDisabled = isInputDisabled || carrierCode === '' || invoiceNumber.trim() === '';
+  // 미발송이면 늘 열려 있고, 발송된 건은 [송장 수정하기] 를 누른 뒤에만 열린다.
+  const isFormOpen = !isShipped || isEditingInvoice;
+  const registeredOptions = carrierOptions.filter((option) => option.registered);
+  const otherOptions = carrierOptions.filter((option) => !option.registered);
 
   const handleClose = () => {
     // Belt-and-braces: collapse immediately even if a close path bypasses the parent state.
@@ -200,7 +209,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
    * - 200 응답을 받은 뒤에만 입력을 잠근다. 요청 자체가 실패하면 잠그지 않는다(D14).
    */
   const handleManualConfirm = async () => {
-    if (carrierId == null) return;
+    if (carrierCode === '') return;
     try {
       setIsSubmitting(true);
       setSubmitError('');
@@ -208,7 +217,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
       // (Coupang vendorItemId) would fail silently. Same value previewRowsByOrder takes.
       const response = await useCase.confirmManualShipment({
         orderItemId: order.id,
-        carrierId,
+        deliveryCompanyCode: carrierCode,
         invoiceNumber: invoiceNumber.trim(),   // D15: trim only, no format check
       });
       setResult(response);                     // the lock is set here and nowhere else (D14)
@@ -291,23 +300,54 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
 
               {isShipped && (
                 <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
-                  이미 발송처리된 주문입니다. 입력한 운송장으로 송장번호를 수정합니다.
+                  {isFormOpen
+                    ? '이미 발송처리된 주문입니다. 입력한 운송장으로 송장 수정을 요청합니다.'
+                    : '이미 발송처리된 주문입니다. 운송장을 고치려면 [송장 수정하기] 를 누르세요.'}
                 </div>
               )}
 
+              {/* 발송된 건은 입력칸을 감춰 둔다 — 실수로 정상 송장을 덮어쓰지 않게 한 번 막는다. */}
+              {!isFormOpen && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => setIsEditingInvoice(true)}
+                    disabled={isLocked}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
+                  >
+                    송장 수정하기
+                  </button>
+                </div>
+              )}
+
+              {isFormOpen && (
               <div className="mt-4 flex flex-wrap items-center gap-3">
+                {/* 값은 마켓 코드 자체다 — 쿠팡은 택배사 목록 API 가 없고 문서 코드표가 SSOT 라
+                    로컬에 등록한 택배사는 [등록 택배사] 그룹으로 맨 위에만 올린다. */}
                 <select
-                  value={carrierId ?? ''}
-                  onChange={(e) => setCarrierId(e.target.value === '' ? null : Number(e.target.value))}
+                  value={carrierCode}
+                  onChange={(e) => setCarrierCode(e.target.value)}
                   disabled={isInputDisabled}
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
                 >
                   <option value="">택배사 선택</option>
-                  {carrierOptions.map((option) => (
-                    <option key={option.carrierId} value={option.carrierId}>
-                      {option.carrierName}
-                    </option>
-                  ))}
+                  {registeredOptions.length > 0 && (
+                    <optgroup label="등록 택배사">
+                      {registeredOptions.map((option) => (
+                        <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
+                          {option.carrierName}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {otherOptions.length > 0 && (
+                    <optgroup label={registeredOptions.length > 0 ? '전체 택배사' : '택배사'}>
+                      {otherOptions.map((option) => (
+                        <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
+                          {option.carrierName}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
 
                 {/* type="text": invoice formats differ per carrier and Coupang validates them (D15). */}
@@ -326,9 +366,10 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
                   disabled={isSubmitDisabled}
                   className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? <Spinner label="전송 중..." /> : (isShipped ? '송장 수정' : '발송처리')}
+                  {isSubmitting ? <Spinner label="전송 중..." /> : (isShipped ? '송장 수정 요청' : '발송처리')}
                 </button>
               </div>
+              )}
 
               {/* A load failure and an empty list need different words — telling someone whose
                   carriers are registered to go register them sends them to the wrong screen. */}
@@ -347,7 +388,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
                 carrierOptions.length === 0 &&
                 !isLoadingCarriers && (
                   <p className="mt-2 text-sm text-gray-500">
-                    택배사 관리에서 이 플랫폼의 택배사 코드를 먼저 등록하세요.   {/* D16 */}
+                    {/* D16 — 쿠팡은 코드표 전량을 내려주므로 여기까지 오면 서버 쪽 문제다. */}
+                    선택할 수 있는 택배사가 없습니다. 잠시 후 다시 시도해주세요.
                   </p>
                 )
               )}
@@ -360,7 +402,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
 
               {result != null && result.succeeded > 0 && result.failed.length === 0 && (
                 <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
-                  {result.mode === 'UPDATE' ? '송장 수정 완료' : '발송처리 완료'} — 박스 {result.shipmentBoxId} ·{' '}
+                  {result.mode === 'UPDATE' ? '송장 수정 요청 완료' : '발송처리 완료'} — 박스 {result.shipmentBoxId} ·{' '}
                   {result.sentLines}건
                 </div>
               )}
