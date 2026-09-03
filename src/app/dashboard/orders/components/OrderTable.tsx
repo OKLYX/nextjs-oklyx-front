@@ -1,5 +1,6 @@
 'use client';
 
+import { getCustomerName } from '@/domain/entities/OrderEntity';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 
 interface OrderTableProps {
@@ -24,6 +25,7 @@ interface Column {
 
 const COLUMNS: Column[] = [
   { key: 'externalOrderId', label: '주문번호', align: 'left' },
+  { key: 'receiverName', label: '고객명', align: 'left' },
   { key: 'itemName', label: '상품명', align: 'left' },
   { key: 'orderCount', label: '주문수량', align: 'right' },
   { key: 'cancelCount', label: '취소', align: 'right' },
@@ -138,6 +140,7 @@ export function OrderTable({
                 className="hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 <td className="px-6 py-3 text-sm text-gray-700">{order.externalOrderId}</td>
+                <td className="px-6 py-3 text-sm text-gray-700">{getCustomerName(order)}</td>
                 <td className="px-6 py-3 text-sm text-gray-700">{order.itemName || '-'}</td>
                 <td className="px-6 py-3 text-sm text-right text-gray-700">{order.orderCount}</td>
                 <td className="px-6 py-3 text-sm text-right text-gray-700">{order.cancelCount}</td>
