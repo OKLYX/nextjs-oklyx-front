@@ -43,3 +43,32 @@ export interface ShippingLabelPreviewRow {
 
 // Same fields as PreviewRow (edited parcelQuantity included) — posted back for xlsx export.
 export type ShippingLabelExportRow = ShippingLabelPreviewRow;
+
+// --- Manual single-box shipment (PLAN 2609_11) ---
+
+// Carrier dropdown item. Only `carrierId` travels back to the server on submit — the marketplace
+// code is resolved server-side (D2). `deliveryCompanyCode` is carried straight from the backend
+// record; it is not rendered.
+export interface CarrierOption {
+  carrierId: number;
+  carrierName: string;
+  deliveryCompanyCode: string;
+}
+
+export interface ManualShipmentRequest {
+  orderItemId: number;
+  carrierId: number;
+  invoiceNumber: string;
+}
+
+// `mode` is decided by the server from the order status (D3) — the client only reports it.
+// `resultStatus` is 'DEPARTURE' after a successful CREATE, null otherwise.
+export interface ManualShipmentResult {
+  orderId: string;
+  shipmentBoxId: string;
+  mode: 'CREATE' | 'UPDATE';
+  sentLines: number;
+  succeeded: number;
+  failed: FailedBox[];
+  resultStatus: string | null;
+}

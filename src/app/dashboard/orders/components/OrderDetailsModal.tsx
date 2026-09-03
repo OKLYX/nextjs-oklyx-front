@@ -1,17 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Spinner } from '@/presentation/components/Spinner';
 import { addressHead } from '@/infrastructure/utils/address';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
-import { getOrderStatusLabel } from '@/domain/entities/OrderEntity';
+import { getOrderStatusLabel, isAlreadyShipped } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
-import type { ShippingLabelExportRow } from '@/application/dto/ShippingLabelDTOs';
+import type {
+  CarrierOption,
+  ManualShipmentResult,
+  ShippingLabelExportRow,
+} from '@/application/dto/ShippingLabelDTOs';
 
 /**
  * 주문 상세 모달 — 읽기전용 정보 + (ADMIN·쿠팡) 단건 송장 접수시트 조회·다운로드
  *
+ * 인라인 섹션이 두 개 붙는다 — 송장 접수시트(조회·다운로드)와 발송처리(택배사·송장번호 직접 입력).
  * 시트 섹션은 새 팝업이 아니라 이 모달을 인라인 확장한다. 표 편집 UI 가 기존
  * `ShippingLabelPreviewModal`(주문목록 전체)과 모양이 비슷하지만 **공통 컴포넌트로 추출하지 않는다** —
  * 사용자 결정(PLAN D5)에 따라 이미 검증된 주문목록 다운로드 화면의 회귀 위험을 0 으로 두기 위함.
@@ -26,7 +31,8 @@ import type { ShippingLabelExportRow } from '@/application/dto/ShippingLabelDTOs
  */
 interface OrderDetailsModalProps {
   order: OrderItem | null;
-  onClose: () => void;
+  /** true = 발송처리가 성공했다 → 부모가 목록을 다시 불러와야 한다(PLAN 2609_11 D13). */
+  onClose: (didSucceed: boolean) => void;
   isAdmin: boolean;
   useCase: ShippingLabelUseCase;
 }
@@ -55,6 +61,48 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
   const [exportError, setExportError] = useState('');
   const [invalidRowKey, setInvalidRowKey] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  // Manual shipment section state. Reset is the parent's `key` remount, not an effect.
+  const [carrierOptions, setCarrierOptions] = useState<CarrierOption[]>([]);
+  const [carrierId, setCarrierId] = useState<number | null>(null);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [result, setResult] = useState<ManualShipmentResult | null>(null);
+  // Load failure is NOT an empty list: an empty list means "register a carrier code", a failure
+  // means "we could not ask". Collapsing the two shows the register notice to someone whose
+  // carriers are already registered.
+  const [carrierLoadFailed, setCarrierLoadFailed] = useState(false);
+  const [isLoadingCarriers, setIsLoadingCarriers] = useState(false);
+  const [carrierReloadTick, setCarrierReloadTick] = useState(0);   // [다시 시도] re-runs the effect
+
+  // Carrier list load — a DB lookup (a handful of rows), not a Coupang call, so it runs on open
+  // without a button. The guard mirrors the section's render gate: hooks run even when the
+  // section is hidden, so without it a USER account would hammer an ADMIN-only endpoint for 403s.
+  // Deps are the platform *string* and isAdmin — passing the order object refetches every render.
+  useEffect(() => {
+    const platform = order?.platform;
+    if (!isAdmin || platform !== 'COUPANG') return;
+    let alive = true;
+    void (async () => {
+      setIsLoadingCarriers(true);
+      try {
+        const options = await useCase.getCarrierOptions(platform);
+        if (alive) {
+          setCarrierOptions(options);
+          setCarrierLoadFailed(false);
+        }
+      } catch {
+        // Keep the section (the user can retry); the flag routes the notice away from D16.
+        if (alive) {
+          setCarrierOptions([]);
+          setCarrierLoadFailed(true);
+        }
+      } finally {
+        if (alive) setIsLoadingCarriers(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [isAdmin, order?.platform, useCase, carrierReloadTick]);
 
   if (order == null) return null;
 
@@ -67,6 +115,12 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
   // throw inside render and blank the modal.
   const hasMissingPhone = rows.some((row) => !row.receiverPhone?.trim());
 
+  // Manual shipment derived state — never mirrored into useState.
+  const isShipped = isAlreadyShipped(order.status);
+  const isLocked = isSubmitting || result != null;                  // D14 — only after a 200
+  const isInputDisabled = isLocked || carrierOptions.length === 0;  // load failure lands here too (empty list)
+  const isSubmitDisabled = isInputDisabled || carrierId == null || invoiceNumber.trim() === '';
+
   const handleClose = () => {
     // Belt-and-braces: collapse immediately even if a close path bypasses the parent state.
     setRows([]);
@@ -75,7 +129,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
     setInvalidRowKey(null);
     setHasLoaded(false);
     setIsExporting(false);
-    onClose();
+    // Only a real success justifies the parent's refetch (PLAN 2609_11 D13).
+    onClose(result != null && result.succeeded > 0);
   };
 
   const handlePreview = async () => {
@@ -84,8 +139,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
       setPreviewError('');
       setExportError('');
       setInvalidRowKey(null);
-      const result = await useCase.previewRowsByOrder(order.id);
-      setRows(result);
+      const previewRows = await useCase.previewRowsByOrder(order.id);
+      setRows(previewRows);
       setHasLoaded(true);
     } catch {
       setPreviewError('쿠팡 주문 조회에 실패했습니다. 다시 시도해주세요.');
@@ -138,6 +193,37 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
     }
   };
 
+  /**
+   * 단건 발송처리 — 앵커 라인이 속한 박스 1개를 전송한다.
+   * - 전송 단위는 박스 전체다. 박스 라인 전개는 서버가 한다(PLAN 2609_11 D1) — 여기서는 앵커 1줄만 보낸다.
+   * - 신규 업로드/송장수정 모드는 서버가 주문 상태로 결정한다(D3) — 클라이언트는 라벨만 바꾼다.
+   * - 200 응답을 받은 뒤에만 입력을 잠근다. 요청 자체가 실패하면 잠그지 않는다(D14).
+   */
+  const handleManualConfirm = async () => {
+    if (carrierId == null) return;
+    try {
+      setIsSubmitting(true);
+      setSubmitError('');
+      // orderItemId is our order_item PK (`order.id`) — the visible `order.externalItemId`
+      // (Coupang vendorItemId) would fail silently. Same value previewRowsByOrder takes.
+      const response = await useCase.confirmManualShipment({
+        orderItemId: order.id,
+        carrierId,
+        invoiceNumber: invoiceNumber.trim(),   // D15: trim only, no format check
+      });
+      setResult(response);                     // the lock is set here and nowhere else (D14)
+    } catch (err) {
+      // Request never landed — no setResult, so the inputs stay open for a retry (D14).
+      const serverMessage =
+        axios.isAxiosError(err) && err.response?.status === 400
+          ? (err.response.data as { message?: string } | undefined)?.message
+          : undefined;
+      setSubmitError(serverMessage ?? '발송처리에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // No detail API exists — display the row's fields read-only
   const fields: { label: string; value: string | number }[] = [
     { label: '플랫폼', value: order.platform },
@@ -151,7 +237,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
     { label: '취소수량', value: order.cancelCount },
     { label: '보류수량', value: order.holdCount },
     { label: '구매가능수량', value: order.purchasableQty },
-    { label: '상태', value: getOrderStatusLabel(order.status) },
+    // A successful CREATE writes 배송지시 back server-side; show it straight from the result (D4).
+    { label: '상태', value: getOrderStatusLabel(result?.resultStatus ?? order.status) },
     { label: '결제일', value: formatDate(order.paidAt) },
     { label: '마켓 계정 ID', value: order.marketplaceAccountId },
   ];
@@ -189,6 +276,124 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
           {previewError && (
             <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
               {previewError}
+            </div>
+          )}
+
+          {/* 발송처리 — 택배사·송장번호를 직접 입력해 이 라인이 속한 박스 1개를 전송한다.
+              전송 단위는 박스 전체(PLAN 2609_11 D1), 신규/수정 모드는 서버가 상태로 결정(D3),
+              입력 잠금은 200 응답을 받은 뒤에만(요청 실패는 열어둔다, D14). */}
+          {isAdmin && isCoupang && (
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <h4 className="text-lg font-semibold text-gray-900">발송처리</h4>
+              <p className="mt-1 text-sm text-gray-500">
+                박스 {order.externalBoxId ?? '-'} 의 모든 옵션에 같은 운송장번호가 적용됩니다.
+              </p>
+
+              {isShipped && (
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
+                  이미 발송처리된 주문입니다. 입력한 운송장으로 송장번호를 수정합니다.
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <select
+                  value={carrierId ?? ''}
+                  onChange={(e) => setCarrierId(e.target.value === '' ? null : Number(e.target.value))}
+                  disabled={isInputDisabled}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
+                >
+                  <option value="">택배사 선택</option>
+                  {carrierOptions.map((option) => (
+                    <option key={option.carrierId} value={option.carrierId}>
+                      {option.carrierName}
+                    </option>
+                  ))}
+                </select>
+
+                {/* type="text": invoice formats differ per carrier and Coupang validates them (D15). */}
+                <input
+                  type="text"
+                  maxLength={50}
+                  placeholder="송장번호"
+                  value={invoiceNumber}
+                  onChange={(e) => { setInvoiceNumber(e.target.value); setSubmitError(''); }}
+                  disabled={isInputDisabled}
+                  className="w-56 px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
+                />
+
+                <button
+                  onClick={handleManualConfirm}
+                  disabled={isSubmitDisabled}
+                  className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? <Spinner label="전송 중..." /> : (isShipped ? '송장 수정' : '발송처리')}
+                </button>
+              </div>
+
+              {/* A load failure and an empty list need different words — telling someone whose
+                  carriers are registered to go register them sends them to the wrong screen. */}
+              {carrierLoadFailed ? (
+                <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                  <span>택배사 목록을 불러오지 못했습니다.</span>
+                  <button
+                    onClick={() => setCarrierReloadTick((tick) => tick + 1)}
+                    disabled={isLoadingCarriers}
+                    className="text-blue-600 underline hover:text-blue-700 disabled:text-gray-400 disabled:no-underline"
+                  >
+                    {isLoadingCarriers ? '불러오는 중...' : '다시 시도'}
+                  </button>
+                </div>
+              ) : (
+                carrierOptions.length === 0 &&
+                !isLoadingCarriers && (
+                  <p className="mt-2 text-sm text-gray-500">
+                    택배사 관리에서 이 플랫폼의 택배사 코드를 먼저 등록하세요.   {/* D16 */}
+                  </p>
+                )
+              )}
+
+              {submitError && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                  {submitError}
+                </div>
+              )}
+
+              {result != null && result.succeeded > 0 && result.failed.length === 0 && (
+                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
+                  {result.mode === 'UPDATE' ? '송장 수정 완료' : '발송처리 완료'} — 박스 {result.shipmentBoxId} ·{' '}
+                  {result.sentLines}건
+                </div>
+              )}
+
+              {result != null && result.failed.length > 0 && (
+                <div className="mt-4">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                    발송처리에 실패한 박스가 있습니다.
+                  </div>
+                  {/* Same columns/tone as ShipmentConfirmModal's failure table, deliberately not
+                      extracted into a shared component (2609_01 D5). Coupang wording verbatim (D6). */}
+                  <div className="mt-3 border border-gray-200 rounded-lg list-table-scroll">
+                    <table>
+                      <thead>
+                        <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                          <th className="px-4 py-2">박스 ID</th>
+                          <th className="px-4 py-2">코드</th>
+                          <th className="px-4 py-2">메시지</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
+                        {result.failed.map((box) => (
+                          <tr key={box.shipmentBoxId}>
+                            <td className="px-4 py-2">{box.shipmentBoxId}</td>
+                            <td className="px-4 py-2">{box.resultCode}</td>
+                            <td className="px-4 py-2">{box.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
