@@ -3,6 +3,9 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { ShippingLabelRepository } from '@/domain/repositories/ShippingLabelRepository';
 import type {
+  CarrierOption,
+  ManualShipmentRequest,
+  ManualShipmentResult,
   ShipmentConfirmResult,
   ShippingLabelPreviewRow,
   ShippingLabelExportRow,
@@ -45,5 +48,21 @@ export class ShippingLabelRepositoryImpl implements ShippingLabelRepository {
       { responseType: 'blob' }
     );
     return response.data;
+  }
+
+  // Carrier dropdown for the manual single-box path — standard JSON envelope.
+  // Returns an empty list (not an error) when the platform has no carrier code registered.
+  async getCarrierOptions(platform: string): Promise<CarrierOption[]> {
+    const response = await axiosInstance.get('/api/admin/shipping-labels/carrier-options', {
+      params: { platform },
+    });
+    return response.data.data;
+  }
+
+  // Manual single-box confirm — standard JSON envelope. The server expands the anchor line into
+  // every line of its box (PLAN 2609_11 D1) and picks CREATE/UPDATE from the order status (D3).
+  async confirmManualShipment(request: ManualShipmentRequest): Promise<ManualShipmentResult> {
+    const response = await axiosInstance.post('/api/admin/shipping-labels/confirm/manual', request);
+    return response.data.data;
   }
 }

@@ -1,4 +1,7 @@
 import type {
+  CarrierOption,
+  ManualShipmentRequest,
+  ManualShipmentResult,
   ShipmentConfirmResult,
   ShippingLabelPreviewRow,
   ShippingLabelExportRow,
@@ -9,4 +12,6 @@ export interface ShippingLabelRepository {
   previewRows(sellerId?: number): Promise<ShippingLabelPreviewRow[]>;
   previewRowsByOrder(orderItemId: number): Promise<ShippingLabelPreviewRow[]>;
   exportSpreadsheet(rows: ShippingLabelExportRow[]): Promise<Blob>;
+  getCarrierOptions(platform: string): Promise<CarrierOption[]>;
+  confirmManualShipment(request: ManualShipmentRequest): Promise<ManualShipmentResult>;
 }

@@ -541,7 +541,11 @@ export function OrderContainer() {
         <OrderDetailsModal
           key={selectedOrder?.id ?? 'none'}
           order={selectedOrder}
-          onClose={() => setSelectedOrder(null)}
+          onClose={(didSucceed) => {
+            setSelectedOrder(null);
+            // Re-run the current search so the write-back'd 배송지시 row shows up without a full reload.
+            if (didSucceed) void handleSearch();
+          }}
           isAdmin={isAdmin}
           useCase={shippingLabelUseCase}
         />

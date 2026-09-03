@@ -47,6 +47,15 @@ export const ORDER_STATUSES = [
   'NONE_TRACKING',
 ] as const;
 
+// Statuses at or past 배송지시 — an order in one of these is an invoice *edit* target, not a new
+// upload. The decision itself is made by the server (PLAN 2609_11 D3); this is only used for the
+// button label and the notice text in the manual shipment section.
+export const SHIPPED_STATUSES = ['DEPARTURE', 'DELIVERING', 'FINAL_DELIVERY', 'NONE_TRACKING'] as const;
+
+export function isAlreadyShipped(status: string): boolean {
+  return (SHIPPED_STATUSES as readonly string[]).includes(status);
+}
+
 // Virtual filter key for fully-canceled orders. Coupang keeps the raw status
 // (e.g. ACCEPT) even when an order is fully canceled, so this is not a real
 // status code — it is a derived filter surfaced as its own chip.
