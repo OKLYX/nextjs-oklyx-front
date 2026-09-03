@@ -1,10 +1,15 @@
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 
-export interface OrderSyncResponse {
+/** 동기화 1회의 집계 결과. 기간 백필(`POST /api/orders/sync/period`)은 목록 없이 이것만 돌려준다(PLAN D8). */
+export interface OrderSyncResult {
   syncedAt: string;
   newOrders: number;
   updatedOrders: number;
+  /** 기간 백필에서는 항상 0 — 취소 보정을 돌리지 않는다(PLAN D4). */
   canceledUpdated: number;
+}
+
+export interface OrderSyncResponse extends OrderSyncResult {
   orders: OrderItem[];
 }
 
