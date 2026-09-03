@@ -33,6 +33,11 @@ interface OrderDetailsModalProps {
 
 const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
 
+// Platform display labels. COUPANG only on purpose: the sheet button is disabled for every other
+// platform (`!isCoupang`), so no other code can reach this banner. Kept as a map (not a literal
+// '쿠팡') so a second platform needs one entry, not a rewrite; unknown codes fall back to the raw code.
+const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡' };
+
 // Format ISO LocalDateTime to ko-KR readable string; '-' for null
 function formatDate(value: string | null): string {
   if (!value) return '-';
@@ -55,6 +60,12 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
 
   const isEmpty = hasLoaded && rows.length === 0;
   const isCoupang = order.platform === 'COUPANG';
+  // Coupang safe numbers die 48h after delivery; the ordersheet then returns an empty phone.
+  // The sheet table never renders the phone (PII), so this flag is the only signal the user gets.
+  // `receiverPhone` is a non-nullable string in the DTO — "" is the only "no value" form.
+  // `?.` guards the one case types can't: a server response that drops the field would otherwise
+  // throw inside render and blank the modal.
+  const hasMissingPhone = rows.some((row) => !row.receiverPhone?.trim());
 
   const handleClose = () => {
     // Belt-and-braces: collapse immediately even if a close path bypasses the parent state.
@@ -145,114 +156,129 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
-      <div
-        className={`bg-white rounded-lg shadow-lg p-8 w-full mx-4 ${
-          hasLoaded ? 'max-w-4xl max-h-[90vh] flex flex-col overflow-y-auto' : 'max-w-lg'
-        }`}
-      >
-        <h3 className="text-2xl font-semibold text-gray-900 mb-6">주문 상세</h3>
-        <dl className="divide-y divide-gray-200">
-          {fields.map((field) => (
-            <div key={field.label} className="flex justify-between py-2">
-              <dt className="text-sm font-medium text-gray-500">{field.label}</dt>
-              <dd className="text-sm text-gray-900 text-right">{field.value}</dd>
-            </div>
-          ))}
-        </dl>
+      {/* Fixed geometry from the first paint — expanding the sheet must not resize the modal (D1). */}
+      <div className="bg-white rounded-lg shadow-lg w-full mx-4 max-w-4xl h-[90vh] flex flex-col p-8">
+        <h3 className="shrink-0 text-2xl font-semibold text-gray-900 mb-6">주문 상세</h3>
 
-        {isAdmin && (
-          <div className="mt-6 flex items-center gap-3">
-            <button
-              onClick={handlePreview}
-              disabled={!isCoupang || isPreviewing}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
-            >
-              {isPreviewing ? <Spinner label="불러오는 중..." /> : '송장시트 조회'}
-            </button>
-            {!isCoupang && <span className="text-sm text-gray-500">쿠팡 주문만 지원합니다.</span>}
-          </div>
-        )}
-
-        {previewError && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-            {previewError}
-          </div>
-        )}
-
-        {hasLoaded && (
-          <div className="mt-6 border-t border-gray-200 pt-6">
-            <h4 className="text-lg font-semibold text-gray-900">송장 접수시트</h4>
-            <p className="mt-1 text-sm text-gray-500">
-              주문번호 {order.externalOrderId} · {rows.length}건
-            </p>
-
-            {isEmpty ? (
-              <div className="py-10 text-center text-gray-500">발송 대상 라인이 없습니다.</div>
-            ) : (
-              <div className="mt-4 max-h-[45vh] overflow-y-auto">
-                <div className="border border-gray-200 rounded-lg list-table-scroll">
-                  <table>
-                    <thead>
-                      <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
-                        <th className="px-4 py-2">이름</th>
-                        <th className="px-4 py-2">배송지</th>
-                        <th className="px-4 py-2">상품명</th>
-                        <th className="px-4 py-2 text-right">내품수량</th>
-                        <th className="px-4 py-2 text-right">택배수량</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
-                      {rows.map((row) => (
-                        <tr key={row.rowKey}>
-                          <td className="px-4 py-2">{row.receiverName}</td>
-                          <td className="px-4 py-2">{addressHead(row.address)}</td>
-                          <td className="px-4 py-2">{row.productName}</td>
-                          <td className="px-4 py-2 text-right">{row.quantity}</td>
-                          <td className="px-4 py-2 text-right">
-                            <input
-                              type="number"
-                              min={1}
-                              value={row.parcelQuantity}
-                              onChange={(e) => handleParcelChange(row.rowKey, e.target.value)}
-                              className={`w-20 px-2 py-1 border rounded text-right outline-none focus:ring-2 focus:ring-blue-500 ${
-                                invalidRowKey === row.rowKey
-                                  ? 'border-red-500 ring-2 ring-red-300'
-                                  : 'border-gray-300'
-                              }`}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+        {/* Only this middle band scrolls — the table keeps no scroller of its own (D2). */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <dl className="divide-y divide-gray-200">
+            {fields.map((field) => (
+              <div key={field.label} className="flex justify-between py-2">
+                <dt className="text-sm font-medium text-gray-500">{field.label}</dt>
+                <dd className="text-sm text-gray-900 text-right">{field.value}</dd>
               </div>
+            ))}
+          </dl>
+
+          {isAdmin && (
+            <div className="mt-6 flex items-center gap-3">
+              <button
+                onClick={handlePreview}
+                disabled={!isCoupang || isPreviewing}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
+              >
+                {isPreviewing ? <Spinner label="불러오는 중..." /> : '송장시트 조회'}
+              </button>
+              {!isCoupang && <span className="text-sm text-gray-500">쿠팡 주문만 지원합니다.</span>}
+            </div>
+          )}
+
+          {previewError && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+              {previewError}
+            </div>
+          )}
+
+          {hasLoaded && (
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <h4 className="text-lg font-semibold text-gray-900">송장 접수시트</h4>
+              <p className="mt-1 text-sm text-gray-500">
+                주문번호 {order.externalOrderId} · {rows.length}건
+              </p>
+
+              {/* Notice only, no re-issue button: Coupang OpenAPI has no safe-number re-issue endpoint
+                  and re-fetching the ordersheet returns the same value (PLAN 조사 결과). */}
+              {hasMissingPhone && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
+                  {PLATFORM_LABELS[order.platform] ?? order.platform}에서 고객 안심번호를 재발행하십시오.
+                </div>
+              )}
+
+              {isEmpty ? (
+                <div className="py-10 text-center text-gray-500">발송 대상 라인이 없습니다.</div>
+              ) : (
+                <div className="mt-4">
+                  <div className="border border-gray-200 rounded-lg list-table-scroll">
+                    <table>
+                      <thead>
+                        <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                          <th className="px-4 py-2">이름</th>
+                          <th className="px-4 py-2">배송지</th>
+                          <th className="px-4 py-2">상품명</th>
+                          <th className="px-4 py-2 text-right">내품수량</th>
+                          <th className="px-4 py-2 text-right">택배수량</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
+                        {rows.map((row) => (
+                          <tr key={row.rowKey}>
+                            <td className="px-4 py-2">{row.receiverName}</td>
+                            <td className="px-4 py-2">{addressHead(row.address)}</td>
+                            <td className="px-4 py-2">{row.productName}</td>
+                            <td className="px-4 py-2 text-right">{row.quantity}</td>
+                            <td className="px-4 py-2 text-right">
+                              <input
+                                type="number"
+                                min={1}
+                                value={row.parcelQuantity}
+                                onChange={(e) => handleParcelChange(row.rowKey, e.target.value)}
+                                className={`w-20 px-2 py-1 border rounded text-right outline-none focus:ring-2 focus:ring-blue-500 ${
+                                  invalidRowKey === row.rowKey
+                                    ? 'border-red-500 ring-2 ring-red-300'
+                                    : 'border-gray-300'
+                                }`}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Pinned foot band. exportError lives here, not in the body: a download failure must be
+            visible right where the button that caused it is, even when the table is scrolled away.
+            border-t marks where the scrolling body ends — without it the body scrolls under the
+            buttons with no visible boundary. */}
+        <div className="shrink-0 border-t border-gray-200">
+          {exportError && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+              {exportError}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-6">
+            <button
+              onClick={handleClose}
+              className="px-6 py-3 bg-gray-300 text-gray-700 font-semibold text-base rounded-lg hover:bg-gray-400 transition-colors"
+            >
+              닫기
+            </button>
+            {hasLoaded && (
+              <button
+                onClick={handleExport}
+                disabled={isPreviewing || isExporting || isEmpty || !!previewError}
+                className="px-6 py-3 bg-blue-600 text-white font-semibold text-base rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+              >
+                {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
+              </button>
             )}
           </div>
-        )}
-
-        {exportError && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-            {exportError}
-          </div>
-        )}
-
-        <div className="flex justify-end gap-2 pt-6">
-          <button
-            onClick={handleClose}
-            className="px-6 py-3 bg-gray-300 text-gray-700 font-semibold text-base rounded-lg hover:bg-gray-400 transition-colors"
-          >
-            닫기
-          </button>
-          {hasLoaded && (
-            <button
-              onClick={handleExport}
-              disabled={isPreviewing || isExporting || isEmpty || !!previewError}
-              className="px-6 py-3 bg-blue-600 text-white font-semibold text-base rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
-            >
-              {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
-            </button>
-          )}
         </div>
       </div>
     </div>
