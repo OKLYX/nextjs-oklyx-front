@@ -4,7 +4,9 @@ import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { OrderRepository } from '@/domain/repositories/OrderRepository';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
-import type { OrderMonth, OrderSyncResponse, SyncTarget } from '@/application/dto/OrderDTOs';
+import type {
+  OrderMonth, OrderSyncResponse, OrderSyncResult, SyncTarget,
+} from '@/application/dto/OrderDTOs';
 
 export class OrderRepositoryImpl implements OrderRepository {
   // period omitted -> no from/to sent, so the server applies its default window.
@@ -33,6 +35,15 @@ export class OrderRepositoryImpl implements OrderRepository {
   async getSyncTargets(sellerId?: number): Promise<SyncTarget[]> {
     const response = await axiosInstance.get('/api/orders/sync/targets', {
       params: sellerId != null ? { sellerId } : undefined,
+    });
+    return response.data.data;
+  }
+
+  // One account per call; the server does not return the order list here (PLAN D8) — the caller
+  // refetches the list for the selected period once the whole loop is done.
+  async syncPeriod(accountId: number, range: OrderPeriodRange): Promise<OrderSyncResult> {
+    const response = await axiosInstance.post('/api/orders/sync/period', null, {
+      params: { accountId, from: range.from, to: range.to },
     });
     return response.data.data;
   }

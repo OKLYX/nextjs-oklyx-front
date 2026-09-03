@@ -25,6 +25,7 @@ import { OrderDetailsModal } from './OrderDetailsModal';
 import { ShipmentConfirmModal } from './ShipmentConfirmModal';
 import { ShippingLabelPreviewModal } from './ShippingLabelPreviewModal';
 import { SyncProgressModal } from './SyncProgressModal';
+import { PeriodBackfillDialog } from './PeriodBackfillDialog';
 import type { ChannelProgress } from './SyncProgressModal';
 
 const PAGE_SIZE = 20;
@@ -81,6 +82,16 @@ export function OrderContainer() {
   const periodOptions = useMemo(() => buildPeriodOptions(monthsWithData), [monthsWithData]);
   // Cancel is requested through a ref so the running loop sees it without a re-render.
   const cancelRef = useRef(false);
+  // Empty month to offer a backfill for. null = the dialog stays closed.
+  const [backfillPrompt, setBackfillPrompt] = useState<{ period: string; label: string } | null>(null);
+  // Suppresses a second prompt for the same scope in this session (PLAN D10) — asking once is
+  // enough whether the user accepted, declined or the backfill failed. A ref because the value
+  // never needs a re-render and the search callback must see the latest one.
+  const askedPeriodsRef = useRef<Set<string>>(new Set());
+  // Whether the progress modal is currently showing a backfill run: [재시도] means something
+  // different on each path (a regular sync would overwrite the "last sync" banner, PLAN D5).
+  const [isBackfillRun, setIsBackfillRun] = useState(false);
+  const backfillPeriodRef = useRef<string | null>(null);
 
   // Reuse existing SellerUseCase.getAll() for the seller dropdown
   useEffect(() => {
@@ -210,6 +221,15 @@ export function OrderContainer() {
       setHasSearched(true);
       setCurrentPage(0);
       await loadSyncTargets(selectedSellerId);
+
+      // Empty month -> offer to fetch it from Coupang once (PLAN D1). '최근 2주' never asks:
+      // it is already inside the sync window, so empty there means there is really nothing.
+      const key = `${selectedSellerId || 'all'}:${selectedPeriod}`;
+      if (result.length === 0 && isMonthPeriod(selectedPeriod) && !askedPeriodsRef.current.has(key)) {
+        askedPeriodsRef.current.add(key);   // recorded when asked - declining does not re-ask
+        const label = periodOptions.find((o) => o.value === selectedPeriod)?.label ?? selectedPeriod;
+        setBackfillPrompt({ period: selectedPeriod, label });
+      }
     } catch {
       setError('주문 조회에 실패했습니다. 다시 시도해주세요.');
       setOrders([]);
@@ -222,6 +242,7 @@ export function OrderContainer() {
   // per-channel failure handling lives here. Only accountId is sent — adding sellerId would clash
   // with the server's accountId > sellerId priority and blur the scope of the response.
   const runSync = async (targets: SyncTarget[]) => {
+    setIsBackfillRun(false);
     cancelRef.current = false;
     setSyncCanceled(false);
     setSyncModalOpen(true);
@@ -289,6 +310,78 @@ export function OrderContainer() {
     }
   };
 
+  // Backfills one month, account by account. Mirrors runSync but calls the period endpoint,
+  // refetches the selected period afterwards and deliberately leaves the sync banners alone
+  // (the server records no channel status for a period backfill, PLAN D5).
+  // retryTargets: the progress modal's [재시도] path - only those channels run again.
+  const runPeriodBackfill = async (period: string, retryTargets?: SyncTarget[]) => {
+    const range = toPeriodRange(period);
+    if (!range) return;                                   // RECENT guard - unreachable
+    let targets: SyncTarget[];
+    if (retryTargets) {
+      targets = retryTargets;
+    } else {
+      try {
+        targets = await orderUseCase.getSyncTargets(selectedSellerId || undefined);   // PLAN D12
+      } catch {
+        setError('동기화 대상을 불러오지 못했습니다.');
+        return;
+      }
+    }
+    if (targets.length === 0) {
+      setError('불러올 채널이 없습니다.');
+      return;
+    }
+
+    setIsBackfillRun(true);
+    backfillPeriodRef.current = period;
+    cancelRef.current = false;
+    setSyncCanceled(false);
+    setSyncModalOpen(true);
+    setIsSyncing(true);
+    setError('');
+    setSyncChannels(targets.map((t) => ({ target: t, state: 'pending' })));
+    setSyncCursor(0);
+
+    let newOrders = 0;
+    for (let i = 0; i < targets.length; i += 1) {
+      if (cancelRef.current) {
+        setSyncCanceled(true);
+        break;
+      }
+      setSyncChannels((prev) => markState(prev, i, 'running'));
+      try {
+        const result = await orderUseCase.syncPeriod(targets[i].accountId, range);
+        newOrders += result.newOrders;
+        setSyncChannels((prev) => markState(prev, i, 'success'));
+      } catch (e) {
+        setSyncChannels((prev) => markState(prev, i, 'failed', extractMessage(e)));   // PLAN D9
+      }
+      setSyncCursor(i + 1);
+    }
+    setIsSyncing(false);
+
+    // Refetch the period that was backfilled - the month the screen was looking at.
+    try {
+      const refreshed = await orderUseCase.getOrders(selectedSellerId || undefined, range);
+      setOrders(refreshed);
+      setCurrentPage(0);
+      if (refreshed.length === 0 && newOrders === 0) {
+        setError('쿠팡에도 해당 기간 주문이 없습니다.');      // PLAN D11
+      }
+    } catch {
+      setError('주문 목록을 불러오지 못했습니다.');
+    }
+
+    // Something landed -> drop the '(데이터 없음)' label from the dropdown (PLAN D15).
+    if (newOrders > 0) {
+      try {
+        const rows = await orderUseCase.getOrderMonths();
+        setMonthsWithData(new Set(rows.map((r) => r.ym)));
+      } catch { /* label refresh failure is harmless */ }
+    }
+  };
+
   const handleSync = async () => {
     try {
       const targets = await orderUseCase.getSyncTargets(selectedSellerId || undefined);
@@ -304,7 +397,14 @@ export function OrderContainer() {
 
   const handleRetryFailed = () => {
     const failed = syncChannels.filter((c) => c.state === 'failed').map((c) => c.target);
-    if (failed.length > 0) runSync(failed);
+    if (failed.length === 0) return;
+    // Retrying a failed backfill re-runs the backfill for that period - routing it through the
+    // regular sync would stamp the "last sync" banner with a period run (PLAN D5).
+    if (isBackfillRun && backfillPeriodRef.current) {
+      runPeriodBackfill(backfillPeriodRef.current, failed);
+      return;
+    }
+    runSync(failed);
   };
 
   const handleSort = (key: keyof OrderItem) => {
@@ -465,6 +565,17 @@ export function OrderContainer() {
           onCancel={() => { cancelRef.current = true; }}
           onRetryFailed={handleRetryFailed}
           onClose={() => setSyncModalOpen(false)}
+        />
+
+        <PeriodBackfillDialog
+          open={backfillPrompt != null}
+          periodLabel={backfillPrompt?.label ?? ''}
+          onCancel={() => setBackfillPrompt(null)}
+          onConfirm={() => {
+            const period = backfillPrompt?.period;
+            setBackfillPrompt(null);           // close first so it does not stack on the progress modal
+            if (period) void runPeriodBackfill(period);
+          }}
         />
 
         <ShippingLabelPreviewModal
