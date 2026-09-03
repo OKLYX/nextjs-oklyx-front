@@ -6,6 +6,8 @@ export interface OrderItem {
   externalBoxId: string | null;
   externalItemId: string;
   itemName: string | null;
+  ordererName: string | null;
+  receiverName: string | null;
   orderCount: number;
   cancelCount: number;
   holdCount: number;
@@ -27,6 +29,12 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 // Returns the Korean label for an order status code; falls back to the raw value
 export function getOrderStatusLabel(status: string): string {
   return ORDER_STATUS_LABELS[status] ?? status;
+}
+
+// Single "customer" label for the narrow list column. The receiver is what the parcel is
+// addressed to, so it wins; a gift order (orderer !== receiver) still shows both in the detail modal.
+export function getCustomerName(order: Pick<OrderItem, 'ordererName' | 'receiverName'>): string {
+  return order.receiverName ?? order.ordererName ?? '-';
 }
 
 // Order status codes in workflow sequence; used for the status filter buttons

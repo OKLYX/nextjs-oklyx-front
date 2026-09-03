@@ -145,6 +145,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
     { label: '박스 ID', value: order.externalBoxId ?? '-' },
     { label: '아이템 ID', value: order.externalItemId },
     { label: '상품명', value: order.itemName ?? '-' },
+    { label: '주문자', value: order.ordererName ?? '-' },
+    { label: '수취인', value: order.receiverName ?? '-' },
     { label: '주문수량', value: order.orderCount },
     { label: '취소수량', value: order.cancelCount },
     { label: '보류수량', value: order.holdCount },
