@@ -1,5 +1,8 @@
 import type { ShippingLabelRepository } from '@/domain/repositories/ShippingLabelRepository';
 import type {
+  CarrierOption,
+  ManualShipmentRequest,
+  ManualShipmentResult,
   ShipmentConfirmResult,
   ShippingLabelPreviewRow,
   ShippingLabelExportRow,
@@ -22,5 +25,13 @@ export class ShippingLabelUseCase {
 
   async exportSpreadsheet(rows: ShippingLabelExportRow[]): Promise<Blob> {
     return this.repository.exportSpreadsheet(rows);
+  }
+
+  async getCarrierOptions(platform: string): Promise<CarrierOption[]> {
+    return this.repository.getCarrierOptions(platform);
+  }
+
+  async confirmManualShipment(request: ManualShipmentRequest): Promise<ManualShipmentResult> {
+    return this.repository.confirmManualShipment(request);
   }
 }
