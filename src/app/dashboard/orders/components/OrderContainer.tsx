@@ -356,6 +356,13 @@ export function OrderContainer() {
           canceledCount={canceledCount}
         />
 
+        {/* -mt-4 cancels the parent's 24px stack gap so the note reads as part of the chip row. */}
+        {selectedStatus === 'NONE_TRACKING' && (
+          <p className="-mt-4 text-xs text-gray-500">
+            업체가 직접 배송해 배송 연동이 적용되지 않는 주문입니다 — 송장 추적이 불가합니다.
+          </p>
+        )}
+
         <OrderTable
           orders={pagedOrders}
           isLoading={isLoading}
@@ -382,7 +389,11 @@ export function OrderContainer() {
 
         <ShipmentConfirmModal
           isOpen={isConfirmOpen}
-          onClose={() => setIsConfirmOpen(false)}
+          onClose={(didSucceed) => {
+            setIsConfirmOpen(false);
+            // Re-run the current search so write-back'd 배송지시 rows show up without a full page reload.
+            if (didSucceed) void handleSearch();
+          }}
           useCase={shippingLabelUseCase}
         />
 
