@@ -10,7 +10,11 @@ import { ShippingLabelRepositoryImpl } from '@/infrastructure/repositories/Shipp
 import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
-import { CANCELED_FILTER, isFullyCanceled } from '@/domain/entities/OrderEntity';
+import { CANCELED_FILTER, isFullyCanceled, matchesOrderSearch } from '@/domain/entities/OrderEntity';
+import type { OrderSearchField } from '@/domain/entities/OrderEntity';
+import {
+  RECENT_PERIOD, buildPeriodOptions, isMonthPeriod, toPeriodRange,
+} from '@/domain/entities/OrderPeriod';
 import type { OrderSyncResponse, SyncTarget } from '@/application/dto/OrderDTOs';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -65,6 +69,16 @@ export function OrderContainer() {
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [syncCanceled, setSyncCanceled] = useState(false);
   const [syncTargets, setSyncTargets] = useState<SyncTarget[]>([]);
+  // Period shown in the dropdown: picked but not yet applied to the list (needs [조회]).
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(RECENT_PERIOD);
+  // Period the current list actually holds. The stale notice reads THIS one — reading
+  // selectedPeriod would hide the notice when the select is reverted while the list is still 8월.
+  const [appliedPeriod, setAppliedPeriod] = useState<string>(RECENT_PERIOD);
+  const [searchField, setSearchField] = useState<OrderSearchField>('customer');
+  const [searchTerm, setSearchTerm] = useState('');
+  // Months that have orders — only used to label options '(데이터 없음)'.
+  const [monthsWithData, setMonthsWithData] = useState<ReadonlySet<string>>(new Set());
+  const periodOptions = useMemo(() => buildPeriodOptions(monthsWithData), [monthsWithData]);
   // Cancel is requested through a ref so the running loop sees it without a re-render.
   const cancelRef = useRef(false);
 
@@ -80,6 +94,15 @@ export function OrderContainer() {
     };
     loadSellers();
   }, [sellerUseCase]);
+
+  // Fetched once on entry and deliberately not refetched after a search or sync: the sync window is
+  // only 14 days, so new orders are almost always in the current month, and refetching on every
+  // search would make the dropdown labels flicker. A failure only costs the labels.
+  useEffect(() => {
+    orderUseCase.getOrderMonths()
+      .then((rows) => setMonthsWithData(new Set(rows.map((r) => r.ym))))
+      .catch(() => { /* labels only — the query itself still works */ });
+  }, [orderUseCase]);
 
   // Banner source: the server-persisted per-channel sync status. Failures only hide the banner.
   // Returns the fetched rows (null on failure) so the caller can reuse them without a second call.
@@ -116,28 +139,34 @@ export function OrderContainer() {
     loadInitialOrders();
   }, [orderUseCase, loadSyncTargets]);
 
+  // Search -> status filter -> sort -> paging. The badge counts also count this result.
+  const searchedOrders = useMemo(
+    () => orders.filter((o) => matchesOrderSearch(o, searchField, searchTerm)),
+    [orders, searchField, searchTerm]
+  );
+
   // Count orders per status for the filter button badges (unaffected by selection).
   // Fully-canceled orders are excluded here and counted separately below.
   const statusCounts = useMemo(() => {
-    return orders.reduce<Record<string, number>>((acc, order) => {
+    return searchedOrders.reduce<Record<string, number>>((acc, order) => {
       if (isFullyCanceled(order)) return acc;
       acc[order.status] = (acc[order.status] ?? 0) + 1;
       return acc;
     }, {});
-  }, [orders]);
+  }, [searchedOrders]);
 
   // Fully-canceled orders (orderCount === cancelCount) surfaced under the 취소항목 chip
-  const canceledCount = useMemo(() => orders.filter(isFullyCanceled).length, [orders]);
+  const canceledCount = useMemo(() => searchedOrders.filter(isFullyCanceled).length, [searchedOrders]);
 
   // Apply the selected filter before sorting/paging:
   // - CANCELED_FILTER: only fully-canceled orders
   // - a status code: that status, excluding fully-canceled ones
   // - null: all orders except fully-canceled (those live under 취소항목)
   const filteredOrders = useMemo(() => {
-    if (selectedStatus === CANCELED_FILTER) return orders.filter(isFullyCanceled);
-    if (selectedStatus == null) return orders.filter((o) => !isFullyCanceled(o));
-    return orders.filter((o) => o.status === selectedStatus && !isFullyCanceled(o));
-  }, [orders, selectedStatus]);
+    if (selectedStatus === CANCELED_FILTER) return searchedOrders.filter(isFullyCanceled);
+    if (selectedStatus == null) return searchedOrders.filter((o) => !isFullyCanceled(o));
+    return searchedOrders.filter((o) => o.status === selectedStatus && !isFullyCanceled(o));
+  }, [searchedOrders, selectedStatus]);
 
   const sortedOrders = useMemo(() => {
     if (sortKey == null) return filteredOrders;
@@ -172,8 +201,12 @@ export function OrderContainer() {
       setIsLoading(true);
       setError('');
       setSyncResult(null);
-      const result = await orderUseCase.getOrders(selectedSellerId || undefined);
+      const result = await orderUseCase.getOrders(
+        selectedSellerId || undefined,
+        toPeriodRange(selectedPeriod)
+      );
       setOrders(result);
+      setAppliedPeriod(selectedPeriod);
       setHasSearched(true);
       setCurrentPage(0);
       await loadSyncTargets(selectedSellerId);
@@ -222,8 +255,12 @@ export function OrderContainer() {
     // The per-call `orders` payload is scoped by the sellerId parameter, so it is not reused here —
     // the list is refetched once after the loop instead.
     try {
-      const orders = await orderUseCase.getOrders(selectedSellerId || undefined);
+      const orders = await orderUseCase.getOrders(
+        selectedSellerId || undefined,
+        toPeriodRange(selectedPeriod)
+      );
       setOrders(orders);
+      setAppliedPeriod(selectedPeriod);
       setHasSearched(true);
       setCurrentPage(0);
     } catch {
@@ -280,6 +317,20 @@ export function OrderContainer() {
     setCurrentPage(0);
   };
 
+  // Search input / chip changes reset to page 1 (searching from page 3 would show a blank list).
+  const handleSearchTermChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(0);
+  };
+
+  const handleSearchFieldChange = (field: OrderSearchField) => {
+    setSearchField(field);
+    setCurrentPage(0);
+  };
+
+  // The period only takes effect on [조회] — this just records the picked value.
+  const handlePeriodChange = (value: string) => setSelectedPeriod(value);
+
   const handleStatusChange = (status: string | null) => {
     setSelectedStatus(status);
     setCurrentPage(0);
@@ -308,7 +359,15 @@ export function OrderContainer() {
           onSync={handleSync}
           isLoading={isLoading}
           isSyncing={isSyncing}
-          resultCount={orders.length}
+          resultCount={searchedOrders.length}
+          periodOptions={periodOptions}
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={handlePeriodChange}
+          searchField={searchField}
+          onSearchFieldChange={handleSearchFieldChange}
+          searchTerm={searchTerm}
+          onSearchTermChange={handleSearchTermChange}
+          showStaleNotice={isMonthPeriod(appliedPeriod)}
           lastSyncedAt={lastSyncedAt}
           canDownload={isAdmin}
           onDownload={() => setIsPreviewOpen(true)}
