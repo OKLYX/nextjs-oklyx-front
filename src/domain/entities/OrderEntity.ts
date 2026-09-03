@@ -23,7 +23,7 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   DEPARTURE: '배송지시',
   DELIVERING: '배송중',
   FINAL_DELIVERY: '배송완료',
-  NONE_TRACKING: '업체 직접 배송(배송 연동 미적용), 추적불가',
+  NONE_TRACKING: '추적불가',   // long explanation lives under the status filter chip (OrderContainer)
 };
 
 // Returns the Korean label for an order status code; falls back to the raw value
