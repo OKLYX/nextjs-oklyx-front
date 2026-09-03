@@ -57,3 +57,22 @@ export const CANCELED_FILTER = 'CANCELED';
 export function isFullyCanceled(order: Pick<OrderItem, 'orderCount' | 'cancelCount'>): boolean {
   return order.cancelCount > 0 && order.cancelCount === order.orderCount;
 }
+
+// Search target chip. Customer name is the default (PLAN D10).
+export type OrderSearchField = 'customer' | 'orderNo';
+
+// Strip whitespace + lowercase so '김 철수' matches '김철수' (PLAN D11).
+const normalize = (value: string): string => value.replace(/\s+/g, '').toLowerCase();
+
+// Customer search looks at both orderer and receiver — a gift order has different names.
+export function matchesOrderSearch(
+  order: Pick<OrderItem, 'ordererName' | 'receiverName' | 'externalOrderId'>,
+  field: OrderSearchField,
+  term: string,
+): boolean {
+  const needle = normalize(term);
+  if (needle === '') return true;
+  if (field === 'orderNo') return normalize(order.externalOrderId).includes(needle);
+  return [order.ordererName, order.receiverName]
+    .some((name) => name != null && normalize(name).includes(needle));
+}

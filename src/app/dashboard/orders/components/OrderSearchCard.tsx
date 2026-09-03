@@ -1,7 +1,9 @@
 'use client';
 
-import { Download, Upload } from 'lucide-react';
+import { Download, Upload, X } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import type { OrderSearchField } from '@/domain/entities/OrderEntity';
+import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
 
 interface OrderSearchCardProps {
   sellers: Seller[];
@@ -16,7 +18,20 @@ interface OrderSearchCardProps {
   canDownload: boolean;
   onDownload: () => void;
   onOpenConfirm: () => void;
+  periodOptions: OrderPeriodOption[];
+  selectedPeriod: string;
+  onPeriodChange: (value: string) => void;
+  searchField: OrderSearchField;
+  onSearchFieldChange: (field: OrderSearchField) => void;
+  searchTerm: string;
+  onSearchTermChange: (value: string) => void;
+  /** The container decides this from the period the list actually holds — the card never judges. */
+  showStaleNotice: boolean;
 }
+
+const CHIP_BASE = 'px-3 py-1 rounded-full text-sm';
+const CHIP_ON = 'bg-blue-600 text-white';
+const CHIP_OFF = 'bg-gray-100 text-gray-700 hover:bg-gray-200';
 
 function formatSyncedAt(value: string | null): string {
   if (!value) return '동기화 기록 없음';
@@ -38,6 +53,14 @@ export function OrderSearchCard({
   canDownload,
   onDownload,
   onOpenConfirm,
+  periodOptions,
+  selectedPeriod,
+  onPeriodChange,
+  searchField,
+  onSearchFieldChange,
+  searchTerm,
+  onSearchTermChange,
+  showStaleNotice,
 }: OrderSearchCardProps) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -64,6 +87,18 @@ export function OrderSearchCard({
                 </option>
               ))}
             </select>
+            <select
+              value={selectedPeriod}
+              onChange={(e) => onPeriodChange(e.target.value)}
+              aria-label="기간"
+              className="w-40 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            >
+              {periodOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             {canDownload && (
               <button
                 onClick={onDownload}
@@ -84,6 +119,52 @@ export function OrderSearchCard({
             )}
           </div>
         </div>
+
+        {/* No <form>: Enter would reload the page, and filtering happens as you type. */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">검색</label>
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              type="button"
+              onClick={() => onSearchFieldChange('customer')}
+              className={`${CHIP_BASE} ${searchField === 'customer' ? CHIP_ON : CHIP_OFF}`}
+            >
+              고객명
+            </button>
+            <button
+              type="button"
+              onClick={() => onSearchFieldChange('orderNo')}
+              className={`${CHIP_BASE} ${searchField === 'orderNo' ? CHIP_ON : CHIP_OFF}`}
+            >
+              주문번호
+            </button>
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => onSearchTermChange(e.target.value)}
+              placeholder={searchField === 'orderNo' ? '주문번호 검색' : '고객명 검색 (주문자·수취인)'}
+              className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => onSearchTermChange('')}
+                aria-label="검색어 지우기"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {showStaleNotice && (
+          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+            최근 2주 이전 주문은 배송 상태가 최신이 아닐 수 있습니다 (동기화해도 갱신되지 않습니다).
+          </p>
+        )}
 
         <div className="flex items-center justify-between">
           <div>
