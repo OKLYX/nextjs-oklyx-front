@@ -46,18 +46,19 @@ export type ShippingLabelExportRow = ShippingLabelPreviewRow;
 
 // --- Manual single-box shipment (PLAN 2609_11) ---
 
-// Carrier dropdown item. Only `carrierId` travels back to the server on submit — the marketplace
-// code is resolved server-side (D2). `deliveryCompanyCode` is carried straight from the backend
-// record; it is not rendered.
+// Carrier dropdown item. The identifier IS the marketplace code — Coupang has no carrier-list API,
+// so the dropdown is its documented code table and most carriers have no local `carrier` row to
+// hang an id on (D2 revised 2026-09-03). The server whitelists whatever code comes back.
+// `registered` = 택배사 관리에 등록해 둔 코드 (목록 맨 위로 올린다).
 export interface CarrierOption {
-  carrierId: number;
-  carrierName: string;
   deliveryCompanyCode: string;
+  carrierName: string;
+  registered: boolean;
 }
 
 export interface ManualShipmentRequest {
   orderItemId: number;
-  carrierId: number;
+  deliveryCompanyCode: string;
   invoiceNumber: string;
 }
 
