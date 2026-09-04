@@ -8,24 +8,35 @@ interface OrderStatusFilterProps {
   onStatusChange: (status: string | null) => void;
   // Item count per status code, keyed by status (fully-canceled orders excluded)
   counts: Record<string, number>;
-  // Count of fully-canceled orders, shown on the dedicated 취소항목 chip
+  // Count of fully-canceled orders, shown on the dedicated 취소항목 chip.
+  // Required even when the chip is hidden — pass 0 there.
   canceledCount: number;
+  /** 그릴 상태 후보. 기본값 = 전 상태(주문내역). 출고관리는 SHIPMENT_STATUSES 만 넘긴다. */
+  statuses?: readonly string[];
+  /** 취소항목 칩 표시 여부. 출고관리는 취소를 아예 제외하므로 false. */
+  showCanceledChip?: boolean;
 }
 
 // Renders the order-status filter chips between the search card and the list.
-// The 6 status chips are followed by a dedicated 취소항목 chip that isolates
+// The status chips are followed by a dedicated 취소항목 chip that isolates
 // fully-canceled orders (orderCount === cancelCount) out of the normal statuses.
-// Each chip shows its item count; clicking the active chip again clears the filter.
+// Each chip shows its item count; clicking the active chip again clears the filter
+// (there is no '전체' chip — re-clicking the active one is how you clear it).
+//
+// 후보(`statuses`)와 취소 칩(`showCanceledChip`)만 선택적으로 좁힐 수 있다(PLAN 2609_15 D12).
+// 기본값이 현행이라 주문내역 렌더는 무변경이고, 출고관리는 후보 2종 + 취소 칩 숨김으로 쓴다.
 export function OrderStatusFilter({
   selectedStatus,
   onStatusChange,
   counts,
   canceledCount,
+  statuses = ORDER_STATUSES,
+  showCanceledChip = true,
 }: OrderStatusFilterProps) {
   const isCanceledActive = selectedStatus === CANCELED_FILTER;
   return (
     <div className="flex flex-wrap gap-2">
-      {ORDER_STATUSES.map((status) => {
+      {statuses.map((status) => {
         const isActive = selectedStatus === status;
         return (
           <button
@@ -50,6 +61,7 @@ export function OrderStatusFilter({
         );
       })}
 
+      {showCanceledChip && (
       <button
         type="button"
         onClick={() => onStatusChange(isCanceledActive ? null : CANCELED_FILTER)}
@@ -68,6 +80,7 @@ export function OrderStatusFilter({
           {canceledCount}
         </span>
       </button>
+      )}
     </div>
   );
 }

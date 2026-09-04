@@ -134,7 +134,10 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       label: '주문관리',
       open: isOrdersOpen,
       toggle: toggleOrdersMenu,
-      items: [{ href: ROUTES.ORDERS_RETRIEVE, label: '주문내역' }],
+      items: [
+        { href: ROUTES.ORDERS_SHIPMENT, label: '출고관리' },
+        { href: ROUTES.ORDERS_RETRIEVE, label: '주문내역' },
+      ],
     },
     {
       icon: ShoppingCart,
