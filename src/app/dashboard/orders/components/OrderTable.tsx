@@ -15,6 +15,20 @@ interface OrderTableProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  /**
+   * 선택 열을 그릴지. 미전달 = 주문내역과 완전히 같은 표(열 추가 없음).
+   * 출고관리 발주처리에서만 넘긴다(PLAN 2609_17 D7).
+   */
+  selection?: {
+    selectedIds: Set<number>;
+    /** 그 행이 선택 가능한지(비대상 행은 disabled 체크박스). */
+    isSelectable: (order: OrderItem) => boolean;
+    onToggle: (id: number) => void;
+    /** 현재 페이지의 선택 가능 행 전체 토글. */
+    onTogglePage: () => void;
+    /** 현재 페이지의 선택 가능 행이 모두 선택됨 = 헤더 체크박스 checked */
+    isPageAllSelected: boolean;
+  };
 }
 
 interface Column {
@@ -58,6 +72,7 @@ export function OrderTable({
   currentPage,
   totalPages,
   onPageChange,
+  selection,
 }: OrderTableProps) {
   if (isLoading) {
     return (
@@ -66,6 +81,8 @@ export function OrderTable({
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
+                {/* 선택 열이 있으면 스켈레톤도 같은 열 수를 그린다 — 안 그리면 로딩 중에만 표가 흔들린다. */}
+                {selection && <th className="w-10 px-3 py-3" />}
                 {COLUMNS.map((col) => (
                   <th key={col.key} className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
                     {col.label}
@@ -76,6 +93,7 @@ export function OrderTable({
             <tbody>
               {[...Array(5)].map((_, i) => (
                 <tr key={i} className="border-b border-gray-200">
+                  {selection && <td className="px-3 py-3" />}
                   {[...Array(COLUMNS.length)].map((_, j) => (
                     <td key={j} className="px-6 py-3">
                       <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
@@ -120,6 +138,18 @@ export function OrderTable({
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr>
+              {selection && (
+                <th className="w-10 px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selection.isPageAllSelected}
+                    disabled={!orders.some(selection.isSelectable)}
+                    onChange={selection.onTogglePage}
+                    aria-label="현재 페이지 전체 선택"
+                    className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                </th>
+              )}
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
@@ -139,6 +169,19 @@ export function OrderTable({
                 onClick={() => onRowClick(order)}
                 className="hover:bg-gray-50 transition-colors cursor-pointer"
               >
+                {/* stopPropagation 은 <td> 에 건다 — 체크박스 주변 여백을 눌러도 행 클릭(상세 모달)이 새지 않게. */}
+                {selection && (
+                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selection.selectedIds.has(order.id)}
+                      disabled={!selection.isSelectable(order)}
+                      onChange={() => selection.onToggle(order.id)}
+                      aria-label={`${order.externalOrderId} 선택`}
+                      className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                  </td>
+                )}
                 <td className="px-6 py-3 text-sm text-gray-700">{order.externalOrderId}</td>
                 <td className="px-6 py-3 text-sm text-gray-700">{getCustomerName(order)}</td>
                 <td className="px-6 py-3 text-sm text-gray-700">{order.itemName || '-'}</td>

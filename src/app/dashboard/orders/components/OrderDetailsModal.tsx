@@ -7,6 +7,9 @@ import { addressHead } from '@/infrastructure/utils/address';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { getOrderStatusLabel, isAlreadyShipped } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
+import type { OrderUseCase } from '@/application/usecases/OrderUseCase';
+import type { OrderAcknowledgeResult } from '@/application/dto/OrderDTOs';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type {
   CarrierOption,
   ManualShipmentResult,
@@ -35,6 +38,8 @@ interface OrderDetailsModalProps {
   onClose: (didSucceed: boolean) => void;
   isAdmin: boolean;
   useCase: ShippingLabelUseCase;
+  /** 발주처리(결제완료→상품준비중) 전용. 주문내역·출고관리 두 호출부가 모두 넘긴다. */
+  orderUseCase: OrderUseCase;
 }
 
 const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
@@ -52,7 +57,7 @@ function formatDate(value: string | null): string {
   return date.toLocaleString('ko-KR');
 }
 
-export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDetailsModalProps) {
+export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase }: OrderDetailsModalProps) {
   // Hooks must precede the `order == null` guard — a conditional hook breaks the Rules of Hooks.
   const [rows, setRows] = useState<ShippingLabelExportRow[]>([]);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -79,6 +84,10 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
   // `false` start shows the D16 register notice for a frame to someone who has carriers registered.
   const [isLoadingCarriers, setIsLoadingCarriers] = useState(true);
   const [carrierReloadTick, setCarrierReloadTick] = useState(0);   // [다시 시도] re-runs the effect
+  // 발주처리(ACCEPT→INSTRUCT). 일괄과 같은 엔드포인트를 쓴다(PLAN 2609_17 D6).
+  const [ackResult, setAckResult] = useState<OrderAcknowledgeResult | null>(null);
+  const [isAcknowledging, setIsAcknowledging] = useState(false);
+  const [ackError, setAckError] = useState('');
 
   // Carrier list load — the platform's code table (Coupang has no carrier-list API), served from
   // our own backend, not a Coupang call, so it runs on open without a button. The guard mirrors the section's render gate: hooks run even when the
@@ -127,6 +136,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
   const isSubmitDisabled = isInputDisabled || carrierCode === '' || invoiceNumber.trim() === '';
   // 미발송이면 늘 열려 있고, 발송된 건은 [송장 수정하기] 를 누른 뒤에만 열린다.
   const isFormOpen = !isShipped || isEditingInvoice;
+  const ackSucceeded = ackResult != null && ackResult.succeeded > 0;
   const registeredOptions = carrierOptions.filter((option) => option.registered);
   const otherOptions = carrierOptions.filter((option) => !option.registered);
 
@@ -139,7 +149,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
     setHasLoaded(false);
     setIsExporting(false);
     // Only a real success justifies the parent's refetch (PLAN 2609_11 D13).
-    onClose(result != null && result.succeeded > 0);
+    // 발주처리 성공도 같은 채널로 올린다(2609_17) — 호출부가 갈리지 않게 새 콜백을 만들지 않는다.
+    onClose((result != null && result.succeeded > 0) || ackSucceeded);
   };
 
   const handlePreview = async () => {
@@ -203,6 +214,23 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
   };
 
   /**
+   * 단건 발주처리 — 이 라인이 속한 박스 1개를 결제완료→상품준비중으로 전환한다.
+   * 일괄(출고관리)과 같은 엔드포인트를 쓴다(PLAN 2609_17 D6) — 대상 판정은 서버가 한다.
+   */
+  const handleAcknowledge = async () => {
+    try {
+      setIsAcknowledging(true);
+      setAckError('');
+      setAckResult(await orderUseCase.acknowledgeOrders([order.id]));
+    } catch (err) {
+      // 요청이 안 갔을 수도 있으므로 버튼은 다시 누를 수 있게 열어 둔다.
+      setAckError(extractErrorMessage(err, '발주처리에 실패했습니다. 다시 시도해주세요.'));
+    } finally {
+      setIsAcknowledging(false);
+    }
+  };
+
+  /**
    * 단건 발송처리 — 앵커 라인이 속한 박스 1개를 전송한다.
    * - 전송 단위는 박스 전체다. 박스 라인 전개는 서버가 한다(PLAN 2609_11 D1) — 여기서는 앵커 1줄만 보낸다.
    * - 신규 업로드/송장수정 모드는 서버가 주문 상태로 결정한다(D3) — 클라이언트는 라벨만 바꾼다.
@@ -247,7 +275,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
     { label: '보류수량', value: order.holdCount },
     { label: '구매가능수량', value: order.purchasableQty },
     // A successful CREATE writes 배송지시 back server-side; show it straight from the result (D4).
-    { label: '상태', value: getOrderStatusLabel(result?.resultStatus ?? order.status) },
+    // ⚠️ 발송처리 result 가 우선 — 순서를 뒤집으면 한 모달에서 발주→발송을 연달아 한 사용자에게 배송지시가 안 보인다.
+    { label: '상태', value: getOrderStatusLabel(result?.resultStatus ?? (ackSucceeded ? 'INSTRUCT' : order.status)) },
     { label: '결제일', value: formatDate(order.paidAt) },
     { label: '마켓 계정 ID', value: order.marketplaceAccountId },
   ];
@@ -285,6 +314,56 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase }: OrderDet
           {previewError && (
             <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
               {previewError}
+            </div>
+          )}
+
+          {/* 발주처리 — 이 라인이 속한 박스 전체를 상품준비중으로 전환한다(PLAN 2609_17 D14).
+              노출 조건은 `order.status` 로 판정한다 — 성공 후에도 섹션이 남아야 결과 문구를 보여줄 수 있다. */}
+          {isAdmin && isCoupang && order.status === 'ACCEPT' && (
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <h4 className="text-lg font-semibold text-gray-900">발주처리</h4>
+
+              {ackSucceeded ? (
+                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
+                  발주처리 완료
+                </div>
+              ) : (
+                <>
+                  <p className="mt-1 text-sm text-gray-500">
+                    이 주문의 배송건(박스 {order.externalBoxId ?? '-'}) 전체가 상품준비중으로 전환됩니다. 되돌릴 수 없습니다.
+                  </p>
+                  <div className="mt-4">
+                    <button
+                      onClick={handleAcknowledge}
+                      disabled={isAcknowledging}
+                      className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                    >
+                      {isAcknowledging ? <Spinner label="전송 중..." /> : '발주처리'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {ackError && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                  {ackError}
+                </div>
+              )}
+
+              {/* 실패 사유는 쿠팡 원문 그대로(D15). 버튼은 열어 둔다. */}
+              {ackResult != null && ackResult.failed.length > 0 && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                  {ackResult.failed.map((box) => (
+                    <p key={box.shipmentBoxId}>{box.resultCode}: {box.message}</p>
+                  ))}
+                </div>
+              )}
+
+              {ackResult != null && !ackSucceeded && ackResult.failed.length === 0 && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
+                  발주처리 대상이 아닙니다. 목록을 새로고침해 상태를 확인해주세요.
+                </div>
+              )}
             </div>
           )}
 
