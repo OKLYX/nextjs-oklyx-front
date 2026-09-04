@@ -47,6 +47,10 @@ export const ORDER_STATUSES = [
   'NONE_TRACKING',
 ] as const;
 
+// 출고관리 화면 대상 — 아직 발송하지 않은 주문(PLAN 2609_15 D1).
+// 전량취소는 status 로 걸러지지 않으므로 isFullyCanceled 로 따로 제외한다(D13).
+export const SHIPMENT_STATUSES = ['ACCEPT', 'INSTRUCT'] as const;
+
 // Statuses at or past 배송지시 — an order in one of these is an invoice *edit* target, not a new
 // upload. The decision itself is made by the server (PLAN 2609_11 D3); this is only used for the
 // button label and the notice text in the manual shipment section.

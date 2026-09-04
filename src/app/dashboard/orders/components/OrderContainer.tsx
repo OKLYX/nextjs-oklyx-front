@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import axios from 'axios';
 import { OrderRepositoryImpl } from '@/infrastructure/repositories/OrderRepositoryImpl';
 import { OrderUseCase } from '@/application/usecases/OrderUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
@@ -15,29 +14,22 @@ import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import {
   RECENT_PERIOD, buildPeriodOptions, isMonthPeriod, toPeriodRange,
 } from '@/domain/entities/OrderPeriod';
-import type { OrderSyncResponse, SyncTarget } from '@/application/dto/OrderDTOs';
+import type { SyncTarget } from '@/application/dto/OrderDTOs';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
+import { useOrderSync } from '@/presentation/hooks/useOrderSync';
 import { OrderSearchCard } from './OrderSearchCard';
+import { channelOptionLabel } from './OrderSearchCard';
+import type { ChannelOption } from './OrderSearchCard';
 import { OrderStatusFilter } from './OrderStatusFilter';
 import { OrderTable } from './OrderTable';
 import { OrderDetailsModal } from './OrderDetailsModal';
-import { ShipmentConfirmModal } from './ShipmentConfirmModal';
-import { ShippingLabelPreviewModal } from './ShippingLabelPreviewModal';
 import { SyncProgressModal } from './SyncProgressModal';
 import { PeriodBackfillDialog } from './PeriodBackfillDialog';
-import type { ChannelProgress } from './SyncProgressModal';
 
 const PAGE_SIZE = 20;
-const LAST_SYNCED_AT_KEY = 'oklyx_order_last_synced_at';
 
-const markState = (
-  list: ChannelProgress[], index: number, state: ChannelProgress['state'], error?: string,
-): ChannelProgress[] => list.map((c, i) => (i === index ? { ...c, state, error } : c));
-
-// The server owns the reason text: use the received message as-is, falling back only when absent.
-const extractMessage = (e: unknown): string =>
-  (axios.isAxiosError(e) ? e.response?.data?.message : undefined) ?? '동기화에 실패했습니다.';
+const CHANNEL_NOT_SYNCABLE = '동기화할 수 없는 채널입니다(비활성).';
 
 export function OrderContainer() {
   const orderUseCase = useMemo(() => new OrderUseCase(new OrderRepositoryImpl()), []);
@@ -47,28 +39,21 @@ export function OrderContainer() {
     []
   );
 
+  // 상세 모달의 단건 발송처리 섹션이 계속 쓴다(송장시트·발송처리 버튼은 출고관리로 옮겼다).
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [selectedSellerId, setSelectedSellerId] = useState<number | ''>('');
+  const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
-  const [syncResult, setSyncResult] = useState<OrderSyncResponse | null>(null);
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<keyof OrderItem | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [syncChannels, setSyncChannels] = useState<ChannelProgress[]>([]);
-  const [syncCursor, setSyncCursor] = useState(0);
-  const [syncModalOpen, setSyncModalOpen] = useState(false);
-  const [syncCanceled, setSyncCanceled] = useState(false);
   const [syncTargets, setSyncTargets] = useState<SyncTarget[]>([]);
   // Period shown in the dropdown: picked but not yet applied to the list (needs [조회]).
   const [selectedPeriod, setSelectedPeriod] = useState<string>(RECENT_PERIOD);
@@ -80,8 +65,6 @@ export function OrderContainer() {
   // Months that have orders — only used to label options '(데이터 없음)'.
   const [monthsWithData, setMonthsWithData] = useState<ReadonlySet<string>>(new Set());
   const periodOptions = useMemo(() => buildPeriodOptions(monthsWithData), [monthsWithData]);
-  // Cancel is requested through a ref so the running loop sees it without a re-render.
-  const cancelRef = useRef(false);
   // Empty month to offer a backfill for. null = the dialog stays closed.
   const [backfillPrompt, setBackfillPrompt] = useState<{ period: string; label: string } | null>(null);
   // Suppresses a second prompt for the same scope in this session (PLAN D10) — asking once is
@@ -128,16 +111,13 @@ export function OrderContainer() {
     }
   }, [orderUseCase]);
 
-  // On first entry: restore the persisted last sync time and load all sellers' orders
-  // without requiring a search click. Reads run inside the async callback to avoid
-  // synchronous setState in the effect body.
+  // On first entry: load all sellers' orders without requiring a search click.
+  // (The persisted last sync time is restored by useOrderSync.)
   useEffect(() => {
     const loadInitialOrders = async () => {
       try {
         setIsLoading(true);
-        const persisted = localStorage.getItem(LAST_SYNCED_AT_KEY);
         const result = await orderUseCase.getOrders();
-        setLastSyncedAt(persisted);
         setOrders(result);
         setHasSearched(true);
         await loadSyncTargets('');
@@ -150,10 +130,84 @@ export function OrderContainer() {
     loadInitialOrders();
   }, [orderUseCase, loadSyncTargets]);
 
-  // Search -> status filter -> sort -> paging. The badge counts also count this result.
+  // 동기화 루프가 끝난 뒤의 목록 재조회. 화면마다 다르므로 훅에 넘긴다.
+  // 훅보다 먼저 선언한다(useCallback 은 TDZ).
+  const refetchAfterSync = useCallback(async () => {
+    // The per-call `orders` payload is scoped by the sellerId parameter, so it is not reused —
+    // the list is refetched once after the loop instead.
+    try {
+      const result = await orderUseCase.getOrders(
+        selectedSellerId || undefined,
+        toPeriodRange(selectedPeriod)
+      );
+      setOrders(result);
+      setAppliedPeriod(selectedPeriod);
+      setHasSearched(true);
+      setCurrentPage(0);
+    } catch {
+      setError('주문 목록을 불러오지 못했습니다.');
+    }
+  }, [orderUseCase, selectedSellerId, selectedPeriod]);
+
+  // 함수 선언문이라 호이스팅된다 — 훅이 돌려주는 applyChannelErrors 를 호출 시점(렌더 이후)에 읽는다.
+  async function handleSyncSettled() {
+    const refreshed = await loadSyncTargets(selectedSellerId);
+    if (!refreshed) return;
+    applyChannelErrors(new Map(
+      refreshed
+        .filter((t): t is SyncTarget & { lastSyncError: string } => Boolean(t.lastSyncError))
+        .map((t) => [t.accountId, t.lastSyncError])
+    ));
+  }
+
+  const {
+    runChannels, runSync, applyChannelErrors, failedTargets,
+    isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen, syncResult, lastSyncedAt,
+    cancelSync, closeSyncModal, stopSyncing, clearSyncResult,
+  } = useOrderSync({ onAfterSync: refetchAfterSync, onSyncSettled: handleSyncSettled });
+
+  // 채널 옵션 = 동기화 대상 ∪ 조회된 목록의 계정(PLAN 2609_15 D7-a).
+  // ⚠️ 대상(활성 계정)만으로 채우면 비활성 채널의 과거 주문이 필터에서 영영 사라진다.
+  const channelOptions = useMemo<ChannelOption[]>(() => {
+    const byId = new Map<number, ChannelOption>();
+    syncTargets.forEach((t) => byId.set(t.accountId, {
+      accountId: t.accountId,
+      label: channelOptionLabel(t.accountId, t.accountAlias),
+      syncable: true,
+    }));
+    orders.forEach((o) => {
+      if (byId.has(o.marketplaceAccountId)) return;
+      // 목록에만 있는 계정은 이름을 모른다.
+      byId.set(o.marketplaceAccountId, {
+        accountId: o.marketplaceAccountId,
+        label: channelOptionLabel(o.marketplaceAccountId, null),
+        syncable: false,
+      });
+    });
+    return [...byId.values()].sort((a, b) => a.accountId - b.accountId);
+  }, [syncTargets, orders]);
+
+  const selectedChannel = useMemo(
+    () => channelOptions.find((c) => c.accountId === selectedAccountId),
+    [channelOptions, selectedAccountId]
+  );
+  // 조회는 되고 동기화는 안 되는 상태를 그대로 드러낸다(D7-a).
+  const syncDisabledReason =
+    selectedAccountId !== '' && selectedChannel && !selectedChannel.syncable
+      ? CHANNEL_NOT_SYNCABLE
+      : undefined;
+
+  // 기간(서버) -> 채널 -> 검색 -> 상태 -> 정렬 -> 페이징. 배지 건수도 이 결과를 센다.
+  const channelFilteredOrders = useMemo(
+    () => (selectedAccountId === ''
+      ? orders
+      : orders.filter((o) => o.marketplaceAccountId === selectedAccountId)),
+    [orders, selectedAccountId]
+  );
+
   const searchedOrders = useMemo(
-    () => orders.filter((o) => matchesOrderSearch(o, searchField, searchTerm)),
-    [orders, searchField, searchTerm]
+    () => channelFilteredOrders.filter((o) => matchesOrderSearch(o, searchField, searchTerm)),
+    [channelFilteredOrders, searchField, searchTerm]
   );
 
   // Count orders per status for the filter button badges (unaffected by selection).
@@ -211,7 +265,7 @@ export function OrderContainer() {
     try {
       setIsLoading(true);
       setError('');
-      setSyncResult(null);
+      clearSyncResult();
       const result = await orderUseCase.getOrders(
         selectedSellerId || undefined,
         toPeriodRange(selectedPeriod)
@@ -238,81 +292,16 @@ export function OrderContainer() {
     }
   };
 
-  // One account per call: the server isolates accounts only inside its multi-account path, so the
-  // per-channel failure handling lives here. Only accountId is sent — adding sellerId would clash
-  // with the server's accountId > sellerId priority and blur the scope of the response.
-  const runSync = async (targets: SyncTarget[]) => {
+  // 표준 동기화 진입점. 백필 플래그를 내리는 건 화면 몫이다(훅은 백필의 존재를 모른다).
+  const startSync = (targets: SyncTarget[]) => {
     setIsBackfillRun(false);
-    cancelRef.current = false;
-    setSyncCanceled(false);
-    setSyncModalOpen(true);
-    setIsSyncing(true);
     setError('');
-    setSyncChannels(targets.map((t) => ({ target: t, state: 'pending' })));
-    setSyncCursor(0);
-
-    let newOrders = 0;
-    let updatedOrders = 0;
-    let canceledUpdated = 0;
-
-    for (let i = 0; i < targets.length; i += 1) {
-      if (cancelRef.current) {
-        setSyncCanceled(true);
-        break;
-      }
-      setSyncChannels((prev) => markState(prev, i, 'running'));
-      try {
-        const result = await orderUseCase.syncOrders({ accountId: targets[i].accountId });
-        newOrders += result.newOrders;
-        updatedOrders += result.updatedOrders;
-        canceledUpdated += result.canceledUpdated;
-        setSyncChannels((prev) => markState(prev, i, 'success'));
-      } catch (e) {
-        setSyncChannels((prev) => markState(prev, i, 'failed', extractMessage(e)));
-      }
-      setSyncCursor(i + 1);
-    }
-
-    // The per-call `orders` payload is scoped by the sellerId parameter, so it is not reused here —
-    // the list is refetched once after the loop instead.
-    try {
-      const orders = await orderUseCase.getOrders(
-        selectedSellerId || undefined,
-        toPeriodRange(selectedPeriod)
-      );
-      setOrders(orders);
-      setAppliedPeriod(selectedPeriod);
-      setHasSearched(true);
-      setCurrentPage(0);
-    } catch {
-      setError('주문 목록을 불러오지 못했습니다.');
-    }
-
-    const syncedAt = new Date().toISOString();
-    setLastSyncedAt(syncedAt);
-    localStorage.setItem(LAST_SYNCED_AT_KEY, syncedAt);
-    setSyncResult({ syncedAt, newOrders, updatedOrders, canceledUpdated, orders: [] });
-    setIsSyncing(false);
-
-    // The reason still comes from the server (D18), but from the channel status the sync just
-    // stamped rather than the HTTP envelope: sync failures surface as IllegalStateException /
-    // RestClientException, which the backend's catch-all handler answers with the generic
-    // "Internal server error" body. `lastSyncError` carries the real one ("HTTP 504 from Coupang").
-    const refreshed = await loadSyncTargets(selectedSellerId);
-    if (refreshed) {
-      setSyncChannels((prev) =>
-        prev.map((channel) => {
-          if (channel.state !== 'failed') return channel;
-          const recorded = refreshed.find((t) => t.accountId === channel.target.accountId);
-          return recorded?.lastSyncError ? { ...channel, error: recorded.lastSyncError } : channel;
-        })
-      );
-    }
+    return runSync(targets);
   };
 
-  // Backfills one month, account by account. Mirrors runSync but calls the period endpoint,
-  // refetches the selected period afterwards and deliberately leaves the sync banners alone
-  // (the server records no channel status for a period backfill, PLAN D5).
+  // Backfills one month, account by account. Borrows the shared channel runner but calls the period
+  // endpoint, refetches the selected period afterwards and deliberately leaves the sync banners
+  // alone (the server records no channel status for a period backfill, PLAN 2609_10 D5).
   // retryTargets: the progress modal's [재시도] path - only those channels run again.
   const runPeriodBackfill = async (period: string, retryTargets?: SyncTarget[]) => {
     const range = toPeriodRange(period);
@@ -335,31 +324,15 @@ export function OrderContainer() {
 
     setIsBackfillRun(true);
     backfillPeriodRef.current = period;
-    cancelRef.current = false;
-    setSyncCanceled(false);
-    setSyncModalOpen(true);
-    setIsSyncing(true);
     setError('');
-    setSyncChannels(targets.map((t) => ({ target: t, state: 'pending' })));
-    setSyncCursor(0);
 
     let newOrders = 0;
-    for (let i = 0; i < targets.length; i += 1) {
-      if (cancelRef.current) {
-        setSyncCanceled(true);
-        break;
-      }
-      setSyncChannels((prev) => markState(prev, i, 'running'));
-      try {
-        const result = await orderUseCase.syncPeriod(targets[i].accountId, range);
-        newOrders += result.newOrders;
-        setSyncChannels((prev) => markState(prev, i, 'success'));
-      } catch (e) {
-        setSyncChannels((prev) => markState(prev, i, 'failed', extractMessage(e)));   // PLAN D9
-      }
-      setSyncCursor(i + 1);
-    }
-    setIsSyncing(false);
+    await runChannels(targets, async (target) => {
+      const result = await orderUseCase.syncPeriod(target.accountId, range);
+      newOrders += result.newOrders;                      // PLAN D9
+    });
+    // 백필은 루프 직후 스피너를 푼다(표준 동기화는 재조회까지 끝낸 뒤 — 현행 유지).
+    stopSyncing();
 
     // Refetch the period that was backfilled - the month the screen was looking at.
     try {
@@ -385,26 +358,29 @@ export function OrderContainer() {
   const handleSync = async () => {
     try {
       const targets = await orderUseCase.getSyncTargets(selectedSellerId || undefined);
-      if (targets.length === 0) {
+      // 동기화 가능한 채널이 선택돼 있으면 그 대상 1개만 돌린다(PLAN 2609_15 D7).
+      const scoped = selectedAccountId === '' || syncDisabledReason
+        ? targets
+        : targets.filter((t) => t.accountId === selectedAccountId);
+      if (scoped.length === 0) {
         setError('동기화할 채널이 없습니다.');
         return;
       }
-      await runSync(targets);
+      await startSync(scoped);
     } catch {
       setError('동기화 대상을 불러오지 못했습니다.');
     }
   };
 
   const handleRetryFailed = () => {
-    const failed = syncChannels.filter((c) => c.state === 'failed').map((c) => c.target);
-    if (failed.length === 0) return;
+    if (failedTargets.length === 0) return;
     // Retrying a failed backfill re-runs the backfill for that period - routing it through the
-    // regular sync would stamp the "last sync" banner with a period run (PLAN D5).
+    // regular sync would stamp the "last sync" banner with a period run (PLAN 2609_10 D5).
     if (isBackfillRun && backfillPeriodRef.current) {
-      runPeriodBackfill(backfillPeriodRef.current, failed);
+      void runPeriodBackfill(backfillPeriodRef.current, failedTargets);
       return;
     }
-    runSync(failed);
+    void startSync(failedTargets);
   };
 
   const handleSort = (key: keyof OrderItem) => {
@@ -431,6 +407,17 @@ export function OrderContainer() {
   // The period only takes effect on [조회] — this just records the picked value.
   const handlePeriodChange = (value: string) => setSelectedPeriod(value);
 
+  // 판매자를 바꾸면 채널 선택을 푼다 — 다른 판매자의 계정이 남으면 목록이 영문 없이 0건이 된다.
+  const handleSellerChange = (value: number | '') => {
+    setSelectedSellerId(value);
+    setSelectedAccountId('');
+  };
+
+  const handleAccountChange = (value: number | '') => {
+    setSelectedAccountId(value);
+    setCurrentPage(0);
+  };
+
   const handleStatusChange = (status: string | null) => {
     setSelectedStatus(status);
     setCurrentPage(0);
@@ -454,12 +441,16 @@ export function OrderContainer() {
         <OrderSearchCard
           sellers={sellers}
           selectedSellerId={selectedSellerId}
-          onSellerChange={setSelectedSellerId}
+          onSellerChange={handleSellerChange}
           onSearch={handleSearch}
           onSync={handleSync}
           isLoading={isLoading}
           isSyncing={isSyncing}
           resultCount={searchedOrders.length}
+          channelOptions={channelOptions}
+          selectedAccountId={selectedAccountId}
+          onAccountChange={handleAccountChange}
+          syncDisabledReason={syncDisabledReason}
           periodOptions={periodOptions}
           selectedPeriod={selectedPeriod}
           onPeriodChange={handlePeriodChange}
@@ -469,9 +460,6 @@ export function OrderContainer() {
           onSearchTermChange={handleSearchTermChange}
           showStaleNotice={isMonthPeriod(appliedPeriod)}
           lastSyncedAt={lastSyncedAt}
-          canDownload={isAdmin}
-          onDownload={() => setIsPreviewOpen(true)}
-          onOpenConfirm={() => setIsConfirmOpen(true)}
         />
 
         {syncResult && (
@@ -499,7 +487,7 @@ export function OrderContainer() {
               })}
             </ul>
             <button
-              onClick={() => runSync(nonSuccessTargets)}
+              onClick={() => void startSync(nonSuccessTargets)}
               disabled={isSyncing}
               className="mt-3 px-4 py-2 border border-amber-300 rounded-lg font-medium hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -550,25 +538,15 @@ export function OrderContainer() {
           useCase={shippingLabelUseCase}
         />
 
-        <ShipmentConfirmModal
-          isOpen={isConfirmOpen}
-          onClose={(didSucceed) => {
-            setIsConfirmOpen(false);
-            // Re-run the current search so write-back'd 배송지시 rows show up without a full page reload.
-            if (didSucceed) void handleSearch();
-          }}
-          useCase={shippingLabelUseCase}
-        />
-
         <SyncProgressModal
           open={syncModalOpen}
           channels={syncChannels}
           doneCount={syncCursor}
           isRunning={isSyncing}
           canceled={syncCanceled}
-          onCancel={() => { cancelRef.current = true; }}
+          onCancel={cancelSync}
           onRetryFailed={handleRetryFailed}
-          onClose={() => setSyncModalOpen(false)}
+          onClose={closeSyncModal}
         />
 
         <PeriodBackfillDialog
@@ -580,14 +558,6 @@ export function OrderContainer() {
             setBackfillPrompt(null);           // close first so it does not stack on the progress modal
             if (period) void runPeriodBackfill(period);
           }}
-        />
-
-        <ShippingLabelPreviewModal
-          open={isPreviewOpen}
-          onOpenChange={setIsPreviewOpen}
-          sellerId={selectedSellerId || undefined}
-          isAdmin={isAdmin}
-          useCase={shippingLabelUseCase}
         />
     </PageContainer>
   );
