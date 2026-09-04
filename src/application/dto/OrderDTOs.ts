@@ -13,6 +13,13 @@ export interface OrderSyncResponse extends OrderSyncResult {
   orders: OrderItem[];
 }
 
+/**
+ * 동기화가 조회할 주문 상태 범위 (백엔드 `OrderSyncScope`).
+ * - FULL: 전 상태 (주문내역·구매목록)
+ * - ACTIVE: 결제완료·상품준비중만 (출고관리 — 쿠팡 왕복 6회 → 2회)
+ */
+export type OrderSyncScope = 'FULL' | 'ACTIVE';
+
 /** GET /api/orders/months 응답 행 — 주문이 존재하는 달(yyyy-MM)과 그 달의 주문 라인 수. */
 export interface OrderMonth {
   ym: string;

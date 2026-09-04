@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { OrderRepositoryImpl } from '@/infrastructure/repositories/OrderRepositoryImpl';
 import { OrderUseCase } from '@/application/usecases/OrderUseCase';
-import type { OrderSyncResponse, SyncTarget } from '@/application/dto/OrderDTOs';
+import type { OrderSyncResponse, OrderSyncScope, SyncTarget } from '@/application/dto/OrderDTOs';
 import type { ChannelProgress } from '@/app/dashboard/orders/components/SyncProgressModal';
 
 const LAST_SYNCED_AT_KEY = 'oklyx_order_last_synced_at';
@@ -25,6 +25,11 @@ export interface UseOrderSyncOptions {
    * `applyChannelErrors` 로 되돌리는 자리. 없으면 사유 보강을 건너뛴다.
    */
   onSyncSettled?: () => Promise<void> | void;
+  /**
+   * 조회할 주문 상태 범위. 생략하면 서버 기본값(FULL, 전 상태)이다.
+   * 출고관리처럼 "아직 안 보낸 주문"만 다루는 화면은 `'ACTIVE'` 를 준다.
+   */
+  scope?: OrderSyncScope;
 }
 
 /**
@@ -48,7 +53,7 @@ export interface UseOrderSyncOptions {
  * ⚠️ 에러 문구(`setError`)는 화면 상태다. 훅은 채널별 실패만 다루고 화면 에러는 건드리지 않는다.
  * ❌ 채널 루프를 화면에 복사하지 말 것 — 다른 엔드포인트를 돌려야 하면 `runChannels` 를 빌려 쓴다.
  */
-export function useOrderSync({ onAfterSync, onSyncSettled }: UseOrderSyncOptions) {
+export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSyncOptions) {
   // 훅이 자기 호출(syncOrders)만 소유한다 — 화면의 usecase 인스턴스와 독립. 둘 다 무상태 래퍼다.
   const orderUseCase = useMemo(() => new OrderUseCase(new OrderRepositoryImpl()), []);
 
@@ -108,6 +113,7 @@ export function useOrderSync({ onAfterSync, onSyncSettled }: UseOrderSyncOptions
    * 재조회 도중에 먼저 풀린다.
    * ⚠️ accountId 만 보낸다 — sellerId 를 함께 보내면 서버의 accountId > sellerId 우선순위와
    * 충돌해 응답 범위가 흐려진다.
+   * 옵션의 `scope` 는 그대로 실려 나간다(없으면 미전송 = 서버 기본값 FULL).
    */
   const runSync = useCallback(async (targets: SyncTarget[]) => {
     let newOrders = 0;
@@ -115,7 +121,7 @@ export function useOrderSync({ onAfterSync, onSyncSettled }: UseOrderSyncOptions
     let canceledUpdated = 0;
 
     await runChannels(targets, async (target) => {
-      const result = await orderUseCase.syncOrders({ accountId: target.accountId });
+      const result = await orderUseCase.syncOrders({ accountId: target.accountId, scope });
       newOrders += result.newOrders;
       updatedOrders += result.updatedOrders;
       canceledUpdated += result.canceledUpdated;
@@ -136,7 +142,7 @@ export function useOrderSync({ onAfterSync, onSyncSettled }: UseOrderSyncOptions
     // RestClientException, which the backend's catch-all handler answers with the generic
     // "Internal server error" body. `lastSyncError` carries the real one ("HTTP 504 from Coupang").
     await onSyncSettled?.();
-  }, [orderUseCase, runChannels, onAfterSync, onSyncSettled]);
+  }, [orderUseCase, runChannels, onAfterSync, onSyncSettled, scope]);
 
   /**
    * 실패 채널의 사유를 서버 기록(`lastSyncError`)으로 덮어쓴다 — 대상 재조회는 화면이 하고
