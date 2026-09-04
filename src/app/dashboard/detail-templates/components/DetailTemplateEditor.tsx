@@ -39,7 +39,17 @@ function createBlock(type: AppendableType): DetailBlock {
     case 'spacer':
       return { type, bind: null, src: null, defaultValue: null, align: null, widthPercent: null, heightPx: 24 };
     case 'imageZone':
-      return { type, bind: '', src: null, defaultValue: null, align: 'center', widthPercent: 100, heightPx: null };
+      // processingPresetId=null → 템플릿 상단 프리셋을 상속 (FEATURE_2608_08/04).
+      return {
+        type,
+        bind: '',
+        src: null,
+        defaultValue: null,
+        align: 'center',
+        widthPercent: 100,
+        heightPx: null,
+        processingPresetId: null,
+      };
   }
 }
 
@@ -496,6 +506,8 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
               error={blockErrors[selectedIndex]}
               fonts={fonts}
               fontsLoading={fontsLoading}
+              presets={presets}
+              presetsLoading={presetsLoading}
               groups={groups}
               groupsLoadFailed={groupsLoadFailed}
               onCreateGroup={handleCreateGroup}

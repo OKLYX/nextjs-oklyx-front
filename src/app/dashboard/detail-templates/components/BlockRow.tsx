@@ -8,6 +8,7 @@ import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import type { DetailBlock } from '@/domain/entities/DetailTemplateEntity';
 import type { DetailImageGroup } from '@/domain/entities/DetailImageGroupEntity';
 import type { FontAsset } from '@/domain/entities/FontEntity';
+import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity';
 
 // Reserved field keys auto-derive their value from the product (brandName/productName).
 // Custom keys fall back to the template's defaultValue. Reused from the thumbnail model.
@@ -73,6 +74,10 @@ interface BlockRowProps {
   error?: string;
   fonts: FontAsset[]; // tenant font library (font select options)
   fontsLoading: boolean;
+  // Image-processing presets (FEATURE_2608_08/04). Secondary data, same as fonts:
+  // an empty list never blocks saving — imageZone blocks just fall back to the template preset.
+  presets: ProcessingPreset[];
+  presetsLoading: boolean;
   // Detail image zone catalog (FEATURE_2609_03). imageZone blocks pick a group, never free text.
   groups: DetailImageGroup[];
   groupsLoadFailed: boolean;
@@ -93,6 +98,8 @@ export function BlockRow({
   error,
   fonts,
   fontsLoading,
+  presets,
+  presetsLoading,
   groups,
   groupsLoadFailed,
   onCreateGroup,
@@ -467,6 +474,27 @@ export function BlockRow({
               )}
               <span className="mt-1 block text-xs text-gray-400">
                 이 존의 이미지는 마스터별로 업로드됩니다(상세 편집기). 여기선 존 정의만.
+              </span>
+            </div>
+            <div className="sm:col-span-2">
+              <span className={labelCls}>이미지 처리</span>
+              <select
+                value={block.processingPresetId != null ? String(block.processingPresetId) : ''}
+                onChange={(e) =>
+                  onChange({ processingPresetId: e.target.value ? Number(e.target.value) : null })
+                }
+                disabled={presetsLoading}
+                className={inputCls}
+              >
+                <option value="">템플릿 기본값 사용</option>
+                {presets.map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-gray-400">
+                이 그룹의 사진에만 적용됩니다. 같은 그룹이라도 템플릿(판매채널)마다 다르게 지정할 수 있습니다.
               </span>
             </div>
             {alignControl('center')}
