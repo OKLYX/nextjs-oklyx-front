@@ -536,6 +536,7 @@ export function OrderContainer() {
           }}
           isAdmin={isAdmin}
           useCase={shippingLabelUseCase}
+          orderUseCase={orderUseCase}
         />
 
         <SyncProgressModal

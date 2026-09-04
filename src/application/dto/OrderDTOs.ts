@@ -1,4 +1,5 @@
 import type { OrderItem } from '@/domain/entities/OrderEntity';
+import type { FailedBox, SkippedOrder } from './ShippingLabelDTOs';
 
 /** 동기화 1회의 집계 결과. 기간 백필(`POST /api/orders/sync/period`)은 목록 없이 이것만 돌려준다(PLAN D8). */
 export interface OrderSyncResult {
@@ -41,4 +42,20 @@ export interface SyncTarget {
   lastOrderSyncAt: string | null;
   lastCancelSyncAt: string | null;
   lastSyncError: string | null;
+}
+
+/**
+ * 발주처리 결과 (POST /api/admin/orders/acknowledge).
+ *
+ * 백엔드가 `ShipmentConfirmResult.FailedBox`/`SkippedOrder` 를 그대로 재사용하므로 프론트도 같은 타입을
+ * import 한다 — shape 을 새로 적으면 두 벌이 되어 서버와 조용히 어긋난다.
+ * 실패 사유는 쿠팡 원문 그대로 노출한다(PLAN 2609_17 D8·D15).
+ */
+export interface OrderAcknowledgeResult {
+  requestedLines: number;
+  targetBoxes: number;
+  succeeded: number;
+  failed: FailedBox[];
+  skipped: SkippedOrder[];
+  unsupported: string[];
 }

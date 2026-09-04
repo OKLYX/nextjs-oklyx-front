@@ -2,7 +2,7 @@ import type { OrderRepository } from '@/domain/repositories/OrderRepository';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  OrderMonth, OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
+  OrderAcknowledgeResult, OrderMonth, OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export class OrderUseCase {
@@ -29,5 +29,9 @@ export class OrderUseCase {
 
   async syncPeriod(accountId: number, range: OrderPeriodRange): Promise<OrderSyncResult> {
     return this.repository.syncPeriod(accountId, range);
+  }
+
+  async acknowledgeOrders(orderItemIds: number[]): Promise<OrderAcknowledgeResult> {
+    return this.repository.acknowledgeOrders(orderItemIds);
   }
 }

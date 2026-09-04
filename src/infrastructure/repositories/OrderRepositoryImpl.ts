@@ -5,7 +5,7 @@ import type { OrderRepository } from '@/domain/repositories/OrderRepository';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  OrderMonth, OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
+  OrderAcknowledgeResult, OrderMonth, OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export class OrderRepositoryImpl implements OrderRepository {
@@ -48,6 +48,12 @@ export class OrderRepositoryImpl implements OrderRepository {
     const response = await axiosInstance.post('/api/orders/sync/period', null, {
       params: { accountId, from: range.from, to: range.to },
     });
+    return response.data.data;
+  }
+
+  // 라인 id 만 보낸다 — 박스 dedupe·상태 필터는 서버가 한다(PLAN 2609_17 D1·D2).
+  async acknowledgeOrders(orderItemIds: number[]): Promise<OrderAcknowledgeResult> {
+    const response = await axiosInstance.post('/api/admin/orders/acknowledge', { orderItemIds });
     return response.data.data;
   }
 }
