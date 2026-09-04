@@ -1,7 +1,7 @@
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  OrderMonth, OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
+  OrderAcknowledgeResult, OrderMonth, OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export interface OrderRepository {
@@ -13,4 +13,5 @@ export interface OrderRepository {
   ): Promise<OrderSyncResponse>;
   getSyncTargets(sellerId?: number): Promise<SyncTarget[]>;
   syncPeriod(accountId: number, range: OrderPeriodRange): Promise<OrderSyncResult>;
+  acknowledgeOrders(orderItemIds: number[]): Promise<OrderAcknowledgeResult>;
 }
