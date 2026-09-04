@@ -1,9 +1,31 @@
 'use client';
 
-import { Download, Upload, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
+
+/**
+ * 채널(계정) 셀렉트 옵션. 출고관리 필터 카드도 같은 shape 을 쓴다.
+ *
+ * `syncable = false` = 조회는 되지만 동기화 대상이 아닌 채널(비활성 계정) — 주문내역은 이력
+ * 조회라 목록에만 남은 계정도 옵션에 노출한다(PLAN 2609_15 D7-a).
+ */
+export interface ChannelOption {
+  accountId: number;
+  label: string;
+  syncable: boolean;
+}
+
+/**
+ * 채널 옵션 라벨. 별칭이 없으면 `채널 #{id}` 로 떨어진다.
+ *
+ * ⚠️ `??` 가 아니라 공백 판정이다 — 서버는 별칭 미설정을 `null` 이 아니라 **빈 문자열**로 주고,
+ * `??` 만 쓰면 선택할 수 없는 빈 옵션이 그려진다(2026-09-04 dev 실측).
+ */
+export function channelOptionLabel(accountId: number, accountAlias: string | null): string {
+  return accountAlias?.trim() ? accountAlias : `채널 #${accountId}`;
+}
 
 interface OrderSearchCardProps {
   sellers: Seller[];
@@ -15,9 +37,11 @@ interface OrderSearchCardProps {
   isSyncing: boolean;
   resultCount: number;
   lastSyncedAt: string | null;
-  canDownload: boolean;
-  onDownload: () => void;
-  onOpenConfirm: () => void;
+  channelOptions: ChannelOption[];
+  selectedAccountId: number | '';
+  onAccountChange: (value: number | '') => void;
+  /** 있으면 [동기화] 를 비활성하고 그 사유를 보여준다(비활성 채널 선택 등). */
+  syncDisabledReason?: string;
   periodOptions: OrderPeriodOption[];
   selectedPeriod: string;
   onPeriodChange: (value: string) => void;
@@ -50,9 +74,10 @@ export function OrderSearchCard({
   isSyncing,
   resultCount,
   lastSyncedAt,
-  canDownload,
-  onDownload,
-  onOpenConfirm,
+  channelOptions,
+  selectedAccountId,
+  onAccountChange,
+  syncDisabledReason,
   periodOptions,
   selectedPeriod,
   onPeriodChange,
@@ -99,24 +124,19 @@ export function OrderSearchCard({
                 </option>
               ))}
             </select>
-            {canDownload && (
-              <button
-                onClick={onDownload}
-                className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
-              >
-                <Download size={16} />
-                주문목록 다운로드
-              </button>
-            )}
-            {canDownload && (
-              <button
-                onClick={onOpenConfirm}
-                className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
-              >
-                <Upload size={16} />
-                발송처리
-              </button>
-            )}
+            <select
+              value={selectedAccountId}
+              onChange={(e) => onAccountChange(e.target.value === '' ? '' : Number(e.target.value))}
+              aria-label="채널"
+              className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            >
+              <option value="">전체 채널</option>
+              {channelOptions.map((option) => (
+                <option key={option.accountId} value={option.accountId}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -172,10 +192,14 @@ export function OrderSearchCard({
               <p className="text-sm text-gray-600">{resultCount}개의 결과</p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {syncDisabledReason && (
+              <p className="text-xs text-gray-500">{syncDisabledReason}</p>
+            )}
             <button
               onClick={onSync}
-              disabled={isSyncing}
+              disabled={isSyncing || syncDisabledReason != null}
+              title={syncDisabledReason}
               className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
             >
               {isSyncing ? '동기화 중...' : '동기화'}

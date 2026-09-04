@@ -29,6 +29,7 @@ export const ROUTES = {
   SELLERS_LIST: '/dashboard/sellers/list' as const,
   SELLERS_MANAGE: '/dashboard/sellers/manage' as const,
   ORDERS_RETRIEVE: '/dashboard/orders' as const,
+  ORDERS_SHIPMENT: '/dashboard/orders/shipment' as const,
   PURCHASE_LIST: '/dashboard/purchase/list' as const,
   SETTINGS_LOGGING: '/dashboard/settings/logging' as const,
   THUMBNAIL_TEMPLATES: '/dashboard/thumbnail-templates' as const,
