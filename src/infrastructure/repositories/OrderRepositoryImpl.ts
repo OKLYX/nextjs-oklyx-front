@@ -5,7 +5,7 @@ import type { OrderRepository } from '@/domain/repositories/OrderRepository';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  OrderMonth, OrderSyncResponse, OrderSyncResult, SyncTarget,
+  OrderMonth, OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export class OrderRepositoryImpl implements OrderRepository {
@@ -27,7 +27,10 @@ export class OrderRepositoryImpl implements OrderRepository {
     return response.data.data;
   }
 
-  async syncOrders(params?: { sellerId?: number; accountId?: number }): Promise<OrderSyncResponse> {
+  // scope omitted -> not sent, so the server applies its default (FULL, 전 상태).
+  async syncOrders(
+    params?: { sellerId?: number; accountId?: number; scope?: OrderSyncScope },
+  ): Promise<OrderSyncResponse> {
     const response = await axiosInstance.post('/api/orders/sync', null, { params });
     return response.data.data;
   }

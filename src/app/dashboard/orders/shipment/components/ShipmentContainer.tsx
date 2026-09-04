@@ -120,11 +120,13 @@ export function ShipmentContainer() {
     ));
   }
 
+  // 출고관리는 "아직 안 보낸 주문"만 다룬다 → 결제완료·상품준비중만 조회(쿠팡 왕복 6회 → 2회).
+  // 배송지시 이후 상태는 주문내역 동기화(전 상태)가 따라잡는다.
   const {
     runSync, applyChannelErrors, failedTargets,
     isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen, lastSyncedAt,
     cancelSync, closeSyncModal,
-  } = useOrderSync({ onAfterSync: load, onSyncSettled: handleSyncSettled });
+  } = useOrderSync({ onAfterSync: load, onSyncSettled: handleSyncSettled, scope: 'ACTIVE' });
 
   // 최초 진입 로드(주문내역과 같은 형태). 이후 재조회는 [조회]·동기화·모달 성공이 담당한다.
   // ⚠️ `load()` 를 직접 부르면 lint(set-state-in-effect) 에 걸린다 — 인라인 async 함수로 감싼다.
