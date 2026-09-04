@@ -16,6 +16,8 @@ export interface DetailBlock {
   align: string | null; // 'left' | 'center' | 'right'
   heightPx: number | null; // spacer=vertical gap in px
   textStyle?: Record<string, string> | null; // text = inline style overrides (fontSize/color/bold/italic ...)
+  // imageZone = 이 블록(이미지 그룹)에 적용할 처리 프리셋. null/미지정 = 템플릿 프리셋 상속. (FEATURE_2608_08/03)
+  processingPresetId?: number | null;
 }
 
 export interface DetailTemplateResponse {
