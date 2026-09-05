@@ -6,7 +6,6 @@ import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
-import { ProductThumbnailSection } from './ProductThumbnailSection';
 import { StockCard } from './StockCard';
 
 interface ProductDetailViewProps {
@@ -135,13 +134,6 @@ export function ProductDetailView({ product, onDelete, imageUseCase }: ProductDe
 
       {/* Image gallery */}
       <ProductImageGallery productId={product.id} useCase={imageUseCase} />
-
-      {/* Per-seller generated thumbnails */}
-      <ProductThumbnailSection
-        productId={product.id}
-        productBrand={product.brand}
-        productName={product.productName}
-      />
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirmation && (
