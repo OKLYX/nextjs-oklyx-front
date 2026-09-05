@@ -7,7 +7,7 @@ import type { ListingRegistrationUseCase } from '@/application/usecases/ListingR
 import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import { AutoPreviewPane } from './AutoPreviewPane';
 import { StructuredDataPane } from './StructuredDataPane';
-import { RawHtmlPane } from './RawHtmlPane';
+import { DetailPagePane } from './DetailPagePane';
 import { ThumbnailPane } from './ThumbnailPane';
 
 // The page owns `generated`; children lift updates via onGenerated.
@@ -21,14 +21,16 @@ interface DetailEditorTabsProps {
   listingUseCase: ListingRegistrationUseCase;
   detailUseCase: DetailContentUseCase;
   onGenerated: OnGenerated;
+  // 템플릿이 바뀌면 페이지가 소유한 template 도 교체해야 한다(구조 데이터 탭이 blocks 를 쓴다).
+  onTemplateChanged: (next: DetailTemplateResponse) => void;
 }
 
-type TabKey = 'preview' | 'structure' | 'raw' | 'thumbnail';
+type TabKey = 'preview' | 'structure' | 'detail' | 'thumbnail';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'preview', label: '자동 미리보기' },
   { key: 'structure', label: '구조 데이터' },
-  { key: 'raw', label: 'HTML 직접 수정' },
+  { key: 'detail', label: '상세 페이지' }, // 2609_20: 옛 'raw'(HTML 직접 수정) 자리
   { key: 'thumbnail', label: '썸네일' },
 ];
 
@@ -44,6 +46,7 @@ export function DetailEditorTabs({
   listingUseCase,
   detailUseCase,
   onGenerated,
+  onTemplateChanged,
 }: DetailEditorTabsProps) {
   const [tab, setTab] = useState<TabKey>('preview');
 
@@ -85,12 +88,15 @@ export function DetailEditorTabs({
             onGenerated={onGenerated}
           />
         )}
-        {tab === 'raw' && (
-          <RawHtmlPane
+        {tab === 'detail' && (
+          <DetailPagePane
             listingId={listingId}
             generated={generated}
+            template={template}
             listingUseCase={listingUseCase}
+            detailUseCase={detailUseCase}
             onGenerated={onGenerated}
+            onTemplateChanged={onTemplateChanged}
           />
         )}
         {tab === 'thumbnail' && (

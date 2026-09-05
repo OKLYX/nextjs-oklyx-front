@@ -135,6 +135,7 @@ export default function MasterProductDetailEditPage() {
           listingUseCase={listingUseCase}
           detailUseCase={detailUseCase}
           onGenerated={setGenerated}
+          onTemplateChanged={setTemplate}
         />
       ) : (
         !error && <p className="text-sm text-gray-500">표시할 상세 데이터가 없습니다.</p>

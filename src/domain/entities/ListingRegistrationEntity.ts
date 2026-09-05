@@ -79,6 +79,8 @@ export interface GeneratedProductResponse {
   // false = 배송 설정 미완료(등록 차단). null/undefined = 미지원 플랫폼·레거시 응답 → 가드 안 함.
   // ⚠️ 프론트에서 재계산하지 말 것.
   shippingReady?: boolean | null;
+  // 이 셀에 지정된 상세 템플릿 id(2609_20/D12). null|undefined = 계정/테넌트 기본 상속.
+  detailTemplateId?: number | null;
 }
 
 export interface ChannelAddResponse {

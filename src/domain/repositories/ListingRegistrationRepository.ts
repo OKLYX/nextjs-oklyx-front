@@ -29,6 +29,7 @@ import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
   DetailTemplateResponse,
+  DetailTemplateSelectRequest,
 } from '@/domain/entities/DetailTemplateEntity';
 
 export interface ListingRegistrationRepository {
@@ -60,7 +61,8 @@ export interface ListingRegistrationRepository {
   pendingSync(): Promise<PendingSyncResponse[]>;
   pushSync(data: PushSyncRequest): Promise<PushSyncResponse>;
   // Detail-page (prompt 11): AUTO preview + raw HTML override / clear.
-  previewDetail(listingId: number): Promise<DetailPreviewResponse>;
+  // templateId 를 넘기면 그 템플릿으로 렌더한 결과(비영속). 생략하면 이 셀에 해석된 템플릿(2609_20/D4).
+  previewDetail(listingId: number, templateId?: number): Promise<DetailPreviewResponse>;
   overrideDetailHtml(
     listingId: number,
     data: DetailHtmlOverrideRequest,
@@ -69,6 +71,11 @@ export interface ListingRegistrationRepository {
   // Detail-page (prompt 30): resolve the template actually applied to this cell
   // (account-assigned ?? tenant default) so upload zones match the generator.
   getResolvedDetailTemplate(listingId: number): Promise<DetailTemplateResponse>;
+  /** 이 셀에 적용할 상세 템플릿 지정(2609_20/D5). templateId=null 이면 기본값 상속으로 복귀. */
+  updateDetailTemplate(
+    listingId: number,
+    data: DetailTemplateSelectRequest,
+  ): Promise<GeneratedProductResponse>;
   // Per-channel option activation (prompt 42/43): read the full option set (with
   // active flags) and save the active subset. Only active options are market-pushed.
   getListingOptions(listingId: number): Promise<ListingOptionsResponse>;
