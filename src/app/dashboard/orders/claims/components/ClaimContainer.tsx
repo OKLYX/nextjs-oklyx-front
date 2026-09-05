@@ -6,17 +6,21 @@ import { ClaimRepositoryImpl } from '@/infrastructure/repositories/ClaimReposito
 import { ClaimUseCase } from '@/application/usecases/ClaimUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
+import {
+  CLAIM_TYPE_LABEL,
+  EXCHANGE_STATUS_FILTERS,
+  RETURN_STATUS_FILTERS,
+} from '@/domain/entities/ClaimEntity';
 import type { Claim, ClaimStatus, ClaimType } from '@/domain/entities/ClaimEntity';
 import { RECENT_PERIOD, buildPeriodOptions, toPeriodRange } from '@/domain/entities/OrderPeriod';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { ClaimSearchCard } from './ClaimSearchCard';
+import { ClaimTypeTabs } from './ClaimTypeTabs';
 import { ClaimStatusFilter } from './ClaimStatusFilter';
 import { ClaimTable } from './ClaimTable';
 import { ClaimDetailsModal } from './ClaimDetailsModal';
 
-// Stage A is returns only. 07 promotes this to state when the exchange tab lands.
-const CLAIM_TYPE: ClaimType = 'RETURN';
 const PAGE_SIZE = 20;
 
 export function ClaimContainer() {
@@ -37,17 +41,19 @@ export function ClaimContainer() {
   // 접수일 single axis — there is no sort key state.
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
+  // The tab is a server axis: switching it refetches.
+  const [claimType, setClaimType] = useState<ClaimType>('RETURN');
 
   // null = do not label months with data — claims have no "months with data" API.
   const periodOptions = useMemo(() => buildPeriodOptions(null), []);
 
   const fetchClaims = useCallback(
-    async (sellerId: number | '', period: string, keyword: string) => {
+    async (type: ClaimType, sellerId: number | '', period: string, keyword: string) => {
       try {
         setIsLoading(true);
         setError('');
         const result = await claimUseCase.getClaims({
-          type: CLAIM_TYPE,
+          type,
           ...(sellerId !== '' ? { sellerId } : {}),
           ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
           period: toPeriodRange(period),
@@ -59,7 +65,9 @@ export function ClaimContainer() {
         const serverMessage = axios.isAxiosError(err)
           ? (err.response?.data as { message?: string } | undefined)?.message
           : undefined;
-        setError(serverMessage ?? '반품 조회에 실패했습니다. 다시 시도해주세요.');
+        setError(
+          serverMessage ?? `${CLAIM_TYPE_LABEL[type]} 조회에 실패했습니다. 다시 시도해주세요.`
+        );
         setClaims([]);
       } finally {
         setIsLoading(false);
@@ -85,7 +93,7 @@ export function ClaimContainer() {
   // synchronous setState in an effect body.
   useEffect(() => {
     void (async () => {
-      await fetchClaims('', RECENT_PERIOD, '');
+      await fetchClaims('RETURN', '', RECENT_PERIOD, '');
     })();
   }, [fetchClaims]);
 
@@ -123,7 +131,21 @@ export function ClaimContainer() {
   );
 
   const handleSearch = () => {
-    void fetchClaims(selectedSellerId, selectedPeriod, searchTerm);
+    void fetchClaims(claimType, selectedSellerId, selectedPeriod, searchTerm);
+  };
+
+  // Seller/period/keyword carry over — following one order context across both tabs is natural.
+  // `selectedPeriod`/`searchTerm` are pending values (see above), and a tab switch applies them
+  // exactly like [조회] does.
+  const handleTypeChange = (next: ClaimType) => {
+    if (next === claimType || isLoading) return;
+    setClaimType(next);
+    // Required: the chip list differs per tab, so a stale selection (e.g. 확인요청 on 교환)
+    // would filter the list to zero rows with nothing on screen explaining why.
+    setSelectedStatus(null);
+    setCurrentPage(0);
+    setSelectedClaim(null);
+    void fetchClaims(next, selectedSellerId, selectedPeriod, searchTerm);
   };
 
   // Chip changes reset to page 1 — filtering from page 3 would show a blank list.
@@ -137,14 +159,19 @@ export function ClaimContainer() {
     setCurrentPage(0);
   };
 
+  const statusFilters = claimType === 'EXCHANGE' ? EXCHANGE_STATUS_FILTERS : RETURN_STATUS_FILTERS;
+  const typeLabel = CLAIM_TYPE_LABEL[claimType];
+
   // "no data" and "filtered out" mean different things to the user.
   const emptyMessage =
     selectedStatus != null && claims.length > 0
-      ? '이 상태의 반품이 없습니다.'
-      : '해당 기간에 반품 내역이 없습니다.';
+      ? `이 상태의 ${typeLabel}이 없습니다.`
+      : `해당 기간에 ${typeLabel} 내역이 없습니다.`;
 
   return (
     <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+      <ClaimTypeTabs value={claimType} onChange={handleTypeChange} disabled={isLoading} />
+
       <ClaimSearchCard
         sellers={sellers}
         selectedSellerId={selectedSellerId}
@@ -160,6 +187,7 @@ export function ClaimContainer() {
       />
 
       <ClaimStatusFilter
+        statuses={statusFilters}
         selectedStatus={selectedStatus}
         onStatusChange={handleStatusChange}
         counts={statusCounts}
@@ -167,6 +195,7 @@ export function ClaimContainer() {
       />
 
       <ClaimTable
+        claimType={claimType}
         claims={paged}
         isLoading={isLoading}
         error={error}

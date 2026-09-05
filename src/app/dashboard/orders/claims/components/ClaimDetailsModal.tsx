@@ -2,12 +2,14 @@
 
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
-import { CLAIM_STATUS_LABEL, faultTypeText } from '@/domain/entities/ClaimEntity';
+import { CLAIM_STATUS_LABEL, CLAIM_TYPE_LABEL, faultTypeText } from '@/domain/entities/ClaimEntity';
 import type { Claim } from '@/domain/entities/ClaimEntity';
 
 /**
- * 반품 상세. 목록 행 객체를 그대로 받는다 — 서버가 목록·상세에 같은 record 를 주므로
+ * 반품/교환 상세. 목록 행 객체를 그대로 받는다 — 서버가 목록·상세에 같은 record 를 주므로
  * 단건 재조회가 없다.
+ *
+ * 종류 분기는 `claim.claimType` 하나로 한다: 반품은 `처리` 1섹션, 교환은 `회수`·`재발송` 2섹션.
  *
  * ⚠️ Stage A 는 조회 전용이다. 승인·입고확인 같은 처리 버튼을 여기에 붙이지 말 것.
  */
@@ -25,6 +27,10 @@ function formatDate(value: string | null): string {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString('ko-KR');
 }
+
+// Shared by 회수 and 재발송 — both rows read `-` when neither carrier nor invoice is set.
+const invoiceText = (carrier: string | null, invoice: string | null): string =>
+  carrier == null && invoice == null ? '-' : `${carrier ?? '-'} ${invoice ?? '-'}`.trim();
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -47,16 +53,15 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function ClaimDetailsModal({ claim, onClose }: ClaimDetailsModalProps) {
   if (claim == null) return null;
 
-  const collect =
-    claim.collectInvoiceNo == null && claim.collectCarrierCode == null
-      ? '-'
-      : `${claim.collectCarrierCode ?? '-'} ${claim.collectInvoiceNo ?? '-'}`.trim();
+  const isExchange = claim.claimType === 'EXCHANGE';
+  const typeLabel = CLAIM_TYPE_LABEL[claim.claimType];
+  const collect = invoiceText(claim.collectCarrierCode, claim.collectInvoiceNo);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg w-full mx-4 max-w-3xl max-h-[85vh] flex flex-col p-8">
         <div className="shrink-0 flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-semibold text-gray-900">반품 상세</h3>
+          <h3 className="text-2xl font-semibold text-gray-900">{typeLabel} 상세</h3>
           <button
             onClick={onClose}
             aria-label="닫기"
@@ -95,23 +100,41 @@ export function ClaimDetailsModal({ claim, onClose }: ClaimDetailsModalProps) {
 
           {!claim.linked && (
             <p className="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-              이 반품에 해당하는 주문이 아직 동기화되지 않았습니다.
+              이 {typeLabel}에 해당하는 주문이 아직 동기화되지 않았습니다.
             </p>
           )}
 
-          <Section title="처리">
-            <Row label="사유" value={claim.reasonText ?? claim.reasonCode ?? '-'} />
-            <Row label="귀책" value={faultTypeText(claim.faultType)} />
-            <Row
-              label="반품비"
-              value={
-                claim.returnShippingCharge != null
-                  ? `${claim.returnShippingCharge.toLocaleString()}원`
-                  : '-'
-              }
-            />
-            <Row label="회수송장" value={collect} />
-          </Section>
+          {isExchange ? (
+            <>
+              <Section title="회수">
+                <Row label="사유" value={claim.reasonText ?? claim.reasonCode ?? '-'} />
+                <Row label="귀책" value={faultTypeText(claim.faultType)} />
+                <Row label="회수송장" value={collect} />
+              </Section>
+              {/* Rendered even while empty: "not reshipped yet" and "no reshipment concept"
+                  are different facts. 반품비 is dropped instead — it is always null for 교환. */}
+              <Section title="재발송">
+                <Row
+                  label="재발송송장"
+                  value={invoiceText(claim.reshipCarrierCode, claim.reshipInvoiceNo)}
+                />
+              </Section>
+            </>
+          ) : (
+            <Section title="처리">
+              <Row label="사유" value={claim.reasonText ?? claim.reasonCode ?? '-'} />
+              <Row label="귀책" value={faultTypeText(claim.faultType)} />
+              <Row
+                label="반품비"
+                value={
+                  claim.returnShippingCharge != null
+                    ? `${claim.returnShippingCharge.toLocaleString()}원`
+                    : '-'
+                }
+              />
+              <Row label="회수송장" value={collect} />
+            </Section>
+          )}
         </div>
 
         <div className="shrink-0 border-t border-gray-200">
