@@ -51,6 +51,9 @@ export interface OptionPrice {
   // 102/D5: upper bound for this option's channel stock = master stock ?? 9999; also the
   // effective value while stockQuantity is null. Backend is the SSOT — never recompute it.
   maxStock: number;
+  // 2609_19/D1: 'AUTO' = 자동계산가, 'MANUAL_OVERRIDE' = 이 채널만 사용자가 정한 값.
+  // 레거시 응답은 undefined → AUTO 로 취급한다.
+  priceSource?: 'AUTO' | 'MANUAL_OVERRIDE';
 }
 
 // Auto-generated (or overridden) product assets for one channel/listing.
@@ -197,6 +200,9 @@ export interface ListingOptionSummary {
   stockQuantity: number | null;
   // 102/D5: upper bound (master stock ?? 9999); also the inherited value. Backend SSOT.
   maxStock: number;
+  // 2609_19/D1: 'AUTO' = 자동계산가, 'MANUAL_OVERRIDE' = 이 채널만 사용자가 정한 값.
+  // 레거시 응답은 undefined → AUTO 로 취급한다.
+  priceSource?: 'AUTO' | 'MANUAL_OVERRIDE';
 }
 
 export interface ListingOptionsResponse {
@@ -219,4 +225,18 @@ export interface ActiveOptionsRequest {
 // listed options are touched. stockQuantity null = clear the override (inherit master).
 export interface OptionStocksRequest {
   stocks: { optionId: number; stockQuantity: number | null }[];
+}
+
+// 채널 옵션 판매가 부분 갱신(2609_19). sellingPrice null = 자동계산가로 복귀(D3).
+export interface OptionPricesRequest {
+  prices: { optionId: number; sellingPrice: number | null }[];
+}
+
+// 저장 + 마켓 반영 결과(D5·D6). 부분 성공이 정상 경로다.
+// ⚠️ 저장 후 옵션 목록은 `listing` 안에 있다(`options` 가 아니다 — 백엔드 D14).
+export interface ChannelPriceUpdateResponse {
+  listing: ListingOptionsResponse;
+  pushed: number; // 마켓에 실제 반영된 옵션 수
+  skipped: string[]; // 마켓 식별자 없음(미승인/DRAFT) — 로컬만 저장된 옵션명
+  failed: { optionName: string; message: string }[]; // 마켓 실패 → 저장되지 않은 옵션
 }

@@ -17,6 +17,8 @@ import type {
   ListingOptionsResponse,
   ActiveOptionsRequest,
   OptionStocksRequest,
+  OptionPricesRequest,
+  ChannelPriceUpdateResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -73,4 +75,6 @@ export interface ListingRegistrationRepository {
   setActiveOptions(listingId: number, data: ActiveOptionsRequest): Promise<ListingOptionsResponse>;
   // Per-channel option stock (102): partial bulk save of the cell's stock overrides.
   setOptionStocks(listingId: number, data: OptionStocksRequest): Promise<ListingOptionsResponse>;
+  /** 채널 옵션 판매가 저장 + 마켓 즉시 반영(2609_19). null = 자동계산가 복귀. */
+  setOptionPrices(listingId: number, data: OptionPricesRequest): Promise<ChannelPriceUpdateResponse>;
 }

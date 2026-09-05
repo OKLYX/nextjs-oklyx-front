@@ -9,6 +9,7 @@ import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegist
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { ChannelFieldValuesModal } from './ChannelFieldValuesModal';
 import { ChannelStockModal } from './ChannelStockModal';
+import { ChannelPriceModal } from './ChannelPriceModal';
 import { ChannelShippingOverrideModal } from './ChannelShippingOverrideModal';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type {
@@ -76,6 +77,7 @@ export function CellActions({
   const [showFieldValues, setShowFieldValues] = useState(false);
   const [showShipping, setShowShipping] = useState(false);
   const [showStock, setShowStock] = useState(false);
+  const [showPrice, setShowPrice] = useState(false);
 
   const optionName = (id: number) => options.find((o) => o.id === id)?.name ?? `옵션 #${id}`;
 
@@ -249,6 +251,16 @@ export function CellActions({
         >
           재고 설정
         </button>
+
+        {/* 판매가도 등록 전에 정해두는 값이라 DRAFT 를 포함한 모든 셀에서 노출한다(2609_19). */}
+        <button
+          type="button"
+          onClick={() => setShowPrice(true)}
+          disabled={busy !== null}
+          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+        >
+          가격 설정
+        </button>
       </div>
 
       {status === 'DRAFT' && shippingBlocked && (
@@ -314,6 +326,15 @@ export function CellActions({
           channelLabel={channelLabel}
           onSaved={() => onReload()}
           onClose={() => setShowStock(false)}
+        />
+      )}
+
+      {showPrice && (
+        <ChannelPriceModal
+          listingId={listing.id}
+          channelLabel={channelLabel}
+          onSaved={() => onReload()}
+          onClose={() => setShowPrice(false)}
         />
       )}
     </div>
