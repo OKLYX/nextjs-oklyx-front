@@ -84,14 +84,3 @@ export interface TemplateAsset {
   storageKey: string;
   contentType: string | null;
 }
-
-export interface ProductThumbnail {
-  id: number;
-  productId: number;
-  sellerId: number;
-  sellerName: string;
-  templateId: number | null;
-  imageUrl: string;
-  source: 'GENERATED' | 'MANUAL_OVERRIDE';
-  generatedAt: string;
-}
