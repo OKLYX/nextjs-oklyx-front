@@ -33,6 +33,7 @@ import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
   DetailTemplateResponse,
+  DetailTemplateSelectRequest,
 } from '@/domain/entities/DetailTemplateEntity';
 
 const masterBase = '/api/admin/master-products';
@@ -147,8 +148,10 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     return response.data.data;
   }
 
-  async previewDetail(listingId: number): Promise<DetailPreviewResponse> {
-    const response = await axiosInstance.get(`${listingBase}/${listingId}/detail-preview`);
+  async previewDetail(listingId: number, templateId?: number): Promise<DetailPreviewResponse> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/detail-preview`, {
+      params: templateId != null ? { templateId } : undefined,
+    });
     return response.data.data;
   }
 
@@ -167,6 +170,14 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async getResolvedDetailTemplate(listingId: number): Promise<DetailTemplateResponse> {
     const response = await axiosInstance.get(`${listingBase}/${listingId}/detail-template`);
+    return response.data.data;
+  }
+
+  async updateDetailTemplate(
+    listingId: number,
+    data: DetailTemplateSelectRequest,
+  ): Promise<GeneratedProductResponse> {
+    const response = await axiosInstance.patch(`${listingBase}/${listingId}/detail-template`, data);
     return response.data.data;
   }
 

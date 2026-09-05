@@ -52,7 +52,7 @@ export function AutoPreviewPane({ listingId, generated, listingUseCase }: AutoPr
       </p>
       {isOverridden && (
         <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">
-          수동 override 가 적용 중입니다 — 실제 저장본은 &quot;HTML 직접 수정&quot; 탭에서 확인하세요.
+          수동 override 가 적용 중입니다 — 실제 저장본은 &quot;상세 페이지 &gt; HTML 직접수정&quot; 에서 확인하세요.
         </p>
       )}
 
