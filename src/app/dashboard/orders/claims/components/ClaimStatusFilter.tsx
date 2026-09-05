@@ -1,9 +1,11 @@
 'use client';
 
-import { CLAIM_STATUS_LABEL, RETURN_STATUS_FILTERS } from '@/domain/entities/ClaimEntity';
+import { CLAIM_STATUS_LABEL } from '@/domain/entities/ClaimEntity';
 import type { ClaimStatus } from '@/domain/entities/ClaimEntity';
 
 interface ClaimStatusFilterProps {
+  // Which chips to show — the container derives this from the active tab
+  statuses: ClaimStatus[];
   // null = 전체 (no filter)
   selectedStatus: ClaimStatus | null;
   onStatusChange: (status: ClaimStatus | null) => void;
@@ -13,9 +15,10 @@ interface ClaimStatusFilterProps {
   totalCount: number;
 }
 
-// Chip styling mirrors OrderStatusFilter. Returns only show the statuses returns actually
-// produce; STALE has no rows until 05 (tracking) lands, so it is visible under 전체 only.
+// Chip styling mirrors OrderStatusFilter. Which statuses get a chip is the container's decision
+// (it differs per claim type) — this component never branches on the tab itself.
 export function ClaimStatusFilter({
+  statuses,
   selectedStatus,
   onStatusChange,
   counts,
@@ -23,7 +26,7 @@ export function ClaimStatusFilter({
 }: ClaimStatusFilterProps) {
   const chips: { status: ClaimStatus | null; label: string; count: number }[] = [
     { status: null, label: '전체', count: totalCount },
-    ...RETURN_STATUS_FILTERS.map((status) => ({
+    ...statuses.map((status) => ({
       status,
       label: CLAIM_STATUS_LABEL[status],
       count: counts[status] ?? 0,
