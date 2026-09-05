@@ -43,17 +43,19 @@ export const CLAIM_TYPE_LABEL: Record<ClaimType, string> = { RETURN: '반품', E
 /**
  * Only the statuses returns actually produce get a chip (PLAN §3.1) — exchange has its own list
  * in `EXCHANGE_STATUS_FILTERS` below, and the two differing is intentional.
- * ⚠️ `STALE` has zero rows until 05 (tracking) creates them, so it is not a chip yet — add it here
- * when 05 starts. Until then STALE rows are only visible under `전체`.
+ * Returns now also produce `IN_PROGRESS` (입고완료, from the corrected receiptStatus mapping),
+ * `WITHDRAWN` (closed from the withdrawal history) and `STALE` (forced close by tracking).
  */
-export const RETURN_STATUS_FILTERS: ClaimStatus[] = ['RECEIVED', 'DONE', 'PENDING_REVIEW'];
+export const RETURN_STATUS_FILTERS: ClaimStatus[] = [
+  'RECEIVED', 'IN_PROGRESS', 'DONE', 'PENDING_REVIEW', 'WITHDRAWN', 'STALE',
+];
 
 /**
  * Only the statuses exchanges actually produce (PLAN §3.1). `PENDING_REVIEW` is returns-only, so
  * it is absent here on purpose.
  */
 export const EXCHANGE_STATUS_FILTERS: ClaimStatus[] = [
-  'RECEIVED', 'IN_PROGRESS', 'DONE', 'REJECTED', 'WITHDRAWN',
+  'RECEIVED', 'IN_PROGRESS', 'DONE', 'REJECTED', 'WITHDRAWN', 'STALE',
 ];
 
 /**
