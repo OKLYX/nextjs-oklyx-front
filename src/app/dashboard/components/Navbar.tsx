@@ -12,9 +12,7 @@ import {
   ShoppingCart,
   UserCog,
   Settings,
-  Image as ImageIcon,
   LayoutTemplate,
-  Stamp,
   type LucideIcon,
 } from 'lucide-react';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
@@ -51,9 +49,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const isOrdersOpen = useNavigationStore((state) => state.isOrdersMenuOpen);
   const isPurchaseOpen = useNavigationStore((state) => state.isPurchaseMenuOpen);
   const isSettingsOpen = useNavigationStore((state) => state.isSettingsMenuOpen);
-  const isThumbnailTemplatesOpen = useNavigationStore((state) => state.isThumbnailTemplatesMenuOpen);
-  const isDetailTemplatesOpen = useNavigationStore((state) => state.isDetailTemplatesMenuOpen);
-  const isProcessingPresetsOpen = useNavigationStore((state) => state.isProcessingPresetsMenuOpen);
+  const isDesignTemplatesOpen = useNavigationStore((state) => state.isDesignTemplatesMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
@@ -64,9 +60,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const toggleOrdersMenu = useNavigationStore((state) => state.toggleOrdersMenu);
   const togglePurchaseMenu = useNavigationStore((state) => state.togglePurchaseMenu);
   const toggleSettingsMenu = useNavigationStore((state) => state.toggleSettingsMenu);
-  const toggleThumbnailTemplatesMenu = useNavigationStore((state) => state.toggleThumbnailTemplatesMenu);
-  const toggleDetailTemplatesMenu = useNavigationStore((state) => state.toggleDetailTemplatesMenu);
-  const toggleProcessingPresetsMenu = useNavigationStore((state) => state.toggleProcessingPresetsMenu);
+  const toggleDesignTemplatesMenu = useNavigationStore((state) => state.toggleDesignTemplatesMenu);
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
@@ -161,25 +155,15 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       ],
     });
     menuGroups.push({
-      icon: ImageIcon,
-      label: '썸네일 템플릿',
-      open: isThumbnailTemplatesOpen,
-      toggle: toggleThumbnailTemplatesMenu,
-      items: [{ href: ROUTES.THUMBNAIL_TEMPLATES, label: '템플릿 관리' }],
-    });
-    menuGroups.push({
       icon: LayoutTemplate,
-      label: '상세 템플릿',
-      open: isDetailTemplatesOpen,
-      toggle: toggleDetailTemplatesMenu,
-      items: [{ href: ROUTES.DETAIL_TEMPLATES, label: '템플릿 관리' }],
-    });
-    menuGroups.push({
-      icon: Stamp,
-      label: '이미지 처리 프리셋',
-      open: isProcessingPresetsOpen,
-      toggle: toggleProcessingPresetsMenu,
-      items: [{ href: ROUTES.PROCESSING_PRESETS, label: '프리셋 관리' }],
+      label: '디자인 템플릿 관리',
+      open: isDesignTemplatesOpen,
+      toggle: toggleDesignTemplatesMenu,
+      items: [
+        { href: ROUTES.THUMBNAIL_TEMPLATES, label: '썸네일' },
+        { href: ROUTES.DETAIL_TEMPLATES, label: '상세 페이지' },
+        { href: ROUTES.PROCESSING_PRESETS, label: '이미지 처리' },
+      ],
     });
     menuGroups.push({
       icon: Settings,
