@@ -51,6 +51,11 @@ export interface DetailHtmlOverrideRequest {
   html: string;
 }
 
+// 셀 상세 템플릿 지정(2609_20/D5). null = 기본값 상속으로 복귀(D6) — 필수 필드지만 값은 nullable.
+export interface DetailTemplateSelectRequest {
+  templateId: number | null;
+}
+
 // Reserved field key for the cover photo (master source image). Mirrors the
 // backend constant SOURCE_ZONE = "__source__". Single definition on the front.
 export const SOURCE_ZONE = '__source__';

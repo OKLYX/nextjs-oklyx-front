@@ -42,7 +42,7 @@ export function RawHtmlPane({ listingId, generated, listingUseCase, onGenerated 
   };
 
   const handleClear = async () => {
-    if (!window.confirm('수동 수정본을 버리고 자동생성 결과로 복귀합니다. 계속하시겠습니까?')) return;
+    if (!window.confirm('직접 수정한 내용을 버리고 템플릿 자동생성 결과로 되돌립니다. 계속하시겠습니까?')) return;
     setIsClearing(true);
     setError('');
     try {
@@ -89,7 +89,7 @@ export function RawHtmlPane({ listingId, generated, listingUseCase, onGenerated 
           disabled={busy}
           className="flex items-center gap-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {isSaving ? <Spinner label="저장 중..." /> : '직접 작성본 저장'}
+          {isSaving ? <Spinner label="저장 중..." /> : '저장하기'}
         </button>
         <button
           type="button"
@@ -97,7 +97,7 @@ export function RawHtmlPane({ listingId, generated, listingUseCase, onGenerated 
           disabled={busy}
           className="flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
         >
-          {isClearing ? <Spinner label="복귀 중..." /> : '자동생성으로 복귀'}
+          {isClearing ? <Spinner label="초기화 중..." /> : '변경 초기화'}
         </button>
       </div>
     </div>

@@ -30,6 +30,7 @@ import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
   DetailTemplateResponse,
+  DetailTemplateSelectRequest,
 } from '@/domain/entities/DetailTemplateEntity';
 
 export class ListingRegistrationUseCase {
@@ -114,8 +115,8 @@ export class ListingRegistrationUseCase {
     return this.repository.pushSync(data);
   }
 
-  previewDetail(listingId: number): Promise<DetailPreviewResponse> {
-    return this.repository.previewDetail(listingId);
+  previewDetail(listingId: number, templateId?: number): Promise<DetailPreviewResponse> {
+    return this.repository.previewDetail(listingId, templateId);
   }
 
   overrideDetailHtml(
@@ -131,6 +132,13 @@ export class ListingRegistrationUseCase {
 
   getResolvedDetailTemplate(listingId: number): Promise<DetailTemplateResponse> {
     return this.repository.getResolvedDetailTemplate(listingId);
+  }
+
+  updateDetailTemplate(
+    listingId: number,
+    data: DetailTemplateSelectRequest,
+  ): Promise<GeneratedProductResponse> {
+    return this.repository.updateDetailTemplate(listingId, data);
   }
 
   getListingOptions(listingId: number): Promise<ListingOptionsResponse> {
