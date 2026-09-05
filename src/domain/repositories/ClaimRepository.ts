@@ -1,4 +1,9 @@
-import type { Claim, ClaimType } from '@/domain/entities/ClaimEntity';
+import type {
+  Claim,
+  ClaimActionPayload,
+  ClaimActionResult,
+  ClaimType,
+} from '@/domain/entities/ClaimEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 
 export interface ClaimListParams {
@@ -8,8 +13,14 @@ export interface ClaimListParams {
   period?: OrderPeriodRange;     // undefined = server default window (recent 14 days)
 }
 
-// List only on purpose: the details modal reuses the row object (the server returns the same
-// record for list and detail), and the status chips are a client-side filter.
+/**
+ * The list still carries the whole record (list and detail return the same shape) and the status
+ * chips stay a client-side filter — but a processing action changes the server's answer, so
+ * `getClaim` re-reads that one claim afterwards (2609_21 D8). Re-reading the *list* is not an
+ * option: it would throw away the user's filter, page and scroll.
+ */
 export interface ClaimRepository {
   getClaims(params: ClaimListParams): Promise<Claim[]>;
+  getClaim(id: number): Promise<Claim>;
+  executeAction(claimId: number, payload: ClaimActionPayload): Promise<ClaimActionResult>;
 }
