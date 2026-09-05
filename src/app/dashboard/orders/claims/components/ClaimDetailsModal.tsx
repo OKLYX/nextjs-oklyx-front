@@ -2,7 +2,12 @@
 
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
-import { CLAIM_STATUS_LABEL, CLAIM_TYPE_LABEL, faultTypeText } from '@/domain/entities/ClaimEntity';
+import {
+  CLAIM_STATUS_LABEL,
+  CLAIM_TYPE_LABEL,
+  collectStatusText,
+  faultTypeText,
+} from '@/domain/entities/ClaimEntity';
 import type { Claim } from '@/domain/entities/ClaimEntity';
 import { ClaimActionPanel } from './ClaimActionPanel';
 
@@ -116,6 +121,9 @@ export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetails
               <Section title="회수">
                 <Row label="사유" value={claim.reasonText ?? claim.reasonCode ?? '-'} />
                 <Row label="귀책" value={faultTypeText(claim.faultType)} />
+                {/* 회수상태는 교환에만 있다(05). 이 한 줄이 있어야 "왜 재발송 버튼이 없나"가 화면에서
+                    설명된다 — 반품 상세에는 그리지 않는다(항상 null 이라 `-` 만 늘어난다). */}
+                <Row label="회수상태" value={collectStatusText(claim.collectStatus)} />
                 <Row label="회수송장" value={collect} />
               </Section>
               {/* Rendered even while empty: "not reshipped yet" and "no reshipment concept"

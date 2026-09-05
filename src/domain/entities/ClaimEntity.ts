@@ -24,6 +24,8 @@ export interface Claim {
   returnShippingCharge: number | null;
   collectInvoiceNo: string | null;
   collectCarrierCode: string | null;
+  collectStatus?: string | null;     // exchange only — raw platform value (05). Optional: an older
+                                     // server response has no such field at all (undefined).
   reshipInvoiceNo: string | null;    // exchange only — reshipment (seller → customer) invoice
   reshipCarrierCode: string | null;  // exchange only
   requesterName: string | null;
@@ -139,3 +141,24 @@ export const FAULT_TYPE_LABEL: Record<string, string> = {};
  * Mobile (03) uses the same policy so web and app never disagree on fault text.
  */
 export const faultTypeText = (v: string | null): string => (v ? FAULT_TYPE_LABEL[v] ?? v : '-');
+
+/**
+ * Exchange collect status (raw Coupang value) → Korean label — **display only** (FEATURE_2609_21 / 06).
+ *
+ * ⚠️ This is not a D19 violation: D19 bans code→label constants for values the screen **sends back**
+ * (the reject reason, which the server owns through `choices`). `collectStatus` is never sent
+ * anywhere, and the server deliberately ships the raw value (05 Step 1), so an unmapped value only
+ * looks a little rough on screen — it can never reach the marketplace.
+ */
+export const COLLECT_STATUS_LABEL: Record<string, string> = {
+  BeforeDirection: '회수 연동 전',
+  CompleteCollect: '업체 전달 완료',
+};
+
+/**
+ * ⚠️ Same rule as {@link faultTypeText} — always render through this, never read
+ * COLLECT_STATUS_LABEL[x] in a component: an unmapped value comes back `undefined` and paints an
+ * empty cell. Returns only ever have `null` here, so the 반품 detail must not show the row at all.
+ */
+export const collectStatusText = (v?: string | null): string =>
+  v ? COLLECT_STATUS_LABEL[v] ?? v : '-';
