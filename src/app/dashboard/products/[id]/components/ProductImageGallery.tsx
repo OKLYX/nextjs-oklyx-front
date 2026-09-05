@@ -12,7 +12,10 @@ import type { ProductImageUseCase } from '@/application/usecases/ProductImageUse
  * 등록/수정/상세 3화면에서 재사용한다.
  * File: src/app/dashboard/products/[id]/components/ProductImageGallery.tsx
  *
- * **용도**: 여러 장 업로드·대체·삭제·순서변경(◀▶). 첫 장이 "대표"(백엔드 규칙).
+ * **용도**: 여러 장 업로드·대체·삭제·순서변경(◀▶)·원본 다운로드. 첫 장이 "대표"(백엔드 규칙).
+ *   - [다운로드]는 읽기 전용이라 `isViewMode` 에서도 노출한다. 수정/상세 모드는 same-origin
+ *     프록시(`/api/image-download?url=…`)를 거친다 — S3 URL 은 교차 출처라 `<a download>` 가
+ *     무시되기 때문(등록 모드는 blob: URL 이라 그대로 저장됨).
  *
  * **모드**:
  *   - 수정/상세(`productId != null`): 마운트 시 서버 조회, 각 연산 즉시 서버 반영(backend 39).
@@ -42,8 +45,21 @@ const ACCEPT = 'image/jpeg,image/png';
 const MAX_SIZE = 20 * 1024 * 1024;
 const REJECT_MSG = 'JPEG/PNG·20MB 이하만 업로드 가능';
 
+// Saved file name = last segment of the stored key (query stripped).
+function imageFileName(imageUrl: string): string {
+  const path = imageUrl.split('?')[0].replace(/\/+$/, '');
+  return path.substring(path.lastIndexOf('/') + 1) || 'product-image';
+}
+
 // A row normalized across both modes. `imageId` is null in register mode.
-type GalleryItem = { key: string; url: string; imageId: number | null };
+// `downloadHref`/`downloadName` feed the [다운로드] anchor (same-origin so `download` works).
+type GalleryItem = {
+  key: string;
+  url: string;
+  imageId: number | null;
+  downloadHref: string;
+  downloadName: string;
+};
 
 export function ProductImageGallery({
   productId,
@@ -106,10 +122,20 @@ export function ProductImageGallery({
         key: String(img.id),
         url: resolveThumbUrl(img.imageUrl),
         imageId: img.id,
+        // S3 URL 은 교차 출처 → download 속성이 무시되므로 same-origin 프록시를 거친다.
+        downloadHref: `/api/image-download?url=${encodeURIComponent(img.imageUrl)}`,
+        downloadName: imageFileName(img.imageUrl),
       }));
     }
-    return previews.map((url, index) => ({ key: `buf-${index}`, url, imageId: null }));
-  }, [isEdit, images, previews]);
+    // Register mode: the object URL is same-origin (blob:), so it downloads directly.
+    return previews.map((url, index) => ({
+      key: `buf-${index}`,
+      url,
+      imageId: null,
+      downloadHref: url,
+      downloadName: bufferFiles?.[index]?.name ?? `product-image-${index + 1}`,
+    }));
+  }, [isEdit, images, previews, bufferFiles]);
 
   // Keep only JPEG/PNG ≤ 20MB; surface a banner if anything was dropped.
   const filterValid = useCallback((files: File[]): File[] => {
@@ -293,46 +319,56 @@ export function ProductImageGallery({
                   </span>
                 )}
               </div>
-              {!isViewMode && (
-                <div className="space-y-1">
-                  <div className="flex gap-1">
+              <div className="space-y-1">
+                {!isViewMode && (
+                  <>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleMove(index, -1)}
+                        disabled={busy || index === 0}
+                        aria-label="앞으로"
+                        className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                      >
+                        ◀
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMove(index, 1)}
+                        disabled={busy || index === items.length - 1}
+                        aria-label="뒤로"
+                        className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                      >
+                        ▶
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => handleMove(index, -1)}
-                      disabled={busy || index === 0}
-                      aria-label="앞으로"
-                      className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                      onClick={() => triggerReplace(item, index)}
+                      disabled={busy}
+                      className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                     >
-                      ◀
+                      대체
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleMove(index, 1)}
-                      disabled={busy || index === items.length - 1}
-                      aria-label="뒤로"
-                      className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                      onClick={() => handleDelete(item, index)}
+                      disabled={busy}
+                      className="w-full rounded border border-red-300 px-1.5 py-0.5 text-[11px] text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
-                      ▶
+                      삭제
                     </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => triggerReplace(item, index)}
-                    disabled={busy}
-                    className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                  >
-                    대체
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(item, index)}
-                    disabled={busy}
-                    className="w-full rounded border border-red-300 px-1.5 py-0.5 text-[11px] text-red-600 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    삭제
-                  </button>
-                </div>
-              )}
+                  </>
+                )}
+                {/* Read-only action: available in view mode too. */}
+                <a
+                  href={item.downloadHref}
+                  download={item.downloadName}
+                  className="block w-full rounded border border-gray-300 px-1.5 py-0.5 text-center text-[11px] text-gray-700 hover:bg-gray-100"
+                >
+                  다운로드
+                </a>
+              </div>
             </div>
           ))}
         </div>
