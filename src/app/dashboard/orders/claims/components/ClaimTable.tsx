@@ -1,9 +1,11 @@
 'use client';
 
 import { CLAIM_STATUS_LABEL, faultTypeText } from '@/domain/entities/ClaimEntity';
-import type { Claim } from '@/domain/entities/ClaimEntity';
+import type { Claim, ClaimType } from '@/domain/entities/ClaimEntity';
 
 interface ClaimTableProps {
+  // Only 교환 has a 재발송송장 column
+  claimType: ClaimType;
   claims: Claim[];
   isLoading: boolean;
   error: string;
@@ -32,6 +34,13 @@ const HEADERS: { label: string; align: 'left' | 'right'; sortable?: boolean }[] 
   { label: '회수송장', align: 'left' },
 ];
 
+const RESHIP_HEADER = { label: '재발송송장', align: 'left' } as const;
+
+const HEADERS_BY_TYPE: Record<ClaimType, typeof HEADERS> = {
+  RETURN: HEADERS,
+  EXCHANGE: [...HEADERS, RESHIP_HEADER],
+};
+
 function formatDate(value: string | null): string {
   if (!value) return '-';
   const date = new Date(value);
@@ -40,6 +49,7 @@ function formatDate(value: string | null): string {
 }
 
 export function ClaimTable({
+  claimType,
   claims,
   isLoading,
   error,
@@ -52,6 +62,10 @@ export function ClaimTable({
   onPageChange,
   emptyMessage,
 }: ClaimTableProps) {
+  // Header list and body cells must be derived from the same source, or the skeleton and the
+  // 교환 rows end up one column off.
+  const headers = HEADERS_BY_TYPE[claimType];
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -59,7 +73,7 @@ export function ClaimTable({
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
-                {HEADERS.map((col) => (
+                {headers.map((col) => (
                   <th key={col.label} className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
                     {col.label}
                   </th>
@@ -69,7 +83,7 @@ export function ClaimTable({
             <tbody>
               {[...Array(5)].map((_, i) => (
                 <tr key={i} className="border-b border-gray-200">
-                  {[...Array(HEADERS.length)].map((_, j) => (
+                  {[...Array(headers.length)].map((_, j) => (
                     <td key={j} className="px-6 py-3">
                       <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
                     </td>
@@ -113,7 +127,7 @@ export function ClaimTable({
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr>
-              {HEADERS.map((col) => (
+              {headers.map((col) => (
                 <th
                   key={col.label}
                   onClick={col.sortable ? onToggleSort : undefined}
@@ -155,6 +169,9 @@ export function ClaimTable({
                   </span>
                 </td>
                 <td className="px-6 py-3 text-sm text-gray-700">{claim.collectInvoiceNo ?? '-'}</td>
+                {claimType === 'EXCHANGE' && (
+                  <td className="px-6 py-3 text-sm text-gray-700">{claim.reshipInvoiceNo ?? '-'}</td>
+                )}
               </tr>
             ))}
           </tbody>

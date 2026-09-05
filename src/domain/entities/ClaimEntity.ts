@@ -1,5 +1,5 @@
 // Claim (return/exchange) domain types — GET /api/claims (FEATURE_2609_18).
-// Stage A is returns only; exchange lands with 07.
+// Shared by both claim types: the screen is one list with a 반품/교환 tab.
 
 export type ClaimType = 'RETURN' | 'EXCHANGE';
 
@@ -22,6 +22,8 @@ export interface Claim {
   returnShippingCharge: number | null;
   collectInvoiceNo: string | null;
   collectCarrierCode: string | null;
+  reshipInvoiceNo: string | null;    // exchange only — reshipment (seller → customer) invoice
+  reshipCarrierCode: string | null;  // exchange only
   requesterName: string | null;
   receivedAt: string;            // ISO
   sellerId: number | null;
@@ -35,12 +37,24 @@ export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {
   WITHDRAWN: '철회', PENDING_REVIEW: '확인요청', STALE: '확인필요',
 };
 
+/** The single naming table shared by the tab labels, empty-state wording and the modal title. */
+export const CLAIM_TYPE_LABEL: Record<ClaimType, string> = { RETURN: '반품', EXCHANGE: '교환' };
+
 /**
- * Only the statuses returns actually produce get a chip (PLAN §3.1). Exchange statuses come with 07.
+ * Only the statuses returns actually produce get a chip (PLAN §3.1) — exchange has its own list
+ * in `EXCHANGE_STATUS_FILTERS` below, and the two differing is intentional.
  * ⚠️ `STALE` has zero rows until 05 (tracking) creates them, so it is not a chip yet — add it here
  * when 05 starts. Until then STALE rows are only visible under `전체`.
  */
 export const RETURN_STATUS_FILTERS: ClaimStatus[] = ['RECEIVED', 'DONE', 'PENDING_REVIEW'];
+
+/**
+ * Only the statuses exchanges actually produce (PLAN §3.1). `PENDING_REVIEW` is returns-only, so
+ * it is absent here on purpose.
+ */
+export const EXCHANGE_STATUS_FILTERS: ClaimStatus[] = [
+  'RECEIVED', 'IN_PROGRESS', 'DONE', 'REJECTED', 'WITHDRAWN',
+];
 
 /**
  * Fault code → Korean label. **Starts empty on purpose** — Coupang's actual `faultByType` value set
