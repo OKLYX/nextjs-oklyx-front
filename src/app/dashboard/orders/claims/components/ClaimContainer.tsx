@@ -154,6 +154,16 @@ export function ClaimContainer() {
     setCurrentPage(0);
   };
 
+  /**
+   * 액션 성공(또는 409) 뒤 단건 재조회 결과를 받는다(2609_21 D8).
+   * 두 state 를 **함께** 바꾼다 — `claims` 만 고치면 열려 있는 모달이 낡은 채 남고,
+   * `selectedClaim` 만 고치면 목록 행이 낡은다. 전체 재조회는 금지(필터·페이지·스크롤이 날아간다).
+   */
+  const handleActionDone = (updated: Claim) => {
+    setClaims((prev) => prev.map((claim) => (claim.id === updated.id ? updated : claim)));
+    setSelectedClaim((prev) => (prev?.id === updated.id ? updated : prev));
+  };
+
   const handleToggleSort = () => {
     setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     setCurrentPage(0);
@@ -209,7 +219,11 @@ export function ClaimContainer() {
         emptyMessage={emptyMessage}
       />
 
-      <ClaimDetailsModal claim={selectedClaim} onClose={() => setSelectedClaim(null)} />
+      <ClaimDetailsModal
+        claim={selectedClaim}
+        onClose={() => setSelectedClaim(null)}
+        onActionDone={handleActionDone}
+      />
     </PageContainer>
   );
 }
