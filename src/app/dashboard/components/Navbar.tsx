@@ -12,9 +12,7 @@ import {
   ShoppingCart,
   UserCog,
   Settings,
-  Image as ImageIcon,
   LayoutTemplate,
-  Stamp,
   type LucideIcon,
 } from 'lucide-react';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
@@ -28,6 +26,9 @@ interface MenuGroup {
   open: boolean;
   toggle: () => void;
   items: { href: string; label: string }[];
+  /** Hidden from non-ADMIN users. Kept inline so the display order below is the
+      real order — an ADMIN-only group can sit between two public ones. */
+  adminOnly?: boolean;
 }
 
 interface NavbarProps {
@@ -51,9 +52,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const isOrdersOpen = useNavigationStore((state) => state.isOrdersMenuOpen);
   const isPurchaseOpen = useNavigationStore((state) => state.isPurchaseMenuOpen);
   const isSettingsOpen = useNavigationStore((state) => state.isSettingsMenuOpen);
-  const isThumbnailTemplatesOpen = useNavigationStore((state) => state.isThumbnailTemplatesMenuOpen);
-  const isDetailTemplatesOpen = useNavigationStore((state) => state.isDetailTemplatesMenuOpen);
-  const isProcessingPresetsOpen = useNavigationStore((state) => state.isProcessingPresetsMenuOpen);
+  const isDesignTemplatesOpen = useNavigationStore((state) => state.isDesignTemplatesMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
@@ -64,9 +63,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const toggleOrdersMenu = useNavigationStore((state) => state.toggleOrdersMenu);
   const togglePurchaseMenu = useNavigationStore((state) => state.togglePurchaseMenu);
   const toggleSettingsMenu = useNavigationStore((state) => state.toggleSettingsMenu);
-  const toggleThumbnailTemplatesMenu = useNavigationStore((state) => state.toggleThumbnailTemplatesMenu);
-  const toggleDetailTemplatesMenu = useNavigationStore((state) => state.toggleDetailTemplatesMenu);
-  const toggleProcessingPresetsMenu = useNavigationStore((state) => state.toggleProcessingPresetsMenu);
+  const toggleDesignTemplatesMenu = useNavigationStore((state) => state.toggleDesignTemplatesMenu);
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
@@ -75,7 +72,40 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
     }
   }, []);
 
+  // Display order. ADMIN-only groups are marked and filtered below rather than
+  // appended, so this array reads top-to-bottom exactly as the sidebar renders.
   const menuGroups: MenuGroup[] = [
+    {
+      icon: Tags,
+      label: '판매상품',
+      open: isSalesProductsOpen,
+      toggle: toggleSalesProductsMenu,
+      items: [
+        { href: ROUTES.MASTER_PRODUCTS, label: '판매상품 마스터' },
+        { href: ROUTES.SALES_PRODUCTS_REGISTER, label: '판매상품 등록' },
+        { href: ROUTES.SALES_PRODUCTS_RETRIEVE, label: '판매상품 조회' },
+        { href: ROUTES.MARGIN_POLICIES, label: '마진 프리셋' },
+        { href: ROUTES.LISTINGS_SYNC, label: '마켓 반영/승인' },
+      ],
+    },
+    {
+      icon: ClipboardList,
+      label: '주문관리',
+      open: isOrdersOpen,
+      toggle: toggleOrdersMenu,
+      items: [
+        { href: ROUTES.ORDERS_SHIPMENT, label: '출고관리' },
+        { href: ROUTES.ORDERS_RETRIEVE, label: '주문내역' },
+        { href: ROUTES.ORDERS_CLAIMS, label: '반품/교환' },
+      ],
+    },
+    {
+      icon: ShoppingCart,
+      label: '구매관리',
+      open: isPurchaseOpen,
+      toggle: togglePurchaseMenu,
+      items: [{ href: ROUTES.PURCHASE_LIST, label: '구매목록' }],
+    },
     {
       icon: Package,
       label: '상품관리',
@@ -110,85 +140,44 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       ],
     },
     {
-      icon: Tags,
-      label: '판매상품',
-      open: isSalesProductsOpen,
-      toggle: toggleSalesProductsMenu,
+      icon: LayoutTemplate,
+      label: '디자인 템플릿 관리',
+      open: isDesignTemplatesOpen,
+      toggle: toggleDesignTemplatesMenu,
+      adminOnly: true,
       items: [
-        { href: ROUTES.SALES_PRODUCTS_REGISTER, label: '판매상품 등록' },
-        { href: ROUTES.SALES_PRODUCTS_RETRIEVE, label: '판매상품 조회' },
-        { href: ROUTES.MASTER_PRODUCTS, label: '판매상품 마스터' },
-        { href: ROUTES.MARGIN_POLICIES, label: '마진 프리셋' },
-        { href: ROUTES.LISTINGS_SYNC, label: '마켓 반영/승인' },
+        { href: ROUTES.THUMBNAIL_TEMPLATES, label: '썸네일' },
+        { href: ROUTES.DETAIL_TEMPLATES, label: '상세 페이지' },
+        { href: ROUTES.PROCESSING_PRESETS, label: '이미지 처리' },
       ],
     },
     {
       icon: Store,
-      label: '판매자',
+      label: '판매자 관리',
       open: isSellersOpen,
       toggle: toggleSellersMenu,
       items: [{ href: ROUTES.SELLERS_LIST, label: '판매자 관리' }],
     },
     {
-      icon: ClipboardList,
-      label: '주문관리',
-      open: isOrdersOpen,
-      toggle: toggleOrdersMenu,
-      items: [
-        { href: ROUTES.ORDERS_SHIPMENT, label: '출고관리' },
-        { href: ROUTES.ORDERS_RETRIEVE, label: '주문내역' },
-        { href: ROUTES.ORDERS_CLAIMS, label: '반품/교환' },
-      ],
-    },
-    {
-      icon: ShoppingCart,
-      label: '구매관리',
-      open: isPurchaseOpen,
-      toggle: togglePurchaseMenu,
-      items: [{ href: ROUTES.PURCHASE_LIST, label: '구매목록' }],
-    },
-  ];
-
-  if (user?.role === 'ADMIN') {
-    menuGroups.push({
       icon: UserCog,
       label: '회원관리',
       open: isUsersOpen,
       toggle: toggleUsersMenu,
+      adminOnly: true,
       items: [
         { href: ROUTES.USER_REGISTER, label: '회원등록' },
         { href: ROUTES.USER_MANAGE, label: '회원관리' },
       ],
-    });
-    menuGroups.push({
-      icon: ImageIcon,
-      label: '썸네일 템플릿',
-      open: isThumbnailTemplatesOpen,
-      toggle: toggleThumbnailTemplatesMenu,
-      items: [{ href: ROUTES.THUMBNAIL_TEMPLATES, label: '템플릿 관리' }],
-    });
-    menuGroups.push({
-      icon: LayoutTemplate,
-      label: '상세 템플릿',
-      open: isDetailTemplatesOpen,
-      toggle: toggleDetailTemplatesMenu,
-      items: [{ href: ROUTES.DETAIL_TEMPLATES, label: '템플릿 관리' }],
-    });
-    menuGroups.push({
-      icon: Stamp,
-      label: '이미지 처리 프리셋',
-      open: isProcessingPresetsOpen,
-      toggle: toggleProcessingPresetsMenu,
-      items: [{ href: ROUTES.PROCESSING_PRESETS, label: '프리셋 관리' }],
-    });
-    menuGroups.push({
+    },
+    {
       icon: Settings,
       label: '설정',
       open: isSettingsOpen,
       toggle: toggleSettingsMenu,
+      adminOnly: true,
       items: [{ href: ROUTES.SETTINGS_LOGGING, label: '로그 설정' }],
-    });
-  }
+    },
+  ].filter((menu) => !menu.adminOnly || user?.role === 'ADMIN');
 
   // Collapsed = icon-only rail. Labels/submenus appear on hover (group-hover)
   // or stay visible when pinned. No-op when not in rail mode.
