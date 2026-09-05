@@ -8,7 +8,9 @@ export type ClaimStatus =
 
 export interface Claim {
   id: number;
-  platform: string;              // 'COUPANG' — D5. Display only for now; 07+ branches actions on it
+  platform: string;              // 'COUPANG' — D5. Display + carrier-option lookup only:
+                                 // the action list comes from `availableActions`, so the screen
+                                 // never branches on the platform (2609_21 D1).
   claimType: ClaimType;
   status: ClaimStatus;
   platformStatus: string;        // raw marketplace status ('UC' etc.) — details modal only
@@ -30,6 +32,71 @@ export interface Claim {
   sellerName: string | null;
   orderItemId: number | null;
   linked: boolean;               // false = not linked to an order line (D12)
+  availableActions: ClaimAction[];   // server-decided; empty for non-ADMIN, unsupported platforms
+                                     // and claims with nothing to do (never null)
+}
+
+// --- Processing actions (FEATURE_2609_21) ---
+// 🔴 The server decides what can be pressed. There is no client-side action table, no label map and
+// no `platform === 'COUPANG'` branch here: adding one means every new marketplace edits the screen.
+
+/** Action identifiers — echoed back to the server verbatim. 교환 4값은 06 이 쓴다(D14). */
+export type ClaimActionCode =
+  | 'RETURN_RECEIVE_CONFIRM' | 'RETURN_APPROVE' | 'RETURN_COLLECT_INVOICE'
+  | 'EXCHANGE_RECEIVE_CONFIRM' | 'EXCHANGE_REJECT'
+  | 'EXCHANGE_RESHIP_INVOICE' | 'EXCHANGE_COLLECT_INVOICE';
+
+/**
+ * Extra input the action needs. ⚠️ An unknown value must hide the button — the screen cannot build
+ * a form it does not know (PLAN §8). That is the whole forward-compatibility story for new
+ * marketplaces, so never widen this to `string` and never `switch` on `ClaimActionCode` instead.
+ */
+export type ClaimActionRequires = 'NONE' | 'INVOICE' | 'REJECT_CODE';
+
+/** A value choice for actions that require one (D19) — 반품 3액션은 항상 빈 배열. */
+export interface ActionChoice {
+  code: string;
+  label: string;
+}
+
+export interface ClaimAction {
+  action: ClaimActionCode;
+  label: string;               // server-authored display name — never re-derived here (D18)
+  requires: ClaimActionRequires;
+  choices: ActionChoice[];     // only filled when `requires` asks for a value (06 uses it)
+  irreversible: boolean;       // drives the two-step confirm (D10)
+}
+
+/**
+ * Action request body — POST /api/admin/claims/{id}/actions.
+ *
+ * ⚠️ 택배사는 **마켓 코드 자체**(`deliveryCompanyCode`)로 보낸다. 로컬 carrier PK 가 아니다 —
+ * 쿠팡은 택배사 목록 API 가 없고 문서 코드표가 SSOT 라 대부분의 택배사에 붙일 로컬 id 가 없다
+ * (2609_11 D2 개정 2026-09-03, 단건 발송처리와 같은 계약). 드롭다운도 같은 원천을 쓴다:
+ * `ShippingLabelUseCase.getCarrierOptions(platform)`.
+ *
+ * `regNumber` 는 쿠팡 선택 필드라 UI 가 보내지 않는다 — 계약을 모바일과 맞추려고 타입에만 둔다.
+ */
+export interface ClaimActionPayload {
+  action: ClaimActionCode;
+  deliveryCompanyCode?: string;
+  invoiceNumber?: string;
+  regNumber?: string;
+  rejectCode?: string;         // 06 에서 사용
+}
+
+/**
+ * Action result. `succeeded` is always `true` on a 200 — a marketplace rejection arrives as 502
+ * with this same shape in `data` — so never branch on it. It exists so web, mobile and the audit
+ * table read one contract.
+ * ⚠️ `resultMessage` is the marketplace's raw text (D15): show it, never translate or summarise it.
+ */
+export interface ClaimActionResult {
+  claimId: number;
+  action: ClaimActionCode;
+  succeeded: boolean;
+  resultCode: string | null;
+  resultMessage: string | null;
 }
 
 export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {

@@ -4,18 +4,25 @@ import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { CLAIM_STATUS_LABEL, CLAIM_TYPE_LABEL, faultTypeText } from '@/domain/entities/ClaimEntity';
 import type { Claim } from '@/domain/entities/ClaimEntity';
+import { ClaimActionPanel } from './ClaimActionPanel';
 
 /**
- * 반품/교환 상세. 목록 행 객체를 그대로 받는다 — 서버가 목록·상세에 같은 record 를 주므로
- * 단건 재조회가 없다.
+ * 반품/교환 상세. 목록 행 객체를 그대로 받는다 — 서버가 목록·상세에 같은 record 를 준다.
  *
  * 종류 분기는 `claim.claimType` 하나로 한다: 반품은 `처리` 1섹션, 교환은 `회수`·`재발송` 2섹션.
  *
- * ⚠️ Stage A 는 조회 전용이다. 승인·입고확인 같은 처리 버튼을 여기에 붙이지 말 것.
+ * 처리 액션(승인·입고확인·송장등록)은 본문 맨 아래 `ClaimActionPanel` 이 담당한다
+ * (FEATURE_2609_21). 무엇을 그릴지는 서버의 `claim.availableActions` 가 정하므로 이 모달은
+ * 액션을 알지 못한다 — 버튼을 여기에 직접 붙이지 말 것.
+ *
+ * ⚠️ 액션이 성공하면 그 claim 만 다시 읽어(D8) `onActionDone` 으로 올라간다. 부모가 그 객체로
+ * `selectedClaim` 을 교체해야 열려 있는 이 모달이 갱신된다.
  */
 interface ClaimDetailsModalProps {
   claim: Claim | null;
   onClose: () => void;
+  /** 단건 재조회 결과 — 컨테이너 핸들러를 그대로 패널에 내려보낸다. */
+  onActionDone: (updated: Claim) => void;
 }
 
 // Platform display labels; unknown codes fall back to the raw code.
@@ -50,7 +57,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function ClaimDetailsModal({ claim, onClose }: ClaimDetailsModalProps) {
+export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetailsModalProps) {
   if (claim == null) return null;
 
   const isExchange = claim.claimType === 'EXCHANGE';
@@ -135,6 +142,10 @@ export function ClaimDetailsModal({ claim, onClose }: ClaimDetailsModalProps) {
               <Row label="회수송장" value={collect} />
             </Section>
           )}
+
+          {/* 스크롤 본문의 맨 마지막 — 푸터(shrink-0)에 넣으면 폼을 펼칠 때 푸터가 커지며
+              본문 스크롤 영역을 잡아먹는다. 상세를 다 읽고 나서 누르는 순서라 위치도 자연스럽다. */}
+          <ClaimActionPanel claim={claim} onActionDone={onActionDone} />
         </div>
 
         <div className="shrink-0 border-t border-gray-200">

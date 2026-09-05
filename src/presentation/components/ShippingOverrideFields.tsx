@@ -36,10 +36,18 @@ const EXTRA_INFO_PRESETS = [
 ];
 const CUSTOM_MESSAGE = '__custom__';
 
-// 쿠팡 택배사 코드(deliveryCompanyCode)는 조회 API 가 없는 정적 표(공식 문서, ~150개).
-// 사용자는 코드를 모르므로 이름으로 고르게 하고 코드를 대신 저장/전송한다.
-// 출처: https://developers.coupang.com/hc/en-us/articles/360034156033-Courier-Code
-const COUPANG_DELIVERY_COMPANIES: { code: string; name: string }[] = [
+/**
+ * 쿠팡 택배사 코드(deliveryCompanyCode)는 조회 API 가 없는 정적 표(공식 문서, ~150개).
+ * 사용자는 코드를 모르므로 이름으로 고르게 하고 코드를 대신 저장/전송한다.
+ * 출처: https://developers.coupang.com/hc/en-us/articles/360034156033-Courier-Code
+ *
+ * ⚠️ 클레임 회수송장 등록(`ClaimActionPanel`)도 이 목록을 **공유**한다 — 사본을 만들면 두 화면이
+ * 다른 택배사를 보여주게 된다. 백엔드에도 같은 성격의 표(`CoupangCourierCodes`, 198개)가 있고
+ * 그쪽이 전송 전 화이트리스트 검증을 하므로, 여기 목록은 그 부분집합이어야 한다.
+ * TODO: 두 표(프론트 큐레이션 16 / 백엔드 전량 198)를 한 원천으로 합치는 것은 후속 리팩터링
+ * (사용자 결정 2026-09-05 — 지금은 프론트 상수 공유로 간다).
+ */
+export const COUPANG_DELIVERY_COMPANIES: { code: string; name: string }[] = [
   { code: 'CJGLS', name: 'CJ대한통운' },
   { code: 'HANJIN', name: '한진택배' },
   // ⚠️ 롯데는 코드가 2개다 — 공식 표에 `HYUNDAI`·`LOTTEGLOBAL` 이 **둘 다** "Lotte Global Logistics"
@@ -66,8 +74,8 @@ const COUPANG_DELIVERY_COMPANIES: { code: string; name: string }[] = [
 
 const MANUAL_CARRIER = '__manual__';
 
-// Curated per-platform carrier list; empty = free-text fallback (other platforms).
-function deliveryCompaniesFor(platform: string): { code: string; name: string }[] {
+/** Curated per-platform carrier list; empty = free-text fallback (other platforms). */
+export function deliveryCompaniesFor(platform: string): { code: string; name: string }[] {
   return platform === 'COUPANG' ? COUPANG_DELIVERY_COMPANIES : [];
 }
 
