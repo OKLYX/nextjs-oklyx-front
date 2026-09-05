@@ -21,7 +21,10 @@ const pad = (n: number): string => String(n).padStart(2, '0');
 // entry point for the follow-up backfill feature (2609_10).
 // 🔴 Never use toISOString() here: in KST it shifts the date one day back.
 export function buildPeriodOptions(
-  monthsWithData: ReadonlySet<string>,          // 'YYYY-MM' set; empty = everything is (데이터 없음)
+  // 'YYYY-MM' set; empty = everything is (데이터 없음).
+  // null = do not label data presence at all — for screens with no "months with data" API
+  // (claims). Labeling every month (데이터 없음) there would be false information.
+  monthsWithData: ReadonlySet<string> | null,
   today: Date = new Date(),
   months = 12,
 ): OrderPeriodOption[] {
@@ -32,7 +35,7 @@ export function buildPeriodOptions(
     const base = `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
     options.push({
       value,
-      label: monthsWithData.has(value) ? base : `${base} (데이터 없음)`,
+      label: monthsWithData == null || monthsWithData.has(value) ? base : `${base} (데이터 없음)`,
     });
   }
   return options;
