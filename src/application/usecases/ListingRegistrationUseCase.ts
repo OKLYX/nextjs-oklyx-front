@@ -18,6 +18,8 @@ import type {
   ListingOptionsResponse,
   ActiveOptionsRequest,
   OptionStocksRequest,
+  OptionPricesRequest,
+  ChannelPriceUpdateResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -141,5 +143,12 @@ export class ListingRegistrationUseCase {
 
   setOptionStocks(listingId: number, data: OptionStocksRequest): Promise<ListingOptionsResponse> {
     return this.repository.setOptionStocks(listingId, data);
+  }
+
+  setOptionPrices(
+    listingId: number,
+    data: OptionPricesRequest,
+  ): Promise<ChannelPriceUpdateResponse> {
+    return this.repository.setOptionPrices(listingId, data);
   }
 }

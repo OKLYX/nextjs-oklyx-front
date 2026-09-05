@@ -21,6 +21,8 @@ import type {
   ListingOptionsResponse,
   ActiveOptionsRequest,
   OptionStocksRequest,
+  OptionPricesRequest,
+  ChannelPriceUpdateResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -186,6 +188,14 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     data: OptionStocksRequest,
   ): Promise<ListingOptionsResponse> {
     const response = await axiosInstance.put(`${listingBase}/${listingId}/options/stock`, data);
+    return response.data.data;
+  }
+
+  async setOptionPrices(
+    listingId: number,
+    data: OptionPricesRequest,
+  ): Promise<ChannelPriceUpdateResponse> {
+    const response = await axiosInstance.put(`${listingBase}/${listingId}/options/price`, data);
     return response.data.data;
   }
 }

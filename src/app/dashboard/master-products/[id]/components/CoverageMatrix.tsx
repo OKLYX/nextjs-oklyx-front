@@ -1121,6 +1121,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                                 <span className={active ? '' : 'text-gray-400'}>
                                   <span className={active ? 'text-gray-500' : ''}>{name}: </span>
                                   {formatWon(p.sellingPrice)}
+                                  {/* 2609_19: 자동계산가가 아니라 사람이 정한 값이라는 표식.
+                                      재고의 '상속=회색' 과는 다른 규칙이다(판매가엔 상속이 없다). */}
+                                  {p.priceSource === 'MANUAL_OVERRIDE' && (
+                                    <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700">
+                                      수동
+                                    </span>
+                                  )}
                                   <span
                                     className={
                                       active && !inherited ? 'ml-1' : 'ml-1 text-gray-400'
