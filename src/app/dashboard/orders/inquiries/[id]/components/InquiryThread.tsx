@@ -1,9 +1,15 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { Inquiry, InquiryReply } from '@/domain/entities/InquiryEntity';
 
 interface InquiryThreadProps {
   inquiry: Inquiry;
+  /**
+   * 스레드 말풍선 아래에 그대로 렌더되는 슬롯 — 답변 컴포저가 들어온다(05).
+   * ⚠️ 스레드는 표시 전용이다. `capability`·`onSend` 를 받아 컴포저를 여기서 만들지 않는다.
+   */
+  footer?: ReactNode;
 }
 
 // 말풍선 시각 — yyyy-MM-dd HH:mm (null/파싱 실패는 원문 그대로).
@@ -62,7 +68,7 @@ function Bubble({
  *
  * ⚠️ `replies` 는 서버가 `replied_at ASC` 로 정렬해 준다(01). 클라이언트에서 다시 정렬하지 않는다.
  */
-export function InquiryThread({ inquiry }: InquiryThreadProps) {
+export function InquiryThread({ inquiry, footer }: InquiryThreadProps) {
   const replies = inquiry.replies ?? [];
 
   return (
@@ -95,6 +101,8 @@ export function InquiryThread({ inquiry }: InquiryThreadProps) {
           />
         ))
       )}
+
+      {footer}
     </div>
   );
 }

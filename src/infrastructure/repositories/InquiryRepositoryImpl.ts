@@ -34,4 +34,17 @@ export class InquiryRepositoryImpl implements InquiryRepository {
     const response = await axiosInstance.get('/api/inquiries/types');
     return response.data.data;
   }
+
+  /**
+   * 답변 전송 — 조회와 **경로가 다르다**(`/api/admin/…`, ADMIN 전용). 응답은 단건 조회와 같은 모양의
+   * 갱신된 문의라 화면이 재조회 없이 스레드·상태·`replyCapability` 를 통째로 교체한다.
+   *
+   * ⚠️ 에러를 잡지 않는다 — 상태코드(403·502)로 갈라야 하는 판단은 컨테이너가 한다.
+   */
+  async sendReply(inquiryId: number, content: string): Promise<Inquiry> {
+    const response = await axiosInstance.post(`/api/admin/inquiries/${inquiryId}/replies`, {
+      content,
+    });
+    return response.data.data;
+  }
 }
