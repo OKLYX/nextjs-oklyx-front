@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PAGE_SIZES, SORT_OPTIONS, type MasterListQuery } from '../masterListQuery';
 
 interface MasterProductToolbarProps {
@@ -19,24 +19,39 @@ interface MasterProductToolbarProps {
  * (덮으면 디바운스 중 타이핑이 튄다). 뒤로가기로 `q` 가 바뀌면 목록은 갱신되지만 입력창에는 이전
  * 문자열이 남는 것을 허용한다 — 고치려고 URL→draft 역동기화 useEffect 를 넣지 말 것.
  *
- * ⚠️ `onChange` 는 부모에서 `useCallback` 으로 고정할 것(부모 리렌더마다 디바운스 타이머가 리셋된다).
+ * ⚠️ 디바운스 이펙트는 **draft 에만** 의존해야 한다. `onChange`(부모의 updateQuery)는 URL 이 바뀔
+ * 때마다 새 함수가 되므로 deps 에 넣으면 페이지 이동 직후 이펙트가 다시 돌아 `{ q }` 만 담긴 patch 를
+ * 커밋하고, 부모가 이를 "검색 변경"으로 보아 page 를 0 으로 되돌린다(= 페이지 이동 불가). 그래서
+ * `onChange` 는 ref 로 최신값만 읽고, 마지막으로 커밋한 검색어와 같으면 아예 커밋하지 않는다.
  *
  * ❌ 옵션을 JSX 에 하드코딩하지 말 것 — PAGE_SIZES / SORT_OPTIONS 를 map 한다.
  */
 export function MasterProductToolbar({ query, onChange }: MasterProductToolbarProps) {
   const [draft, setDraft] = useState(() => query.q ?? '');
+  // 마지막으로 URL 에 반영한 검색어 — 같은 값을 다시 커밋하지 않기 위한 기준선.
+  const committedRef = useRef(query.q ?? '');
+  const onChangeRef = useRef(onChange);
 
   useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+
+  useEffect(() => {
+    const next = draft.trim();
+    if (next === committedRef.current) return;
+
     const timer = setTimeout(() => {
-      const next = draft.trim();
-      onChange({ q: next ? next : undefined });
+      committedRef.current = next;
+      onChangeRef.current({ q: next ? next : undefined });
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [draft, onChange]);
+  }, [draft]);
 
   const handleReset = () => {
     setDraft('');
+    if (committedRef.current === '') return;
+    committedRef.current = '';
     onChange({ q: undefined });
   };
 
