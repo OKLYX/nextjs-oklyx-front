@@ -184,3 +184,52 @@ body {
 .color-swatch-fill::-webkit-color-swatch-wrapper { padding: 0; }
 .color-swatch-fill::-webkit-color-swatch { border: none; border-radius: 0.25rem; }
 .color-swatch-fill::-moz-color-swatch { border: none; border-radius: 0.25rem; }
+
+/* ---- Modal body vertical scroll (single source) ----
+   Add `.modal-scroll-body` to the band of a modal that scrolls.
+
+   Why: macOS/Chrome overlay scrollbars float ON TOP of the content (they hide
+   right-aligned values), and when the OS is set to always-show scrollbars the
+   bar steals width and pushes the content sideways. This class makes the bar
+   permanently visible AND parks it inside the modal's own right padding, so the
+   content column keeps exactly the width/position it has with no scrollbar.
+
+   Requires: the modal box owns the padding (p-8 = 2rem, the default here). For a
+   modal with different padding, override the variable on the element:
+     style={{ '--modal-scroll-pad': '1.25rem' }}   // p-5
+   Tune the bar thickness in one place: --modal-scroll-w.
+   Firefox keeps its own (wider) scrollbar — visible and in the gutter either way. */
+:root {
+  --modal-scroll-w: 10px;
+}
+.modal-scroll-body {
+  --modal-scroll-pad: 2rem;
+  overflow-y: auto;
+  /* Reserve the gutter even when the content is short, so growing it never reflows. */
+  scrollbar-gutter: stable;
+  /* Bleed over the modal's right padding, then pad the content back into place. */
+  margin-right: calc(-1 * var(--modal-scroll-pad));
+  padding-right: calc(var(--modal-scroll-pad) - var(--modal-scroll-w));
+}
+/* Styling ::-webkit-scrollbar also switches Chrome/Safari off overlay bars. */
+.modal-scroll-body::-webkit-scrollbar {
+  width: var(--modal-scroll-w);
+}
+.modal-scroll-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal-scroll-body::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid transparent; /* insets the thumb inside the gutter */
+  background-clip: content-box;
+}
+.modal-scroll-body::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+}
+.dark .modal-scroll-body::-webkit-scrollbar-thumb {
+  background-color: #5f5f5f;
+}
+.dark .modal-scroll-body::-webkit-scrollbar-thumb:hover {
+  background-color: #7a7a7a;
+}
