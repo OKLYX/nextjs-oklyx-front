@@ -33,6 +33,34 @@ export interface InquiryReply {
   repliedAt: string;               // ISO
 }
 
+export interface RelatedOrderLine {
+  orderItemId: number;
+  itemName: string | null;
+  orderCount: number;
+  cancelCount: number;
+  effectiveStatus: string;         // 'CANCELLED' when fully canceled — see getOrderStatusLabel()
+  isInquiryLine: boolean;          // the line this inquiry hangs on (highlighted in the panel)
+}
+
+/**
+ * 관련 주문 — 단건 조회에서만 온다. `lines` 는 **같은 주문번호의 모든 라인**(합포장 포함)이다.
+ * ⚠️ 금액 필드는 없다 — `order_item` 이 가격을 저장하지 않는다. 화면에도 금액을 그리지 않는다.
+ */
+export interface RelatedOrder {
+  externalOrderId: string;
+  paidAt: string | null;           // ISO
+  ordererName: string | null;
+  receiverName: string | null;
+  lines: RelatedOrderLine[];
+}
+
+/** 주문이 연결되지 않은 문의의 대체 정보 — vendorItemId 로 찾은 셀 (D15). */
+export interface RelatedListing {
+  productListingId: number;
+  listingName: string;
+  optionName: string | null;
+}
+
 export interface Inquiry {
   id: number;
   platform: string;                // 'COUPANG' — display only. The screen never branches on it (D4).
@@ -57,6 +85,8 @@ export interface Inquiry {
   answeredAt: string | null;
   linked: boolean;                 // false = not linked to an order line (D15)
   replies?: InquiryReply[];        // filled by the single-inquiry read only
+  relatedOrder?: RelatedOrder | null;      // single-inquiry read only (detail right panel)
+  relatedListing?: RelatedListing | null;  // single-inquiry read only — fallback when unlinked
 }
 
 /** All four are rendered — `STALE` reaches the 상태 column even though it has no chip. */
