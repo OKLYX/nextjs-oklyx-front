@@ -162,7 +162,7 @@ export function ShippingLabelPreviewModal({
         ) : isEmpty ? (
           <div className="py-16 text-center text-gray-500">발송 대상 주문이 없습니다.</div>
         ) : (
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto modal-scroll-body">
             <div className="border border-gray-200 rounded-lg list-table-scroll">
               <table>
                 <thead>
