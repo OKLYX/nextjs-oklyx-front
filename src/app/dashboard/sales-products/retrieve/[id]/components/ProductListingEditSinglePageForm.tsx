@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/ProductListingRepositoryImpl';
@@ -577,6 +578,31 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
 
   if (loadingData) {
     return <div className="text-center py-12">데이터를 불러오는 중...</div>;
+  }
+
+  // 2609_22/D32: 마스터에 연결된 셀은 /{id}/edit 로 직접 들어와도 폼을 열지 않는다.
+  if (existingListing?.masterProductId != null) {
+    return (
+      <div className="w-full max-w-4xl mx-auto py-8 space-y-4">
+        <h1 className="text-3xl font-bold">판매상품 수정</h1>
+        <p className="text-sm text-gray-700">
+          마스터에 연결된 판매상품입니다. 마스터 상세에서 수정하세요.{' '}
+          <Link
+            href={ROUTES.MASTER_PRODUCT_DETAIL(existingListing.masterProductId)}
+            className="text-blue-600 underline hover:no-underline"
+          >
+            마스터 상세
+          </Link>
+        </p>
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
+        >
+          뒤로
+        </button>
+      </div>
+    );
   }
 
   const isAllComplete = selectedPlatform && productListingName.trim() && platformProductId && selectedCategory && selectedCarrierRateId && selectedPackageId && optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0);

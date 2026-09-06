@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { ProductListing } from '@/domain/entities/ProductListingEntity';
 
 interface ProductListingDetailsCardProps {
@@ -9,6 +10,9 @@ interface ProductListingDetailsCardProps {
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  // 2609_22/D32: 마스터에 연결된 셀은 여기서 수정·삭제하지 않는다(마스터 상세가 창구).
+  actionsDisabled?: boolean;
+  actionsNotice?: ReactNode;
 }
 
 export function ProductListingDetailsCard({
@@ -18,6 +22,8 @@ export function ProductListingDetailsCard({
   onBack,
   onEdit,
   onDelete,
+  actionsDisabled,
+  actionsNotice,
 }: ProductListingDetailsCardProps) {
   return (
     <div className="space-y-6">
@@ -39,17 +45,18 @@ export function ProductListingDetailsCard({
           </button>
           <h1 className="text-3xl font-bold">판매 상품 상세정보</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {actionsNotice}
           <button
             onClick={onEdit}
-            disabled={isLoading}
+            disabled={isLoading || actionsDisabled}
             className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             수정
           </button>
           <button
             onClick={onDelete}
-            disabled={isLoading}
+            disabled={isLoading || actionsDisabled}
             className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             삭제

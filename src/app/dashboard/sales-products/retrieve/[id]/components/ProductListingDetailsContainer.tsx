@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/ProductListingRepositoryImpl';
 import { ProductListingUseCase } from '@/application/usecases/ProductListingUseCase';
@@ -121,6 +122,9 @@ export function ProductListingDetailsContainer({ id }: ProductListingDetailsCont
     );
   }
 
+  // 2609_22/D32: 마스터에 연결된 셀은 legacy 수정·삭제 창구를 닫는다(서버도 400 이지만 눌러야 알게 하지 않는다).
+  const masterProductId = listing.masterProductId;
+
   return (
     <>
       <div className="space-y-6">
@@ -134,6 +138,20 @@ export function ProductListingDetailsContainer({ id }: ProductListingDetailsCont
             setApiError('');
             setShowDeleteDialog(true);
           }}
+          actionsDisabled={masterProductId != null}
+          actionsNotice={
+            masterProductId != null ? (
+              <span className="text-sm text-gray-500">
+                마스터에 연결된 판매상품입니다. 마스터 상세에서 수정하세요.{' '}
+                <Link
+                  href={ROUTES.MASTER_PRODUCT_DETAIL(masterProductId)}
+                  className="text-blue-600 underline hover:no-underline"
+                >
+                  마스터 상세
+                </Link>
+              </span>
+            ) : undefined
+          }
         />
 
         <ProductListingDetailsTable options={listing.options} isLoading={isLoading} />
