@@ -54,6 +54,10 @@ export interface OptionPrice {
   // 2609_19/D1: 'AUTO' = 자동계산가, 'MANUAL_OVERRIDE' = 이 채널만 사용자가 정한 값.
   // 레거시 응답은 undefined → AUTO 로 취급한다.
   priceSource?: 'AUTO' | 'MANUAL_OVERRIDE';
+  // 2609_22/D3: 'MANUAL_OVERRIDE' = 이 채널에서 정한 옵션명. 레거시 응답 undefined → AUTO 취급.
+  optionNameSource?: 'AUTO' | 'MANUAL_OVERRIDE';
+  // 2609_22/D2: 마스터에 대응 옵션이 없는 채널 전용 옵션.
+  channelOnly?: boolean;
 }
 
 // Auto-generated (or overridden) product assets for one channel/listing.
@@ -87,6 +91,9 @@ export interface ChannelAddResponse {
   productListingId: number;
   status: ListingStatus;
   generated: GeneratedProductResponse;
+  // 2609_22/D15: 커밋은 쿠팡을 재조회하므로 미리보기에 없던 경고가 여기서 처음 올 수 있다.
+  // 버리지 말고 가져오기 성공 배너로 그대로 띄운다(채널 추가 응답에는 없음 → undefined).
+  categoryWarning?: string | null;
 }
 
 // Register (push, 3c)
@@ -127,7 +134,7 @@ export interface PropagateResponse {
  * Master ↔ channel difference preview (89, GET /api/admin/master-products/{id}/channel-sync-preview).
  * Read-only: it answers "what would [채널에 반영하기] change?" before the button is pressed.
  *
- * ⚠️ `marketOrphanOptions` is NOT counted in `totals` / `inSync` — a propagation run leaves those
+ * ⚠️ `marketChannelOnlyOptions` is NOT counted in `totals` / `inSync` — a propagation run leaves those
  * options alone (the operator must stop them on the marketplace), so counting them would keep the
  * banner up forever. Never use it for the badge count or the disabled check.
  */
@@ -141,7 +148,7 @@ export interface ChannelSyncPreview {
 export interface ChannelSyncTotals {
   affectedChannels: number;
   missingOptions: number;
-  orphanOptions: number;
+  channelOnlyOptions: number;
   quantityMismatch: number;
 }
 
@@ -152,9 +159,9 @@ export interface ChannelSyncChannel {
   /** Already on the marketplace → needs a re-register after the change is applied. */
   onMarket: boolean;
   missingOptions: string[];
-  orphanOptions: string[];
+  channelOnlyOptions: string[];
   /** Informational only (see ChannelSyncPreview) — excluded from totals/inSync. */
-  marketOrphanOptions: string[];
+  marketChannelOnlyOptions: string[];
   quantityMismatchOptions: string[];
 }
 
@@ -205,6 +212,10 @@ export interface ListingOptionSummary {
   // 2609_19/D1: 'AUTO' = 자동계산가, 'MANUAL_OVERRIDE' = 이 채널만 사용자가 정한 값.
   // 레거시 응답은 undefined → AUTO 로 취급한다.
   priceSource?: 'AUTO' | 'MANUAL_OVERRIDE';
+  // 2609_22/D3: 'MANUAL_OVERRIDE' = 이 채널에서 정한 옵션명. 레거시 응답 undefined → AUTO 취급.
+  optionNameSource?: 'AUTO' | 'MANUAL_OVERRIDE';
+  // 2609_22/D2: 마스터에 대응 옵션이 없는 채널 전용 옵션.
+  channelOnly?: boolean;
 }
 
 export interface ListingOptionsResponse {
@@ -241,4 +252,61 @@ export interface ChannelPriceUpdateResponse {
   pushed: number; // 마켓에 실제 반영된 옵션 수
   skipped: string[]; // 마켓 식별자 없음(미승인/DRAFT) — 로컬만 저장된 옵션명
   failed: { optionName: string; message: string }[]; // 마켓 실패 → 저장되지 않은 옵션
+}
+
+// ── 쿠팡 상품 가져오기 (2609_22) ─────────────────────────────────────────────
+// 이미 마켓에 올라가 있는 상품을 마스터의 채널 셀로 편입한다. 읽기 전용 편입이라
+// 가져오기 자체는 마켓에 아무것도 쓰지 않는다.
+
+// 2609_22: 미리보기 요청. 판매자·플랫폼은 행에서 받는다(모달에 선택 UI 없음).
+export interface ImportPreviewRequest {
+  sellerId: number;
+  platform: string;
+  platformProductId: string;
+}
+
+// 2609_22: 가져오기 미리보기(쓰기 없음). components = 수량을 채워야 하는 마스터 구성품 줄(D9).
+export interface ImportPreviewResponse {
+  productName: string;
+  status: string;
+  categoryCode: string;
+  categoryMatched: boolean;
+  categoryWarning: string | null; // D15 문구. 그대로 출력한다(가공 금지)
+  channelTags: string[];
+  components: { productId: number; brand?: string; productName: string }[];
+  options: {
+    itemName: string;
+    vendorItemId: string | null;
+    sellerProductItemId: string | null;
+    salePrice: number;
+    stockQuantity: number | null;
+  }[];
+}
+
+export interface ImportOptionSpec {
+  vendorItemId: string | null; // 미승인 옵션은 null → 서버가 itemName 으로 매칭
+  itemName: string;
+  masterOptionName: string; // 기본값 = itemName (D11)
+  components: { productId: number; quantity: number }[];
+}
+
+// 커밋. 가격·재고·옵션 id 는 보내지 않는다 — 서버가 쿠팡 재조회로 확정한다.
+export interface ImportRequest extends ImportPreviewRequest {
+  options: ImportOptionSpec[];
+}
+
+// 채널 옵션명 부분 갱신(2609_22/D3). optionName null = 마스터 옵션명으로 복귀(AUTO).
+// 부분 저장이다(재고·판매가와 같은 규칙): 목록에 없는 옵션은 손대지 않는다.
+export interface OptionNamesRequest {
+  names: { optionId: number; optionName: string | null }[];
+}
+
+// [옵션명 일괄 적용] 결과(2609_22/D4).
+// ⚠️ `warnings` = 이름 중복으로 통째로 건너뛴 셀의 **사람이 읽는 문장**이다
+// (`옵션명 중복으로 건너뜀: listingId=12`). 셀 id 배열이 아니므로 파싱하지 말고 그대로 나열한다.
+// 구버전 응답 대비 화면에서는 `?? []` 로 읽는다.
+export interface ApplyOptionNamesResponse {
+  updatedCells: number;
+  updatedOptions: number;
+  warnings: string[];
 }

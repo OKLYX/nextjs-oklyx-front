@@ -68,6 +68,7 @@ import { MasterTagsPanel } from './MasterTagsPanel';
 import { MasterRegistrationSuffixPanel } from './MasterRegistrationSuffixPanel';
 import { MasterShippingOverridePanel } from './MasterShippingOverridePanel';
 import { CellActions } from './CellActions';
+import { ImportCoupangProductModal } from './ImportCoupangProductModal';
 import { DisplayNameRow } from './DisplayNameRow';
 import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
 
@@ -102,26 +103,26 @@ const MARKET_OPTION_LOCK_REASON = '마켓에 등록된 옵션은 뺄 수 없습�
  * 채널 반영 요약 줄(90). 배너와 확인 모달이 **같은 문구**를 쓰도록 여기서 한 번만 만든다 —
  * 두 곳에 복붙하지 말 것. 0 인 항목은 생략한다.
  *
- * ⚠️ `marketOrphanOptions` 는 반영이 손대지 않으므로(89 규칙) 여기 건수에 포함하지 않는다.
+ * ⚠️ `marketChannelOnlyOptions` 는 반영이 손대지 않으므로(89 규칙) 여기 건수에 포함하지 않는다.
  */
 const syncSummaryLines = (preview: ChannelSyncPreview): string[] => {
   const t = preview.totals;
   const lines: string[] = [];
   if (t.missingOptions > 0) lines.push(`채널에 없는 옵션 ${t.missingOptions}`);
-  if (t.orphanOptions > 0) lines.push(`마스터에 없는 옵션 ${t.orphanOptions}`);
+  if (t.channelOnlyOptions > 0) lines.push(`마스터에 없는 옵션 ${t.channelOnlyOptions}`);
   if (t.quantityMismatch > 0) lines.push(`수량이 다른 옵션 ${t.quantityMismatch}`);
   return lines;
 };
 
 /** 배너 건수 = 옵션 건수 합(채널 수가 아니다 — 버튼 배지가 채널 수). */
 const syncOptionCount = (preview: ChannelSyncPreview): number =>
-  preview.totals.missingOptions + preview.totals.orphanOptions + preview.totals.quantityMismatch;
+  preview.totals.missingOptions + preview.totals.channelOnlyOptions + preview.totals.quantityMismatch;
 
 /** 한 채널 줄의 `{항목 라벨}: {옵션명, 옵션명}` 조각들(0 인 항목 생략). 회색 안내 항목은 제외. */
 const channelDiffText = (c: ChannelSyncChannel): string => {
   const parts: string[] = [];
   if (c.missingOptions.length > 0) parts.push(`채널에 없는 옵션: ${c.missingOptions.join(', ')}`);
-  if (c.orphanOptions.length > 0) parts.push(`마스터에 없는 옵션: ${c.orphanOptions.join(', ')}`);
+  if (c.channelOnlyOptions.length > 0) parts.push(`마스터에 없는 옵션: ${c.channelOnlyOptions.join(', ')}`);
   if (c.quantityMismatchOptions.length > 0)
     parts.push(`수량이 다른 옵션: ${c.quantityMismatchOptions.join(', ')}`);
   return parts.join(' · ');
@@ -255,6 +256,16 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   // Per-channel option activation (43): the listing id currently saving an active-set change.
   const [optionBusyId, setOptionBusyId] = useState<number | null>(null);
+
+  // 2609_22: 쿠팡 상품 가져오기 대상 행(모달 mount). null = 닫힘.
+  const [importTarget, setImportTarget] = useState<{
+    sellerId: number;
+    platform: string;
+    sellerName: string;
+  } | null>(null);
+  // 2609_22/D4: [옵션명 일괄 적용] 확인 모달 + 재진입 가드.
+  const [applyNamesOpen, setApplyNamesOpen] = useState(false);
+  const [isApplyingNames, setIsApplyingNames] = useState(false);
 
   // Fetch per-channel generated assets (thumbnail + detail HTML) in one call each,
   // N calls total, without blocking the table render. Each failure is absorbed as
@@ -606,6 +617,38 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     }
   };
 
+  // 2609_22: 가져오기 성공 → 매트릭스 재조회 + 커밋에서 처음 온 카테고리 경고를 그대로 노출.
+  const handleImportDone = async (categoryWarning: string | null) => {
+    setBanner(categoryWarning ? { text: categoryWarning, tone: 'amber' } : null);
+    await load();
+  };
+
+  // [옵션명 일괄 적용](2609_22/D4): 채널이 따로 지정한 옵션명을 마스터 기준으로 되돌린다.
+  const handleApplyNamesConfirm = async () => {
+    // ⚠️ PopupDialogModal 에 disabled prop 이 없다 → 재진입 가드는 호출부 책임.
+    if (isApplyingNames) return;
+    setApplyNamesOpen(false);
+    setIsApplyingNames(true);
+    setBanner(null);
+    try {
+      const res = await listingUseCase.applyMasterOptionNames(masterId);
+      // ⚠️ `warnings` 는 이미 완성된 안내 문장이다(셀 id 배열 아님) — 그대로 이어 붙인다.
+      // 구버전 응답(필드 없음)에서도 렌더 에러가 나지 않게 `?? []`.
+      const warnings = res.warnings ?? [];
+      setBanner({
+        text:
+          `${res.updatedCells}개 채널 · ${res.updatedOptions}개 옵션의 이름을 마스터 기준으로 되돌렸습니다.` +
+          (warnings.length > 0 ? ` — ${warnings.join(' · ')}` : ''),
+        tone: warnings.length > 0 ? 'amber' : 'green',
+      });
+      await load();
+    } catch (e: unknown) {
+      setBanner({ text: extractErrorMessage(e, '옵션명 일괄 적용에 실패했습니다.'), tone: 'amber' });
+    } finally {
+      setIsApplyingNames(false);
+    }
+  };
+
   // Toggle one option's per-channel active flag inline (43). Sends the full active set (backend
   // requires ≥1 active). On success we patch just this cell's optionPrices in place — no full
   // reload — so the row doesn't flash. needsResync (already-pushed cell) shows the re-register hint.
@@ -769,7 +812,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         </p>
       )}
 
-      {/* 반영 전 요약(90): 무엇이 반영되는지 누르기 전에 보여준다. ⚠️ marketOrphanOptions 만 있는
+      {/* 반영 전 요약(90): 무엇이 반영되는지 누르기 전에 보여준다. ⚠️ marketChannelOnlyOptions 만 있는
           채널도 목록에 오지만 건수 문장에는 넣지 않는다(반영이 손대지 않는 항목). */}
       {syncPreview && !syncPreview.inSync && (
         <div className="rounded bg-blue-50 px-3 py-2 text-sm text-blue-800">
@@ -788,10 +831,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     {c.onMarket && <span className="text-gray-500"> (반영 후 재등록 필요)</span>}
                   </span>
                 )}
-                {c.marketOrphanOptions.length > 0 && (
+                {c.marketChannelOnlyOptions.length > 0 && (
                   <span className="text-gray-500">
                     {channelDiffText(c) ? ' ' : `${c.sellerName} · ${c.platform} — `}
-                    마스터에 없는데 판매 중: {c.marketOrphanOptions.join(', ')} (WING에서 직접 중지)
+                    마스터에 없는데 판매 중: {c.marketChannelOnlyOptions.join(', ')} (WING에서 직접 중지)
                   </span>
                 )}
               </li>
@@ -805,15 +848,15 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
       {/* inSync 인데 마켓 고아만 남은 경우: 배너 없이 이 안내만(버튼은 비활성 유지). */}
       {syncPreview?.inSync &&
-        syncPreview.channels.some((c) => c.marketOrphanOptions.length > 0) && (
+        syncPreview.channels.some((c) => c.marketChannelOnlyOptions.length > 0) && (
           <ul className="list-disc rounded px-3 py-2 pl-8 text-xs text-gray-500">
             {syncPreview.channels
-              .filter((c) => c.marketOrphanOptions.length > 0)
+              .filter((c) => c.marketChannelOnlyOptions.length > 0)
               .slice(0, 5)
               .map((c) => (
                 <li key={c.listingId}>
                   {c.sellerName} · {c.platform} — 마스터에 없는데 판매 중:{' '}
-                  {c.marketOrphanOptions.join(', ')} (WING에서 직접 중지)
+                  {c.marketChannelOnlyOptions.join(', ')} (WING에서 직접 중지)
                 </li>
               ))}
           </ul>
@@ -840,6 +883,16 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         confirmText="반영하기"
         onConfirm={handlePropagateConfirm}
         onCancel={() => setConfirmOpen(false)}
+      />
+
+      {/* 옵션명 일괄 적용 확인(2609_22/D4). 기존 공통 모달 재사용 — 신규 확인 모달을 만들지 말 것. */}
+      <PopupDialogModal
+        isOpen={applyNamesOpen}
+        title="옵션명 일괄 적용"
+        message="채널에서 따로 지정한 옵션명이 마스터 옵션명으로 되돌아갑니다. 진행할까요?"
+        confirmText="적용하기"
+        onConfirm={handleApplyNamesConfirm}
+        onCancel={() => setApplyNamesOpen(false)}
       />
 
       {/* 마스터 편집 = 토글 섹션 스택(83A/83B). 순서 = 상품 기본 정보(기본 정보·표준 카테고리·
@@ -875,7 +928,17 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           />
 
           <div className="space-y-2 border-t border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
+              <button
+                type="button"
+                onClick={() => setApplyNamesOpen(true)}
+                disabled={options.length === 0 || isApplyingNames}
+                className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              >
+                옵션명 일괄 적용
+              </button>
+            </div>
             <p className="text-[11px] text-gray-500">
               옵션의 카테고리 필수속성은 저장된 마스터 값을 기준으로 상속 여부를 판단합니다. 위
               [카테고리 필수속성 · 고시]에서 저장한 뒤 입력하세요.
@@ -1173,6 +1236,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                         <span className="text-xs text-gray-400">–</span>
                       ) : !row.registered || !row.cell ? (
                         <div className="space-y-1">
+                          <div className="flex flex-wrap gap-1.5">
                           <button
                             type="button"
                             onClick={() =>
@@ -1184,6 +1248,26 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           >
                             {rowBusyId === row.accountId ? <Spinner size={12} label="등록 중" /> : '등록'}
                           </button>
+                          {/* 2609_22: 이미 마켓에 올라간 상품을 이 셀로 편입한다. 다른 플랫폼은 백엔드가
+                              미지원이므로 버튼 자체를 노출하지 않는다. ⚠️ isShippingBlocked 가드는 걸지
+                              않는다 — 이미 팔고 있는 상품이라 출고지 미설정이어도 가져올 수 있다. */}
+                          {row.platform === 'COUPANG' && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setImportTarget({
+                                  sellerId: row.sellerId,
+                                  platform: row.platform,
+                                  sellerName: row.sellerName,
+                                })
+                              }
+                              disabled={busy}
+                              className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                            >
+                              가져오기
+                            </button>
+                          )}
+                          </div>
                           {isShippingBlocked(row.accountId) && (
                             <p className="text-[11px] text-amber-700" title={SHIPPING_BLOCK_REASON}>
                               배송 설정 필요
@@ -1232,6 +1316,17 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       <p className="text-[11px] text-amber-700">
         {`${MARKET_OPTION_LOCK_REASON} 옵션 추가는 언제든 가능합니다.`}
       </p>
+
+      {importTarget && (
+        <ImportCoupangProductModal
+          masterId={masterId}
+          sellerId={importTarget.sellerId}
+          platform={importTarget.platform}
+          sellerName={importTarget.sellerName}
+          onClose={() => setImportTarget(null)}
+          onDone={handleImportDone}
+        />
+      )}
 
       <ChannelPreviewModal data={preview} onClose={() => setPreview(null)} />
     </PageContainer>
