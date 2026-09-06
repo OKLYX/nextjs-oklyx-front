@@ -1,5 +1,5 @@
 import type { ProductListingRepository } from '@/domain/repositories/ProductListingRepository';
-import type { ProductListing, ProductListingOption, ProductListingProduct } from '@/domain/entities/ProductListingEntity';
+import type { ProductListing, ProductListingOption, ProductListingProduct, ListingMasterPreview, ListingMasterCreateRequest, ListingMasterCreateResult } from '@/domain/entities/ProductListingEntity';
 import type { CreateProductListingRequest, UpdateProductListingRequest, CreateProductListingOptionRequest, CreateProductListingProductRequest } from '@/application/dto/ProductListingDTOs';
 
 export class ProductListingUseCase {
@@ -9,8 +9,8 @@ export class ProductListingUseCase {
     return this.repository.getProductListingById(id);
   }
 
-  async getByPlatform(platform: string, page: number, size: number) {
-    return this.repository.getProductListingsByPlatform(platform, page, size);
+  async getByPlatform(platform: string, page: number, size: number, masterLinked?: boolean) {
+    return this.repository.getProductListingsByPlatform(platform, page, size, masterLinked);
   }
 
   async create(request: CreateProductListingRequest): Promise<ProductListing> {
@@ -35,5 +35,16 @@ export class ProductListingUseCase {
 
   async addProduct(request: CreateProductListingProductRequest): Promise<ProductListingProduct> {
     return this.repository.addProductListingProduct(request);
+  }
+
+  async previewMaster(listingId: number): Promise<ListingMasterPreview> {
+    return this.repository.previewMasterFromListing(listingId);
+  }
+
+  async createMaster(
+    listingId: number,
+    request: ListingMasterCreateRequest
+  ): Promise<ListingMasterCreateResult> {
+    return this.repository.createMasterFromListing(listingId, request);
   }
 }
