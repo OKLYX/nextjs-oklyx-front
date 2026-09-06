@@ -54,6 +54,22 @@ export interface RelatedOrder {
   lines: RelatedOrderLine[];
 }
 
+/**
+ * 답변 가능 여부·제약 — 단건 조회와 답변 전송 성공 응답에만 실린다 (D5).
+ *
+ * 🔴 이 값들을 화면이 다시 계산하지 않는다. `inquiryType === 'PRODUCT_QNA'` 같은 유형 분기,
+ * 플랫폼 분기, 길이 상수 하드코딩은 전부 금지다 — 유형마다 답변 규칙이 다르고 판정의 주인은
+ * 서버(`InquiryReplyPolicy`) 하나다. `reason` 도 서버가 완성한 문장이라 코드→문구 맵을 두지 않는다.
+ */
+export interface ReplyCapability {
+  canReply: boolean;
+  reason: string | null;           // canReply=false 일 때만 채워지는 사용자 노출 문구
+  minLength: number;               // 본문 최소 길이 (trim 기준)
+  maxLength: number;               // 본문 최대 길이 (trim 기준)
+  once: boolean;                   // true = 되돌릴 수 없음 → 2단 확인 (D17)
+  parentReplyId: string | null;    // 고객센터 전용. 서버가 고른 값 — 전송할 때 되돌려 보내지 않는다
+}
+
 /** 주문이 연결되지 않은 문의의 대체 정보 — vendorItemId 로 찾은 셀 (D15). */
 export interface RelatedListing {
   productListingId: number;
@@ -87,6 +103,11 @@ export interface Inquiry {
   replies?: InquiryReply[];        // filled by the single-inquiry read only
   relatedOrder?: RelatedOrder | null;      // single-inquiry read only (detail right panel)
   relatedListing?: RelatedListing | null;  // single-inquiry read only — fallback when unlinked
+  /**
+   * 답변 가능 여부 (D5) — 단건 조회·답변 전송 응답에만 있다.
+   * ⚠️ `undefined` 는 "모른다"이지 "가능하다"가 아니다. 컴포저는 이때 아무것도 렌더하지 않는다.
+   */
+  replyCapability?: ReplyCapability;
 }
 
 /** All four are rendered — `STALE` reaches the 상태 column even though it has no chip. */

@@ -26,4 +26,9 @@ export interface InquiryRepository {
   getInquiry(id: number): Promise<Inquiry>;
   /** 플랫폼별 지원 유형 (D4) — 유형 탭의 유일한 원천. */
   getTypes(): Promise<PlatformInquiryTypes[]>;
+  /**
+   * 답변 전송 (ADMIN 전용, D17 — 되돌릴 수 없다). 갱신된 문의 1건을 돌려받는다.
+   * ⚠️ `parentReplyId` 를 보내지 않는다 — 서버가 전송 시점에 자기 값을 다시 고른다.
+   */
+  sendReply(inquiryId: number, content: string): Promise<Inquiry>;
 }

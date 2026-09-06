@@ -24,6 +24,11 @@ export class InquiryUseCase {
     return this.repository.getTypes();
   }
 
+  /** 답변 전송 (D17). 성공하면 갱신된 문의로 화면을 통째 교체한다 — 로컬에서 스레드를 조립하지 않는다. */
+  async sendReply(inquiryId: number, content: string): Promise<Inquiry> {
+    return this.repository.sendReply(inquiryId, content);
+  }
+
   /**
    * 플랫폼별 유형 목록을 탭 하나에 쓸 평탄한 목록으로 만든다.
    *

@@ -8,11 +8,16 @@ import { InquiryRepositoryImpl } from '@/infrastructure/repositories/InquiryRepo
 import { InquiryUseCase } from '@/application/usecases/InquiryUseCase';
 import type { Inquiry } from '@/domain/entities/InquiryEntity';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
 import { InquiryDetailHeader } from './InquiryDetailHeader';
 import { InquiryThread } from './InquiryThread';
+import { InquiryReplyComposer } from './InquiryReplyComposer';
 import { InquiryOrderPanel } from './InquiryOrderPanel';
+
+/** `ClaimActionPanel` 과 같은 문구 — 권한 오류는 서버 문구 대신 화면이 갖는다. */
+const FORBIDDEN_MESSAGE = '이 작업은 관리자만 할 수 있습니다.';
 
 interface InquiryDetailContainerProps {
   /** `Number(params.id)` — 숫자가 아니면 조회하지 않고 빈 상태를 그린다. */
@@ -28,12 +33,21 @@ interface InquiryDetailContainerProps {
 export function InquiryDetailContainer({ inquiryId }: InquiryDetailContainerProps) {
   const router = useRouter();
   const inquiryUseCase = useMemo(() => new InquiryUseCase(new InquiryRepositoryImpl()), []);
+  /**
+   * 답변 전송은 ADMIN 전용 엔드포인트다(PLAN §5). 서버의 `replyCapability` 판정에는 역할이 없어
+   * 비-ADMIN 에게도 `canReply=true` 가 내려오므로, 다 쓰고 나서 403 을 맞지 않게 여기서 막는다.
+   */
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
 
   const [inquiry, setInquiry] = useState<Inquiry | null>(null);
   const [typeLabelMap, setTypeLabelMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+  // 502 = 전송 성공 여부 불명 → 재전송을 막는다(중복 전송이 되고 되돌릴 수 없다).
+  const [sendLocked, setSendLocked] = useState(false);
 
   /**
    * ⚠️ 로딩·에러 플래그를 여기서 세우지 않는다 — 초기값이 이미 로딩 상태이고, 재시도는 핸들러가
@@ -73,6 +87,34 @@ export function InquiryDetailContainer({ inquiryId }: InquiryDetailContainerProp
       await load();
     })();
   }, [inquiryId, load]);
+
+  /**
+   * 답변 전송(D17). 성공하면 **서버가 준 문의로 통째 교체**한다 — 스레드·상태·`replyCapability` 를
+   * 로컬에서 조립하면 다음 조회와 어긋난다. 성공 후 목록으로 자동 이동하지 않는다(결과를 확인해야 한다).
+   */
+  const handleSend = useCallback(
+    async (content: string) => {
+      try {
+        setIsSending(true);
+        setSendError('');
+        const updated = await inquiryUseCase.sendReply(inquiryId, content);
+        setInquiry(updated);
+      } catch (err) {
+        // 401 은 다루지 않는다 — axiosInstance 인터셉터가 갱신·재시도하고 실패 시 /login 으로 보낸다.
+        const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+        // 502 는 마켓 전송 결과가 불명이다 — 재시도를 권하면 중복 전송이 된다(다음 동기화가 정정한다).
+        if (status === 502) setSendLocked(true);
+        setSendError(
+          status === 403
+            ? FORBIDDEN_MESSAGE
+            : extractErrorMessage(err, '답변 전송에 실패했습니다.')
+        );
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [inquiryUseCase, inquiryId]
+  );
 
   const handleRetry = () => {
     setIsLoading(true);
@@ -162,7 +204,22 @@ export function InquiryDetailContainer({ inquiryId }: InquiryDetailContainerProp
         />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-7">
-            <InquiryThread inquiry={inquiry} />
+            <InquiryThread
+              inquiry={inquiry}
+              footer={
+                // capability 가 없으면(구버전 응답) 아무것도 그리지 않는다 — 모르는 상태에서
+                // 입력창을 열지 않는 것이 이 화면의 전방호환 계약이다.
+                isAdmin && inquiry.replyCapability ? (
+                  <InquiryReplyComposer
+                    capability={inquiry.replyCapability}
+                    isSending={isSending}
+                    isLocked={sendLocked}
+                    error={sendError}
+                    onSend={handleSend}
+                  />
+                ) : null
+              }
+            />
           </div>
           <div className="lg:col-span-5 lg:sticky lg:top-6 self-start">
             <InquiryOrderPanel inquiry={inquiry} />
