@@ -8,7 +8,7 @@ import { MarginPolicyUseCase } from '@/application/usecases/MarginPolicyUseCase'
 import { MarginPolicyRepositoryImpl } from '@/infrastructure/repositories/MarginPolicyRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
-import { PLATFORMS } from '@/app/dashboard/sales-products/register/components/ProductListingForm';
+import { PLATFORMS } from '@/config/platforms';
 import type { MarginPolicyResponse } from '@/domain/entities/MarginPolicyEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 
