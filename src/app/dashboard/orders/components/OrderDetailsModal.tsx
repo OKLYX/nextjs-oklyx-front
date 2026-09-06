@@ -23,7 +23,9 @@ import type {
 /**
  * 주문 상세 모달 — 읽기전용 정보 + (ADMIN·쿠팡) 단건 송장 접수시트 조회·다운로드
  *
- * 인라인 섹션이 두 개 붙는다 — 송장 접수시트(조회·다운로드)와 발송처리(택배사·송장번호 직접 입력).
+ * 액션 배치 — 발주처리는 **하단 고정 바 왼쪽**에, 발송처리·주문취소는 본문의 **좌우 탭**에 둔다
+ * (왼쪽 발송처리가 기본). 발주는 발송·취소의 앞 단계라 탭에 섞지 않고, 뒤 두 개는 배타적 선택이라
+ * 세로로 쌓지 않는다. 송장 접수시트(조회·다운로드)는 그 아래 인라인 섹션으로 남는다.
  * 시트 섹션은 새 팝업이 아니라 이 모달을 인라인 확장한다. 표 편집 UI 가 기존
  * `ShippingLabelPreviewModal`(주문목록 전체)과 모양이 비슷하지만 **공통 컴포넌트로 추출하지 않는다** —
  * 사용자 결정(PLAN D5)에 따라 이미 검증된 주문목록 다운로드 화면의 회귀 위험을 0 으로 두기 위함.
@@ -52,6 +54,15 @@ const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
 // platform (`!isCoupang`), so no other code can reach this banner. Kept as a map (not a literal
 // '쿠팡') so a second platform needs one entry, not a rewrite; unknown codes fall back to the raw code.
 const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡' };
+
+// 발송처리·주문취소 액션 탭. 발송처리가 왼쪽이자 기본값이다 — 주문 대부분이 발송으로 끝나고,
+// 취소는 되돌릴 수 없어 한 번 더 누르게 두는 편이 안전하다.
+const ACTION_TABS = [
+  { key: 'shipment', label: '발송처리' },
+  { key: 'cancel', label: '주문 취소' },
+] as const;
+
+type ActionTab = (typeof ACTION_TABS)[number]['key'];
 
 // 취소 접수 유형 라벨 — 쿠팡 `receiptType`(CANCEL=즉시취소 / STOP_SHIPMENT=출고중지) 표시 전용.
 // 이 모달 안에서만 쓰므로 엔티티·DTO 로 빼지 않는다. 모르는 코드는 원문 그대로 보여준다(PLAN 2609_25 D16).
@@ -109,6 +120,9 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const [cancelResult, setCancelResult] = useState<OrderCancelResult | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
+  // 발송처리·주문취소 탭. 기본은 왼쪽(발송처리). 상태 때문에 못 쓰는 탭이 골라져 있으면
+  // 아래 `activeTab` 이 파생값으로 되돌린다 — effect 로 고쳐 쓰지 않는다.
+  const [actionTab, setActionTab] = useState<ActionTab>('shipment');
 
   // Carrier list load — the platform's code table (Coupang has no carrier-list API), served from
   // our own backend, not a Coupang call, so it runs on open without a button. The guard mirrors the section's render gate: hooks run even when the
@@ -198,6 +212,16 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   // 빈칸은 Number('') === 0 이라 0·NaN 도 범위 밖으로 취급해 버튼만 막는다 — 입력 중 값을 되돌리지 않는다.
   const isCancelQtyValid = Number.isInteger(cancelQty) && cancelQty >= 1 && cancelQty <= order.purchasableQty;
   const isCancelInputDisabled = isCancelling || cancelSucceeded || cancelReasons.length === 0;
+  // 액션 노출 게이트 — 발주처리는 하단 고정 바로, 나머지 둘은 탭으로 갈린다.
+  const canAcknowledge = isAdmin && isCoupang && order.status === 'ACCEPT' && !fullyCanceled;
+  const canShip = isAdmin && isCoupang && !fullyCanceled;
+  const canCancel = isAdmin && isCoupang && (order.status === 'ACCEPT' || order.status === 'INSTRUCT');
+  // 고른 탭을 쓸 수 없으면 남은 탭을 보여준다(둘 다 없으면 탭 영역 자체가 안 그려진다).
+  const activeTab: ActionTab =
+    actionTab === 'shipment' && !canShip ? 'cancel'
+      : actionTab === 'cancel' && !canCancel ? 'shipment'
+        : actionTab;
+
   const registeredOptions = carrierOptions.filter((option) => option.registered);
   const otherOptions = carrierOptions.filter((option) => !option.registered);
 
@@ -408,312 +432,293 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             </div>
           )}
 
-          {/* 발주처리 — 이 라인이 속한 박스 전체를 상품준비중으로 전환한다(PLAN 2609_17 D14).
-              노출 조건은 `order.status` 로 판정한다 — 성공 후에도 섹션이 남아야 결과 문구를 보여줄 수 있다. */}
-          {isAdmin && isCoupang && order.status === 'ACCEPT' && !fullyCanceled && (
+          {/* 발송처리 · 주문 취소 — 좌우 탭(왼쪽 발송처리가 기본).
+              세로로 쌓으면 모달이 길어져 뒤 액션이 스크롤 밖으로 밀린다. 두 액션은 어차피
+              배타적 선택이라 탭이 맞다. 쓸 수 없는 탭은 지우지 않고 비활성으로 남긴다 —
+              지우면 "왜 안 보이지" 를 사용자가 알 수 없다.
+              ⚠️ 입력값(택배사·송장번호·사유·수량)은 이 컴포넌트의 state 라 탭을 오가도 남는다.
+              패널 안으로 state 를 내리면 탭 전환마다 입력이 날아간다. */}
+          {(canShip || canCancel) && (
             <div className="mt-6 border-t border-gray-200 pt-6">
-              <h4 className="text-lg font-semibold text-gray-900">발주처리</h4>
-
-              {ackSucceeded ? (
-                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
-                  발주처리 완료
-                </div>
-              ) : (
-                <>
-                  <p className="mt-1 text-sm text-gray-500">
-                    이 주문의 배송건(박스 {order.externalBoxId ?? '-'}) 전체가 상품준비중으로 전환됩니다. 되돌릴 수 없습니다.
-                  </p>
-                  <div className="mt-4">
+              {/* 탭 모양은 ClaimTypeTabs 와 같은 관용구(밑줄) — 모달 안이라 컴포넌트로 빼지 않는다. */}
+              <div className="flex gap-1 border-b border-gray-200">
+                {ACTION_TABS.map((tab) => {
+                  const isAvailable = tab.key === 'shipment' ? canShip : canCancel;
+                  const isActive = activeTab === tab.key;
+                  return (
                     <button
-                      onClick={handleAcknowledge}
-                      disabled={isAcknowledging}
-                      className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setActionTab(tab.key)}
+                      disabled={!isAvailable}
+                      className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed ${
+                        isActive
+                          ? 'border-blue-600 text-blue-700'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 disabled:text-gray-300 disabled:hover:text-gray-300'
+                      }`}
                     >
-                      {isAcknowledging ? <Spinner label="전송 중..." /> : '발주처리'}
+                      {tab.label}
                     </button>
-                  </div>
-                </>
-              )}
+                  );
+                })}
+              </div>
 
-              {ackError && (
-                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-                  {ackError}
-                </div>
-              )}
-
-              {/* 실패 사유는 쿠팡 원문 그대로(D15). 버튼은 열어 둔다. */}
-              {ackResult != null && ackResult.failed.length > 0 && (
-                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-                  {ackResult.failed.map((box) => (
-                    <p key={box.shipmentBoxId}>{box.resultCode}: {box.message}</p>
-                  ))}
-                </div>
-              )}
-
-              {ackResult != null && !ackSucceeded && ackResult.failed.length === 0 && (
-                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
-                  발주처리 대상이 아닙니다. 목록을 새로고침해 상태를 확인해주세요.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 주문 취소 — 결제완료는 즉시취소, 상품준비중은 출고중지로 접수된다(PLAN 2609_25 D6·D7).
-              노출은 2단계다: ① 섹션 게이트는 `order.status` 로만 판정해 성공 후에도 결과가 남게 하고,
-              ② 취소할 수량이 없는 주문은 섹션 안에서 안내 1줄로 갈린다.
-              전량취소 판정에 `isFullyCanceled` 를 쓰지 않는 이유는 파생값 주석 참조. */}
-          {isAdmin && isCoupang && (order.status === 'ACCEPT' || order.status === 'INSTRUCT') && (
-            <div className="mt-6 border-t border-gray-200 pt-6">
-              <h4 className="text-lg font-semibold text-gray-900">주문 취소</h4>
-
-              {order.purchasableQty === 0 ? (
-                <p className="mt-1 text-sm text-gray-500">취소 가능한 수량이 없습니다 (이미 취소된 주문)</p>
-              ) : (
-                <>
+              {/* 발송처리 — 택배사·송장번호를 직접 입력해 이 라인이 속한 박스 1개를 전송한다.
+                  전송 단위는 박스 전체(PLAN 2609_11 D1), 신규/수정 모드는 서버가 상태로 결정(D3),
+                  입력 잠금은 200 응답을 받은 뒤에만(요청 실패는 열어둔다, D14). */}
+              {/* 전량취소면 남은 액션이 없다. 숨김 조건은 `fullyCanceled` 뿐 — `cancelSucceeded` 로 숨기면
+                  부분취소 후 잔여 발송이 막힌다(PLAN 2609_25 D19). */}
+              {activeTab === 'shipment' && canShip && (
+                <div className="mt-4">
                   <p className="mt-1 text-sm text-gray-500">
-                    결제완료 주문은 즉시 취소되고, 상품준비중 주문은 출고중지로 접수됩니다.
-                  </p>
-                  {/* 판매자 점수 하락은 화면이 반드시 알려야 하는 대가다(D13). */}
-                  <p className="mt-1 text-sm text-red-600">
-                    ⚠️ 되돌릴 수 없으며, 쿠팡 판매자 점수(주문이행)가 하락합니다.
+                    박스 {order.externalBoxId ?? '-'} 의 모든 옵션에 같은 운송장번호가 적용됩니다.
                   </p>
 
+                  {isShipped && (
+                    <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
+                      {isFormOpen
+                        ? '이미 발송처리된 주문입니다. 입력한 운송장으로 송장 수정을 요청합니다.'
+                        : '이미 발송처리된 주문입니다. 운송장을 고치려면 [송장 수정하기] 를 누르세요.'}
+                    </div>
+                  )}
+
+                  {/* 발송된 건은 입력칸을 감춰 둔다 — 실수로 정상 송장을 덮어쓰지 않게 한 번 막는다. */}
+                  {!isFormOpen && (
+                    <div className="mt-4">
+                      <button
+                        onClick={() => setIsEditingInvoice(true)}
+                        disabled={isLocked}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
+                      >
+                        송장 수정하기
+                      </button>
+                    </div>
+                  )}
+
+                  {isFormOpen && (
                   <div className="mt-4 flex flex-wrap items-center gap-3">
-                    {/* 사유 라벨은 서버가 내려준 것만 쓴다 — 하드코딩하면 서버가 값을 늘렸을 때 조용히 어긋난다(D4). */}
+                    {/* 값은 마켓 코드 자체다 — 쿠팡은 택배사 목록 API 가 없고 문서 코드표가 SSOT 라
+                        로컬에 등록한 택배사는 [등록 택배사] 그룹으로 맨 위에만 올린다. */}
                     <select
-                      value={cancelReason}
-                      onChange={(e) => { setCancelReason(e.target.value); setCancelError(''); }}
-                      disabled={isCancelInputDisabled}
+                      value={carrierCode}
+                      onChange={(e) => setCarrierCode(e.target.value)}
+                      disabled={isInputDisabled}
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
                     >
-                      <option value="" disabled>사유를 선택하세요</option>
-                      {cancelReasons.map((reason) => (
-                        <option key={reason.code} value={reason.code}>{reason.label}</option>
-                      ))}
+                      <option value="">택배사 선택</option>
+                      {registeredOptions.length > 0 && (
+                        <optgroup label="등록 택배사">
+                          {registeredOptions.map((option) => (
+                            <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
+                              {option.carrierName}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {otherOptions.length > 0 && (
+                        <optgroup label={registeredOptions.length > 0 ? '전체 택배사' : '택배사'}>
+                          {otherOptions.map((option) => (
+                            <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
+                              {option.carrierName}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
 
+                    {/* type="text": invoice formats differ per carrier and Coupang validates them (D15). */}
                     <input
-                      type="number"
-                      min={1}
-                      max={order.purchasableQty}
-                      value={cancelQty}
-                      onChange={(e) => { setCancelQty(Number(e.target.value)); setCancelError(''); }}
-                      disabled={isCancelInputDisabled}
-                      className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm text-right disabled:bg-gray-100"
+                      type="text"
+                      maxLength={50}
+                      placeholder="송장번호"
+                      value={invoiceNumber}
+                      onChange={(e) => { setInvoiceNumber(e.target.value); setSubmitError(''); }}
+                      disabled={isInputDisabled}
+                      className="w-56 px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
                     />
-                    <span className="text-sm text-gray-500">/ 취소 가능 {order.purchasableQty}개</span>
 
                     <button
-                      onClick={handleCancel}
-                      disabled={isCancelInputDisabled || cancelReason === '' || !isCancelQtyValid}
-                      className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors disabled:bg-red-300 disabled:cursor-not-allowed"
+                      onClick={handleManualConfirm}
+                      disabled={isSubmitDisabled}
+                      className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                     >
-                      {isCancelling ? <Spinner label="전송 중..." /> : '주문 취소'}
+                      {isSubmitting ? <Spinner label="전송 중..." /> : (isShipped ? '송장 수정 요청' : '발송처리')}
                     </button>
                   </div>
-
-                  {/* 서버도 400 으로 막지만 왕복하지 않는다(D3). */}
-                  {!isCancelQtyValid && (
-                    <p className="mt-2 text-sm text-gray-500">1~{order.purchasableQty} 사이로 입력하세요</p>
                   )}
 
-                  {/* 목록을 못 불러온 것과 "값이 없는 것"은 다르다 — 임의 기본값을 만들지 않는다. */}
-                  {cancelReasonsFailed && (
-                    <p className="mt-2 text-sm text-gray-500">사유 목록을 불러오지 못했습니다.</p>
+                  {/* A load failure and an empty list need different words — telling someone whose
+                      carriers are registered to go register them sends them to the wrong screen. */}
+                  {carrierLoadFailed ? (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                      <span>택배사 목록을 불러오지 못했습니다.</span>
+                      <button
+                        onClick={() => setCarrierReloadTick((tick) => tick + 1)}
+                        disabled={isLoadingCarriers}
+                        className="text-blue-600 underline hover:text-blue-700 disabled:text-gray-400 disabled:no-underline"
+                      >
+                        {isLoadingCarriers ? '불러오는 중...' : '다시 시도'}
+                      </button>
+                    </div>
+                  ) : (
+                    carrierOptions.length === 0 &&
+                    !isLoadingCarriers && (
+                      <p className="mt-2 text-sm text-gray-500">
+                        {/* D16 — 쿠팡은 코드표 전량을 내려주므로 여기까지 오면 서버 쪽 문제다. */}
+                        선택할 수 있는 택배사가 없습니다. 잠시 후 다시 시도해주세요.
+                      </p>
+                    )
                   )}
-                </>
-              )}
 
-              {cancelSucceeded && (
-                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
-                  취소 접수 완료 — {cancelResult?.succeededQty ?? 0}개
-                  {cancelReceiptLabel !== '' && ` · ${cancelReceiptLabel}`}
+                  {submitError && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                      {submitError}
+                    </div>
+                  )}
+
+                  {result != null && result.succeeded > 0 && result.failed.length === 0 && (
+                    <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
+                      {result.mode === 'UPDATE' ? '송장 수정 요청 완료' : '발송처리 완료'} — 박스 {result.shipmentBoxId} ·{' '}
+                      {result.sentLines}건
+                    </div>
+                  )}
+
+                  {result != null && result.failed.length > 0 && (
+                    <div className="mt-4">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                        발송처리에 실패한 박스가 있습니다.
+                      </div>
+                      {/* Same columns/tone as ShipmentConfirmModal's failure table, deliberately not
+                          extracted into a shared component (2609_01 D5). Coupang wording verbatim (D6). */}
+                      <div className="mt-3 border border-gray-200 rounded-lg list-table-scroll">
+                        <table>
+                          <thead>
+                            <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                              <th className="px-4 py-2">박스 ID</th>
+                              <th className="px-4 py-2">코드</th>
+                              <th className="px-4 py-2">메시지</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
+                            {result.failed.map((box) => (
+                              <tr key={box.shipmentBoxId}>
+                                <td className="px-4 py-2">{box.shipmentBoxId}</td>
+                                <td className="px-4 py-2">{box.resultCode}</td>
+                                <td className="px-4 py-2">{box.message}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {cancelError && (
-                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-                  {cancelError}
-                </div>
-              )}
-
-              {/* 실패 사유는 쿠팡 원문 그대로 — 번역·요약하면 유일한 진단 정보가 사라진다(D16). */}
-              {cancelResult != null && cancelResult.failed.length > 0 && (
-                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-                  {cancelResult.failed.map((line) => (
-                    <p key={line.orderItemId}>{line.code}: {line.message}</p>
-                  ))}
-                </div>
-              )}
-
-              {cancelResult != null && cancelResult.skipped.length > 0 && (
-                <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 text-sm">
-                  {cancelResult.skipped.map((line) => (
-                    <p key={line.orderItemId}>{line.reason} ({getOrderStatusLabel(line.status)})</p>
-                  ))}
-                </div>
-              )}
-
-              {cancelResult != null && cancelResult.unsupported.length > 0 && (
-                <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 text-sm">
-                  {cancelResult.unsupported.map((line) => (
-                    <p key={line.orderItemId}>{line.reason}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 발송처리 — 택배사·송장번호를 직접 입력해 이 라인이 속한 박스 1개를 전송한다.
-              전송 단위는 박스 전체(PLAN 2609_11 D1), 신규/수정 모드는 서버가 상태로 결정(D3),
-              입력 잠금은 200 응답을 받은 뒤에만(요청 실패는 열어둔다, D14). */}
-          {/* 전량취소면 남은 액션이 없다. 숨김 조건은 `fullyCanceled` 뿐 — `cancelSucceeded` 로 숨기면
-              부분취소 후 잔여 발송이 막힌다(PLAN 2609_25 D19). */}
-          {isAdmin && isCoupang && !fullyCanceled && (
-            <div className="mt-6 border-t border-gray-200 pt-6">
-              <h4 className="text-lg font-semibold text-gray-900">발송처리</h4>
-              <p className="mt-1 text-sm text-gray-500">
-                박스 {order.externalBoxId ?? '-'} 의 모든 옵션에 같은 운송장번호가 적용됩니다.
-              </p>
-
-              {isShipped && (
-                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
-                  {isFormOpen
-                    ? '이미 발송처리된 주문입니다. 입력한 운송장으로 송장 수정을 요청합니다.'
-                    : '이미 발송처리된 주문입니다. 운송장을 고치려면 [송장 수정하기] 를 누르세요.'}
-                </div>
-              )}
-
-              {/* 발송된 건은 입력칸을 감춰 둔다 — 실수로 정상 송장을 덮어쓰지 않게 한 번 막는다. */}
-              {!isFormOpen && (
+              {/* 주문 취소 — 결제완료는 즉시취소, 상품준비중은 출고중지로 접수된다(PLAN 2609_25 D6·D7).
+                  노출은 2단계다: ① 섹션 게이트는 `order.status` 로만 판정해 성공 후에도 결과가 남게 하고,
+                  ② 취소할 수량이 없는 주문은 섹션 안에서 안내 1줄로 갈린다.
+                  전량취소 판정에 `isFullyCanceled` 를 쓰지 않는 이유는 파생값 주석 참조. */}
+              {activeTab === 'cancel' && canCancel && (
                 <div className="mt-4">
-                  <button
-                    onClick={() => setIsEditingInvoice(true)}
-                    disabled={isLocked}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
-                  >
-                    송장 수정하기
-                  </button>
-                </div>
-              )}
+                  {order.purchasableQty === 0 ? (
+                    <p className="mt-1 text-sm text-gray-500">취소 가능한 수량이 없습니다 (이미 취소된 주문)</p>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-gray-500">
+                        결제완료 주문은 즉시 취소되고, 상품준비중 주문은 출고중지로 접수됩니다.
+                      </p>
+                      {/* 판매자 점수 하락은 화면이 반드시 알려야 하는 대가다(D13). */}
+                      <p className="mt-1 text-sm text-red-600">
+                        ⚠️ 되돌릴 수 없으며, 쿠팡 판매자 점수(주문이행)가 하락합니다.
+                      </p>
 
-              {isFormOpen && (
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                {/* 값은 마켓 코드 자체다 — 쿠팡은 택배사 목록 API 가 없고 문서 코드표가 SSOT 라
-                    로컬에 등록한 택배사는 [등록 택배사] 그룹으로 맨 위에만 올린다. */}
-                <select
-                  value={carrierCode}
-                  onChange={(e) => setCarrierCode(e.target.value)}
-                  disabled={isInputDisabled}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
-                >
-                  <option value="">택배사 선택</option>
-                  {registeredOptions.length > 0 && (
-                    <optgroup label="등록 택배사">
-                      {registeredOptions.map((option) => (
-                        <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
-                          {option.carrierName}
-                        </option>
-                      ))}
-                    </optgroup>
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        {/* 사유 라벨은 서버가 내려준 것만 쓴다 — 하드코딩하면 서버가 값을 늘렸을 때 조용히 어긋난다(D4). */}
+                        <select
+                          value={cancelReason}
+                          onChange={(e) => { setCancelReason(e.target.value); setCancelError(''); }}
+                          disabled={isCancelInputDisabled}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
+                        >
+                          <option value="" disabled>사유를 선택하세요</option>
+                          {cancelReasons.map((reason) => (
+                            <option key={reason.code} value={reason.code}>{reason.label}</option>
+                          ))}
+                        </select>
+
+                        <input
+                          type="number"
+                          min={1}
+                          max={order.purchasableQty}
+                          value={cancelQty}
+                          onChange={(e) => { setCancelQty(Number(e.target.value)); setCancelError(''); }}
+                          disabled={isCancelInputDisabled}
+                          className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm text-right disabled:bg-gray-100"
+                        />
+                        <span className="text-sm text-gray-500">/ 취소 가능 {order.purchasableQty}개</span>
+
+                        <button
+                          onClick={handleCancel}
+                          disabled={isCancelInputDisabled || cancelReason === '' || !isCancelQtyValid}
+                          className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors disabled:bg-red-300 disabled:cursor-not-allowed"
+                        >
+                          {isCancelling ? <Spinner label="전송 중..." /> : '주문 취소'}
+                        </button>
+                      </div>
+
+                      {/* 서버도 400 으로 막지만 왕복하지 않는다(D3). */}
+                      {!isCancelQtyValid && (
+                        <p className="mt-2 text-sm text-gray-500">1~{order.purchasableQty} 사이로 입력하세요</p>
+                      )}
+
+                      {/* 목록을 못 불러온 것과 "값이 없는 것"은 다르다 — 임의 기본값을 만들지 않는다. */}
+                      {cancelReasonsFailed && (
+                        <p className="mt-2 text-sm text-gray-500">사유 목록을 불러오지 못했습니다.</p>
+                      )}
+                    </>
                   )}
-                  {otherOptions.length > 0 && (
-                    <optgroup label={registeredOptions.length > 0 ? '전체 택배사' : '택배사'}>
-                      {otherOptions.map((option) => (
-                        <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
-                          {option.carrierName}
-                        </option>
-                      ))}
-                    </optgroup>
+
+                  {cancelSucceeded && (
+                    <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
+                      취소 접수 완료 — {cancelResult?.succeededQty ?? 0}개
+                      {cancelReceiptLabel !== '' && ` · ${cancelReceiptLabel}`}
+                    </div>
                   )}
-                </select>
 
-                {/* type="text": invoice formats differ per carrier and Coupang validates them (D15). */}
-                <input
-                  type="text"
-                  maxLength={50}
-                  placeholder="송장번호"
-                  value={invoiceNumber}
-                  onChange={(e) => { setInvoiceNumber(e.target.value); setSubmitError(''); }}
-                  disabled={isInputDisabled}
-                  className="w-56 px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
-                />
+                  {cancelError && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                      {cancelError}
+                    </div>
+                  )}
 
-                <button
-                  onClick={handleManualConfirm}
-                  disabled={isSubmitDisabled}
-                  className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? <Spinner label="전송 중..." /> : (isShipped ? '송장 수정 요청' : '발송처리')}
-                </button>
-              </div>
-              )}
+                  {/* 실패 사유는 쿠팡 원문 그대로 — 번역·요약하면 유일한 진단 정보가 사라진다(D16). */}
+                  {cancelResult != null && cancelResult.failed.length > 0 && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                      {cancelResult.failed.map((line) => (
+                        <p key={line.orderItemId}>{line.code}: {line.message}</p>
+                      ))}
+                    </div>
+                  )}
 
-              {/* A load failure and an empty list need different words — telling someone whose
-                  carriers are registered to go register them sends them to the wrong screen. */}
-              {carrierLoadFailed ? (
-                <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                  <span>택배사 목록을 불러오지 못했습니다.</span>
-                  <button
-                    onClick={() => setCarrierReloadTick((tick) => tick + 1)}
-                    disabled={isLoadingCarriers}
-                    className="text-blue-600 underline hover:text-blue-700 disabled:text-gray-400 disabled:no-underline"
-                  >
-                    {isLoadingCarriers ? '불러오는 중...' : '다시 시도'}
-                  </button>
-                </div>
-              ) : (
-                carrierOptions.length === 0 &&
-                !isLoadingCarriers && (
-                  <p className="mt-2 text-sm text-gray-500">
-                    {/* D16 — 쿠팡은 코드표 전량을 내려주므로 여기까지 오면 서버 쪽 문제다. */}
-                    선택할 수 있는 택배사가 없습니다. 잠시 후 다시 시도해주세요.
-                  </p>
-                )
-              )}
+                  {cancelResult != null && cancelResult.skipped.length > 0 && (
+                    <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 text-sm">
+                      {cancelResult.skipped.map((line) => (
+                        <p key={line.orderItemId}>{line.reason} ({getOrderStatusLabel(line.status)})</p>
+                      ))}
+                    </div>
+                  )}
 
-              {submitError && (
-                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-                  {submitError}
+                  {cancelResult != null && cancelResult.unsupported.length > 0 && (
+                    <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 text-sm">
+                      {cancelResult.unsupported.map((line) => (
+                        <p key={line.orderItemId}>{line.reason}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {result != null && result.succeeded > 0 && result.failed.length === 0 && (
-                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
-                  {result.mode === 'UPDATE' ? '송장 수정 요청 완료' : '발송처리 완료'} — 박스 {result.shipmentBoxId} ·{' '}
-                  {result.sentLines}건
-                </div>
-              )}
-
-              {result != null && result.failed.length > 0 && (
-                <div className="mt-4">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-                    발송처리에 실패한 박스가 있습니다.
-                  </div>
-                  {/* Same columns/tone as ShipmentConfirmModal's failure table, deliberately not
-                      extracted into a shared component (2609_01 D5). Coupang wording verbatim (D6). */}
-                  <div className="mt-3 border border-gray-200 rounded-lg list-table-scroll">
-                    <table>
-                      <thead>
-                        <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
-                          <th className="px-4 py-2">박스 ID</th>
-                          <th className="px-4 py-2">코드</th>
-                          <th className="px-4 py-2">메시지</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
-                        {result.failed.map((box) => (
-                          <tr key={box.shipmentBoxId}>
-                            <td className="px-4 py-2">{box.shipmentBoxId}</td>
-                            <td className="px-4 py-2">{box.resultCode}</td>
-                            <td className="px-4 py-2">{box.message}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -789,22 +794,69 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-6">
-            <button
-              onClick={handleClose}
-              className="px-6 py-3 bg-gray-300 text-gray-700 font-semibold text-base rounded-lg hover:bg-gray-400 transition-colors"
-            >
-              닫기
-            </button>
-            {hasLoaded && (
+          {/* 발주처리 결과·오류도 이 띠에 둔다 — 버튼이 하단 고정이라 본문이 스크롤돼 있어도
+              누른 결과가 눈앞에 남아야 한다. 실패 사유는 쿠팡 원문 그대로(D15). */}
+          {ackError && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+              {ackError}
+            </div>
+          )}
+
+          {ackResult != null && ackResult.failed.length > 0 && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+              {ackResult.failed.map((box) => (
+                <p key={box.shipmentBoxId}>{box.resultCode}: {box.message}</p>
+              ))}
+            </div>
+          )}
+
+          {ackResult != null && !ackSucceeded && ackResult.failed.length === 0 && (
+            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
+              발주처리 대상이 아닙니다. 목록을 새로고침해 상태를 확인해주세요.
+            </div>
+          )}
+
+          {/* 왼쪽 = 발주처리 하나만. 발주는 발송·취소와 달리 배타적 선택이 아니라 앞 단계라
+              탭에 넣지 않고 항상 보이는 자리에 둔다(PLAN 2609_17 D14).
+              대상이 아니면 왼쪽 칸은 빈 채로 두고 오른쪽 버튼 자리는 그대로 유지한다. */}
+          <div className="flex items-center justify-between gap-3 pt-6">
+            <div className="flex items-center gap-3">
+              {canAcknowledge &&
+                (ackSucceeded ? (
+                  <span className="text-sm font-medium text-green-700">발주처리 완료</span>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleAcknowledge}
+                      disabled={isAcknowledging}
+                      className="px-6 py-3 bg-blue-600 text-white font-semibold text-base rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                    >
+                      {isAcknowledging ? <Spinner label="전송 중..." /> : '발주처리'}
+                    </button>
+                    <span className="hidden text-sm text-gray-500 sm:inline">
+                      박스 {order.externalBoxId ?? '-'} 전체가 상품준비중으로 전환됩니다. 되돌릴 수 없습니다.
+                    </span>
+                  </>
+                ))}
+            </div>
+
+            <div className="flex shrink-0 gap-2">
               <button
-                onClick={handleExport}
-                disabled={isPreviewing || isExporting || isEmpty || !!previewError}
-                className="px-6 py-3 bg-blue-600 text-white font-semibold text-base rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                onClick={handleClose}
+                className="px-6 py-3 bg-gray-300 text-gray-700 font-semibold text-base rounded-lg hover:bg-gray-400 transition-colors"
               >
-                {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
+                닫기
               </button>
-            )}
+              {hasLoaded && (
+                <button
+                  onClick={handleExport}
+                  disabled={isPreviewing || isExporting || isEmpty || !!previewError}
+                  className="px-6 py-3 bg-blue-600 text-white font-semibold text-base rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                >
+                  {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
