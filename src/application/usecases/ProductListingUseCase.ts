@@ -13,6 +13,7 @@ export class ProductListingUseCase {
     return this.repository.getProductListingsByPlatform(platform, page, size, masterLinked);
   }
 
+  /** @deprecated 2609_24 로 legacy 등록 화면이 사라져 호출자가 없다. 마스터 → 채널 추가/가져오기를 쓴다. */
   async create(request: CreateProductListingRequest): Promise<ProductListing> {
     return this.repository.createProductListing(request);
   }
