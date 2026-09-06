@@ -23,9 +23,10 @@ import type {
 /**
  * 주문 상세 모달 — 읽기전용 정보 + (ADMIN·쿠팡) 단건 송장 접수시트 조회·다운로드
  *
- * 액션 배치 — 발주처리는 **하단 고정 바 왼쪽**에, 발송처리·주문취소는 본문의 **좌우 탭**에 둔다
- * (왼쪽 발송처리가 기본). 발주는 발송·취소의 앞 단계라 탭에 섞지 않고, 뒤 두 개는 배타적 선택이라
- * 세로로 쌓지 않는다. 송장 접수시트(조회·다운로드)는 그 아래 인라인 섹션으로 남는다.
+ * 액션 배치 — 발주처리는 **하단 고정 바 왼쪽**에, 나머지는 본문의 **좌우 탭**(왼쪽부터 송장시트 ·
+ * 발송처리 · 주문취소, 기본 선택은 발송처리)에 둔다. 발주는 뒤 액션들의 앞 단계라 탭에 섞지 않고,
+ * 탭 셋은 한 번에 하나만 쓰는 배타적 선택이라 세로로 쌓지 않는다.
+ * 엑셀 다운로드 버튼은 표를 볼 수 있는 송장시트 탭에서만 하단 바에 나온다.
  * 시트 섹션은 새 팝업이 아니라 이 모달을 인라인 확장한다. 표 편집 UI 가 기존
  * `ShippingLabelPreviewModal`(주문목록 전체)과 모양이 비슷하지만 **공통 컴포넌트로 추출하지 않는다** —
  * 사용자 결정(PLAN D5)에 따라 이미 검증된 주문목록 다운로드 화면의 회귀 위험을 0 으로 두기 위함.
@@ -55,9 +56,10 @@ const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
 // '쿠팡') so a second platform needs one entry, not a rewrite; unknown codes fall back to the raw code.
 const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡' };
 
-// 발송처리·주문취소 액션 탭. 발송처리가 왼쪽이자 기본값이다 — 주문 대부분이 발송으로 끝나고,
-// 취소는 되돌릴 수 없어 한 번 더 누르게 두는 편이 안전하다.
+// 주문 상세 액션 탭. 왼쪽부터 송장시트 조회 → 발송처리 → 주문취소 순이고, **기본 선택은 발송처리**다 —
+// 주문 대부분이 발송으로 끝나고, 취소는 되돌릴 수 없어 한 번 더 누르게 두는 편이 안전하다.
 const ACTION_TABS = [
+  { key: 'sheet', label: '송장시트' },
   { key: 'shipment', label: '발송처리' },
   { key: 'cancel', label: '주문 취소' },
 ] as const;
@@ -214,13 +216,16 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const isCancelInputDisabled = isCancelling || cancelSucceeded || cancelReasons.length === 0;
   // 액션 노출 게이트 — 발주처리는 하단 고정 바로, 나머지 둘은 탭으로 갈린다.
   const canAcknowledge = isAdmin && isCoupang && order.status === 'ACCEPT' && !fullyCanceled;
+  // 시트는 쿠팡 전용이 아니다 — 버튼만 비활성되고 안내가 붙으므로 ADMIN 이면 탭을 연다.
+  const canSheet = isAdmin;
   const canShip = isAdmin && isCoupang && !fullyCanceled;
   const canCancel = isAdmin && isCoupang && (order.status === 'ACCEPT' || order.status === 'INSTRUCT');
-  // 고른 탭을 쓸 수 없으면 남은 탭을 보여준다(둘 다 없으면 탭 영역 자체가 안 그려진다).
-  const activeTab: ActionTab =
-    actionTab === 'shipment' && !canShip ? 'cancel'
-      : actionTab === 'cancel' && !canCancel ? 'shipment'
-        : actionTab;
+  const tabAvailability: Record<ActionTab, boolean> = { sheet: canSheet, shipment: canShip, cancel: canCancel };
+  // 고른 탭을 쓸 수 없으면 왼쪽부터 첫 번째로 쓸 수 있는 탭을 보여준다
+  // (하나도 없으면 탭 영역 자체가 안 그려진다).
+  const activeTab: ActionTab = tabAvailability[actionTab]
+    ? actionTab
+    : ACTION_TABS.find((tab) => tabAvailability[tab.key])?.key ?? actionTab;
 
   const registeredOptions = carrierOptions.filter((option) => option.registered);
   const otherOptions = carrierOptions.filter((option) => !option.registered);
@@ -413,37 +418,18 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             ))}
           </dl>
 
-          {isAdmin && (
-            <div className="mt-6 flex items-center gap-3">
-              <button
-                onClick={handlePreview}
-                disabled={!isCoupang || isPreviewing}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
-              >
-                {isPreviewing ? <Spinner label="불러오는 중..." /> : '송장시트 조회'}
-              </button>
-              {!isCoupang && <span className="text-sm text-gray-500">쿠팡 주문만 지원합니다.</span>}
-            </div>
-          )}
-
-          {previewError && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-              {previewError}
-            </div>
-          )}
-
-          {/* 발송처리 · 주문 취소 — 좌우 탭(왼쪽 발송처리가 기본).
-              세로로 쌓으면 모달이 길어져 뒤 액션이 스크롤 밖으로 밀린다. 두 액션은 어차피
-              배타적 선택이라 탭이 맞다. 쓸 수 없는 탭은 지우지 않고 비활성으로 남긴다 —
+          {/* 송장시트 · 발송처리 · 주문 취소 — 좌우 탭(기본 선택은 발송처리).
+              세로로 쌓으면 모달이 길어져 뒤 액션이 스크롤 밖으로 밀린다. 어차피 한 번에 하나만
+              쓰는 배타적 선택이라 탭이 맞다. 쓸 수 없는 탭은 지우지 않고 비활성으로 남긴다 —
               지우면 "왜 안 보이지" 를 사용자가 알 수 없다.
               ⚠️ 입력값(택배사·송장번호·사유·수량)은 이 컴포넌트의 state 라 탭을 오가도 남는다.
               패널 안으로 state 를 내리면 탭 전환마다 입력이 날아간다. */}
-          {(canShip || canCancel) && (
+          {(canSheet || canShip || canCancel) && (
             <div className="mt-6 border-t border-gray-200 pt-6">
               {/* 탭 모양은 ClaimTypeTabs 와 같은 관용구(밑줄) — 모달 안이라 컴포넌트로 빼지 않는다. */}
               <div className="flex gap-1 border-b border-gray-200">
                 {ACTION_TABS.map((tab) => {
-                  const isAvailable = tab.key === 'shipment' ? canShip : canCancel;
+                  const isAvailable = tabAvailability[tab.key];
                   const isActive = activeTab === tab.key;
                   return (
                     <button
@@ -462,6 +448,88 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                   );
                 })}
               </div>
+
+              {/* 송장 접수시트 — 조회는 쿠팡 실시간 호출이라 탭을 열어도 자동으로 부르지 않는다.
+                  버튼을 눌러야 조회하고, 불러온 표는 이 탭 안에 남는다(탭을 오가도 유지). */}
+              {activeTab === 'sheet' && canSheet && (
+                <div className="mt-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handlePreview}
+                      disabled={!isCoupang || isPreviewing}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
+                    >
+                      {isPreviewing ? <Spinner label="불러오는 중..." /> : '송장시트 조회'}
+                    </button>
+                    {!isCoupang && <span className="text-sm text-gray-500">쿠팡 주문만 지원합니다.</span>}
+                  </div>
+
+                  {previewError && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                      {previewError}
+                    </div>
+                  )}
+
+                  {hasLoaded && (
+                    <div className="mt-4">
+                      <p className="mt-1 text-sm text-gray-500">
+                        주문번호 {order.externalOrderId} · {rows.length}건
+                      </p>
+
+                      {/* Notice only, no re-issue button: Coupang OpenAPI has no safe-number re-issue endpoint
+                          and re-fetching the ordersheet returns the same value (PLAN 조사 결과). */}
+                      {hasMissingPhone && (
+                        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
+                          {PLATFORM_LABELS[order.platform] ?? order.platform}에서 고객 안심번호를 재발행하십시오.
+                        </div>
+                      )}
+
+                      {isEmpty ? (
+                        <div className="py-10 text-center text-gray-500">발송 대상 라인이 없습니다.</div>
+                      ) : (
+                        <div className="mt-4">
+                          <div className="border border-gray-200 rounded-lg list-table-scroll">
+                            <table>
+                              <thead>
+                                <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                                  <th className="px-4 py-2">이름</th>
+                                  <th className="px-4 py-2">배송지</th>
+                                  <th className="px-4 py-2">상품명</th>
+                                  <th className="px-4 py-2 text-right">내품수량</th>
+                                  <th className="px-4 py-2 text-right">택배수량</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
+                                {rows.map((row) => (
+                                  <tr key={row.rowKey}>
+                                    <td className="px-4 py-2">{row.receiverName}</td>
+                                    <td className="px-4 py-2">{addressHead(row.address)}</td>
+                                    <td className="px-4 py-2">{row.productName}</td>
+                                    <td className="px-4 py-2 text-right">{row.quantity}</td>
+                                    <td className="px-4 py-2 text-right">
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        value={row.parcelQuantity}
+                                        onChange={(e) => handleParcelChange(row.rowKey, e.target.value)}
+                                        className={`w-20 px-2 py-1 border rounded text-right outline-none focus:ring-2 focus:ring-blue-500 ${
+                                          invalidRowKey === row.rowKey
+                                            ? 'border-red-500 ring-2 ring-red-300'
+                                            : 'border-gray-300'
+                                        }`}
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 발송처리 — 택배사·송장번호를 직접 입력해 이 라인이 속한 박스 1개를 전송한다.
                   전송 단위는 박스 전체(PLAN 2609_11 D1), 신규/수정 모드는 서버가 상태로 결정(D3),
@@ -722,65 +790,6 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             </div>
           )}
 
-          {hasLoaded && (
-            <div className="mt-6 border-t border-gray-200 pt-6">
-              <h4 className="text-lg font-semibold text-gray-900">송장 접수시트</h4>
-              <p className="mt-1 text-sm text-gray-500">
-                주문번호 {order.externalOrderId} · {rows.length}건
-              </p>
-
-              {/* Notice only, no re-issue button: Coupang OpenAPI has no safe-number re-issue endpoint
-                  and re-fetching the ordersheet returns the same value (PLAN 조사 결과). */}
-              {hasMissingPhone && (
-                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
-                  {PLATFORM_LABELS[order.platform] ?? order.platform}에서 고객 안심번호를 재발행하십시오.
-                </div>
-              )}
-
-              {isEmpty ? (
-                <div className="py-10 text-center text-gray-500">발송 대상 라인이 없습니다.</div>
-              ) : (
-                <div className="mt-4">
-                  <div className="border border-gray-200 rounded-lg list-table-scroll">
-                    <table>
-                      <thead>
-                        <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
-                          <th className="px-4 py-2">이름</th>
-                          <th className="px-4 py-2">배송지</th>
-                          <th className="px-4 py-2">상품명</th>
-                          <th className="px-4 py-2 text-right">내품수량</th>
-                          <th className="px-4 py-2 text-right">택배수량</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
-                        {rows.map((row) => (
-                          <tr key={row.rowKey}>
-                            <td className="px-4 py-2">{row.receiverName}</td>
-                            <td className="px-4 py-2">{addressHead(row.address)}</td>
-                            <td className="px-4 py-2">{row.productName}</td>
-                            <td className="px-4 py-2 text-right">{row.quantity}</td>
-                            <td className="px-4 py-2 text-right">
-                              <input
-                                type="number"
-                                min={1}
-                                value={row.parcelQuantity}
-                                onChange={(e) => handleParcelChange(row.rowKey, e.target.value)}
-                                className={`w-20 px-2 py-1 border rounded text-right outline-none focus:ring-2 focus:ring-blue-500 ${
-                                  invalidRowKey === row.rowKey
-                                    ? 'border-red-500 ring-2 ring-red-300'
-                                    : 'border-gray-300'
-                                }`}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Pinned foot band. exportError lives here, not in the body: a download failure must be
@@ -847,7 +856,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
               >
                 닫기
               </button>
-              {hasLoaded && (
+              {activeTab === 'sheet' && hasLoaded && (
                 <button
                   onClick={handleExport}
                   disabled={isPreviewing || isExporting || isEmpty || !!previewError}
