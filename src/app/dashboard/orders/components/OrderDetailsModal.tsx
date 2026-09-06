@@ -8,7 +8,11 @@ import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { getOrderStatusLabel, isAlreadyShipped } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { OrderUseCase } from '@/application/usecases/OrderUseCase';
-import type { OrderAcknowledgeResult } from '@/application/dto/OrderDTOs';
+import type {
+  CancelReasonOption,
+  OrderAcknowledgeResult,
+  OrderCancelResult,
+} from '@/application/dto/OrderDTOs';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type {
   CarrierOption,
@@ -49,6 +53,13 @@ const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
 // '쿠팡') so a second platform needs one entry, not a rewrite; unknown codes fall back to the raw code.
 const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡' };
 
+// 취소 접수 유형 라벨 — 쿠팡 `receiptType`(CANCEL=즉시취소 / STOP_SHIPMENT=출고중지) 표시 전용.
+// 이 모달 안에서만 쓰므로 엔티티·DTO 로 빼지 않는다. 모르는 코드는 원문 그대로 보여준다(PLAN 2609_25 D16).
+const RECEIPT_TYPE_LABELS: Record<string, string> = {
+  CANCEL: '즉시취소',
+  STOP_SHIPMENT: '출고중지 접수',
+};
+
 // Format ISO LocalDateTime to ko-KR readable string; '-' for null
 function formatDate(value: string | null): string {
   if (!value) return '-';
@@ -88,6 +99,16 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const [ackResult, setAckResult] = useState<OrderAcknowledgeResult | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
   const [ackError, setAckError] = useState('');
+  // 발송 전 주문 취소(PLAN 2609_25). 사유 목록은 서버가 소유한다(D4) — 코드→라벨 상수를 만들지 않는다.
+  const [cancelReasons, setCancelReasons] = useState<CancelReasonOption[]>([]);
+  // 목록을 못 불러온 것과 "아직 안 골랐다"는 다르다 — 실패는 별도 플래그로 안내 문구를 가른다.
+  const [cancelReasonsFailed, setCancelReasonsFailed] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');            // 선택 전에는 '' = 버튼 비활성
+  // 기본값 = 전량 취소(D3). `order?.` 인 이유는 이 hook 이 `order == null` 가드보다 위에 오기 때문이다.
+  const [cancelQty, setCancelQty] = useState(order?.purchasableQty ?? 1);
+  const [cancelResult, setCancelResult] = useState<OrderCancelResult | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   // Carrier list load — the platform's code table (Coupang has no carrier-list API), served from
   // our own backend, not a Coupang call, so it runs on open without a button. The guard mirrors the section's render gate: hooks run even when the
@@ -118,6 +139,31 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     return () => { alive = false; };
   }, [isAdmin, order?.platform, useCase, carrierReloadTick]);
 
+  // 취소 사유 목록 — 우리 백엔드의 서버 소유 목록이라(PLAN 2609_25 D4) 쿠팡 왕복이 아니다.
+  // 택배사 목록과 같은 관례: 모달이 열릴 때 1회, ADMIN·쿠팡 가드, `alive` 로 언마운트 후 setState 방지.
+  // ⚠️ 여기서 부르는 것은 `orderUseCase` 다 — 택배사 목록의 `useCase`(ShippingLabelUseCase)와 인스턴스가 다르다.
+  useEffect(() => {
+    const platform = order?.platform;
+    if (!isAdmin || platform !== 'COUPANG') return;
+    let alive = true;
+    void (async () => {
+      try {
+        const options = await orderUseCase.getCancelReasons();
+        if (alive) {
+          setCancelReasons(options);
+          setCancelReasonsFailed(false);
+        }
+      } catch {
+        // 임의 기본값을 만들지 않는다 — 목록이 없으면 취소 버튼을 막는다.
+        if (alive) {
+          setCancelReasons([]);
+          setCancelReasonsFailed(true);
+        }
+      }
+    })();
+    return () => { alive = false; };
+  }, [isAdmin, order?.platform, orderUseCase]);
+
   if (order == null) return null;
 
   const isEmpty = hasLoaded && rows.length === 0;
@@ -137,6 +183,21 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   // 미발송이면 늘 열려 있고, 발송된 건은 [송장 수정하기] 를 누른 뒤에만 열린다.
   const isFormOpen = !isShipped || isEditingInvoice;
   const ackSucceeded = ackResult != null && ackResult.succeeded > 0;
+  // 취소 파생값 — 화면은 라인 1건만 보내므로(D6) 성공 라인도 최대 1건이다.
+  const cancelledLine = cancelResult?.cancelled[0] ?? null;
+  const cancelSucceeded = cancelledLine != null;
+  // 전량취소 판정에 `isFullyCanceled` 를 쓰지 않는다 — 그 헬퍼는 cancelCount 만 봐서 출고중지(hold)로
+  // 전량취소된 주문을 놓친다. 응답이 있으면 서버가 준 resultStatus 가, 없으면 cancel+hold 를 모두 반영한
+  // purchasableQty 가 판정 근거다(PLAN 2609_25 남는 위험).
+  const fullyCanceled = cancelResult != null
+    ? cancelResult.cancelled.some((line) => line.resultStatus === 'CANCELLED')
+    : order.purchasableQty === 0;
+  const cancelReceiptLabel = cancelledLine?.receiptType == null
+    ? ''
+    : (RECEIPT_TYPE_LABELS[cancelledLine.receiptType] ?? cancelledLine.receiptType);
+  // 빈칸은 Number('') === 0 이라 0·NaN 도 범위 밖으로 취급해 버튼만 막는다 — 입력 중 값을 되돌리지 않는다.
+  const isCancelQtyValid = Number.isInteger(cancelQty) && cancelQty >= 1 && cancelQty <= order.purchasableQty;
+  const isCancelInputDisabled = isCancelling || cancelSucceeded || cancelReasons.length === 0;
   const registeredOptions = carrierOptions.filter((option) => option.registered);
   const otherOptions = carrierOptions.filter((option) => !option.registered);
 
@@ -150,7 +211,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     setIsExporting(false);
     // Only a real success justifies the parent's refetch (PLAN 2609_11 D13).
     // 발주처리 성공도 같은 채널로 올린다(2609_17) — 호출부가 갈리지 않게 새 콜백을 만들지 않는다.
-    onClose((result != null && result.succeeded > 0) || ackSucceeded);
+    // 취소 성공도 같은 채널로 올린다 — 부모 재조회가 stale 재취소 경로를 없앤다(PLAN 2609_25 D14).
+    onClose((result != null && result.succeeded > 0) || ackSucceeded || cancelSucceeded);
   };
 
   const handlePreview = async () => {
@@ -231,6 +293,31 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   };
 
   /**
+   * 발송 전 주문 취소 — 이 라인을 고른 수량만큼 취소한다(PLAN 2609_25 D6).
+   * - 보내는 것은 라인 id + 수량뿐이다. 박스 분할·상태 판정·수량 상한은 서버가 한다(D1·D2·D3).
+   * - 되돌릴 수 없고 판매자 점수가 하락하므로 확인 다이얼로그가 마지막 방어선이다(D13).
+   */
+  const handleCancel = async () => {
+    if (cancelReason === '' || !isCancelQtyValid) return;
+    const label = cancelReasons.find((reason) => reason.code === cancelReason)?.label ?? cancelReason;
+    if (!window.confirm(
+      `${cancelQty}개를 "${label}" 사유로 취소합니다.\n되돌릴 수 없고 판매자 점수가 하락합니다. 계속할까요?`
+    )) return;
+    try {
+      setIsCancelling(true);
+      setCancelError('');
+      setCancelResult(
+        await orderUseCase.cancelOrders([{ orderItemId: order.id, quantity: cancelQty }], cancelReason)
+      );
+    } catch (err) {
+      // 요청이 안 갔을 수 있으므로 버튼은 다시 누를 수 있게 열어 둔다.
+      setCancelError(extractErrorMessage(err, '주문 취소에 실패했습니다. 다시 시도해주세요.'));
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  /**
    * 단건 발송처리 — 앵커 라인이 속한 박스 1개를 전송한다.
    * - 전송 단위는 박스 전체다. 박스 라인 전개는 서버가 한다(PLAN 2609_11 D1) — 여기서는 앵커 1줄만 보낸다.
    * - 신규 업로드/송장수정 모드는 서버가 주문 상태로 결정한다(D3) — 클라이언트는 라벨만 바꾼다.
@@ -271,12 +358,16 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     { label: '주문자', value: order.ordererName ?? '-' },
     { label: '수취인', value: order.receiverName ?? '-' },
     { label: '주문수량', value: order.orderCount },
-    { label: '취소수량', value: order.cancelCount },
-    { label: '보류수량', value: order.holdCount },
-    { label: '구매가능수량', value: order.purchasableQty },
+    // 취소 성공 라인은 서버가 준 결과값으로 덮어쓴다(PLAN 2609_25 D14) — 즉시취소는 취소수량이,
+    // 출고중지는 보류수량이 는다(D7). 주문수량은 그대로다(쿠팡도 원 주문수량은 바꾸지 않는다).
+    { label: '취소수량', value: cancelledLine?.resultCancelCount ?? order.cancelCount },
+    { label: '보류수량', value: cancelledLine?.resultHoldCount ?? order.holdCount },
+    { label: '구매가능수량', value: cancelledLine?.resultPurchasableQty ?? order.purchasableQty },
     // A successful CREATE writes 배송지시 back server-side; show it straight from the result (D4).
     // ⚠️ 발송처리 result 가 우선 — 순서를 뒤집으면 한 모달에서 발주→발송을 연달아 한 사용자에게 배송지시가 안 보인다.
-    { label: '상태', value: getOrderStatusLabel(result?.resultStatus ?? (ackSucceeded ? 'INSTRUCT' : order.status)) },
+    // 취소가 가장 뒤 단계라 취소 결과가 이긴다 — 전량취소면 서버가 'CANCELLED' 를 준다(D14).
+    { label: '상태', value: getOrderStatusLabel(
+        cancelledLine?.resultStatus ?? result?.resultStatus ?? (ackSucceeded ? 'INSTRUCT' : order.status)) },
     { label: '결제일', value: formatDate(order.paidAt) },
     { label: '마켓 계정 ID', value: order.marketplaceAccountId },
   ];
@@ -319,7 +410,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
 
           {/* 발주처리 — 이 라인이 속한 박스 전체를 상품준비중으로 전환한다(PLAN 2609_17 D14).
               노출 조건은 `order.status` 로 판정한다 — 성공 후에도 섹션이 남아야 결과 문구를 보여줄 수 있다. */}
-          {isAdmin && isCoupang && order.status === 'ACCEPT' && (
+          {isAdmin && isCoupang && order.status === 'ACCEPT' && !fullyCanceled && (
             <div className="mt-6 border-t border-gray-200 pt-6">
               <h4 className="text-lg font-semibold text-gray-900">발주처리</h4>
 
@@ -367,10 +458,118 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             </div>
           )}
 
+          {/* 주문 취소 — 결제완료는 즉시취소, 상품준비중은 출고중지로 접수된다(PLAN 2609_25 D6·D7).
+              노출은 2단계다: ① 섹션 게이트는 `order.status` 로만 판정해 성공 후에도 결과가 남게 하고,
+              ② 취소할 수량이 없는 주문은 섹션 안에서 안내 1줄로 갈린다.
+              전량취소 판정에 `isFullyCanceled` 를 쓰지 않는 이유는 파생값 주석 참조. */}
+          {isAdmin && isCoupang && (order.status === 'ACCEPT' || order.status === 'INSTRUCT') && (
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <h4 className="text-lg font-semibold text-gray-900">주문 취소</h4>
+
+              {order.purchasableQty === 0 ? (
+                <p className="mt-1 text-sm text-gray-500">취소 가능한 수량이 없습니다 (이미 취소된 주문)</p>
+              ) : (
+                <>
+                  <p className="mt-1 text-sm text-gray-500">
+                    결제완료 주문은 즉시 취소되고, 상품준비중 주문은 출고중지로 접수됩니다.
+                  </p>
+                  {/* 판매자 점수 하락은 화면이 반드시 알려야 하는 대가다(D13). */}
+                  <p className="mt-1 text-sm text-red-600">
+                    ⚠️ 되돌릴 수 없으며, 쿠팡 판매자 점수(주문이행)가 하락합니다.
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    {/* 사유 라벨은 서버가 내려준 것만 쓴다 — 하드코딩하면 서버가 값을 늘렸을 때 조용히 어긋난다(D4). */}
+                    <select
+                      value={cancelReason}
+                      onChange={(e) => { setCancelReason(e.target.value); setCancelError(''); }}
+                      disabled={isCancelInputDisabled}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
+                    >
+                      <option value="" disabled>사유를 선택하세요</option>
+                      {cancelReasons.map((reason) => (
+                        <option key={reason.code} value={reason.code}>{reason.label}</option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="number"
+                      min={1}
+                      max={order.purchasableQty}
+                      value={cancelQty}
+                      onChange={(e) => { setCancelQty(Number(e.target.value)); setCancelError(''); }}
+                      disabled={isCancelInputDisabled}
+                      className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm text-right disabled:bg-gray-100"
+                    />
+                    <span className="text-sm text-gray-500">/ 취소 가능 {order.purchasableQty}개</span>
+
+                    <button
+                      onClick={handleCancel}
+                      disabled={isCancelInputDisabled || cancelReason === '' || !isCancelQtyValid}
+                      className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors disabled:bg-red-300 disabled:cursor-not-allowed"
+                    >
+                      {isCancelling ? <Spinner label="전송 중..." /> : '주문 취소'}
+                    </button>
+                  </div>
+
+                  {/* 서버도 400 으로 막지만 왕복하지 않는다(D3). */}
+                  {!isCancelQtyValid && (
+                    <p className="mt-2 text-sm text-gray-500">1~{order.purchasableQty} 사이로 입력하세요</p>
+                  )}
+
+                  {/* 목록을 못 불러온 것과 "값이 없는 것"은 다르다 — 임의 기본값을 만들지 않는다. */}
+                  {cancelReasonsFailed && (
+                    <p className="mt-2 text-sm text-gray-500">사유 목록을 불러오지 못했습니다.</p>
+                  )}
+                </>
+              )}
+
+              {cancelSucceeded && (
+                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
+                  취소 접수 완료 — {cancelResult?.succeededQty ?? 0}개
+                  {cancelReceiptLabel !== '' && ` · ${cancelReceiptLabel}`}
+                </div>
+              )}
+
+              {cancelError && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                  {cancelError}
+                </div>
+              )}
+
+              {/* 실패 사유는 쿠팡 원문 그대로 — 번역·요약하면 유일한 진단 정보가 사라진다(D16). */}
+              {cancelResult != null && cancelResult.failed.length > 0 && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                  {cancelResult.failed.map((line) => (
+                    <p key={line.orderItemId}>{line.code}: {line.message}</p>
+                  ))}
+                </div>
+              )}
+
+              {cancelResult != null && cancelResult.skipped.length > 0 && (
+                <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 text-sm">
+                  {cancelResult.skipped.map((line) => (
+                    <p key={line.orderItemId}>{line.reason} ({getOrderStatusLabel(line.status)})</p>
+                  ))}
+                </div>
+              )}
+
+              {cancelResult != null && cancelResult.unsupported.length > 0 && (
+                <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 text-sm">
+                  {cancelResult.unsupported.map((line) => (
+                    <p key={line.orderItemId}>{line.reason}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 발송처리 — 택배사·송장번호를 직접 입력해 이 라인이 속한 박스 1개를 전송한다.
               전송 단위는 박스 전체(PLAN 2609_11 D1), 신규/수정 모드는 서버가 상태로 결정(D3),
               입력 잠금은 200 응답을 받은 뒤에만(요청 실패는 열어둔다, D14). */}
-          {isAdmin && isCoupang && (
+          {/* 전량취소면 남은 액션이 없다. 숨김 조건은 `fullyCanceled` 뿐 — `cancelSucceeded` 로 숨기면
+              부분취소 후 잔여 발송이 막힌다(PLAN 2609_25 D19). */}
+          {isAdmin && isCoupang && !fullyCanceled && (
             <div className="mt-6 border-t border-gray-200 pt-6">
               <h4 className="text-lg font-semibold text-gray-900">발송처리</h4>
               <p className="mt-1 text-sm text-gray-500">

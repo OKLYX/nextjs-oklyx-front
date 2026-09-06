@@ -5,7 +5,8 @@ import type { OrderRepository } from '@/domain/repositories/OrderRepository';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  OrderAcknowledgeResult, OrderMonth, OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
+  CancelReasonOption, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult, OrderMonth,
+  OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export class OrderRepositoryImpl implements OrderRepository {
@@ -54,6 +55,18 @@ export class OrderRepositoryImpl implements OrderRepository {
   // 라인 id 만 보낸다 — 박스 dedupe·상태 필터는 서버가 한다(PLAN 2609_17 D1·D2).
   async acknowledgeOrders(orderItemIds: number[]): Promise<OrderAcknowledgeResult> {
     const response = await axiosInstance.post('/api/admin/orders/acknowledge', { orderItemIds });
+    return response.data.data;
+  }
+
+  // 사유 목록은 서버가 소유한다(PLAN 2609_25 D4) — 상수로 복제하지 말 것.
+  async getCancelReasons(): Promise<CancelReasonOption[]> {
+    const response = await axiosInstance.get('/api/admin/orders/cancel-reasons');
+    return response.data.data;
+  }
+
+  // 라인 + 수량만 보낸다 — 박스 분할·상태 필터·수량 상한은 서버가 판정한다(PLAN 2609_25 D1·D2·D3).
+  async cancelOrders(lines: OrderCancelLine[], reason: string): Promise<OrderCancelResult> {
+    const response = await axiosInstance.post('/api/admin/orders/cancel', { lines, reason });
     return response.data.data;
   }
 }
