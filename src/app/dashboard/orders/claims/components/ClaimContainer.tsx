@@ -23,6 +23,11 @@ import { ClaimDetailsModal } from './ClaimDetailsModal';
 
 const PAGE_SIZE = 20;
 
+// Status chip selected on entry and after a tab switch. 접수 is what needs handling first, so it
+// is the landing filter instead of 전체. Must stay a value present in BOTH
+// RETURN_STATUS_FILTERS and EXCHANGE_STATUS_FILTERS.
+const DEFAULT_STATUS: ClaimStatus = 'RECEIVED';
+
 export function ClaimContainer() {
   const claimUseCase = useMemo(() => new ClaimUseCase(new ClaimRepositoryImpl()), []);
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
@@ -34,7 +39,8 @@ export function ClaimContainer() {
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
-  const [selectedStatus, setSelectedStatus] = useState<ClaimStatus | null>(null);
+  // Defaults to 접수 (see DEFAULT_STATUS); null still means 전체.
+  const [selectedStatus, setSelectedStatus] = useState<ClaimStatus | null>(DEFAULT_STATUS);
   // Picked in the dropdown but only applied to the list on [조회].
   const [selectedPeriod, setSelectedPeriod] = useState<string>(RECENT_PERIOD);
   const [searchTerm, setSearchTerm] = useState('');
@@ -142,7 +148,8 @@ export function ClaimContainer() {
     setClaimType(next);
     // Required: the chip list differs per tab, so a stale selection (e.g. 확인요청 on 교환)
     // would filter the list to zero rows with nothing on screen explaining why.
-    setSelectedStatus(null);
+    // Reset to the default (접수) rather than 전체 — both tabs carry that chip.
+    setSelectedStatus(DEFAULT_STATUS);
     setCurrentPage(0);
     setSelectedClaim(null);
     void fetchClaims(next, selectedSellerId, selectedPeriod, searchTerm);
