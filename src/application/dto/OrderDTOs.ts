@@ -59,3 +59,73 @@ export interface OrderAcknowledgeResult {
   skipped: SkippedOrder[];
   unsupported: string[];
 }
+
+/**
+ * 취소 사유 1행 (GET /api/admin/orders/cancel-reasons).
+ *
+ * ⚠️ 사유 목록의 유일한 소유자는 서버다(PLAN 2609_25 D4) — 코드→라벨 상수를 프론트에 만들지 말 것.
+ * 서버 enum 이 목록과 검증을 함께 소유하므로 값이 늘어도(D18) 화면은 그대로 따라간다.
+ */
+export interface CancelReasonOption {
+  code: string;
+  label: string;
+}
+
+/** POST /api/admin/orders/cancel 요청 라인. quantity 는 1..purchasableQty(D3). */
+export interface OrderCancelLine {
+  orderItemId: number;
+  quantity: number;
+}
+
+/**
+ * 취소에 성공한 라인 — 화면 즉시 갱신용 값이 함께 온다(D14).
+ *
+ * ⚠️ 취소수량·보류수량이 **둘 다** 온다: 결제완료 취소(`CANCEL`)는 cancelCount 가, 상품준비중
+ * 취소(`STOP_SHIPMENT`)는 holdCount 가 는다(D7). 한쪽만 보고 그리면 상품준비중 취소에서
+ * 숫자가 그대로로 보여 성공을 못 알아본다.
+ */
+export interface CancelledLine {
+  orderItemId: number;
+  cancelledQty: number;
+  resultCancelCount: number;
+  resultHoldCount: number;
+  resultPurchasableQty: number;
+  /** 전량취소(cancel+hold ≥ orderCount)면 'CANCELLED', 아니면 기존 status. */
+  resultStatus: string;
+  receiptId: string | null;
+  /** CANCEL(즉시취소) | STOP_SHIPMENT(출고중지). */
+  receiptType: string | null;
+}
+
+/** 취소에 실패한 라인 — code/message 는 쿠팡 원문(D16). 번역·요약 금지. */
+export interface FailedLine {
+  orderItemId: number;
+  externalItemId: string;
+  code: string;
+  message: string;
+}
+
+/** 전송하지 않은 라인 — skipped·unsupported 가 같은 모양이다(D20). `SkippedOrder` 재사용 금지. */
+export interface SkippedLine {
+  orderItemId: number;
+  externalOrderId: string;
+  status: string;
+  reason: string;
+}
+
+/**
+ * 발송 전 주문 취소 결과 (POST /api/admin/orders/cancel).
+ *
+ * 목록 4종이 전부 **라인 단위**다(D20) — 요청이 lines 배열이라 결과가 주문 단위면 어느 라인이
+ * 걸러졌는지 화면이 맞출 수 없다. 그래서 `ShippingLabelDTOs` 의 `FailedBox`/`SkippedOrder` 를
+ * 재사용하지 않는다.
+ */
+export interface OrderCancelResult {
+  requestedLines: number;
+  succeededLines: number;
+  succeededQty: number;
+  cancelled: CancelledLine[];
+  failed: FailedLine[];
+  skipped: SkippedLine[];
+  unsupported: SkippedLine[];
+}

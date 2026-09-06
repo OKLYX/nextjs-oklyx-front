@@ -2,7 +2,8 @@ import type { OrderRepository } from '@/domain/repositories/OrderRepository';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  OrderAcknowledgeResult, OrderMonth, OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
+  CancelReasonOption, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult, OrderMonth,
+  OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export class OrderUseCase {
@@ -33,5 +34,13 @@ export class OrderUseCase {
 
   async acknowledgeOrders(orderItemIds: number[]): Promise<OrderAcknowledgeResult> {
     return this.repository.acknowledgeOrders(orderItemIds);
+  }
+
+  async getCancelReasons(): Promise<CancelReasonOption[]> {
+    return this.repository.getCancelReasons();
+  }
+
+  async cancelOrders(lines: OrderCancelLine[], reason: string): Promise<OrderCancelResult> {
+    return this.repository.cancelOrders(lines, reason);
   }
 }
