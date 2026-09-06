@@ -128,12 +128,19 @@ export const EXCHANGE_STATUS_FILTERS: ClaimStatus[] = [
 ];
 
 /**
- * Fault code → Korean label. **Starts empty on purpose** — Coupang's actual `faultByType` value set
- * is not confirmed yet, and a guessed mapping would show wrong labels. Fill it in once dev responses
- * confirm the values. Until then (and for any unmapped value afterwards) the screen shows the raw
- * value — it must never render blank.
+ * Fault code → Korean label.
+ *
+ * `VENDOR` is confirmed against production data (2026-09-06); `CUSTOMER` and `COUPANG` are the other
+ * two parties a return can be charged to. Any value outside this table still renders raw rather than
+ * blank, so an unconfirmed code shows up as itself instead of disappearing.
+ *
+ * Mobile keeps the identical table — web and app must never label the same code differently.
  */
-export const FAULT_TYPE_LABEL: Record<string, string> = {};
+export const FAULT_TYPE_LABEL: Record<string, string> = {
+  VENDOR: '판매자',
+  CUSTOMER: '고객',
+  COUPANG: '쿠팡',
+};
 
 /**
  * ⚠️ Always render fault through this — never read FAULT_TYPE_LABEL[x] directly in a component:
