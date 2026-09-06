@@ -97,6 +97,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         { href: ROUTES.ORDERS_SHIPMENT, label: '출고관리' },
         { href: ROUTES.ORDERS_RETRIEVE, label: '주문내역' },
         { href: ROUTES.ORDERS_CLAIMS, label: '반품/교환' },
+        { href: ROUTES.ORDERS_INQUIRIES, label: '고객문의' },
       ],
     },
     {

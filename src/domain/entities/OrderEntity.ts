@@ -24,6 +24,9 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   DELIVERING: '배송중',
   FINAL_DELIVERY: '배송완료',
   NONE_TRACKING: '추적불가',   // long explanation lives under the status filter chip (OrderContainer)
+  // `effectiveStatus` only — a fully canceled line reports CANCELLED while `status` keeps its
+  // original code, so the order screens (which read `status`) are unaffected.
+  CANCELLED: '취소',
 };
 
 // Returns the Korean label for an order status code; falls back to the raw value
