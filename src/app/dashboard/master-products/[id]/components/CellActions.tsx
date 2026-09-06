@@ -10,6 +10,7 @@ import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories
 import { ChannelFieldValuesModal } from './ChannelFieldValuesModal';
 import { ChannelStockModal } from './ChannelStockModal';
 import { ChannelPriceModal } from './ChannelPriceModal';
+import { ChannelOptionNameModal } from './ChannelOptionNameModal';
 import { ChannelShippingOverrideModal } from './ChannelShippingOverrideModal';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type {
@@ -78,6 +79,7 @@ export function CellActions({
   const [showShipping, setShowShipping] = useState(false);
   const [showStock, setShowStock] = useState(false);
   const [showPrice, setShowPrice] = useState(false);
+  const [showOptionName, setShowOptionName] = useState(false);
 
   const optionName = (id: number) => options.find((o) => o.id === id)?.name ?? `옵션 #${id}`;
 
@@ -261,6 +263,16 @@ export function CellActions({
         >
           가격 설정
         </button>
+
+        {/* 옵션명도 등록 전에 정해두는 값이라 DRAFT 를 포함한 모든 셀에서 노출한다(2609_22/D23). */}
+        <button
+          type="button"
+          onClick={() => setShowOptionName(true)}
+          disabled={busy !== null}
+          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+        >
+          옵션명
+        </button>
       </div>
 
       {status === 'DRAFT' && shippingBlocked && (
@@ -335,6 +347,15 @@ export function CellActions({
           channelLabel={channelLabel}
           onSaved={() => onReload()}
           onClose={() => setShowPrice(false)}
+        />
+      )}
+
+      {showOptionName && (
+        <ChannelOptionNameModal
+          listingId={listing.id}
+          channelLabel={channelLabel}
+          onSaved={() => onReload()}
+          onClose={() => setShowOptionName(false)}
         />
       )}
     </div>

@@ -23,6 +23,11 @@ import type {
   OptionStocksRequest,
   OptionPricesRequest,
   ChannelPriceUpdateResponse,
+  OptionNamesRequest,
+  ApplyOptionNamesResponse,
+  ImportPreviewRequest,
+  ImportPreviewResponse,
+  ImportRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -207,6 +212,35 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     data: OptionPricesRequest,
   ): Promise<ChannelPriceUpdateResponse> {
     const response = await axiosInstance.put(`${listingBase}/${listingId}/options/price`, data);
+    return response.data.data;
+  }
+
+  async setOptionNames(
+    listingId: number,
+    data: OptionNamesRequest,
+  ): Promise<ListingOptionsResponse> {
+    const response = await axiosInstance.put(`${listingBase}/${listingId}/options/name`, data);
+    return response.data.data;
+  }
+
+  async applyMasterOptionNames(masterId: number): Promise<ApplyOptionNamesResponse> {
+    const response = await axiosInstance.post(`${masterBase}/${masterId}/options/apply-names`);
+    return response.data.data;
+  }
+
+  async importPreview(
+    masterId: number,
+    body: ImportPreviewRequest,
+  ): Promise<ImportPreviewResponse> {
+    const response = await axiosInstance.post(
+      `${masterBase}/${masterId}/listings/import/preview`,
+      body,
+    );
+    return response.data.data;
+  }
+
+  async importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse> {
+    const response = await axiosInstance.post(`${masterBase}/${masterId}/listings/import`, body);
     return response.data.data;
   }
 }

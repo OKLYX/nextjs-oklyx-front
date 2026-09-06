@@ -19,6 +19,11 @@ import type {
   OptionStocksRequest,
   OptionPricesRequest,
   ChannelPriceUpdateResponse,
+  OptionNamesRequest,
+  ApplyOptionNamesResponse,
+  ImportPreviewRequest,
+  ImportPreviewResponse,
+  ImportRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -84,4 +89,12 @@ export interface ListingRegistrationRepository {
   setOptionStocks(listingId: number, data: OptionStocksRequest): Promise<ListingOptionsResponse>;
   /** 채널 옵션 판매가 저장 + 마켓 즉시 반영(2609_19). null = 자동계산가 복귀. */
   setOptionPrices(listingId: number, data: OptionPricesRequest): Promise<ChannelPriceUpdateResponse>;
+  /** 2609_22/D3: 채널 옵션명 변경. optionName 을 비우면 마스터 옵션명으로 복귀(AUTO). */
+  setOptionNames(listingId: number, data: OptionNamesRequest): Promise<ListingOptionsResponse>;
+  /** 2609_22/D4: 마스터 기준으로 모든 채널 옵션명 되돌리기. */
+  applyMasterOptionNames(masterId: number): Promise<ApplyOptionNamesResponse>;
+  /** 2609_22: 가져오기 미리보기 — 쓰기 없음. 실패는 그대로 throw 해서 모달이 문구를 노출한다. */
+  importPreview(masterId: number, body: ImportPreviewRequest): Promise<ImportPreviewResponse>;
+  /** 2609_22: 가져오기 커밋 — 성공 시 새 셀 id 를 담은 ChannelAddResponse. */
+  importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse>;
 }

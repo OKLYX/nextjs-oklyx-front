@@ -20,6 +20,11 @@ import type {
   OptionStocksRequest,
   OptionPricesRequest,
   ChannelPriceUpdateResponse,
+  OptionNamesRequest,
+  ApplyOptionNamesResponse,
+  ImportPreviewRequest,
+  ImportPreviewResponse,
+  ImportRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -158,5 +163,21 @@ export class ListingRegistrationUseCase {
     data: OptionPricesRequest,
   ): Promise<ChannelPriceUpdateResponse> {
     return this.repository.setOptionPrices(listingId, data);
+  }
+
+  setOptionNames(listingId: number, data: OptionNamesRequest): Promise<ListingOptionsResponse> {
+    return this.repository.setOptionNames(listingId, data);
+  }
+
+  applyMasterOptionNames(masterId: number): Promise<ApplyOptionNamesResponse> {
+    return this.repository.applyMasterOptionNames(masterId);
+  }
+
+  importPreview(masterId: number, body: ImportPreviewRequest): Promise<ImportPreviewResponse> {
+    return this.repository.importPreview(masterId, body);
+  }
+
+  importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse> {
+    return this.repository.importListing(masterId, body);
   }
 }
