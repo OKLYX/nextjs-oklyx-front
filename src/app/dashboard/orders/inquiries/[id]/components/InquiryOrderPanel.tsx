@@ -62,7 +62,7 @@ export function InquiryOrderPanel({ inquiry }: InquiryOrderPanelProps) {
               <div className="flex items-start justify-between gap-2">
                 <span className="text-gray-900 break-words">{line.itemName ?? '-'}</span>
                 <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
-                  {getOrderStatusLabel(line.effectiveStatus)}
+                  {getOrderStatusLabel(line.status)}
                 </span>
               </div>
               <div className="mt-1 text-xs text-gray-500">
