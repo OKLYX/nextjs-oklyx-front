@@ -1,9 +1,9 @@
 'use client';
 
-import { X } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
+import { OrderSearchInput } from './OrderSearchInput';
 
 /**
  * 채널(계정) 셀렉트 옵션. 출고관리 필터 카드도 같은 shape 을 쓴다.
@@ -52,27 +52,6 @@ interface OrderSearchCardProps {
   /** The container decides this from the period the list actually holds — the card never judges. */
   showStaleNotice: boolean;
 }
-
-const CHIP_BASE = 'px-3 py-1 rounded-full text-sm';
-const CHIP_ON = 'bg-blue-600 text-white';
-const CHIP_OFF = 'bg-gray-100 text-gray-700 hover:bg-gray-200';
-
-// Chip order is fixed: the existing two keep their place and the new two are appended
-// (PLAN 2609_27 D3 — moving 고객명 would silently change what an existing user's first search means).
-const SEARCH_FIELDS: ReadonlyArray<{ value: OrderSearchField; label: string }> = [
-  { value: 'customer', label: '고객명' },
-  { value: 'orderNo', label: '주문번호' },
-  { value: 'product', label: '상품명' },
-  { value: 'all', label: '전체' },
-];
-
-// One map instead of nested ternaries (PLAN 2609_27 D8).
-const SEARCH_PLACEHOLDER: Record<OrderSearchField, string> = {
-  customer: '고객명 검색 (주문자·수취인)',
-  orderNo: '주문번호 검색',
-  product: '상품명 검색',
-  all: '고객명·주문번호·상품명 검색',
-};
 
 function formatSyncedAt(value: string | null): string {
   if (!value) return '동기화 기록 없음';
@@ -157,41 +136,12 @@ export function OrderSearchCard({
           </div>
         </div>
 
-        {/* No <form>: Enter would reload the page, and filtering happens as you type. */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">검색</label>
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            {SEARCH_FIELDS.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onSearchFieldChange(value)}
-                className={`${CHIP_BASE} ${searchField === value ? CHIP_ON : CHIP_OFF}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="relative">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => onSearchTermChange(e.target.value)}
-              placeholder={SEARCH_PLACEHOLDER[searchField]}
-              className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => onSearchTermChange('')}
-                aria-label="검색어 지우기"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-        </div>
+        <OrderSearchInput
+          searchField={searchField}
+          onSearchFieldChange={onSearchFieldChange}
+          searchTerm={searchTerm}
+          onSearchTermChange={onSearchTermChange}
+        />
 
         {showStaleNotice && (
           <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
