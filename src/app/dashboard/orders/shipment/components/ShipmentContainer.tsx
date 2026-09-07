@@ -8,8 +8,8 @@ import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { ShippingLabelRepositoryImpl } from '@/infrastructure/repositories/ShippingLabelRepositoryImpl';
 import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
-import type { OrderItem } from '@/domain/entities/OrderEntity';
-import { SHIPMENT_STATUSES } from '@/domain/entities/OrderEntity';
+import type { OrderItem, OrderSearchField } from '@/domain/entities/OrderEntity';
+import { SHIPMENT_STATUSES, matchesOrderSearch } from '@/domain/entities/OrderEntity';
 import type { OrderAcknowledgeResult, SyncTarget } from '@/application/dto/OrderDTOs';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -47,8 +47,10 @@ function buildMessage(result: OrderAcknowledgeResult): { text: string; detail: s
 /**
  * 출고관리 컨테이너 — 아직 발송하지 않은 주문(결제완료·상품준비중)의 작업 화면.
  *
- * 주문내역이 조회 화면인 것과 달리 여기는 작업 화면이라 기간·검색이 없고(PLAN 2609_15 D8)
+ * 주문내역이 조회 화면인 것과 달리 여기는 작업 화면이라 기간 선택이 없고(PLAN 2609_15 D8)
  * 송장 접수시트·발송처리 입구가 여기 하나뿐이다(D4).
+ * 검색은 주문내역과 **같은 규칙**을 쓴다(같은 칩 4종·같은 `matchesOrderSearch`) — 서버 창은
+ * 그대로 14일이고 검색은 그 안에서만 걸린다(클라이언트 필터).
  *
  * ⚠️ 표·모달은 주문내역 것을 그대로 재사용한다(D12) — 복사하지 말 것.
  * ⚠️ 동기화 오케스트레이션은 `useOrderSync` 한 벌만 쓴다(D6).
@@ -71,6 +73,9 @@ export function ShipmentContainer() {
   const [syncTargets, setSyncTargets] = useState<SyncTarget[]>([]);
   const [orders, setOrders] = useState<OrderItem[]>([]);   // 서버 응답 원본(필터 전)
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  // 주문내역과 같은 클라이언트 검색(칩 4종). 서버를 부르지 않으므로 [조회] 없이 즉시 반영된다.
+  const [searchField, setSearchField] = useState<OrderSearchField>('customer');
+  const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -184,23 +189,26 @@ export function ShipmentContainer() {
 
   // 필터 → 정렬 → 페이지. 표시 목록은 파생값으로만 만든다(별도 state 금지 — 두 벌이 되면 어긋난다).
   // 전량취소는 서버 판정(`cancelled`)으로 뺀다(PLAN 2609_26 D26) — 출고중지로만 전량이 빠진 건도 걸린다.
+  // 순서는 주문내역과 같다: 채널 → 검색 → 상태. 배지 건수도 검색 결과를 센다.
   const visible = useMemo(() => orders
     .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
     .filter((o) => !o.cancelled)
     .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
+    .filter((o) => matchesOrderSearch(o, searchField, searchTerm))
     .filter((o) => !selectedStatus || o.status === selectedStatus),
-    [orders, selectedAccountId, selectedStatus]);
+    [orders, selectedAccountId, selectedStatus, searchField, searchTerm]);
 
   // 칩 카운트는 탭 선택 전 목록으로 센다(선택해도 다른 칩 건수가 0 이 되지 않게).
   const statusCounts = useMemo(() => orders
     .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
     .filter((o) => !o.cancelled)
     .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
+    .filter((o) => matchesOrderSearch(o, searchField, searchTerm))
     .reduce<Record<string, number>>((acc, order) => {
       acc[order.status] = (acc[order.status] ?? 0) + 1;
       return acc;
     }, {}),
-    [orders, selectedAccountId]);
+    [orders, selectedAccountId, searchField, searchTerm]);
 
   const sorted = useMemo(() => {
     if (sortKey == null) return visible;
@@ -319,6 +327,19 @@ export function ShipmentContainer() {
     clearSelection();
   };
 
+  // 검색어·칩이 바뀌면 목록이 줄어든다 — 1페이지로 되돌리고, 화면 밖 건이 전송되지 않게 선택을 버린다.
+  const handleSearchTermChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(0);
+    clearSelection();
+  };
+
+  const handleSearchFieldChange = (field: OrderSearchField) => {
+    setSearchField(field);
+    setCurrentPage(0);
+    clearSelection();
+  };
+
   const handleStatusChange = (status: string | null) => {
     setSelectedStatus(status);
     setCurrentPage(0);
@@ -356,6 +377,10 @@ export function ShipmentContainer() {
         canDownload={isAdmin}
         onDownload={() => setIsPreviewOpen(true)}
         onOpenConfirm={() => setIsConfirmOpen(true)}
+        searchField={searchField}
+        onSearchFieldChange={handleSearchFieldChange}
+        searchTerm={searchTerm}
+        onSearchTermChange={handleSearchTermChange}
       />
 
       <OrderStatusFilter

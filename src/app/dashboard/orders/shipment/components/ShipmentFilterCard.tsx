@@ -2,17 +2,20 @@
 
 import { Download, Upload } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { ChannelOption } from '../../components/OrderSearchCard';
+import { OrderSearchInput } from '../../components/OrderSearchInput';
 
 /**
  * 출고관리 화면의 필터·액션 카드.
  *
- * **용도**: 판매자·채널 선택 + [동기화]/[조회] + ADMIN 전용 [송장 접수시트]/[발송처리].
+ * **용도**: 판매자·채널 선택 + 검색 + [동기화]/[조회] + ADMIN 전용 [송장 접수시트]/[발송처리].
  * **파일**: src/app/dashboard/orders/shipment/components/ShipmentFilterCard.tsx
  *
- * ⚠️ 주문내역의 `OrderSearchCard` 를 재사용하지 않는다(PLAN 2609_15 D12) — 출고관리는 기간·검색이
- * 없고 액션 구성이 달라, 토글 props 를 계속 붙이면 카드가 두 화면의 분기 덩어리가 된다.
- * 목록 표·모달은 그대로 재사용하므로 D12 의 취지는 지켜진다.
+ * ⚠️ 주문내역의 `OrderSearchCard` 를 통째로 재사용하지 않는다(PLAN 2609_15 D12) — 출고관리는
+ * 기간이 없고 액션 구성이 달라, 토글 props 를 계속 붙이면 카드가 두 화면의 분기 덩어리가 된다.
+ * 다만 **검색 UI 는 두 화면이 같아야 하므로** 공용 조각 `OrderSearchInput` 을 함께 쓴다
+ * (칩·placeholder 를 복사하면 한쪽만 바뀐다). 목록 표·모달도 그대로 재사용한다.
  * ⚠️ 접수시트·발송처리는 서버가 `sellerId` 기준으로 처리한다 — 채널 필터가 적용되지 않는다.
  */
 interface ShipmentFilterCardProps {
@@ -32,6 +35,11 @@ interface ShipmentFilterCardProps {
   canDownload: boolean;
   onDownload: () => void;
   onOpenConfirm: () => void;
+  /** 주문내역과 같은 클라이언트 검색(칩 4종 + 검색어) — 서버를 부르지 않는다. */
+  searchField: OrderSearchField;
+  onSearchFieldChange: (field: OrderSearchField) => void;
+  searchTerm: string;
+  onSearchTermChange: (value: string) => void;
 }
 
 function formatSyncedAt(value: string | null): string {
@@ -57,6 +65,10 @@ export function ShipmentFilterCard({
   canDownload,
   onDownload,
   onOpenConfirm,
+  searchField,
+  onSearchFieldChange,
+  searchTerm,
+  onSearchTermChange,
 }: ShipmentFilterCardProps) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -127,6 +139,13 @@ export function ShipmentFilterCard({
             </p>
           )}
         </div>
+
+        <OrderSearchInput
+          searchField={searchField}
+          onSearchFieldChange={onSearchFieldChange}
+          searchTerm={searchTerm}
+          onSearchTermChange={onSearchTermChange}
+        />
 
         <div className="flex items-center justify-between">
           <div>
