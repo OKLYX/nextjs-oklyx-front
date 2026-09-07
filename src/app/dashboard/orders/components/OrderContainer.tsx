@@ -9,7 +9,7 @@ import { ShippingLabelRepositoryImpl } from '@/infrastructure/repositories/Shipp
 import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
-import { CANCELED_FILTER, isFullyCanceled, matchesOrderSearch } from '@/domain/entities/OrderEntity';
+import { CANCELED_FILTER, matchesOrderSearch } from '@/domain/entities/OrderEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import {
   RECENT_PERIOD, buildPeriodOptions, isMonthPeriod, toPeriodRange,
@@ -214,23 +214,24 @@ export function OrderContainer() {
   // Fully-canceled orders are excluded here and counted separately below.
   const statusCounts = useMemo(() => {
     return searchedOrders.reduce<Record<string, number>>((acc, order) => {
-      if (isFullyCanceled(order)) return acc;
+      if (order.cancelled) return acc;
       acc[order.status] = (acc[order.status] ?? 0) + 1;
       return acc;
     }, {});
   }, [searchedOrders]);
 
-  // Fully-canceled orders (orderCount === cancelCount) surfaced under the 취소항목 chip
-  const canceledCount = useMemo(() => searchedOrders.filter(isFullyCanceled).length, [searchedOrders]);
+  // Fully-canceled orders surfaced under the 취소항목 chip. 판정은 서버가 소유한다(PLAN 2609_26 D26)
+  // — 출고중지(hold)로만 전량이 빠진 주문도 여기 들어온다.
+  const canceledCount = useMemo(() => searchedOrders.filter((o) => o.cancelled).length, [searchedOrders]);
 
   // Apply the selected filter before sorting/paging:
   // - CANCELED_FILTER: only fully-canceled orders
   // - a status code: that status, excluding fully-canceled ones
   // - null: all orders except fully-canceled (those live under 취소항목)
   const filteredOrders = useMemo(() => {
-    if (selectedStatus === CANCELED_FILTER) return searchedOrders.filter(isFullyCanceled);
-    if (selectedStatus == null) return searchedOrders.filter((o) => !isFullyCanceled(o));
-    return searchedOrders.filter((o) => o.status === selectedStatus && !isFullyCanceled(o));
+    if (selectedStatus === CANCELED_FILTER) return searchedOrders.filter((o) => o.cancelled);
+    if (selectedStatus == null) return searchedOrders.filter((o) => !o.cancelled);
+    return searchedOrders.filter((o) => o.status === selectedStatus && !o.cancelled);
   }, [searchedOrders, selectedStatus]);
 
   const sortedOrders = useMemo(() => {
@@ -502,13 +503,6 @@ export function OrderContainer() {
           counts={statusCounts}
           canceledCount={canceledCount}
         />
-
-        {/* -mt-4 cancels the parent's 24px stack gap so the note reads as part of the chip row. */}
-        {selectedStatus === 'NONE_TRACKING' && (
-          <p className="-mt-4 text-xs text-gray-500">
-            업체가 직접 배송해 배송 연동이 적용되지 않는 주문입니다 — 송장 추적이 불가합니다.
-          </p>
-        )}
 
         <OrderTable
           orders={pagedOrders}

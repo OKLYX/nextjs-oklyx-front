@@ -73,6 +73,14 @@ const RECEIPT_TYPE_LABELS: Record<string, string> = {
   STOP_SHIPMENT: '출고중지 접수',
 };
 
+// 주문 시점 금액 스냅샷 표시(PLAN 2609_26 D9·D10).
+// ⚠️ null 은 0 원이 아니라 "모른다"다 — 과거 주문은 백필된 만큼만 값이 있다.
+// 0 으로 그리면 무료 주문과 구분되지 않으므로 '—' 로 가른다.
+function formatAmount(value: number | null): string {
+  if (value == null) return '—';
+  return `${value.toLocaleString('ko-KR')}원`;
+}
+
 // Format ISO LocalDateTime to ko-KR readable string; '-' for null
 function formatDate(value: string | null): string {
   if (!value) return '-';
@@ -108,7 +116,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   // `false` start shows the D16 register notice for a frame to someone who has carriers registered.
   const [isLoadingCarriers, setIsLoadingCarriers] = useState(true);
   const [carrierReloadTick, setCarrierReloadTick] = useState(0);   // [다시 시도] re-runs the effect
-  // 발주처리(ACCEPT→INSTRUCT). 일괄과 같은 엔드포인트를 쓴다(PLAN 2609_17 D6).
+  // 발주처리(결제완료→상품준비중). 일괄과 같은 엔드포인트를 쓴다(PLAN 2609_17 D6).
   const [ackResult, setAckResult] = useState<OrderAcknowledgeResult | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
   const [ackError, setAckError] = useState('');
@@ -202,12 +210,11 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   // 취소 파생값 — 화면은 라인 1건만 보내므로(D6) 성공 라인도 최대 1건이다.
   const cancelledLine = cancelResult?.cancelled[0] ?? null;
   const cancelSucceeded = cancelledLine != null;
-  // 전량취소 판정에 `isFullyCanceled` 를 쓰지 않는다 — 그 헬퍼는 cancelCount 만 봐서 출고중지(hold)로
-  // 전량취소된 주문을 놓친다. 응답이 있으면 서버가 준 resultStatus 가, 없으면 cancel+hold 를 모두 반영한
-  // purchasableQty 가 판정 근거다(PLAN 2609_25 남는 위험).
+  // 전량취소 판정은 서버가 소유한다(PLAN 2609_26 D26). 응답이 있으면 방금 받은 resultStatus 가,
+  // 없으면 목록 응답의 `cancelled` 가 근거다 — 둘 다 서버 판정이라 기준이 갈리지 않는다.
   const fullyCanceled = cancelResult != null
     ? cancelResult.cancelled.some((line) => line.resultStatus === 'CANCELLED')
-    : order.purchasableQty === 0;
+    : order.cancelled;
   const cancelReceiptLabel = cancelledLine?.receiptType == null
     ? ''
     : (RECEIPT_TYPE_LABELS[cancelledLine.receiptType] ?? cancelledLine.receiptType);
@@ -215,11 +222,11 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const isCancelQtyValid = Number.isInteger(cancelQty) && cancelQty >= 1 && cancelQty <= order.purchasableQty;
   const isCancelInputDisabled = isCancelling || cancelSucceeded || cancelReasons.length === 0;
   // 액션 노출 게이트 — 발주처리는 하단 고정 바로, 나머지 둘은 탭으로 갈린다.
-  const canAcknowledge = isAdmin && isCoupang && order.status === 'ACCEPT' && !fullyCanceled;
+  const canAcknowledge = isAdmin && isCoupang && order.status === 'PAID' && !fullyCanceled;
   // 시트는 쿠팡 전용이 아니다 — 버튼만 비활성되고 안내가 붙으므로 ADMIN 이면 탭을 연다.
   const canSheet = isAdmin;
   const canShip = isAdmin && isCoupang && !fullyCanceled;
-  const canCancel = isAdmin && isCoupang && (order.status === 'ACCEPT' || order.status === 'INSTRUCT');
+  const canCancel = isAdmin && isCoupang && (order.status === 'PAID' || order.status === 'PREPARING');
   const tabAvailability: Record<ActionTab, boolean> = { sheet: canSheet, shipment: canShip, cancel: canCancel };
   // 고른 탭을 쓸 수 없으면 왼쪽부터 첫 번째로 쓸 수 있는 탭을 보여준다
   // (하나도 없으면 탭 영역 자체가 안 그려진다).
@@ -392,11 +399,16 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     { label: '취소수량', value: cancelledLine?.resultCancelCount ?? order.cancelCount },
     { label: '보류수량', value: cancelledLine?.resultHoldCount ?? order.holdCount },
     { label: '구매가능수량', value: cancelledLine?.resultPurchasableQty ?? order.purchasableQty },
-    // A successful CREATE writes 배송지시 back server-side; show it straight from the result (D4).
-    // ⚠️ 발송처리 result 가 우선 — 순서를 뒤집으면 한 모달에서 발주→발송을 연달아 한 사용자에게 배송지시가 안 보인다.
+    // 금액은 주문 시점 스냅샷이라 취소·동기화로 바뀌지 않는다. 배송비는 박스 단위라 여기 없다.
+    { label: '단가', value: formatAmount(order.unitPrice) },
+    { label: '주문금액', value: formatAmount(order.lineAmount) },
+    { label: '할인금액', value: formatAmount(order.discountAmount) },
+    { label: '플랫폼 부담 할인', value: formatAmount(order.platformDiscountAmount) },
+    // A successful CREATE writes 발송처리 back server-side; show it straight from the result (D4).
+    // ⚠️ 발송처리 result 가 우선 — 순서를 뒤집으면 한 모달에서 발주→발송을 연달아 한 사용자에게 발송처리가 안 보인다.
     // 취소가 가장 뒤 단계라 취소 결과가 이긴다 — 전량취소면 서버가 'CANCELLED' 를 준다(D14).
     { label: '상태', value: getOrderStatusLabel(
-        cancelledLine?.resultStatus ?? result?.resultStatus ?? (ackSucceeded ? 'INSTRUCT' : order.status)) },
+        cancelledLine?.resultStatus ?? result?.resultStatus ?? (ackSucceeded ? 'PREPARING' : order.status)) },
     { label: '결제일', value: formatDate(order.paidAt) },
     { label: '마켓 계정 ID', value: order.marketplaceAccountId },
   ];
@@ -685,8 +697,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
 
               {/* 주문 취소 — 결제완료는 즉시취소, 상품준비중은 출고중지로 접수된다(PLAN 2609_25 D6·D7).
                   노출은 2단계다: ① 섹션 게이트는 `order.status` 로만 판정해 성공 후에도 결과가 남게 하고,
-                  ② 취소할 수량이 없는 주문은 섹션 안에서 안내 1줄로 갈린다.
-                  전량취소 판정에 `isFullyCanceled` 를 쓰지 않는 이유는 파생값 주석 참조. */}
+                  ② 취소할 수량이 없는 주문은 섹션 안에서 안내 1줄로 갈린다. */}
               {activeTab === 'cancel' && canCancel && (
                 <div className="mt-4">
                   {order.purchasableQty === 0 ? (

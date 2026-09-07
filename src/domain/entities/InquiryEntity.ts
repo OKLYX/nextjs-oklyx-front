@@ -1,3 +1,5 @@
+import type { OrderStatus } from './OrderEntity';
+
 // Customer inquiry domain types — GET /api/inquiries (FEATURE_2609_23).
 // One list holds every inquiry kind: the type tab is a server axis, not a separate screen.
 
@@ -38,7 +40,7 @@ export interface RelatedOrderLine {
   itemName: string | null;
   orderCount: number;
   cancelCount: number;
-  effectiveStatus: string;         // 'CANCELLED' when fully canceled — see getOrderStatusLabel()
+  status: OrderStatus;             // 중립 상태 — 전량취소는 'CANCELLED' (getOrderStatusLabel 로 라벨화)
   isInquiryLine: boolean;          // the line this inquiry hangs on (highlighted in the panel)
 }
 

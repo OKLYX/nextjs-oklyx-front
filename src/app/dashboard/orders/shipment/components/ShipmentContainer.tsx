@@ -9,7 +9,7 @@ import { ShippingLabelRepositoryImpl } from '@/infrastructure/repositories/Shipp
 import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
-import { SHIPMENT_STATUSES, isFullyCanceled } from '@/domain/entities/OrderEntity';
+import { SHIPMENT_STATUSES } from '@/domain/entities/OrderEntity';
 import type { OrderAcknowledgeResult, SyncTarget } from '@/application/dto/OrderDTOs';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -183,10 +183,10 @@ export function ShipmentContainer() {
   );
 
   // 필터 → 정렬 → 페이지. 표시 목록은 파생값으로만 만든다(별도 state 금지 — 두 벌이 되면 어긋난다).
-  // 전량취소는 status 가 ACCEPT 그대로라 isFullyCanceled 로 따로 뺀다(D13).
+  // 전량취소는 서버 판정(`cancelled`)으로 뺀다(PLAN 2609_26 D26) — 출고중지로만 전량이 빠진 건도 걸린다.
   const visible = useMemo(() => orders
     .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
-    .filter((o) => !isFullyCanceled(o))
+    .filter((o) => !o.cancelled)
     .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
     .filter((o) => !selectedStatus || o.status === selectedStatus),
     [orders, selectedAccountId, selectedStatus]);
@@ -194,7 +194,7 @@ export function ShipmentContainer() {
   // 칩 카운트는 탭 선택 전 목록으로 센다(선택해도 다른 칩 건수가 0 이 되지 않게).
   const statusCounts = useMemo(() => orders
     .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
-    .filter((o) => !isFullyCanceled(o))
+    .filter((o) => !o.cancelled)
     .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
     .reduce<Record<string, number>>((acc, order) => {
       acc[order.status] = (acc[order.status] ?? 0) + 1;
@@ -232,7 +232,7 @@ export function ShipmentContainer() {
 
   // 결제완료 + 쿠팡 + 박스 id 있음 = 발주처리 대상(PLAN 2609_17 D2·D10). 판정은 여기 한 곳에서만 한다.
   const isSelectable = useCallback((o: OrderItem) =>
-    o.status === 'ACCEPT' && o.platform === 'COUPANG' && Boolean(o.externalBoxId), []);
+    o.status === 'PAID' && o.platform === 'COUPANG' && Boolean(o.externalBoxId), []);
 
   // 전체 선택은 현재 페이지 기준으로만 계산한다(D7) — 선택 자체는 id 라 페이지를 넘겨도 유지된다.
   const selectablePaged = useMemo(() => paged.filter(isSelectable), [paged, isSelectable]);

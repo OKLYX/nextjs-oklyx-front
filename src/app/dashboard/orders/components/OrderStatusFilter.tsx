@@ -19,7 +19,7 @@ interface OrderStatusFilterProps {
 
 // Renders the order-status filter chips between the search card and the list.
 // The status chips are followed by a dedicated 취소항목 chip that isolates
-// fully-canceled orders (orderCount === cancelCount) out of the normal statuses.
+// fully-canceled orders (server-decided `cancelled`) out of the normal statuses.
 // Each chip shows its item count; clicking the active chip again clears the filter
 // (there is no '전체' chip — re-clicking the active one is how you clear it).
 //
