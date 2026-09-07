@@ -57,6 +57,23 @@ const CHIP_BASE = 'px-3 py-1 rounded-full text-sm';
 const CHIP_ON = 'bg-blue-600 text-white';
 const CHIP_OFF = 'bg-gray-100 text-gray-700 hover:bg-gray-200';
 
+// Chip order is fixed: the existing two keep their place and the new two are appended
+// (PLAN 2609_27 D3 — moving 고객명 would silently change what an existing user's first search means).
+const SEARCH_FIELDS: ReadonlyArray<{ value: OrderSearchField; label: string }> = [
+  { value: 'customer', label: '고객명' },
+  { value: 'orderNo', label: '주문번호' },
+  { value: 'product', label: '상품명' },
+  { value: 'all', label: '전체' },
+];
+
+// One map instead of nested ternaries (PLAN 2609_27 D8).
+const SEARCH_PLACEHOLDER: Record<OrderSearchField, string> = {
+  customer: '고객명 검색 (주문자·수취인)',
+  orderNo: '주문번호 검색',
+  product: '상품명 검색',
+  all: '고객명·주문번호·상품명 검색',
+};
+
 function formatSyncedAt(value: string | null): string {
   if (!value) return '동기화 기록 없음';
   const date = new Date(value);
@@ -143,28 +160,24 @@ export function OrderSearchCard({
         {/* No <form>: Enter would reload the page, and filtering happens as you type. */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">검색</label>
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              type="button"
-              onClick={() => onSearchFieldChange('customer')}
-              className={`${CHIP_BASE} ${searchField === 'customer' ? CHIP_ON : CHIP_OFF}`}
-            >
-              고객명
-            </button>
-            <button
-              type="button"
-              onClick={() => onSearchFieldChange('orderNo')}
-              className={`${CHIP_BASE} ${searchField === 'orderNo' ? CHIP_ON : CHIP_OFF}`}
-            >
-              주문번호
-            </button>
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            {SEARCH_FIELDS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onSearchFieldChange(value)}
+                className={`${CHIP_BASE} ${searchField === value ? CHIP_ON : CHIP_OFF}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           <div className="relative">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => onSearchTermChange(e.target.value)}
-              placeholder={searchField === 'orderNo' ? '주문번호 검색' : '고객명 검색 (주문자·수취인)'}
+              placeholder={SEARCH_PLACEHOLDER[searchField]}
               className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
             {searchTerm && (

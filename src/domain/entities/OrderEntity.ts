@@ -91,21 +91,52 @@ export function isAlreadyShipped(status: string): boolean {
 // 별도 칩으로 빼는 이유는 목록 기본 화면에서 취소를 감추기 위함이다.
 export const CANCELED_FILTER = 'CANCELLED';
 
-// Search target chip. Customer name is the default (PLAN D10).
-export type OrderSearchField = 'customer' | 'orderNo';
+// Search target chip. Customer name stays the default (PLAN 2609_27 D3).
+export type OrderSearchField = 'customer' | 'orderNo' | 'product' | 'all';
 
-// Strip whitespace + lowercase so '김 철수' matches '김철수' (PLAN D11).
+// Strip whitespace + lowercase so '김 철수' matches '김철수' (2609_08 D11, reused as-is for
+// the product name — one rule for every field (PLAN 2609_27 D5)).
 const normalize = (value: string): string => value.replace(/\s+/g, '').toLowerCase();
 
-// Customer search looks at both orderer and receiver — a gift order has different names.
+type SearchableOrder = Pick<
+  OrderItem,
+  'ordererName' | 'receiverName' | 'externalOrderId' | 'itemName'
+>;
+
+// A gift order has different orderer/receiver names — both are searched.
+const matchesCustomer = (order: SearchableOrder, needle: string): boolean =>
+  [order.ordererName, order.receiverName]
+    .some((name) => name != null && normalize(name).includes(needle));
+
+const matchesOrderNo = (order: SearchableOrder, needle: string): boolean =>
+  normalize(order.externalOrderId).includes(needle);
+
+// itemName is the channel's own text (product + option in one string) and is nullable —
+// a null line simply never matches by product (PLAN 2609_27 D6).
+const matchesProduct = (order: SearchableOrder, needle: string): boolean =>
+  order.itemName != null && normalize(order.itemName).includes(needle);
+
 export function matchesOrderSearch(
-  order: Pick<OrderItem, 'ordererName' | 'receiverName' | 'externalOrderId'>,
+  order: SearchableOrder,
   field: OrderSearchField,
   term: string,
 ): boolean {
   const needle = normalize(term);
   if (needle === '') return true;
-  if (field === 'orderNo') return normalize(order.externalOrderId).includes(needle);
-  return [order.ordererName, order.receiverName]
-    .some((name) => name != null && normalize(name).includes(needle));
+  // No `default:` — TS treats a switch covering every member of a string-literal union as
+  // exhaustive, so a 5th chip added later fails to compile here instead of silently
+  // falling into the customer branch.
+  switch (field) {
+    case 'customer':
+      return matchesCustomer(order, needle);
+    case 'orderNo':
+      return matchesOrderNo(order, needle);
+    case 'product':
+      return matchesProduct(order, needle);
+    // '전체' = OR across all three (PLAN 2609_27 D4).
+    case 'all':
+      return matchesCustomer(order, needle)
+        || matchesOrderNo(order, needle)
+        || matchesProduct(order, needle);
+  }
 }
