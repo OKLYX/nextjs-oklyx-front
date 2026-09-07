@@ -315,7 +315,7 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
               {selected === 'skipped' && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 mb-2">전송 제외</h4>
-                  <p className="text-xs text-gray-500 mb-2">이미 배송지시된 상태입니다.</p>
+                  <p className="text-xs text-gray-500 mb-2">이미 발송처리된 상태입니다.</p>
                   <p className="text-xs text-gray-500 mb-2">{skippedSummary}</p>
                   <ResultTable
                     headers={['주문번호', '상태']}

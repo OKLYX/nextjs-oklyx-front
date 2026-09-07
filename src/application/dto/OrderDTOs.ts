@@ -1,4 +1,4 @@
-import type { OrderItem } from '@/domain/entities/OrderEntity';
+import type { OrderItem, OrderStatus } from '@/domain/entities/OrderEntity';
 import type { FailedBox, SkippedOrder } from './ShippingLabelDTOs';
 
 /** 동기화 1회의 집계 결과. 기간 백필(`POST /api/orders/sync/period`)은 목록 없이 이것만 돌려준다(PLAN D8). */
@@ -90,8 +90,8 @@ export interface CancelledLine {
   resultCancelCount: number;
   resultHoldCount: number;
   resultPurchasableQty: number;
-  /** 전량취소(cancel+hold ≥ orderCount)면 'CANCELLED', 아니면 기존 status. */
-  resultStatus: string;
+  /** 전량취소(cancel+hold ≥ orderCount)면 'CANCELLED', 아니면 라인의 중립 상태. */
+  resultStatus: OrderStatus;
   receiptId: string | null;
   /** CANCEL(즉시취소) | STOP_SHIPMENT(출고중지). */
   receiptType: string | null;
@@ -109,7 +109,8 @@ export interface FailedLine {
 export interface SkippedLine {
   orderItemId: number;
   externalOrderId: string;
-  status: string;
+  /** 중립 상태(OrderStatus) — 한글 라벨 변환은 화면 몫이다. */
+  status: OrderStatus;
   reason: string;
 }
 

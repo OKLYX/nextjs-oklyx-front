@@ -1,14 +1,16 @@
+import type { OrderStatus } from '@/domain/entities/OrderEntity';
+
 export interface FailedBox {
   shipmentBoxId: string;
   resultCode: string;
   message: string;
 }
 
-// An order excluded from the send. `status` = the raw Coupang code used for the decision
-// (DEPARTURE etc.) — the Korean label is resolved at render time.
+// An order excluded from the send. `status` = the neutral status used for the decision
+// (SHIPPED etc.) — the Korean label is resolved at render time.
 export interface SkippedOrder {
   orderId: string;
-  status: string;
+  status: OrderStatus;
 }
 
 export interface ShipmentConfirmResult {
@@ -63,7 +65,7 @@ export interface ManualShipmentRequest {
 }
 
 // `mode` is decided by the server from the order status (D3) — the client only reports it.
-// `resultStatus` is 'DEPARTURE' after a successful CREATE, null otherwise.
+// `resultStatus` is the neutral 'SHIPPED' after a successful CREATE, null otherwise.
 export interface ManualShipmentResult {
   orderId: string;
   shipmentBoxId: string;
@@ -71,5 +73,5 @@ export interface ManualShipmentResult {
   sentLines: number;
   succeeded: number;
   failed: FailedBox[];
-  resultStatus: string | null;
+  resultStatus: OrderStatus | null;
 }
