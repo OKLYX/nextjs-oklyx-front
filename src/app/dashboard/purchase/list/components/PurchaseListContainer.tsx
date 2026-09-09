@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
 import { PurchaseListRepositoryImpl } from '@/infrastructure/repositories/PurchaseListRepositoryImpl';
 import { PurchaseListUseCase } from '@/application/usecases/PurchaseListUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
@@ -13,10 +12,7 @@ import { OrderUseCase } from '@/application/usecases/OrderUseCase';
 import { getImageUrl } from '@/infrastructure/utils/imageUrl';
 import type { PurchaseList, PurchaseListItem } from '@/domain/entities/PurchaseListEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
-import type {
-  RecordPurchaseRequest,
-  AddManualItemRequest,
-} from '@/application/dto/PurchaseListDTOs';
+import type { AddManualItemRequest } from '@/application/dto/PurchaseListDTOs';
 import { PurchaseListToolbar } from './PurchaseListToolbar';
 import { PurchaseListTable } from './PurchaseListTable';
 import { UnmappedOrdersSection } from './UnmappedOrdersSection';
@@ -35,28 +31,25 @@ const todayStr = () => {
 };
 
 export function PurchaseListContainer() {
+  // 🔴 판매자는 더 이상 조회 스코프가 아니다(PLAN 2609_29 D11) — 입고 카드 드롭다운의 재료로만 남는다.
   const [sellers, setSellers] = useState<Seller[]>([]);
-  const [sellerId, setSellerId] = useState<number | null>(null);
   const [purchaseList, setPurchaseList] = useState<PurchaseList | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
   const [isSyncingOrders, setIsSyncingOrders] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   // productId -> 이미지 프록시 URL (없으면 null). 구매목록 응답엔 이미지가 없어 상품 상세로 보강.
   const [productImages, setProductImages] = useState<Record<number, string | null>>({});
-  // 탭(구매목록 / 구매완료내역조회) 상태. 완료내역은 읽기 전용이라 최초 진입 시 1회 로드.
+  // 탭(구매목록 / 구매완료내역조회) 상태. 완료내역은 최초 진입 시 1회 로드.
   const [activeTab, setActiveTab] = useState<PurchaseTab>('list');
   const [completedItems, setCompletedItems] = useState<PurchaseListItem[]>([]);
   const [completedLoaded, setCompletedLoaded] = useState(false);
   const [isCompletedLoading, setIsCompletedLoading] = useState(false);
   const [completedError, setCompletedError] = useState('');
   const [expandedCompletedId, setExpandedCompletedId] = useState<number | null>(null);
-  // 완료내역 필터(판매자 + 구매일 기간). 기본 조회는 오늘. 날짜를 비우면 전체. 조회 버튼으로 적용.
-  const [completedSellerId, setCompletedSellerId] = useState<number | null>(null);
+  // 완료내역 필터(구매일 기간). 기본 조회는 오늘. 날짜를 비우면 전체. 조회 버튼으로 적용.
   const [completedFrom, setCompletedFrom] = useState(todayStr());
   const [completedTo, setCompletedTo] = useState(todayStr());
 
@@ -92,11 +85,11 @@ export function PurchaseListContainer() {
     setProductImages((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
   };
 
-  const loadList = async (sid: number | null) => {
+  const loadList = async () => {
     try {
       setIsLoading(true);
       setError('');
-      const result = await purchaseListUseCase.getList(sid ?? undefined);
+      const result = await purchaseListUseCase.getList();
       setPurchaseList(result);
       loadImages(result.items);
     } catch {
@@ -107,19 +100,11 @@ export function PurchaseListContainer() {
     }
   };
 
-  const loadCompleted = async (
-    sid: number | null = completedSellerId,
-    from: string = completedFrom,
-    to: string = completedTo
-  ) => {
+  const loadCompleted = async (from: string = completedFrom, to: string = completedTo) => {
     try {
       setIsCompletedLoading(true);
       setCompletedError('');
-      const result = await purchaseListUseCase.getCompletedList(
-        sid ?? undefined,
-        from || undefined,
-        to || undefined
-      );
+      const result = await purchaseListUseCase.getCompletedList(from || undefined, to || undefined);
       setCompletedItems(result);
       loadImages(result);
     } catch {
@@ -140,14 +125,13 @@ export function PurchaseListContainer() {
 
   const handleCompletedReset = () => {
     const today = todayStr();
-    setCompletedSellerId(null);
     setCompletedFrom(today);
     setCompletedTo(today);
     setExpandedCompletedId(null);
-    loadCompleted(null, today, today);
+    loadCompleted(today, today);
   };
 
-  // 진입 시 셀러 목록 + 전체 구매 목록 로드
+  // 진입 시 셀러 목록 + 구매 목록 로드
   useEffect(() => {
     const init = async () => {
       try {
@@ -155,33 +139,11 @@ export function PurchaseListContainer() {
       } catch {
         setSellers([]);
       }
-      await loadList(null);
+      await loadList();
     };
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleSellerChange = (sid: number | null) => {
-    setSellerId(sid);
-    setExpandedProductId(null);
-    loadList(sid);
-  };
-
-  const handleExtract = async () => {
-    try {
-      setIsExtracting(true);
-      setError('');
-      setActionError('');
-      // extract 응답이 곧 새 목록 — 추가 GET 불필요
-      const result = await purchaseListUseCase.extract(sellerId ?? undefined);
-      setPurchaseList(result);
-      loadImages(result.items);
-    } catch {
-      setError('동기화(추출)에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setIsExtracting(false);
-    }
-  };
 
   // 주문내역 동기화: 마켓플레이스에서 최신 주문을 가져온 뒤(syncOrders),
   // 그 결과를 반영하도록 구매목록을 재추출(extract)한다. 구매목록은 주문 동기화가
@@ -190,10 +152,9 @@ export function PurchaseListContainer() {
     try {
       setIsSyncingOrders(true);
       setError('');
-      setActionError('');
       setSyncMessage('');
-      const sync = await orderUseCase.syncOrders({ sellerId: sellerId ?? undefined });
-      const result = await purchaseListUseCase.extract(sellerId ?? undefined);
+      const sync = await orderUseCase.syncOrders();
+      const result = await purchaseListUseCase.extract();
       setPurchaseList(result);
       loadImages(result.items);
       setSyncMessage(
@@ -206,37 +167,15 @@ export function PurchaseListContainer() {
     }
   };
 
-  // mutation 후 목록 재조회(=invalidate). 잔여 0이 된 라인/상품은 응답에서 빠진다.
-  const refresh = () => loadList(sellerId);
+  // 입고 후 목록 재조회(=invalidate). 잔여가 바뀌면 그룹이 탭 간에 이동할 수 있다.
+  const handleRecorded = () => loadList();
 
-  const handleRecordPurchase = async (itemId: number, request: RecordPurchaseRequest) => {
-    setActionError('');
-    try {
-      await purchaseListUseCase.recordPurchase(itemId, request);
-      await refresh();
-    } catch (err) {
-      // 금액 검증(총액·단가 동시 입력 등)은 서버가 판정한다 — 메시지를 원문 그대로 보여준다.
-      const serverMessage = axios.isAxiosError(err) ? err.response?.data?.message : undefined;
-      setActionError(serverMessage || '구매 기록 저장에 실패했습니다.');
-      throw err;
-    }
-  };
-
-  const handleAdjustManual = async (itemId: number, manualQty: number) => {
-    setActionError('');
-    try {
-      await purchaseListUseCase.adjustManualQty(itemId, { manualQty });
-      await refresh();
-    } catch (err) {
-      setActionError('수동수량 변경에 실패했습니다.');
-      throw err;
-    }
-  };
+  const handleCompletedRecorded = () => loadCompleted();
 
   const handleAddManual = async (request: AddManualItemRequest) => {
     await purchaseListUseCase.addManualItem(request);
     setIsManualModalOpen(false);
-    await refresh();
+    await loadList();
   };
 
   const handleToggle = (productId: number) => {
@@ -250,11 +189,6 @@ export function PurchaseListContainer() {
         {activeTab === 'list' && (
           <>
             <PurchaseListToolbar
-              sellers={sellers}
-              sellerId={sellerId}
-              onSellerChange={handleSellerChange}
-              onExtract={handleExtract}
-              isExtracting={isExtracting}
               onAddManualClick={() => setIsManualModalOpen(true)}
               onSyncOrders={handleSyncOrders}
               isSyncingOrders={isSyncingOrders}
@@ -266,21 +200,15 @@ export function PurchaseListContainer() {
               </div>
             )}
 
-            {actionError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-                {actionError}
-              </div>
-            )}
-
             <PurchaseListTable
               items={purchaseList?.items ?? []}
+              sellers={sellers}
               productImages={productImages}
               isLoading={isLoading}
               error={error}
               expandedProductId={expandedProductId}
               onToggle={handleToggle}
-              onRecordPurchase={handleRecordPurchase}
-              onAdjustManual={handleAdjustManual}
+              onRecorded={handleRecorded}
             />
 
             <UnmappedOrdersSection
@@ -293,12 +221,9 @@ export function PurchaseListContainer() {
         {activeTab === 'completed' && (
           <>
             <CompletedPurchaseFilter
-              sellers={sellers}
-              sellerId={completedSellerId}
               from={completedFrom}
               to={completedTo}
               isLoading={isCompletedLoading}
-              onSellerChange={setCompletedSellerId}
               onFromChange={setCompletedFrom}
               onToChange={setCompletedTo}
               onApply={() => {
@@ -310,6 +235,7 @@ export function PurchaseListContainer() {
 
             <CompletedPurchaseTable
               items={completedItems}
+              sellers={sellers}
               productImages={productImages}
               isLoading={isCompletedLoading}
               error={completedError}
@@ -317,6 +243,7 @@ export function PurchaseListContainer() {
               onToggle={(productId) =>
                 setExpandedCompletedId((prev) => (prev === productId ? null : productId))
               }
+              onRecorded={handleCompletedRecorded}
             />
           </>
         )}

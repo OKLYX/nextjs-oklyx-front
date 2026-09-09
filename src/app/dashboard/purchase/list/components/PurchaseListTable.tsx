@@ -2,29 +2,29 @@
 
 import { Fragment } from 'react';
 import type { PurchaseListItem } from '@/domain/entities/PurchaseListEntity';
-import type { RecordPurchaseRequest } from '@/application/dto/PurchaseListDTOs';
-import { PurchaseListLineRow } from './PurchaseListLineRow';
+import type { Seller } from '@/domain/entities/SellerEntity';
+import { PurchaseGroupDetail } from './PurchaseGroupDetail';
 
 interface PurchaseListTableProps {
   items: PurchaseListItem[];
+  sellers: Seller[];
   productImages: Record<number, string | null>;
   isLoading: boolean;
   error: string;
   expandedProductId: number | null;
   onToggle: (productId: number) => void;
-  onRecordPurchase: (itemId: number, request: RecordPurchaseRequest) => Promise<void>;
-  onAdjustManual: (itemId: number, manualQty: number) => Promise<void>;
+  onRecorded: () => void | Promise<void>;
 }
 
 export function PurchaseListTable({
   items,
+  sellers,
   productImages,
   isLoading,
   error,
   expandedProductId,
   onToggle,
-  onRecordPurchase,
-  onAdjustManual,
+  onRecorded,
 }: PurchaseListTableProps) {
   return (
     <div className="bg-white rounded-lg shadow list-table-scroll">
@@ -108,16 +108,11 @@ export function PurchaseListTable({
                   {isExpanded && (
                     <tr className="bg-gray-50">
                       <td colSpan={5} className="px-4 py-4">
-                        <div className="space-y-3">
-                          {item.lines.map((line) => (
-                            <PurchaseListLineRow
-                              key={line.itemId}
-                              line={line}
-                              onRecordPurchase={onRecordPurchase}
-                              onAdjustManual={onAdjustManual}
-                            />
-                          ))}
-                        </div>
+                        <PurchaseGroupDetail
+                          item={item}
+                          sellers={sellers}
+                          onRecorded={onRecorded}
+                        />
                       </td>
                     </tr>
                   )}
