@@ -12,6 +12,7 @@ interface NavigationStore {
   isPurchaseMenuOpen: boolean;
   isSettingsMenuOpen: boolean;
   isDesignTemplatesMenuOpen: boolean;
+  isSettlementMenuOpen: boolean;
   // Mobile/narrow-viewport sidebar drawer (hamburger). Not persisted.
   isSidebarOpen: boolean;
   hasHydrated: boolean;
@@ -29,6 +30,7 @@ interface NavigationStore {
   togglePurchaseMenu: () => void;
   toggleSettingsMenu: () => void;
   toggleDesignTemplatesMenu: () => void;
+  toggleSettlementMenu: () => void;
   toggleSidebar: () => void;
   closeSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -49,6 +51,7 @@ const ALL_MENUS_CLOSED = {
   isPurchaseMenuOpen: false,
   isSettingsMenuOpen: false,
   isDesignTemplatesMenuOpen: false,
+  isSettlementMenuOpen: false,
 } as const;
 
 export const useNavigationStore = create<NavigationStore>()(
@@ -91,6 +94,9 @@ export const useNavigationStore = create<NavigationStore>()(
       toggleDesignTemplatesMenu: () => {
         set((state) => ({ ...ALL_MENUS_CLOSED, isDesignTemplatesMenuOpen: !state.isDesignTemplatesMenuOpen }));
       },
+      toggleSettlementMenu: () => {
+        set((state) => ({ ...ALL_MENUS_CLOSED, isSettlementMenuOpen: !state.isSettlementMenuOpen }));
+      },
       toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
       closeSidebar: () => set({ isSidebarOpen: false }),
       setSidebarOpen: (open: boolean) => set({ isSidebarOpen: open }),
@@ -111,6 +117,7 @@ export const useNavigationStore = create<NavigationStore>()(
         isPurchaseMenuOpen: state.isPurchaseMenuOpen,
         isSettingsMenuOpen: state.isSettingsMenuOpen,
         isDesignTemplatesMenuOpen: state.isDesignTemplatesMenuOpen,
+        isSettlementMenuOpen: state.isSettlementMenuOpen,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

@@ -40,6 +40,12 @@ export const ROUTES = {
   DETAIL_TEMPLATES: '/dashboard/detail-templates' as const,
   DETAIL_TEMPLATE_NEW: '/dashboard/detail-templates/new' as const,
   DETAIL_TEMPLATE_EDIT: (id: number | string) => `/dashboard/detail-templates/${id}` as const,
+  // 🔴 매출·정산 화면 (FEATURE_2609_30). 위 SALES_PRODUCTS_* 는 '판매상품 관리'라 이름만 비슷하고
+  // 전혀 다른 화면이다 — 새 항목에 SALES_PRODUCTS_ 접두사를 재사용하지 말 것.
+  SALES_SUMMARY: '/dashboard/sales/summary' as const,
+  SALES_BY_PRODUCT: '/dashboard/sales/products' as const,
+  SETTLEMENT_PAYOUTS: '/dashboard/sales/settlement' as const,
+  SETTLEMENT_PAYOUT_DETAIL: (id: number | string) => `/dashboard/sales/settlement/${id}` as const,
   PROCESSING_PRESETS: '/dashboard/processing-presets' as const,
   PROCESSING_PRESET_NEW: '/dashboard/processing-presets/new' as const,
   PROCESSING_PRESET_EDIT: (id: number | string) => `/dashboard/processing-presets/${id}` as const,
