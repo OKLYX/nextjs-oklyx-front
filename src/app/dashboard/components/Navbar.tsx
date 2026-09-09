@@ -13,6 +13,7 @@ import {
   UserCog,
   Settings,
   LayoutTemplate,
+  Receipt,
   type LucideIcon,
 } from 'lucide-react';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
@@ -53,6 +54,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const isPurchaseOpen = useNavigationStore((state) => state.isPurchaseMenuOpen);
   const isSettingsOpen = useNavigationStore((state) => state.isSettingsMenuOpen);
   const isDesignTemplatesOpen = useNavigationStore((state) => state.isDesignTemplatesMenuOpen);
+  const isSettlementOpen = useNavigationStore((state) => state.isSettlementMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
@@ -64,6 +66,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const togglePurchaseMenu = useNavigationStore((state) => state.togglePurchaseMenu);
   const toggleSettingsMenu = useNavigationStore((state) => state.toggleSettingsMenu);
   const toggleDesignTemplatesMenu = useNavigationStore((state) => state.toggleDesignTemplatesMenu);
+  const toggleSettlementMenu = useNavigationStore((state) => state.toggleSettlementMenu);
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
@@ -125,6 +128,20 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         { href: ROUTES.STOCK_IN_OUT, label: '입고·조정' },
         { href: ROUTES.STOCK_OUTBOUND, label: '출고 확인' },
         { href: ROUTES.STOCK_SEARCH, label: '재고 조회' },
+      ],
+    },
+    {
+      // 매출·정산은 ADMIN 전용 API(`/api/admin/sales`, `/api/admin/settlement`)를 쓴다
+      // — 일반 사용자에게 메뉴만 보이면 열자마자 403 이 된다(PLAN 2609_30 D17).
+      icon: Receipt,
+      label: '정산관리',
+      open: isSettlementOpen,
+      toggle: toggleSettlementMenu,
+      adminOnly: true,
+      items: [
+        { href: ROUTES.SALES_SUMMARY, label: '매출 현황' },
+        { href: ROUTES.SALES_BY_PRODUCT, label: '상품별 수익성' },
+        { href: ROUTES.SETTLEMENT_PAYOUTS, label: '정산 내역' },
       ],
     },
     {
