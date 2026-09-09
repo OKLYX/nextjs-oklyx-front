@@ -6,7 +6,6 @@ import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
-import { StockCard } from './StockCard';
 
 interface ProductDetailViewProps {
   product: Product;
@@ -128,9 +127,6 @@ export function ProductDetailView({ product, onDelete, imageUseCase }: ProductDe
           <p className="text-gray-700 whitespace-pre-wrap">{product.description}</p>
         </div>
       )}
-
-      {/* Stock Card */}
-      {product.barcodeId && <StockCard barcodeId={product.barcodeId} productName={product.productName} />}
 
       {/* Image gallery */}
       <ProductImageGallery productId={product.id} useCase={imageUseCase} />

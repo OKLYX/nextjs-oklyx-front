@@ -1,41 +1,46 @@
 'use client';
 
-import type { StockLog } from '@/domain/repositories/StockRepository';
+import { Fragment } from 'react';
+import type { StockBalance, StockMovement } from '@/domain/entities/StockEntity';
+import { StockMovementTable } from '../../components/StockMovementTable';
 
 interface StockSearchTableProps {
-  logs: StockLog[];
-  currentPage: number;
-  totalElements: number;
-  onPageChange: (page: number) => void;
+  balances: StockBalance[];
   isLoading: boolean;
+  /** 펼친 행 키(`productId:sellerId`). */
+  expandedKey: string | null;
+  movements: StockMovement[];
+  isHistoryLoading: boolean;
+  historyError: string;
+  onToggle: (balance: StockBalance) => void;
 }
 
+export const balanceKey = (balance: StockBalance) => `${balance.productId}:${balance.sellerId}`;
+
+/**
+ * (물품 × 판매자) 잔량 표 (FEATURE_2609_28 / PLAN D14 · 2609_29 D5).
+ *
+ * 🔴 음수를 숨기거나 0 으로 그리지 않는다 — 원장이 사실이고 음수는 "입고 기록이 빠졌다"는 신호다.
+ * ⚠️ 잔량은 서버 집계 결과 그대로다. 화면에서 다시 더하지 않는다.
+ */
 export function StockSearchTable({
-  logs,
-  currentPage,
-  totalElements,
-  onPageChange,
+  balances,
   isLoading,
+  expandedKey,
+  movements,
+  isHistoryLoading,
+  historyError,
+  onToggle,
 }: StockSearchTableProps) {
-  const totalPages = Math.ceil(totalElements / 20);
-
-  const getPaginationPages = () => {
-    const pages = [];
-    const maxPagesToShow = 5;
-    let startPage = Math.max(0, currentPage - Math.floor(maxPagesToShow / 2));
-    let endPage = Math.min(totalPages - 1, startPage + maxPagesToShow - 1);
-
-    if (endPage - startPage < maxPagesToShow - 1) {
-      startPage = Math.max(0, endPage - maxPagesToShow + 1);
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-    return pages;
-  };
-
-  const paginationPages = getPaginationPages();
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6 space-y-2">
+        {[0, 1, 2].map((row) => (
+          <div key={row} className="h-8 bg-gray-100 rounded animate-pulse" />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -43,105 +48,63 @@ export function StockSearchTable({
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">바코드</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">상품명</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">입고</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">출고</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">재고</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">일시</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">상품</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">판매자</th>
+              <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">잔량</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {logs.length === 0 ? (
+            {balances.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
                   조회 결과가 없습니다.
                 </td>
               </tr>
             ) : (
-              logs.map((log) => (
-                <tr key={log.stockId} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-3 text-sm text-gray-700">{log.barcodeId}</td>
-                  <td className="px-6 py-3 text-sm text-gray-700">{log.productName}</td>
-                  <td className="px-6 py-3 text-center text-sm">
-                    {log.stockAdd > 0 && <span className="text-green-600 font-semibold">{log.stockAdd}</span>}
-                    {log.stockAdd === 0 && <span className="text-gray-400">-</span>}
-                  </td>
-                  <td className="px-6 py-3 text-center text-sm">
-                    {log.stockSub > 0 && <span className="text-red-600 font-semibold">{log.stockSub}</span>}
-                    {log.stockSub === 0 && <span className="text-gray-400">-</span>}
-                  </td>
-                  <td className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-                    {log.inStock}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">{log.createdDate}</td>
-                </tr>
-              ))
+              balances.map((balance) => {
+                const key = balanceKey(balance);
+                const isExpanded = expandedKey === key;
+                return (
+                  <Fragment key={key}>
+                    <tr
+                      onClick={() => onToggle(balance)}
+                      className="hover:bg-gray-50 cursor-pointer"
+                    >
+                      <td className="px-6 py-3 text-sm text-gray-700">
+                        {isExpanded ? '▾' : '▸'} {balance.productName}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-700">{balance.sellerName}</td>
+                      <td
+                        className={`px-6 py-3 text-sm text-right font-semibold ${
+                          balance.onHand < 0 ? 'text-red-600' : 'text-gray-900'
+                        }`}
+                        title={
+                          balance.onHand < 0 ? '입고 기록이 빠졌을 수 있습니다' : undefined
+                        }
+                      >
+                        {balance.onHand}
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="bg-gray-50">
+                        <td colSpan={3} className="px-6 py-3">
+                          <StockMovementTable
+                            movements={movements}
+                            isLoading={isHistoryLoading}
+                            error={historyError}
+                            showSeller={false}
+                            emptyMessage="이 기간(최근 30일)에 기록된 이동이 없습니다."
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
-
-      {totalElements > 20 && (
-        <div className="border-t border-gray-200 px-6 py-4 flex items-center justify-center gap-2">
-          <button
-            onClick={() => onPageChange(Math.max(0, currentPage - 1))}
-            disabled={currentPage === 0 || isLoading}
-            className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-          >
-            ← 이전
-          </button>
-
-          {currentPage > 0 && (
-            <button
-              onClick={() => onPageChange(0)}
-              className="px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
-            >
-              1
-            </button>
-          )}
-
-          {paginationPages[0] > 1 && (
-            <span className="px-2 py-1 text-gray-400">...</span>
-          )}
-
-          {paginationPages.map((page) => (
-            <button
-              key={page}
-              onClick={() => onPageChange(page)}
-              disabled={isLoading}
-              className={`px-2 py-1 text-sm rounded transition-colors ${
-                currentPage === page
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed'
-              }`}
-            >
-              {page + 1}
-            </button>
-          ))}
-
-          {paginationPages[paginationPages.length - 1] < totalPages - 2 && (
-            <span className="px-2 py-1 text-gray-400">...</span>
-          )}
-
-          {currentPage < totalPages - 1 && (
-            <button
-              onClick={() => onPageChange(totalPages - 1)}
-              className="px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
-            >
-              {totalPages}
-            </button>
-          )}
-
-          <button
-            onClick={() => onPageChange(Math.min(totalPages - 1, currentPage + 1))}
-            disabled={currentPage === totalPages - 1 || isLoading}
-            className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-          >
-            다음 →
-          </button>
-        </div>
-      )}
     </div>
   );
 }

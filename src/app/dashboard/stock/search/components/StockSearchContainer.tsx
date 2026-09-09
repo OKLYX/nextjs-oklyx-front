@@ -1,111 +1,119 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { StockRepositoryImpl } from '@/infrastructure/repositories/StockRepositoryImpl';
 import { StockUseCase } from '@/application/usecases/StockUseCase';
-import type { GetStockLogsResponse } from '@/domain/repositories/StockRepository';
+import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
+import { SellerUseCase } from '@/application/usecases/SellerUseCase';
+import type { Seller } from '@/domain/entities/SellerEntity';
+import type { StockBalance, StockMovement } from '@/domain/entities/StockEntity';
 import { StockSearchForm } from './StockSearchForm';
-import { StockSearchTable } from './StockSearchTable';
+import { StockSearchTable, balanceKey } from './StockSearchTable';
 
+/**
+ * 재고 조회 화면 (FEATURE_2609_28 / PLAN D14 · 2609_29 D5).
+ *
+ * 잔량은 (물품 × 판매자) 단위 서버 집계다. 행을 누르면 그 조합의 이력이 아래로 펼쳐진다.
+ */
 export function StockSearchContainer() {
-  const [barcodeId, setBarcodeId] = useState('');
-  const [productName, setProductName] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [logs, setLogs] = useState<GetStockLogsResponse | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
+  const stockUseCase = useMemo(() => new StockUseCase(new StockRepositoryImpl()), []);
+  const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
+
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [keyword, setKeyword] = useState('');
+  const [sellerId, setSellerId] = useState('');
+  const [balances, setBalances] = useState<StockBalance[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
 
-  const stockUseCase = useMemo(() => {
-    const repository = new StockRepositoryImpl();
-    return new StockUseCase(repository);
-  }, []);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
-  const handleSearch = async () => {
-    setError('');
+  const loadBalances = async (nextKeyword: string = keyword, nextSellerId: string = sellerId) => {
     setIsLoading(true);
-    setCurrentPage(0);
-    setHasSearched(true);
-
+    setError('');
+    setExpandedKey(null);
     try {
-      const response = await stockUseCase.getStockLogs({
-        barcodeId: barcodeId || undefined,
-        productName: productName || undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        page: 0,
-        size: 20,
-      });
-      setLogs(response);
+      setBalances(
+        await stockUseCase.getBalances({
+          keyword: nextKeyword.trim() || undefined,
+          sellerId: nextSellerId ? Number(nextSellerId) : undefined,
+        })
+      );
     } catch {
-      setError('재고 이력을 조회할 수 없습니다.');
-      setLogs(null);
+      setError('재고 조회에 실패했습니다.');
+      setBalances([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePageChange = async (page: number) => {
-    setError('');
-    setIsLoading(true);
-    setCurrentPage(page);
+  useEffect(() => {
+    const init = async () => {
+      try {
+        setSellers(await sellerUseCase.getAll());
+      } catch {
+        setSellers([]);
+      }
+      await loadBalances();
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  const handleToggle = async (balance: StockBalance) => {
+    const key = balanceKey(balance);
+    if (expandedKey === key) {
+      setExpandedKey(null);
+      return;
+    }
+    setExpandedKey(key);
+    setMovements([]);
+    setIsHistoryLoading(true);
+    setHistoryError('');
     try {
-      const response = await stockUseCase.getStockLogs({
-        barcodeId: barcodeId || undefined,
-        productName: productName || undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        page,
-        size: 20,
-      });
-      setLogs(response);
+      // 그 (물품 × 판매자) 조합의 이력. 기간은 서버 기본값(최근 30일)을 쓴다.
+      setMovements(
+        await stockUseCase.getHistory({
+          productId: balance.productId,
+          sellerId: balance.sellerId,
+        })
+      );
     } catch {
-      setError('재고 이력을 조회할 수 없습니다.');
+      setHistoryError('재고 이력 조회에 실패했습니다.');
     } finally {
-      setIsLoading(false);
+      setIsHistoryLoading(false);
     }
   };
 
   return (
     <PageContainer>
-        <StockSearchForm
-          barcodeId={barcodeId}
-          productName={productName}
-          startDate={startDate}
-          endDate={endDate}
-          onBarcodeChange={setBarcodeId}
-          onProductNameChange={setProductName}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          onSearch={handleSearch}
-          isLoading={isLoading}
-        />
+      <StockSearchForm
+        keyword={keyword}
+        sellerId={sellerId}
+        sellers={sellers}
+        isLoading={isLoading}
+        onKeywordChange={setKeyword}
+        onSellerChange={setSellerId}
+        onSearch={() => loadBalances()}
+      />
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
+      )}
 
-        {hasSearched && logs && (
-          <StockSearchTable
-            logs={logs.content}
-            currentPage={currentPage}
-            totalElements={logs.totalElements}
-            onPageChange={handlePageChange}
-            isLoading={isLoading}
-          />
-        )}
-
-        {hasSearched && !logs && !error && (
-          <div className="bg-white rounded-lg p-8 text-center text-gray-500">
-            검색 결과가 없습니다.
-          </div>
-        )}
+      <StockSearchTable
+        balances={balances}
+        isLoading={isLoading}
+        expandedKey={expandedKey}
+        movements={movements}
+        isHistoryLoading={isHistoryLoading}
+        historyError={historyError}
+        onToggle={handleToggle}
+      />
     </PageContainer>
   );
 }

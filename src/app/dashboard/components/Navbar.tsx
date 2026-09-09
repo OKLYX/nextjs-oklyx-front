@@ -122,8 +122,9 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       open: isStockOpen,
       toggle: toggleStockMenu,
       items: [
-        { href: ROUTES.STOCK_IN_OUT, label: '입출고' },
-        { href: ROUTES.STOCK_SEARCH, label: '입출고조회' },
+        { href: ROUTES.STOCK_IN_OUT, label: '입고·조정' },
+        { href: ROUTES.STOCK_OUTBOUND, label: '출고 확인' },
+        { href: ROUTES.STOCK_SEARCH, label: '재고 조회' },
       ],
     },
     {
