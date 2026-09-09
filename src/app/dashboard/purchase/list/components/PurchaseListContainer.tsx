@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
 import { PurchaseListRepositoryImpl } from '@/infrastructure/repositories/PurchaseListRepositoryImpl';
 import { PurchaseListUseCase } from '@/application/usecases/PurchaseListUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
@@ -214,7 +215,9 @@ export function PurchaseListContainer() {
       await purchaseListUseCase.recordPurchase(itemId, request);
       await refresh();
     } catch (err) {
-      setActionError('구매 기록 저장에 실패했습니다.');
+      // 금액 검증(총액·단가 동시 입력 등)은 서버가 판정한다 — 메시지를 원문 그대로 보여준다.
+      const serverMessage = axios.isAxiosError(err) ? err.response?.data?.message : undefined;
+      setActionError(serverMessage || '구매 기록 저장에 실패했습니다.');
       throw err;
     }
   };
