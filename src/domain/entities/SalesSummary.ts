@@ -2,14 +2,14 @@
  * 매출 집계 (FEATURE_2609_30 / PLAN D2 · D3 · D4 · D14 · D15, 백엔드 03 SSOT).
  *
  * 🔴 <b>축이 둘 섞여 있다.</b> `grossSales`/`discount`/`estFee`/`estNetProfit` 은 <b>판매일</b> 축의 기간
- * 합계이고, `pendingPayout`("받을 돈")은 <b>매출인식일</b> 축의 <b>기간 무관</b> 총액이다(D4).
+ * 합계이고, `pendingPayout`("정산 예정 금액")은 <b>매출인식일</b> 축의 <b>기간 무관</b> 총액이다(D4).
  * 화면은 기간을 바꿔도 안 변하는 이 값에 반드시 `기간 무관 · 미지급 잔액` 라벨을 붙인다 —
  * 라벨이 없으면 버그로 오해받는다.
  *
  * 🔴 `estNetProfit === null`(= `costBasisReady === false`)은 <b>"아직 모른다"</b>는 뜻이다.
  * 0 으로 그리지 않는다 — 0 은 "안 남았다"는 뜻이라 정반대다(D15).
  *
- * ⚠️ 이 화면은 정산 배치·대사를 다루지 않는다. 그쪽 진입점은 `ROUTES.SETTLEMENT_PAYOUTS` 뿐이다.
+ * ⚠️ 이 화면은 정산 배치·금액 확인을 다루지 않는다. 그쪽 진입점은 `ROUTES.SETTLEMENT_PAYOUTS` 뿐이다.
  */
 
 /** ① 판매자별 요약 한 줄. `GET /api/admin/sales/summary` */
@@ -26,7 +26,7 @@ export interface SellerSales {
   /** 원가 스냅샷이 없는 라인이 하나라도 섞이면 null (D15). */
   estNetProfit: number | null;
   costBasisReady: boolean;
-  /** 🔴 기간 무관 "받을 돈". 기간 필터와 함께 묶어 라벨링하지 말 것(D4). */
+  /** 🔴 기간 무관 "정산 예정 금액". 기간 필터와 함께 묶어 라벨링하지 말 것(D4). */
   pendingPayout: number;
   unreconciledPayouts: number;
 }
@@ -51,6 +51,13 @@ export interface ChannelSales {
   unreconciledPayouts: number;
   /** 라인 없이 금액만 있는 묶음 수(추가정산·유보금). 0 이 아닌 것이 정상이다(D5-5). */
   amountOnlyPayouts: number;
+  /**
+   * 🔴 전체 지급 묶음 수. <b>0 = 정산 이력 없음</b>.
+   *
+   * 이 값 없이 `unreconciledPayouts === 0` 만 보면 "전부 금액이 맞음"과 "아직 정산이 안 들어옴"이
+   * 같은 초록 배지가 된다. 정산 전 채널이 훨씬 흔하므로 그 오해가 기본값이 되어 버린다.
+   */
+  payoutCount: number;
 }
 
 /** ③ 상품별 수익성 한 줄. `GET /api/admin/sales/by-product` */

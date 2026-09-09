@@ -37,7 +37,7 @@ export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
     <section className="bg-white rounded-lg shadow p-6 space-y-4">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-gray-900">왜 통장 금액이 다른가</h2>
-        <p className="text-sm text-gray-500">지급 묶음 단위 검증식입니다.</p>
+        <p className="text-sm text-gray-500">지급 묶음 단위로 금액을 맞춰본 결과입니다.</p>
       </div>
 
       <dl className="divide-y divide-gray-200 text-sm">
