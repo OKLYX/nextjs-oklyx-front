@@ -4,6 +4,10 @@ export interface PurchaseRecord {
   id: number;
   purchasedOn: string;
   quantity: number;
+  // 금액은 FEATURE_2609_28 이전에 기록된 행에서 null 이다 — "금액 미상"이며 0 이 아니다.
+  totalAmount: number | null;
+  unitPrice: number | null;
+  reflectToBasePrice: boolean;
 }
 
 export interface PurchaseListLine {
