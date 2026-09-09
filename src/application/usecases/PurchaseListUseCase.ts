@@ -1,7 +1,12 @@
 import type { PurchaseListRepository } from '@/domain/repositories/PurchaseListRepository';
-import type { PurchaseList, PurchaseListItem } from '@/domain/entities/PurchaseListEntity';
+import type {
+  PurchaseList,
+  PurchaseListItem,
+  PurchaseRecord,
+} from '@/domain/entities/PurchaseListEntity';
 import type {
   RecordPurchaseRequest,
+  PurchaseRecordResult,
   AddManualItemRequest,
   AdjustManualQtyRequest,
 } from '@/application/dto/PurchaseListDTOs';
@@ -9,24 +14,24 @@ import type {
 export class PurchaseListUseCase {
   constructor(private repository: PurchaseListRepository) {}
 
-  async getList(sellerId?: number): Promise<PurchaseList> {
-    return this.repository.getPurchaseList(sellerId);
+  async getList(): Promise<PurchaseList> {
+    return this.repository.getPurchaseList();
   }
 
-  async getCompletedList(
-    sellerId?: number,
-    from?: string,
-    to?: string
-  ): Promise<PurchaseListItem[]> {
-    return this.repository.getCompletedList(sellerId, from, to);
+  async getCompletedList(from?: string, to?: string): Promise<PurchaseListItem[]> {
+    return this.repository.getCompletedList(from, to);
   }
 
-  async extract(sellerId?: number): Promise<PurchaseList> {
-    return this.repository.extractPurchaseList(sellerId);
+  async extract(): Promise<PurchaseList> {
+    return this.repository.extractPurchaseList();
   }
 
-  async recordPurchase(itemId: number, request: RecordPurchaseRequest): Promise<void> {
-    return this.repository.recordPurchase(itemId, request);
+  async recordPurchase(request: RecordPurchaseRequest): Promise<PurchaseRecordResult> {
+    return this.repository.recordPurchase(request);
+  }
+
+  async getRecentPurchases(productId: number, limit: number): Promise<PurchaseRecord[]> {
+    return this.repository.getRecentPurchases(productId, limit);
   }
 
   async addManualItem(request: AddManualItemRequest): Promise<void> {
