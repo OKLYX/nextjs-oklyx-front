@@ -18,7 +18,7 @@ import { SellerSummaryTable } from './SellerSummaryTable';
  * 🔴 기간과 펼침은 <b>URL 에 넣지 않는다</b>(04 Step 2-1) — 공유·복원 대상이 아니고,
  * 두 탭이 각자 자기 기간을 갖는다.
  *
- * ⚠️ 정산 배치·대사는 이 화면이 아니다(PLAN D2). 채널 행의 `[정산 내역 →]` 이 유일한 진입점이다.
+ * ⚠️ 정산 배치·금액 확인은 이 화면이 아니다(PLAN D2). 채널 행의 `[정산 내역 →]` 이 유일한 진입점이다.
  */
 export function SalesSummaryContainer() {
   const router = useRouter();

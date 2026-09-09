@@ -15,7 +15,7 @@ import {
  * 한 행 = <b>지급 묶음</b>이다. 같은 인식 기간에 여러 건이 정상적으로 온다(주정산 + 중간 추가정산, D5-3).
  * 기간으로 묶어 한 줄로 합치지 말 것 — 통장에 찍힌 건수와 화면 건수가 달라진다.
  *
- * 🔴 <b>대사 상태 색 규칙</b>(둘 다 지키지 않으면 정상 입금이 매번 경고로 뜬다):
+ * 🔴 <b>금액 확인 상태 색 규칙</b>(둘 다 지키지 않으면 정상 입금이 매번 경고로 뜬다):
  * - `AMOUNT_ONLY` 를 경고색으로 칠하지 않는다 — 정상 입금이고 내역을 쿠팡이 안 주는 것뿐이다(D5-5).
  * - `PENDING` 을 실패처럼 빨갛게 칠하지 않는다 — 아직 채점할 답안지가 없는 정상 상태다.
  *
@@ -38,12 +38,12 @@ function reconBadge(row: PayoutSummary): Badge {
   switch (row.reconStatus) {
     case 'RECONCILED':
       return {
-        text: `✅ 대사완료 (라인 ${row.lineCount.toLocaleString('ko-KR')}건)`,
+        text: `✅ 금액 일치 (라인 ${row.lineCount.toLocaleString('ko-KR')}건)`,
         className: 'bg-green-50 text-green-700 border-green-200',
       };
     case 'UNRECONCILED':
       return {
-        text: '⚠ 미대사 — 상세에서 차액 확인',
+        text: '⚠ 금액 차이 — 상세에서 확인',
         className: 'bg-amber-50 text-amber-800 border-amber-200',
       };
     case 'AMOUNT_ONLY':
@@ -106,7 +106,7 @@ export function PayoutTable({ rows, loading, error, onOpen, onRetry }: PayoutTab
             </th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">지급일</th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">지급액</th>
-            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">대사</th>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">금액 확인</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">

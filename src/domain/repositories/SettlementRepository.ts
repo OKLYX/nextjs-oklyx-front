@@ -11,7 +11,7 @@ import type {
 } from '@/domain/entities/Settlement';
 
 /**
- * 정산 원장·대사 API (FEATURE_2609_30 / 백엔드 01·02). 전 경로가 `/api/admin/settlement/**` —
+ * 정산 원장·금액 확인 API (FEATURE_2609_30 / 백엔드 01·02). 전 경로가 `/api/admin/settlement/**` —
  * ADMIN 전용(PLAN D17).
  *
  * 🔴 <b>조회(get*)와 갱신(sync*)은 성격이 다르다.</b> 조회는 전부 로컬 DB 라 마켓을 부르지 않지만,

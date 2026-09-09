@@ -1,8 +1,8 @@
 /**
- * 정산 원장 · 대사 (FEATURE_2609_30 / PLAN D3 · D5 · D9 · D12 · D13, 백엔드 02 SSOT).
+ * 정산 원장 · 금액 확인 (FEATURE_2609_30 / PLAN D3 · D5 · D9 · D12 · D13, 백엔드 02 SSOT).
  *
  * 🔴 <b>금액은 서버가 계산한 값을 그대로 쓴다.</b> 화면에서 다시 더하면 검증식이 서버와 다른 답을 내고,
- * 그 순간 대사 화면 전체가 신뢰를 잃는다(백엔드 `SettlementReconciler` 가 단일 소유자다).
+ * 그 순간 금액 확인 화면 전체가 신뢰를 잃는다(백엔드 `SettlementReconciler` 가 단일 소유자다).
  *
  * 🔴 <b>문구를 프론트가 지어내지 않는다</b>(D13). 차감 사유는 쿠팡이 주지 않으므로 서버가 `guidance` 로
  * 내려준다. 그 문구가 곧 사용자의 문의 트리거다 — 그럴듯한 추측으로 대체하면 리포트가 거짓말을 시작한다.
@@ -50,7 +50,7 @@ export interface AdjustmentView {
   guidance: string | null;
 }
 
-/** 대사 리포트의 라인 1행. 🔴 문의용 식별자(주문번호·옵션ID·인식일·지급일·정산유형)가 핵심이다. */
+/** 금액 확인 리포트의 라인 1행. 🔴 문의용 식별자(주문번호·옵션ID·인식일·지급일·정산유형)가 핵심이다. */
 export interface ReconLineView {
   externalOrderId: string | null;
   platformOptionId: string | null;

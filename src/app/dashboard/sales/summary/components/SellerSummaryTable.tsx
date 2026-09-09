@@ -16,7 +16,7 @@ interface SellerSummaryTableProps {
   onToggle: (sellerId: number) => void;
   onRetry: () => void;
   onOpenSettlement: (accountId: number) => void;
-  /** 미대사 배지 클릭 — 해당 판매자로 좁힌 정산 화면으로 간다. */
+  /** 금액 차이 배지 클릭 — 해당 판매자로 좁힌 정산 화면으로 간다. */
   onOpenUnreconciled: (sellerId: number) => void;
 }
 
@@ -25,7 +25,7 @@ const COLUMN_COUNT = 7;
 /**
  * 판매자별 매출 표 (FEATURE_2609_30 / 04 Step 3). 한 행 = 판매자, 클릭하면 채널 행이 펼쳐진다.
  *
- * 🔴 <b>"받을 돈" 헤더의 `기간 무관 · 미지급 잔액` 라벨을 지우지 말 것</b>(PLAN D4). 이 값만 기간
+ * 🔴 <b>"정산 예정 금액" 헤더의 `기간 무관 · 미지급 잔액` 라벨을 지우지 말 것</b>(PLAN D4). 이 값만 기간
  * 필터를 따라 움직이지 않아서, 라벨이 없으면 사용자가 버그로 신고한다. 툴팁으로 대체 불가.
  *
  * 🔴 순이익이 없으면 `—` 다. 0 으로 그리면 "안 남았다"로 읽힌다 — 실제는 "아직 모른다"다(D15).
@@ -100,7 +100,7 @@ export function SellerSummaryTable({
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">할인</th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">순이익(추정)</th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
-              받을 돈
+              정산 예정 금액
               {/* 🔴 이 라벨이 없으면 "기간을 바꿨는데 값이 안 변한다"가 버그 신고로 온다(D4). */}
               <span className="block text-[11px] font-normal text-gray-500">기간 무관 · 미지급 잔액</span>
             </th>
@@ -160,7 +160,7 @@ export function SellerSummaryTable({
                           }}
                           className="px-2 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200"
                         >
-                          ⚠ 미대사 {row.unreconciledPayouts}
+                          ⚠ 금액 차이 {row.unreconciledPayouts}
                         </button>
                       )}
                     </td>
