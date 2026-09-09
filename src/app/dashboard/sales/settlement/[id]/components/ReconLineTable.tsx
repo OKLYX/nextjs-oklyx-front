@@ -13,7 +13,7 @@ import {
 } from '@/domain/entities/Settlement';
 
 /**
- * 금액 확인 라인 표 (FEATURE_2609_30 / 05 Step 3 블록 B).
+ * 금액 확인 판매 내역 표 (FEATURE_2609_30 / 05 Step 3 블록 B).
  *
  * 🔴 <b>[식별자 복사]가 이 화면의 핵심 동선이다.</b> 이 화면의 목적은 "왜 적나"를 <b>플랫폼에 문의할 수
  * 있는 형태로</b> 보여주는 것이라, 주문번호·옵션ID·인식일·지급일·정산유형을 한 줄로 복사할 수 있어야 한다.
@@ -31,7 +31,7 @@ interface ReconLineTableProps {
   onCopyIdentifiers: (line: ReconLineView) => void;
 }
 
-/** 목록 안에서만 유일하면 되는 표시용 키 — 서버가 라인 PK 를 내려주지 않는다. */
+/** 목록 안에서만 유일하면 되는 표시용 키 — 서버가 판매 건 PK 를 내려주지 않는다. */
 const lineKey = (line: ReconLineView, index: number): string =>
   `${line.externalOrderId ?? '-'}|${line.platformOptionId ?? '-'}|${line.recognitionDate ?? '-'}|${index}`;
 
@@ -41,7 +41,7 @@ export function ReconLineTable({ lines, loading, error, onCopyIdentifiers }: Rec
   if (loading) {
     return (
       <div className="px-6 py-4 text-sm text-gray-500">
-        <Spinner label="라인 불러오는 중..." />
+        <Spinner label="판매 내역 불러오는 중..." />
       </div>
     );
   }
@@ -51,7 +51,7 @@ export function ReconLineTable({ lines, loading, error, onCopyIdentifiers }: Rec
   }
 
   if (lines.length === 0) {
-    return <div className="px-6 py-4 text-sm text-gray-500">해당하는 라인이 없습니다.</div>;
+    return <div className="px-6 py-4 text-sm text-gray-500">해당하는 판매 건이 없습니다.</div>;
   }
 
   return (

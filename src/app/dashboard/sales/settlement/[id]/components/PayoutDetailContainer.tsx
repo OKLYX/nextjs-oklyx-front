@@ -98,7 +98,7 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
         )
       );
     } catch (e) {
-      setLinesError(extractErrorMessage(e, '라인 조회에 실패했습니다.'));
+      setLinesError(extractErrorMessage(e, '판매 내역 조회에 실패했습니다.'));
       setLines([]);
     } finally {
       setLinesLoading(false);
@@ -244,7 +244,7 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
       {/* 🔴 경고색 금지 — 정상 입금이고 쿠팡이 내역을 안 주는 것뿐이다(D5-5). */}
       {amountOnly && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700">
-          ⓘ 금액만 기록된 지급입니다 — 쿠팡이 어느 주문이 포함됐는지 알려주지 않아 판매 라인을 대조할 수
+          ⓘ 금액만 기록된 지급입니다 — 쿠팡이 어느 주문이 포함됐는지 알려주지 않아 판매 내역을 대조할 수
           없습니다.
         </div>
       )}
@@ -253,10 +253,10 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
 
       {noLines ? (
         <section className="bg-white rounded-lg shadow p-6 space-y-1">
-          <h2 className="text-lg font-semibold text-gray-900">왜 예상보다 적은가</h2>
-          {/* 🔴 라인 0건은 정상이다(D5-4) — 갱신을 유도하지 않는다. */}
+          <h2 className="text-lg font-semibold text-gray-900">차액 원인 분석</h2>
+          {/* 🔴 판매 건 0건은 정상이다(D5-4) — 갱신을 유도하지 않는다. */}
           <p className="text-sm text-gray-500">
-            이 지급에는 판매 라인이 없습니다 (조정 항목만).
+            이 지급에는 판매 건이 없습니다 (조정 항목만).
           </p>
         </section>
       ) : (
