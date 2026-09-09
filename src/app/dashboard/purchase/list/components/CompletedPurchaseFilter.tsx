@@ -1,29 +1,22 @@
 'use client';
 
-import type { Seller } from '@/domain/entities/SellerEntity';
-
 interface CompletedPurchaseFilterProps {
-  sellers: Seller[];
-  sellerId: number | null;
   from: string;
   to: string;
   isLoading: boolean;
-  onSellerChange: (sellerId: number | null) => void;
   onFromChange: (from: string) => void;
   onToChange: (to: string) => void;
   onApply: () => void;
   onReset: () => void;
 }
 
-// Filter bar for the completed-purchase tab: seller + purchase-date range.
+// Filter bar for the completed-purchase tab: purchase-date range only.
+// 🔴 판매자 필터는 없앴다(PLAN 2609_29 D11) — 완료 목록도 항상 전체다.
 // Filters apply on demand (조회 button) so empty dates mean "all time".
 export function CompletedPurchaseFilter({
-  sellers,
-  sellerId,
   from,
   to,
   isLoading,
-  onSellerChange,
   onFromChange,
   onToChange,
   onApply,
@@ -31,22 +24,6 @@ export function CompletedPurchaseFilter({
 }: CompletedPurchaseFilterProps) {
   return (
     <div className="bg-white rounded-lg shadow px-6 py-4 flex flex-wrap items-end gap-3">
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-gray-700">판매자</label>
-        <select
-          value={sellerId ?? ''}
-          onChange={(e) => onSellerChange(e.target.value ? Number(e.target.value) : null)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">전체</option>
-          {sellers.map((seller) => (
-            <option key={seller.id} value={seller.id}>
-              {seller.sellerName}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-700">구매일 시작</label>
         <input

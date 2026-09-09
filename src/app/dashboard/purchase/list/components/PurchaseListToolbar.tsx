@@ -1,47 +1,22 @@
 'use client';
 
 import { RefreshCw } from 'lucide-react';
-import type { Seller } from '@/domain/entities/SellerEntity';
 
+// 🔴 판매자 드롭다운과 [재적재] 버튼은 없앴다(PLAN 2609_29 D11·D12).
+// 조회·동기화는 항상 전체이고, [주문내역 동기화] 가 이미 동기화→재추출을 함께 한다.
 interface PurchaseListToolbarProps {
-  sellers: Seller[];
-  sellerId: number | null;
-  onSellerChange: (sellerId: number | null) => void;
-  onExtract: () => void;
-  isExtracting: boolean;
   onAddManualClick: () => void;
   onSyncOrders: () => void;
   isSyncingOrders: boolean;
 }
 
 export function PurchaseListToolbar({
-  sellers,
-  sellerId,
-  onSellerChange,
-  onExtract,
-  isExtracting,
   onAddManualClick,
   onSyncOrders,
   isSyncingOrders,
 }: PurchaseListToolbarProps) {
   return (
     <div className="bg-white rounded-lg shadow px-6 py-4 flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700">판매자</label>
-        <select
-          value={sellerId ?? ''}
-          onChange={(e) => onSellerChange(e.target.value ? Number(e.target.value) : null)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">전체</option>
-          {sellers.map((seller) => (
-            <option key={seller.id} value={seller.id}>
-              {seller.sellerName}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* 재고 고려: 준비 중(미구현) — 노출만, 비활성 */}
       <label className="flex items-center gap-2 text-sm text-gray-400 cursor-not-allowed">
         <input type="checkbox" disabled className="cursor-not-allowed" />
@@ -64,13 +39,6 @@ export function PurchaseListToolbar({
           className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100"
         >
           수동 추가
-        </button>
-        <button
-          onClick={onExtract}
-          disabled={isExtracting}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
-        >
-          {isExtracting ? '동기화 중...' : '동기화'}
         </button>
       </div>
     </div>

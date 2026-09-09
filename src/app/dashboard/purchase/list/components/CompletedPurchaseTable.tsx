@@ -1,66 +1,31 @@
 'use client';
 
 import { Fragment } from 'react';
-import type { PurchaseListItem, PurchaseListLine } from '@/domain/entities/PurchaseListEntity';
+import type { PurchaseListItem } from '@/domain/entities/PurchaseListEntity';
+import type { Seller } from '@/domain/entities/SellerEntity';
+import { PurchaseGroupDetail } from './PurchaseGroupDetail';
 
+// 완료 그룹이라도 추가 입고·정정이 있을 수 있어 토글 내용물은 구매목록 탭과 같다(PLAN 2609_29 D21).
 interface CompletedPurchaseTableProps {
   items: PurchaseListItem[];
+  sellers: Seller[];
   productImages: Record<number, string | null>;
   isLoading: boolean;
   error: string;
   expandedProductId: number | null;
   onToggle: (productId: number) => void;
-}
-
-// Read-only line summary + purchase history. No record/adjust forms (history is immutable here).
-function CompletedLineRow({ line }: { line: PurchaseListLine }) {
-  const isManual = line.source === 'MANUAL';
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span
-          className={`px-2 py-0.5 rounded text-xs font-medium ${
-            isManual ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-          }`}
-        >
-          {isManual ? '수동' : '주문'}
-        </span>
-        {line.externalOrderId && (
-          <span className="text-gray-500">주문번호 {line.externalOrderId}</span>
-        )}
-        <span className="ml-auto text-gray-600">
-          필요 <b className="text-gray-900">{line.autoQty + line.manualQty}</b>
-          {' · '}구매 <b className="text-gray-900">{line.purchasedQty}</b>
-        </span>
-      </div>
-
-      <div className="mt-3">
-        {line.records.length === 0 ? (
-          <p className="text-xs text-gray-400">구매 이력 없음</p>
-        ) : (
-          <ul className="space-y-1">
-            {line.records.map((record) => (
-              <li key={record.id} className="text-xs text-gray-600 flex gap-3">
-                <span>{record.purchasedOn}</span>
-                <span className={record.quantity < 0 ? 'text-red-600' : 'text-gray-800'}>
-                  {record.quantity > 0 ? `+${record.quantity}` : record.quantity}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
+  onRecorded: () => void | Promise<void>;
 }
 
 export function CompletedPurchaseTable({
   items,
+  sellers,
   productImages,
   isLoading,
   error,
   expandedProductId,
   onToggle,
+  onRecorded,
 }: CompletedPurchaseTableProps) {
   return (
     <div className="bg-white rounded-lg shadow list-table-scroll">
@@ -144,11 +109,11 @@ export function CompletedPurchaseTable({
                   {isExpanded && (
                     <tr className="bg-gray-50">
                       <td colSpan={5} className="px-4 py-4">
-                        <div className="space-y-3">
-                          {item.lines.map((line) => (
-                            <CompletedLineRow key={line.itemId} line={line} />
-                          ))}
-                        </div>
+                        <PurchaseGroupDetail
+                          item={item}
+                          sellers={sellers}
+                          onRecorded={onRecorded}
+                        />
                       </td>
                     </tr>
                   )}
