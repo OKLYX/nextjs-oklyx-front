@@ -47,9 +47,9 @@ export function ReconBlockB({
       <div className="p-6 space-y-4">
         <div className="flex flex-wrap items-start gap-3">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-gray-900">왜 예상보다 적은가</h2>
+            <h2 className="text-lg font-semibold text-gray-900">차액 원인 분석</h2>
             <p className="text-sm text-gray-500">
-              라인 단위 원인 분해입니다. 차액은 <b>예상 − 실정산</b>이라 양수면 예상보다 덜 받은 금액입니다.
+              판매 건별 원인 분해입니다. 차액은 <b>예상 − 실정산</b>이라 양수면 예상보다 덜 받은 금액입니다.
             </p>
           </div>
           <button
@@ -83,7 +83,7 @@ export function ReconBlockB({
         <div className="border-t border-gray-200">
           {blockB.labels.length === 0 ? (
             <p className="px-6 py-4 text-sm text-gray-500">
-              분해할 차이가 없습니다. 이 지급에는 판매 라인이 없거나(조정 항목만) 예상과 실정산이 같습니다.
+              분해할 차이가 없습니다. 이 지급에는 판매 건이 없거나(조정 항목만) 예상과 실정산이 같습니다.
             </p>
           ) : (
             blockB.labels.map((label) => {

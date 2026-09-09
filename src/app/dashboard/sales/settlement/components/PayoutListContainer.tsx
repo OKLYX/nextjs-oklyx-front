@@ -197,7 +197,7 @@ export function PayoutListContainer() {
         return;
       }
       setSyncNotice(
-        `채널 ${result.accounts}개 · 라인 ${result.lines}건 갱신 (매칭 ${result.matched} · 미분류 ${result.unmatched})`
+        `채널 ${result.accounts}개 · 판매 ${result.lines}건 갱신 (매칭 ${result.matched} · 미분류 ${result.unmatched})`
       );
       if (result.failedAccounts.length > 0) {
         setSyncError(`일부 채널 실패: ${result.failedAccounts.join(', ')}`);
@@ -221,7 +221,7 @@ export function PayoutListContainer() {
       );
       // `attributedLines === 0` 도 정상이다(ADDITIONAL·RESERVE 는 라인을 가져가지 않는다).
       setSyncNotice(
-        `지급 묶음 ${result.payouts}건 · 조정 ${result.adjustments}건 갱신 (라인 귀속 ${result.attributedLines}건)`
+        `지급 묶음 ${result.payouts}건 · 조정 ${result.adjustments}건 갱신 (판매 건 연결 ${result.attributedLines}건)`
       );
       if (result.failedAccounts.length > 0) {
         setSyncError(`일부 채널 실패: ${result.failedAccounts.join(', ')}`);

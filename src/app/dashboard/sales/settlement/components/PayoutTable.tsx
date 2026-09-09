@@ -38,7 +38,7 @@ function reconBadge(row: PayoutSummary): Badge {
   switch (row.reconStatus) {
     case 'RECONCILED':
       return {
-        text: `✅ 금액 일치 (라인 ${row.lineCount.toLocaleString('ko-KR')}건)`,
+        text: `✅ 금액 일치 (판매 ${row.lineCount.toLocaleString('ko-KR')}건)`,
         className: 'bg-green-50 text-green-700 border-green-200',
       };
     case 'UNRECONCILED':
@@ -49,7 +49,7 @@ function reconBadge(row: PayoutSummary): Badge {
     case 'AMOUNT_ONLY':
       // 🔴 경고색 금지. 라인 대조가 불가능할 뿐 정상 입금이다.
       return {
-        text: 'ⓘ 금액만 기록 — 판매 라인 대조 불가',
+        text: 'ⓘ 금액만 기록 — 판매 내역 대조 불가',
         className: 'bg-gray-50 text-gray-600 border-gray-200',
       };
     default:
