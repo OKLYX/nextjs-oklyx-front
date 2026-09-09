@@ -51,7 +51,7 @@ export function PayoutListContainer() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // 04 의 "미대사 N건" 배지에서 넘어오면 그 상태만 보여준다. 목록 API 에는 대사 상태 파라미터가 없어
+  // 04 의 "금액 차이 N건" 배지에서 넘어오면 그 상태만 보여준다. 목록 API 에는 확인 상태 파라미터가 없어
   // 클라이언트에서 좁히고, 해제할 수 있도록 칩으로 드러낸다.
   const [reconStatusFilter, setReconStatusFilter] = useState(
     () => searchParams.get('reconStatus') ?? ''
@@ -269,7 +269,7 @@ export function PayoutListContainer() {
       {reconStatusFilter && (
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-2 px-3 py-1 text-sm rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-            미대사만 보기
+            금액 차이만 보기
             <button
               type="button"
               onClick={() => setReconStatusFilter('')}
