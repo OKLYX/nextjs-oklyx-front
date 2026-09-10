@@ -2,6 +2,7 @@
 
 import { Fragment } from 'react';
 import type { ChannelSales, SellerSales } from '@/domain/entities/SalesSummary';
+import type { PayoutSummary } from '@/domain/entities/Settlement';
 import {
   FIXED_COST_HINT,
   PROFIT_PENDING_HINT,
@@ -19,11 +20,17 @@ interface SellerSummaryTableProps {
   channels: ChannelSales[];
   channelsLoading: boolean;
   channelsError: string;
+  /** 펼친 판매자의 정산 건(인식월 축). 채널별 분배는 `SellerChannelRows` 가 한다. */
+  payouts: PayoutSummary[];
+  payoutsLoading: boolean;
+  payoutsError: string;
   onToggle: (sellerId: number) => void;
   onRetry: () => void;
   onOpenSettlement: (accountId: number) => void;
   /** 금액 차이 배지 클릭 — 해당 판매자로 좁힌 정산 화면으로 간다. */
   onOpenUnreconciled: (sellerId: number) => void;
+  /** 정산 건 클릭 — 그 지급 묶음 상세로 바로 간다. */
+  onOpenPayout: (payoutId: number) => void;
 }
 
 // 🔴 열을 추가하면 이 수를 같이 올린다 — 빈 상태 행과 채널 펼침 블록의 `colSpan` 이 이 값을 먹는다.
@@ -47,10 +54,14 @@ export function SellerSummaryTable({
   channels,
   channelsLoading,
   channelsError,
+  payouts,
+  payoutsLoading,
+  payoutsError,
   onToggle,
   onRetry,
   onOpenSettlement,
   onOpenUnreconciled,
+  onOpenPayout,
 }: SellerSummaryTableProps) {
   if (error) {
     return (
@@ -191,7 +202,11 @@ export function SellerSummaryTable({
                           channels={channels}
                           isLoading={channelsLoading}
                           error={channelsError}
+                          payouts={payouts}
+                          payoutsLoading={payoutsLoading}
+                          payoutsError={payoutsError}
                           onOpenSettlement={onOpenSettlement}
+                          onOpenPayout={onOpenPayout}
                         />
                       </td>
                     </tr>

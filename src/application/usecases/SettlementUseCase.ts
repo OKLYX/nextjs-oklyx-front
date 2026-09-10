@@ -4,6 +4,7 @@ import type {
   PayoutQuery,
   PayoutSummary,
   PayoutSyncResult,
+  RecognitionPayoutQuery,
   ReconLineQuery,
   ReconLineView,
   ReconReport,
@@ -11,12 +12,17 @@ import type {
   SettlementSyncTarget,
 } from '@/domain/entities/Settlement';
 
-/** 정산 유스케이스 (FEATURE_2609_30 / 05). 목록·상세 두 화면이 공유한다. */
+/** 정산 유스케이스 (FEATURE_2609_30 / 05). 목록·상세·매출 화면이 공유한다. */
 export class SettlementUseCase {
   constructor(private repository: SettlementRepository) {}
 
   async getPayouts(query: PayoutQuery): Promise<PayoutSummary[]> {
     return this.repository.getPayouts(query);
+  }
+
+  /** 매출인식월 축 — 매출 화면 전용(FEATURE_2609_34). 지급일 축인 `getPayouts` 와 섞지 말 것. */
+  async getPayoutsByRecognition(query: RecognitionPayoutQuery): Promise<PayoutSummary[]> {
+    return this.repository.getPayoutsByRecognition(query);
   }
 
   async getPayout(payoutId: number): Promise<PayoutDetail> {

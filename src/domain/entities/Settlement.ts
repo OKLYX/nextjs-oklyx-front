@@ -190,6 +190,23 @@ export interface PayoutQuery {
   to?: string;
 }
 
+/**
+ * <b>매출인식월</b> 축 조회 파라미터 (FEATURE_2609_34). 매출 화면이 "이 기간 매출에 대한 정산"을 뽑을 때 쓴다.
+ *
+ * 🔴 {@link PayoutQuery} 와 축이 다르다 — 저쪽 `from`/`to` 는 <b>지급일</b>, 이쪽은 <b>판매일</b>이고
+ * 서버가 그 기간이 걸치는 인식월 구간으로 바꿔 조회한다. 8월에 판 것을 9월에 받는 건이 있어서, 축을
+ * 섞으면 8월 매출 옆에 그 정산이 안 뜬다. 두 파라미터 타입을 합치지 말 것.
+ *
+ * ⚠️ `from`/`to` 는 <b>필수</b>다(서버에서 400).
+ */
+export interface RecognitionPayoutQuery {
+  sellerId?: number;
+  accountId?: number;
+  /** 판매일 기준 `yyyy-MM-dd`. */
+  from: string;
+  to: string;
+}
+
 /** 라인 목록 조회 파라미터. 서버가 필터링한다 — 화면에서 다시 거르지 않는다. */
 export interface ReconLineQuery {
   label?: string;
