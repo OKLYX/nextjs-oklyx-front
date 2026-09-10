@@ -166,7 +166,7 @@ export function ProductProfitContainer() {
 
       {showCostBasisNotice && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
-          순이익은 원가 스냅샷 기능 적용 후 표시됩니다.
+          순이익 추정치는 상품 단가와 비용(택배비, 상자비 등)이 모두 작성 완료되어야 표시가능합니다.
         </div>
       )}
 
