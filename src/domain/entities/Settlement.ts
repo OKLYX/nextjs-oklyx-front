@@ -102,11 +102,35 @@ export interface ReconBlockB {
   labels: LabelView[];
 }
 
+/**
+ * 인식월 단위 참고 대조 (FEATURE_2609_32 / PLAN 2609_32 D4·D4-1·D6·D8).
+ *
+ * 🔴 지급 건 단위 검증식이 아니다. 우리 축은 라인의 인식일(달력 월), 쿠팡 축은 지급 건의 인식월이라
+ * 완전히 같지 않다 — `diff` 가 0이 아니어도 정상일 수 있는 <b>참고 지표</b>다. 경고색을 쓰지 않는다.
+ * 🔴 `ourLineCount === 0` = 그 달 매출내역 미적재. 서버는 `diff` 를 그대로 담아 보내지만
+ *    <b>화면이 숨긴다</b>(D4-1) — 0원을 우리 집계인 척 보여주면 방금 지운 −전액이 부활한다.
+ * 🔴 대조 불가 유형(AMOUNT_ONLY)에서만 내려온다. 주정산·월정산이면 `null` 이다.
+ */
+export interface MonthCheck {
+  revenueRecognitionMonth: string | null;
+  ourLineTotal: number | null;
+  /** 그 달 라인 건수. 0 이면 미적재다(D4-1). */
+  ourLineCount: number;
+  payoutTotal: number | null;
+  /** `ourLineTotal − payoutTotal`. 양수 = 우리가 더 크게 봤다. */
+  diff: number | null;
+  payoutCount: number;
+  /** 지급액 미수신 건 수. 0이 아니면 화면이 반드시 밝힌다(D6). */
+  pendingPayoutCount: number;
+}
+
 /** 차이 리포트 2단. `GET /api/admin/settlement/payouts/{id}/report` */
 export interface ReconReport {
   payout: PayoutSummary;
   blockA: ReconBlockA;
   blockB: ReconBlockB;
+  /** 🔴 대조 불가 유형에서만 채워진다. 주정산·월정산은 `null` 이다(D5). */
+  monthCheck: MonthCheck | null;
 }
 
 /** 묶음 1건 + 조정 + 검증식 요약. `GET /api/admin/settlement/payouts/{id}` */
