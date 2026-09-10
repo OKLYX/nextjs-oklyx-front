@@ -74,6 +74,11 @@ export function ChannelSalesContainer() {
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [recordsError, setRecordsError] = useState('');
 
+  // 판매 내역 표시 필터. 🔴 서버로 보내지 않는다 — 걸러내는 것은 <b>보이는 목록</b>뿐이고,
+  //    위 요약 카드의 합계는 서버가 낸 값 그대로 둔다(걸러냈다고 매출이 줄지는 않는다).
+  const [hideCanceled, setHideCanceled] = useState(false);
+  const [hidePending, setHidePending] = useState(false);
+
   // 프리셋을 빠르게 연타하면 응답이 역순으로 도착할 수 있다 — 마지막 요청의 결과만 반영한다.
   const requestIdRef = useRef(0);
   const recordsRequestIdRef = useRef(0);
@@ -257,7 +262,15 @@ export function ChannelSalesContainer() {
                 {records.length.toLocaleString('ko-KR')}건 · 판매일 최근순
               </span>
             </h2>
-            <ChannelSaleRecords rows={records} isLoading={recordsLoading} error={recordsError} />
+            <ChannelSaleRecords
+              rows={records}
+              isLoading={recordsLoading}
+              error={recordsError}
+              hideCanceled={hideCanceled}
+              hidePending={hidePending}
+              onHideCanceledChange={setHideCanceled}
+              onHidePendingChange={setHidePending}
+            />
           </section>
         </>
       )}
