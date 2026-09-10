@@ -44,6 +44,7 @@ export const ROUTES = {
   // 🔴 매출·정산 화면 (FEATURE_2609_30). 위 SALES_PRODUCTS_* 는 '판매상품 관리'라 이름만 비슷하고
   // 전혀 다른 화면이다 — 새 항목에 SALES_PRODUCTS_ 접두사를 재사용하지 말 것.
   SALES_SUMMARY: '/dashboard/sales/summary' as const,
+  SALES_BY_CHANNEL: '/dashboard/sales/channels' as const,
   SALES_BY_PRODUCT: '/dashboard/sales/products' as const,
   SETTLEMENT_PAYOUTS: '/dashboard/sales/settlement' as const,
   SETTLEMENT_PAYOUT_DETAIL: (id: number | string) => `/dashboard/sales/settlement/${id}` as const,
