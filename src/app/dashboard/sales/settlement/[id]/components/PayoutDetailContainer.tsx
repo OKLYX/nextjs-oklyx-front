@@ -290,7 +290,13 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
 
   const payout = report.payout;
   const amountOnly = payout.reconStatus === 'AMOUNT_ONLY';
-  const noLines = payout.lineCount === 0;
+  /**
+   * 🔴 원인이 없으면 원인 분석을 그리지 않는다(PLAN 2609_32 D9). 라인 0건·차액 0원이면 라벨이 0개고,
+   *    그때 제목만 남은 섹션은 "대조했는데 결과가 없다"로 읽힌다 — 없는 항목이다.
+   * 🔴 단, 미분류 목록의 렌더 주체가 블록 B 라 블록 A 의 [보기] 가 켜지면 살려 둔다(D9-1).
+   */
+  const hasCauses = report.blockB.labels.length > 0;
+  const showBlockB = hasCauses || unmatchedOnly;
 
   return (
     <PageContainer>
@@ -341,15 +347,7 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
 
       <ReconBlockA blockA={report.blockA} onShowUnmatched={handleShowUnmatched} />
 
-      {noLines ? (
-        <section className="bg-white rounded-lg shadow p-6 space-y-1">
-          <h2 className="text-lg font-semibold text-gray-900">차액 원인 분석</h2>
-          {/* 🔴 판매 건 0건은 정상이다(D5-4) — 갱신을 유도하지 않는다. */}
-          <p className="text-sm text-gray-500">
-            이 지급에는 판매 건이 없습니다 (조정 항목만).
-          </p>
-        </section>
-      ) : (
+      {showBlockB && (
         <ReconBlockB
           blockB={report.blockB}
           expandedLabel={expandedLabel}
