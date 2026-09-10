@@ -21,6 +21,13 @@ import {
  * 🔴 `DEDUCTION` 의 ⓘ 문구(`guidance`)는 <b>서버 값을 그대로</b> 쓴다. 쿠팡이 사유를 주지 않으므로
  * 프론트가 추측 문구를 지어내면 리포트 전체를 못 믿게 된다(D13).
  * 🔴 판매 건 0건은 정상이다(D5-4) — 유보금 해제·채무 상환·광고비 정산은 판매 라인이 없다.
+ *
+ * 🔴 <b>`ourTotal == null` 이면 대조를 하지 않은 것이다</b>(FEATURE_2609_32 / PLAN 2609_32 D2·D3).
+ * 추가정산·유보금은 라인을 일부러 귀속시키지 않아 계산하면 100% 차액 −전액이 나온다. 이때는
+ * `OCLYX 집계` 행·차액 배지·허용오차를 <b>렌더하지 않는다</b> — 빈칸(`—`)으로 두면 "값을 못 불러왔다"로
+ * 읽힌다. 아예 없는 항목이다. 쿠팡이 준 금액 구성(라인 합·조정 행·지급액)은 그대로 남긴다.
+ * 🔴 판정은 `reconStatus` 문자열이 아니라 <b>값의 유무</b>로 한다 — 서버가 대조 대상 규칙을 바꿔도
+ * 화면이 따로 판단하지 않는다.
  */
 interface ReconBlockAProps {
   blockA: BlockA;
@@ -29,6 +36,8 @@ interface ReconBlockAProps {
 }
 
 export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
+  // 값이 없다 = 서버가 계산하지 않았다(D2). 상태 문자열로 다시 판단하지 않는다.
+  const notReconciled = blockA.ourTotal == null;
   const pending = blockA.finalAmount == null;
   const matched =
     !pending && Math.abs(blockA.diff ?? 0) <= Math.abs(blockA.tolerance ?? 0);
@@ -37,7 +46,7 @@ export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
     <section className="bg-white rounded-lg shadow p-6 space-y-4">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-gray-900">정산 상세 내역</h2>
-        <p className="text-sm text-gray-500">지급 묶음 단위로 금액을 맞춰본 결과입니다.</p>
+        <p className="text-sm text-gray-500">쿠팡이 알려준 금액 구성입니다.</p>
       </div>
 
       <dl className="divide-y divide-gray-200 text-sm">
@@ -78,16 +87,18 @@ export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
           );
         })}
 
-        <div className="flex items-center justify-between py-2">
-          <dt className="font-semibold text-gray-900">OCLYX 집계</dt>
-          <dd className="font-semibold text-gray-900">{formatMoney(blockA.ourTotal)}</dd>
-        </div>
+        {!notReconciled && (
+          <div className="flex items-center justify-between py-2">
+            <dt className="font-semibold text-gray-900">OCLYX 집계</dt>
+            <dd className="font-semibold text-gray-900">{formatMoney(blockA.ourTotal)}</dd>
+          </div>
+        )}
 
         <div className="flex items-center justify-between py-2">
           <dt className="font-semibold text-gray-900">쿠팡 지급액</dt>
           <dd className="flex items-center gap-3">
             <span className="font-semibold text-gray-900">{formatMoney(blockA.finalAmount)}</span>
-            {pending ? (
+            {notReconciled ? null : pending ? (
               // 🔴 지급내역 미수신은 실패가 아니다 — 아직 채점할 답안지가 없는 상태다.
               <span className="px-2 py-1 text-xs rounded border bg-gray-50 text-gray-600 border-gray-200">
                 ⏳ 지급내역 미수신
@@ -119,7 +130,7 @@ export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
             보기
           </button>
         )}
-        {!pending && (
+        {!pending && !notReconciled && (
           <span className="ml-auto text-xs text-gray-500">
             허용오차 {formatMoney(blockA.tolerance)}원
           </span>
