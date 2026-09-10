@@ -346,20 +346,11 @@ export function MasterProductFormModal({
   const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [productFilter, setProductFilter] = useState('');
-  // Search-results dropdown open state (closes on outside click, independent of the query text).
-  const [showResults, setShowResults] = useState(false);
+  // Submitted query (검색 버튼/Enter). Typing alone shows nothing — same flow as the category search.
+  const [productQuery, setProductQuery] = useState('');
+  const [productHasSearched, setProductHasSearched] = useState(false);
   // Once applied, the component set is frozen (search + add/remove disabled) until 수정 is pressed.
   const [componentsLocked, setComponentsLocked] = useState(false);
-  const searchBoxRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const onDocMouseDown = (e: MouseEvent) => {
-      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
-        setShowResults(false);
-      }
-    };
-    document.addEventListener('mousedown', onDocMouseDown);
-    return () => document.removeEventListener('mousedown', onDocMouseDown);
-  }, []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Component-product detail popup (data already loaded — no extra fetch).
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
@@ -401,7 +392,8 @@ export function MasterProductFormModal({
   // Apply the picked component set: clear the search UI and freeze the section (수정 to reopen).
   const applyComponents = () => {
     setProductFilter('');
-    setShowResults(false);
+    setProductQuery('');
+    setProductHasSearched(false);
     setComponentsLocked(true);
   };
 
@@ -439,13 +431,19 @@ export function MasterProductFormModal({
     doToggle();
   };
 
+  const handleProductSearch = () => {
+    if (!productFilter.trim()) return;
+    setProductQuery(productFilter);
+    setProductHasSearched(true);
+  };
+
   const filteredProducts = useMemo(() => {
-    const q = productFilter.trim().toLowerCase();
+    const q = productQuery.trim().toLowerCase();
     if (!q) return products;
     return products.filter((p) => (p.productName ?? '').toLowerCase().includes(q));
-  }, [products, productFilter]);
+  }, [products, productQuery]);
 
-  // Search dropdown = matches excluding already-selected items (they show in the list below).
+  // Search results = matches excluding already-selected items (they show in the list below).
   const PRODUCT_SEARCH_LIMIT = 50;
   const searchMatches = useMemo(() => {
     const selected = new Set(selectedIds);
@@ -743,72 +741,24 @@ export function MasterProductFormModal({
             <label className="mb-1 block text-xs font-medium text-gray-600">
               구성상품 ({selectedIds.length}개 선택)
             </label>
-            {/* 검색 = 드롭다운으로 결과 표시(클릭 시 선택 토글). 아래 목록엔 선택된 것만. */}
-            <div className="mb-2 flex gap-2" ref={searchBoxRef}>
-              <div className="relative flex-1">
-                <input
-                  className="w-full rounded border border-gray-300 py-1.5 pl-2 pr-8 text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100"
-                  placeholder="상품명 검색"
-                  value={productFilter}
-                  disabled={optionFormOpen || componentsLocked}
-                  onChange={(e) => {
-                    setProductFilter(e.target.value);
-                    setShowResults(true);
-                  }}
-                  onFocus={() => setShowResults(true)}
-                  onKeyDown={(e) => e.key === 'Escape' && setShowResults(false)}
-                />
-                {productFilter !== '' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductFilter('');
-                      setShowResults(false);
-                    }}
-                    aria-label="검색어 지우기"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                )}
-                {!componentsLocked && showResults && productFilter.trim() !== '' && (
-                  <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded border border-gray-200 bg-white shadow-lg">
-                    {searchResults.length === 0 ? (
-                      <p className="px-3 py-2 text-sm text-gray-500">검색 결과가 없습니다.</p>
-                    ) : (
-                      <ul>
-                        {searchResults.map((p) => (
-                          <li key={p.id} className="border-t border-gray-100 first:border-t-0">
-                            {/* Row click adds the product (same affordance as the category search list). */}
-                            <button
-                              type="button"
-                              onClick={() => toggleProduct(p.id)}
-                              disabled={optionFormOpen || componentsLocked}
-                              className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {renderThumb(p)}
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm text-gray-900">{p.productName}</span>
-                                <span className="block truncate text-[11px] text-gray-400">
-                                  {p.brand || '—'} · {formatWon(p.price)}
-                                </span>
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                        {searchMatches.length > searchResults.length && (
-                          <li className="border-t border-gray-100 px-3 py-1.5 text-[11px] text-gray-400">
-                            {searchMatches.length}개 중 {searchResults.length}개 표시 — 더 구체적으로 검색하세요.
-                          </li>
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </div>
+            {/* 검색 = 버튼/Enter 로 실행, 결과는 아래 목록(카테고리 검색과 동일한 형식). 클릭 시 추가. */}
+            <div className="mb-2 flex gap-2">
+              <input
+                className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100"
+                placeholder="상품명으로 검색"
+                value={productFilter}
+                disabled={optionFormOpen || componentsLocked}
+                onChange={(e) => setProductFilter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleProductSearch();
+                  }
+                }}
+              />
               <button
                 type="button"
-                onClick={() => setShowResults(true)}
+                onClick={handleProductSearch}
                 disabled={optionFormOpen || componentsLocked || productFilter.trim() === ''}
                 className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
@@ -833,6 +783,41 @@ export function MasterProductFormModal({
                 </button>
               )}
             </div>
+
+            {!componentsLocked && productHasSearched && (
+              <div className="mb-2 max-h-40 overflow-y-auto rounded border border-gray-200">
+                {searchResults.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-gray-500">검색 결과가 없습니다.</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {searchResults.map((p) => (
+                      <li key={p.id}>
+                        {/* Row click adds the product (same affordance as the category search list). */}
+                        <button
+                          type="button"
+                          onClick={() => toggleProduct(p.id)}
+                          disabled={optionFormOpen}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {renderThumb(p)}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm text-gray-800">{p.productName}</span>
+                            <span className="block truncate text-[11px] text-gray-400">
+                              {p.brand || '—'} · {formatWon(p.price)}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {searchMatches.length > searchResults.length && (
+                  <p className="border-t border-gray-100 px-3 py-1.5 text-[11px] text-gray-400">
+                    {searchMatches.length}개 중 {searchResults.length}개 표시 — 더 구체적으로 검색하세요.
+                  </p>
+                )}
+              </div>
+            )}
 
             <p className="mb-1 text-[11px] text-gray-500">
               검색 결과에서 선택하면 아래 목록에 추가됩니다. 제품명을 클릭하면 상세 정보를 볼 수 있습니다.
