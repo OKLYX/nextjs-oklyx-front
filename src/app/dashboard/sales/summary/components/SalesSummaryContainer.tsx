@@ -37,7 +37,8 @@ const isShorterThanMonth = (from: string, to: string): boolean => {
  * 🔴 기간과 펼침은 <b>URL 에 넣지 않는다</b>(04 Step 2-1) — 공유·복원 대상이 아니고,
  * 두 탭이 각자 자기 기간을 갖는다.
  *
- * ⚠️ 정산 배치·금액 확인은 이 화면이 아니다(PLAN D2). 채널 행의 `[정산 내역 →]` 이 유일한 진입점이다.
+ * ⚠️ 정산 배치·금액 확인은 이 화면이 아니다(PLAN D2) — 여기서는 그 기간 매출에 걸린 정산 건으로
+ * 넘어가기만 한다.
  */
 export function SalesSummaryContainer() {
   const router = useRouter();
@@ -144,10 +145,19 @@ export function SalesSummaryContainer() {
     [salesStatsUseCase, settlementUseCase, expandedSellerId, from, to]
   );
 
-  // 05 머지 전에는 404 가 정상이다(라우트만 먼저 확정해 둔다).
-  const openSettlement = useCallback(
-    (accountId: number) => router.push(`${ROUTES.SETTLEMENT_PAYOUTS}?accountId=${accountId}`),
-    [router]
+  /**
+   * 채널 행 클릭 — 채널별 매출 화면으로 넘긴다.
+   *
+   * 🔴 보고 있던 기간·판매자를 쿼리로 함께 넘긴다. 안 넘기면 9월을 보다가 채널을 눌렀는데 이번 달로
+   * 돌아가 버려 "왜 숫자가 다르지"가 된다. 받는 쪽은 이 값을 <b>초기값으로만</b> 쓴다.
+   */
+  const openChannel = useCallback(
+    (accountId: number) => {
+      const query = new URLSearchParams({ from, to, accountId: String(accountId) });
+      if (expandedSellerId != null) query.set('sellerId', String(expandedSellerId));
+      router.push(`${ROUTES.SALES_BY_CHANNEL}?${query.toString()}`);
+    },
+    [router, from, to, expandedSellerId]
   );
   // 정산 건별 이동 — 목록을 거치지 않고 그 지급 묶음 상세로 바로 간다.
   const openPayout = useCallback(
@@ -209,7 +219,7 @@ export function SalesSummaryContainer() {
         payoutsError={payoutsError}
         onToggle={handleToggle}
         onRetry={() => setReloadTick((tick) => tick + 1)}
-        onOpenSettlement={openSettlement}
+        onOpenChannel={openChannel}
         onOpenPayout={openPayout}
       />
     </PageContainer>

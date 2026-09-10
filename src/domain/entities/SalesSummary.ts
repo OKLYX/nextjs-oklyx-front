@@ -2,7 +2,7 @@
  * 매출 집계 (FEATURE_2609_30 / PLAN D2 · D3 · D4 · D14 · D15, 백엔드 03 SSOT).
  *
  * 🔴 <b>축이 둘 섞여 있다.</b> `grossSales`/`discount`/`estFee`/`estNetProfit` 은 <b>판매일</b> 축의 기간
- * 합계이고, `pendingPayout`("정산 예정 금액")은 <b>매출인식일</b> 축의 <b>기간 무관</b> 총액이다(D4).
+ * 합계이고, `pendingPayout`("정산 추정 금액")은 <b>매출인식일</b> 축의 <b>기간 무관</b> 총액이다(D4).
  * 화면은 기간을 바꿔도 안 변하는 이 값에 반드시 `기간 무관 · 미지급 잔액` 라벨을 붙인다 —
  * 라벨이 없으면 버그로 오해받는다.
  *
@@ -31,7 +31,7 @@ export interface SellerSales {
   /** 원가 스냅샷이 없는 라인이 하나라도 섞이면 null (D15). */
   estNetProfit: number | null;
   costBasisReady: boolean;
-  /** 🔴 기간 무관 "정산 예정 금액". 기간 필터와 함께 묶어 라벨링하지 말 것(D4). */
+  /** 🔴 기간 무관 "정산 추정 금액". 기간 필터와 함께 묶어 라벨링하지 말 것(D4). */
   pendingPayout: number;
   /**
    * 조회 기간에 이 판매자의 채널들이 부담하는 월 고정비 합 (PLAN 2609_33 D4 · D7).
