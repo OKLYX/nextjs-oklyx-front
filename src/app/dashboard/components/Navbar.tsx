@@ -26,7 +26,9 @@ interface MenuGroup {
   label: string;
   open: boolean;
   toggle: () => void;
-  items: { href: string; label: string }[];
+  /** `adminOnly` 는 그룹뿐 아니라 항목에도 붙는다 — 공개 그룹 안에 ADMIN 전용 화면이 하나 있을 때
+      새 그룹을 만들지 않기 위해서다(예: 비용관리 > 채널 고정비 = `/api/admin/fixed-costs`). */
+  items: { href: string; label: string; adminOnly?: boolean }[];
   /** Hidden from non-ADMIN users. Kept inline so the display order below is the
       real order — an ADMIN-only group can sit between two public ones. */
   adminOnly?: boolean;
@@ -77,7 +79,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
 
   // Display order. ADMIN-only groups are marked and filtered below rather than
   // appended, so this array reads top-to-bottom exactly as the sidebar renders.
-  const menuGroups: MenuGroup[] = [
+  const allMenuGroups: MenuGroup[] = [
     {
       icon: Tags,
       label: '판매상품',
@@ -154,6 +156,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         { href: ROUTES.COSTS_PACKAGE, label: '상자비' },
         { href: ROUTES.COSTS_CATEGORY, label: '카테고리' },
         { href: ROUTES.COSTS_COMMISSION_RATE, label: '수수료' },
+        { href: ROUTES.COSTS_FIXED_COST, label: '채널 고정비', adminOnly: true },
       ],
     },
     {
@@ -194,7 +197,14 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       adminOnly: true,
       items: [{ href: ROUTES.SETTINGS_LOGGING, label: '로그 설정' }],
     },
-  ].filter((menu) => !menu.adminOnly || user?.role === 'ADMIN');
+  ];
+
+  const menuGroups: MenuGroup[] = allMenuGroups
+    .filter((menu) => !menu.adminOnly || user?.role === 'ADMIN')
+    .map((menu) => ({
+      ...menu,
+      items: menu.items.filter((item) => !item.adminOnly || user?.role === 'ADMIN'),
+    }));
 
   // Collapsed = icon-only rail. Labels/submenus appear on hover (group-hover)
   // or stay visible when pinned. No-op when not in rail mode.

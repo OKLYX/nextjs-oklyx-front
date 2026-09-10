@@ -17,6 +17,7 @@ export const ROUTES = {
   COSTS_PACKAGE: '/dashboard/costs/package',
   COSTS_CATEGORY: '/dashboard/costs/category',
   COSTS_COMMISSION_RATE: '/dashboard/costs/commission-rate',
+  COSTS_FIXED_COST: '/dashboard/costs/fixed-cost',
   SALES_PRODUCTS_RETRIEVE: '/dashboard/sales-products/retrieve' as const,
   SALES_PRODUCTS_RETRIEVE_DETAILS: (id: number | string) => `/dashboard/sales-products/retrieve/${id}` as const,
   SALES_PRODUCTS_RETRIEVE_EDIT: (id: number | string) => `/dashboard/sales-products/retrieve/${id}/edit` as const,

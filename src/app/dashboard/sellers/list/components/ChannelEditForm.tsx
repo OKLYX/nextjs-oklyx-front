@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
@@ -10,7 +10,18 @@ import {
 } from '@/application/dto/MarketplaceAccountDTOs';
 import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 import type { OptionCheckSuffixConfig } from '@/domain/entities/OptionCheckSuffix';
+import type {
+  AccountFixedCost,
+  AccountFixedCostRequestItem,
+  PlatformFixedCost,
+} from '@/domain/entities/FixedCost';
 import { OptionCheckSuffixControl } from '@/presentation/components/OptionCheckSuffixControl';
+import {
+  ChannelFixedCostFields,
+  buildFixedCostRows,
+  toFixedCostRequestItems,
+  type ChannelFixedCostRow,
+} from './ChannelFixedCostFields';
 
 // Hardcoded for now; mirrors ChannelRegistrationForm's PLATFORM_OPTIONS.
 // Exported as SSOT so other features (e.g. carrier platform codes) can reuse it.
@@ -24,13 +35,25 @@ export const PLATFORM_OPTIONS = [
 interface ChannelEditFormProps {
   channel: MarketplaceAccount;
   isLoading?: boolean;
-  // Channel PATCH + suffix PUT run sequentially in the parent. Any failure
-  // throws here → inline banner + retry, modal stays open (see EditChannelModal).
-  onSubmit: (data: UpdateMarketplaceAccountForm, suffixConfig: OptionCheckSuffixConfig) => Promise<void>;
+  // Channel PATCH + suffix PUT + fixed-cost PUT run sequentially in the parent.
+  // Any failure throws here → inline banner + retry, modal stays open (see EditChannelModal).
+  // 🔴 fixedCostItems 가 null 이면 고정비 섹션이 준비되지 않은 것(로딩·조회 실패)이라 저장 대상이 아니다
+  // — 못 읽은 목록으로 replace(PUT)를 보내면 이미 걸린 연결이 통째로 끊긴다.
+  onSubmit: (
+    data: UpdateMarketplaceAccountForm,
+    suffixConfig: OptionCheckSuffixConfig,
+    fixedCostItems: AccountFixedCostRequestItem[] | null,
+  ) => Promise<void>;
   onCancel: () => void;
   thumbTemplates?: TemplateOption[];
   detailTemplates?: TemplateOption[];
   templatesLoading?: boolean;
+  /** 고정비 카탈로그 + 이 채널의 현재 연결 (useCase 는 SellerChannelSection 소유 — 폼에서 만들지 않는다). */
+  fixedCosts?: PlatformFixedCost[];
+  fixedCostLinks?: AccountFixedCost[];
+  fixedCostsLoading?: boolean;
+  fixedCostsError?: string;
+  onRetryFixedCosts?: () => void;
 }
 
 export function ChannelEditForm({
@@ -41,12 +64,42 @@ export function ChannelEditForm({
   thumbTemplates = [],
   detailTemplates = [],
   templatesLoading = false,
+  fixedCosts = [],
+  fixedCostLinks = [],
+  fixedCostsLoading = false,
+  fixedCostsError = '',
+  onRetryFixedCosts = () => {},
 }: ChannelEditFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [suffixConfig, setSuffixConfig] = useState<OptionCheckSuffixConfig>({
     optionCheckSuffixEnabled: channel.optionCheckSuffixEnabled ?? null,
     optionCheckSuffix: channel.optionCheckSuffix ?? null,
   });
+
+  const fixedCostReady = !fixedCostsLoading && fixedCostsError === '';
+
+  // 🔴 카탈로그·연결은 모달이 열린 뒤에 도착한다. 서버 값으로 state 를 만들어 두고 도착 시점에 덮으면
+  // 이펙트 setState(프로젝트 lint 금지)이고, 그 사이 편집분도 날아간다 → **렌더 시점에 합성**한다:
+  // 손댄 행만 `fixedCostEdits` 에 남고 나머지는 서버 값을 그대로 따라간다.
+  const [fixedCostEdits, setFixedCostEdits] = useState<Record<number, ChannelFixedCostRow>>({});
+  const baseFixedCostRows = useMemo(
+    () => buildFixedCostRows(fixedCosts, fixedCostLinks, channel.platform),
+    [fixedCosts, fixedCostLinks, channel.platform],
+  );
+  const fixedCostRows = useMemo(
+    () => baseFixedCostRows.map((row) => fixedCostEdits[row.fixedCostId] ?? row),
+    [baseFixedCostRows, fixedCostEdits],
+  );
+
+  const handleFixedCostRowsChange = (next: ChannelFixedCostRow[]) => {
+    setFixedCostEdits((prev) => {
+      const updated = { ...prev };
+      next.forEach((row, index) => {
+        if (row !== fixedCostRows[index]) updated[row.fixedCostId] = row;
+      });
+      return updated;
+    });
+  };
 
   const { register, handleSubmit, formState } = useForm<UpdateMarketplaceAccountForm>({
     resolver: zodResolver(updateMarketplaceAccountSchema),
@@ -66,7 +119,11 @@ export function ChannelEditForm({
   const onSubmit = async (data: UpdateMarketplaceAccountForm) => {
     try {
       setError(null);
-      await externalOnSubmit(data, suffixConfig);
+      await externalOnSubmit(
+        data,
+        suffixConfig,
+        fixedCostReady ? toFixedCostRequestItems(fixedCostRows) : null,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : '판매채널 수정에 실패했습니다';
       setError(message);
@@ -245,6 +302,15 @@ export function ChannelEditForm({
           disabled={isLoading}
         />
       </div>
+
+      <ChannelFixedCostFields
+        rows={fixedCostRows}
+        onChange={handleFixedCostRowsChange}
+        isLoading={fixedCostsLoading}
+        loadError={fixedCostsError}
+        onRetry={onRetryFixedCosts}
+        disabled={isLoading}
+      />
 
       <div className="flex gap-2 pt-2">
         <button
