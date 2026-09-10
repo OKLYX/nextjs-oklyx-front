@@ -2,7 +2,13 @@
 
 import { Fragment } from 'react';
 import type { ChannelSales, SellerSales } from '@/domain/entities/SalesSummary';
-import { PROFIT_PENDING_HINT, formatMoney, formatProfit } from '@/domain/entities/SalesSummary';
+import {
+  FIXED_COST_HINT,
+  PROFIT_PENDING_HINT,
+  formatFixedCost,
+  formatMoney,
+  formatProfit,
+} from '@/domain/entities/SalesSummary';
 import { SellerChannelRows } from './SellerChannelRows';
 
 interface SellerSummaryTableProps {
@@ -20,7 +26,8 @@ interface SellerSummaryTableProps {
   onOpenUnreconciled: (sellerId: number) => void;
 }
 
-const COLUMN_COUNT = 7;
+// 🔴 열을 추가하면 이 수를 같이 올린다 — 빈 상태 행과 채널 펼침 블록의 `colSpan` 이 이 값을 먹는다.
+const COLUMN_COUNT = 8;
 
 /**
  * 판매자별 매출 표 (FEATURE_2609_30 / 04 Step 3). 한 행 = 판매자, 클릭하면 채널 행이 펼쳐진다.
@@ -76,10 +83,12 @@ export function SellerSummaryTable({
       grossSales: acc.grossSales + row.grossSales,
       discount: acc.discount + row.discount,
       netQty: acc.netQty + row.netQty,
+      // 고정비 합계는 `totalProfitReady` 와 무관하게 항상 숫자다 — 원가가 미확정이어도 나가는 돈은 안다(D6).
+      fixedCost: acc.fixedCost + (row.fixedCost ?? 0),
       estNetProfit: acc.estNetProfit + (row.estNetProfit ?? 0),
       pendingPayout: acc.pendingPayout + row.pendingPayout,
     }),
-    { grossSales: 0, discount: 0, netQty: 0, estNetProfit: 0, pendingPayout: 0 }
+    { grossSales: 0, discount: 0, netQty: 0, fixedCost: 0, estNetProfit: 0, pendingPayout: 0 }
   );
   // 한 행이라도 원가 스냅샷이 없으면 합계도 모르는 값이다 — 부분합을 총계처럼 보이면 안 된다.
   const totalProfitReady = rows.length > 0 && rows.every((row) => row.costBasisReady);
@@ -98,6 +107,12 @@ export function SellerSummaryTable({
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">판매수량</th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">매출액</th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">할인</th>
+            <th
+              className="px-6 py-3 text-right text-sm font-semibold text-gray-900"
+              title={FIXED_COST_HINT}
+            >
+              고정비
+            </th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">순이익(추정)</th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
               정산 예정 금액
@@ -140,6 +155,10 @@ export function SellerSummaryTable({
                     </td>
                     <td className="px-6 py-3 text-sm text-right text-gray-500">
                       {formatMoney(row.discount)}
+                    </td>
+                    {/* 🔴 서버가 준 판매자 행의 값이다 — 채널 값을 화면에서 더하지 않는다(D7). */}
+                    <td className="px-6 py-3 text-sm text-right text-gray-700">
+                      {formatFixedCost(row.fixedCost)}
                     </td>
                     <td
                       className="px-6 py-3 text-sm text-right text-gray-900"
@@ -194,6 +213,9 @@ export function SellerSummaryTable({
               </td>
               <td className="px-6 py-3 text-sm text-right font-semibold text-gray-700">
                 {formatMoney(totals.discount)}
+              </td>
+              <td className="px-6 py-3 text-sm text-right font-semibold text-gray-700">
+                {formatFixedCost(totals.fixedCost)}
               </td>
               <td
                 className="px-6 py-3 text-sm text-right font-semibold text-gray-900"

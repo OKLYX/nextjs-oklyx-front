@@ -12,6 +12,22 @@ import { PeriodFilter, currentMonthRange } from '../../components/PeriodFilter';
 import { SellerSummaryTable } from './SellerSummaryTable';
 
 /**
+ * 조회 기간이 한 달보다 짧은가 (PLAN 2609_33 D4-2).
+ *
+ * 🔴 <b>날짜만 보고 판정한다</b> — 매출·임계를 비교하지 않는다(부과 판정은 서버 몫, D2).
+ * 같은 달 안이면서 그 달 전체(1일~말일)가 아니면 짧은 기간이다.
+ */
+const isShorterThanMonth = (from: string, to: string): boolean => {
+  if (!from || !to || from > to) return false;
+  const [fromYear, fromMonth, fromDay] = from.split('-').map(Number);
+  const [toYear, toMonth, toDay] = to.split('-').map(Number);
+  if (fromYear !== toYear || fromMonth !== toMonth) return false;
+  // `Date.UTC(year, month, 0)` = 그 달의 말일(month 가 1-based 라 0-based 로는 다음 달이다).
+  const lastDay = new Date(Date.UTC(toYear, toMonth, 0)).getUTCDate();
+  return fromDay !== 1 || toDay !== lastDay;
+};
+
+/**
  * 매출 조회 화면의 상태 소유자 (FEATURE_2609_30 / 04 Step 3).
  *
  * 소유 상태 = 기간(`from`/`to`) · 판매자 행 · 펼친 판매자 1명 + 그 채널 행.
@@ -116,6 +132,9 @@ export function SalesSummaryContainer() {
   const invalidRange = Boolean(from && to && from > to);
   // 한 행이라도 원가 스냅샷이 없으면 안내를 띄운다 — 순이익 칸의 `—` 가 무슨 뜻인지 화면에 쓴다(D15).
   const showCostBasisNotice = rows.some((row) => !row.costBasisReady);
+  // 고정비가 하나라도 걸린 기간에만 설명을 띄운다 — 없는 기간에 띄우면 소음이다.
+  const showFixedCostNotice = rows.some((row) => (row.fixedCost ?? 0) > 0);
+  const shortPeriod = isShorterThanMonth(from, to);
 
   return (
     <PageContainer>
@@ -140,6 +159,15 @@ export function SalesSummaryContainer() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
           순이익 추정치는 상품 단가와 비용(택배비, 상자비 등)이 모두 작성 완료되어야 표시가능합니다.
         </div>
+      )}
+
+      {showFixedCostNotice && (
+        <p className="text-sm text-gray-500">
+          채널 고정비는 순이익에서 이미 빠져 있습니다. 그 달 매출이 기준 미만이면 부과되지 않습니다.{' '}
+          {/* 🔴 이 문장을 빼지 말 것 — 상품 탭 순이익 합이 채널 탭과 어긋나는 의도된 차이를 설명하는 유일한 자리다. */}
+          상품별 순이익에는 포함되지 않습니다.
+          {shortPeriod && ' 기간이 한 달보다 짧아도 그 달 고정비 전액이 빠집니다(일할 계산 없음).'}
+        </p>
       )}
 
       <SellerSummaryTable

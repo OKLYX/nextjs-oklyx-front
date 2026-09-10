@@ -2,8 +2,10 @@
 
 import type { ChannelSales } from '@/domain/entities/SalesSummary';
 import {
+  FIXED_COST_HINT,
   PROFIT_PENDING_HINT,
   channelLabel,
+  formatFixedCost,
   formatMoney,
   formatProfit,
 } from '@/domain/entities/SalesSummary';
@@ -21,6 +23,9 @@ interface SellerChannelRowsProps {
  *
  * 🔴 <b>지급확정(현금주의)은 여기에만 있다</b>(PLAN D4-1). 판매자 행으로 올리지 않는다 —
  * 채널마다 정산 주기(WEEKLY/MONTHLY/…)가 달라 합산하면 뜻을 잃는다.
+ *
+ * 🔴 <b>고정비는 이미 순이익에서 빠져 있다</b>(PLAN 2609_33 D6 · D7) — 여기서 다시 빼지 않는다.
+ * 부과 여부 판정은 서버 몫이다(D2). 매출과 임계를 화면에서 비교하지 말 것.
  *
  * ⚠️ 표시 전용이다. 조회·상태 변경을 이 안에서 하지 않는다.
  */
@@ -55,6 +60,9 @@ export function SellerChannelRows({
           <th className="px-3 py-2 text-left font-medium">채널</th>
           <th className="px-3 py-2 text-right font-medium">매출액</th>
           <th className="px-3 py-2 text-right font-medium">할인</th>
+          <th className="px-3 py-2 text-right font-medium" title={FIXED_COST_HINT}>
+            고정비
+          </th>
           <th className="px-3 py-2 text-right font-medium">순이익(추정)</th>
           <th className="px-3 py-2 text-right font-medium">
             정산 예정 금액
@@ -74,6 +82,15 @@ export function SellerChannelRows({
             <td className="px-3 py-2 text-gray-700">└ {channelLabel(channel)}</td>
             <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.grossSales)}</td>
             <td className="px-3 py-2 text-right text-gray-500">{formatMoney(channel.discount)}</td>
+            {/* 🔴 경고색을 쓰지 않는다 — 정상 비용이다. 순이익이 `—`(원가 미확정)여도 이 칸은 숫자다(D6). */}
+            <td
+              className="px-3 py-2 text-right text-gray-700"
+              title={
+                (channel.fixedCost ?? 0) > 0 ? `${channel.fixedCostMonths ?? 0}개월분` : undefined
+              }
+            >
+              {formatFixedCost(channel.fixedCost)}
+            </td>
             <td
               className="px-3 py-2 text-right text-gray-900"
               title={channel.costBasisReady ? undefined : PROFIT_PENDING_HINT}
