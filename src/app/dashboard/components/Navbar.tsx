@@ -139,8 +139,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       toggle: toggleSettlementMenu,
       adminOnly: true,
       items: [
-        { href: ROUTES.SALES_SUMMARY, label: '매출 현황' },
-        { href: ROUTES.SALES_BY_PRODUCT, label: '상품별 수익성' },
+        { href: ROUTES.SALES_SUMMARY, label: '매출' },
         { href: ROUTES.SETTLEMENT_PAYOUTS, label: '정산 내역' },
       ],
     },

@@ -12,7 +12,7 @@ import { PeriodFilter, currentMonthRange } from '../../components/PeriodFilter';
 import { SellerSummaryTable } from './SellerSummaryTable';
 
 /**
- * 매출 현황 화면의 상태 소유자 (FEATURE_2609_30 / 04 Step 3).
+ * 매출 조회 화면의 상태 소유자 (FEATURE_2609_30 / 04 Step 3).
  *
  * 소유 상태 = 기간(`from`/`to`) · 판매자 행 · 펼친 판매자 1명 + 그 채널 행.
  * 🔴 기간과 펼침은 <b>URL 에 넣지 않는다</b>(04 Step 2-1) — 공유·복원 대상이 아니고,
@@ -120,7 +120,7 @@ export function SalesSummaryContainer() {
   return (
     <PageContainer>
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-gray-900">매출 현황</h1>
+        <h1 className="text-2xl font-bold text-gray-900">매출</h1>
         <p className="text-sm text-gray-500">
           판매일 기준 집계입니다. 실제 입금(정산)은 채널을 펼쳐 확인하세요.
         </p>
