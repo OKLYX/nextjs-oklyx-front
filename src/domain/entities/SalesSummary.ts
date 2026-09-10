@@ -98,4 +98,5 @@ export const formatProfit = (row: { estNetProfit: number | null; costBasisReady:
   row.costBasisReady && row.estNetProfit != null ? formatMoney(row.estNetProfit) : '—';
 
 /** 순이익이 비어 있는 이유를 셀 툴팁으로 설명한다(헤더 툴팁만으론 행마다 다른 상태를 못 보여준다). */
-export const PROFIT_PENDING_HINT = '원가 스냅샷 준비 후 표시됩니다';
+export const PROFIT_PENDING_HINT =
+  '순이익 추정치는 상품 단가와 비용(택배비, 상자비 등)이 모두 작성 완료되어야 표시가능합니다.';
