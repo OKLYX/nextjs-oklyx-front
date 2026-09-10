@@ -778,24 +778,21 @@ export function MasterProductFormModal({
                     ) : (
                       <ul>
                         {searchResults.map((p) => (
-                          <li
-                            key={p.id}
-                            className="flex items-center gap-2 border-t border-gray-100 px-2 py-1.5 first:border-t-0 hover:bg-gray-50"
-                          >
-                            {renderThumb(p)}
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm text-gray-900">{p.productName}</span>
-                              <span className="block truncate text-[11px] text-gray-400">
-                                {p.brand || '—'} · {formatWon(p.price)}
-                              </span>
-                            </span>
+                          <li key={p.id} className="border-t border-gray-100 first:border-t-0">
+                            {/* Row click adds the product (same affordance as the category search list). */}
                             <button
                               type="button"
                               onClick={() => toggleProduct(p.id)}
                               disabled={optionFormOpen || componentsLocked}
-                              className="shrink-0 rounded border border-blue-300 px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              추가
+                              {renderThumb(p)}
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm text-gray-900">{p.productName}</span>
+                                <span className="block truncate text-[11px] text-gray-400">
+                                  {p.brand || '—'} · {formatWon(p.price)}
+                                </span>
+                              </span>
                             </button>
                           </li>
                         ))}
