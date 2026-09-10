@@ -10,11 +10,12 @@ import { ROUTES } from '@/config/routes';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { SettlementUseCase } from '@/application/usecases/SettlementUseCase';
 import { SettlementRepositoryImpl } from '@/infrastructure/repositories/SettlementRepositoryImpl';
-import type { ReconLineView, ReconReport } from '@/domain/entities/Settlement';
+import type { MonthCheck, ReconLineView, ReconReport } from '@/domain/entities/Settlement';
 import {
   channelLabel,
   formatDateRange,
   formatMoney,
+  formatSigned,
   payoutStatusLabel,
   settlementTypeLabel,
 } from '@/domain/entities/Settlement';
@@ -40,6 +41,87 @@ interface PayoutDetailContainerProps {
 
 /** 파일명에 못 쓰는 문자만 걷어낸다(채널 별칭은 사용자가 자유롭게 적는다). */
 const safeFileNamePart = (value: string): string => value.replace(/[\\/:*?"<>|]/g, '-').trim();
+
+/** `2026-08` → `2026년 8월`. 🔴 형식이 다르면 원문 그대로 — 빈칸을 만들지 않는다(Settlement `label()` 관례). */
+const monthLabel = (value: string | null): string => {
+  if (!value) return '—';
+  const matched = /^(\d{4})-(\d{2})$/.exec(value);
+  return matched ? `${matched[1]}년 ${Number(matched[2])}월` : value;
+};
+
+/**
+ * 인식월 참고 대조 한 줄 (FEATURE_2609_32 / PLAN 2609_32 D4·D4-1·D6·D8).
+ *
+ * 대조 불가 유형(추가정산·유보금)은 지급 건 단위로 대조할 수 없어 블록 A 에서 우리 집계를 지웠다.
+ * 대신 <b>그 달 전체</b>로 보면 추가정산은 차이를 메우는 항목이라 따져볼 층이 생긴다.
+ *
+ * 🔴 <b>경고색을 쓰지 않는다</b>(D8). 우리 축은 라인의 인식일, 쿠팡 축은 지급 건의 인식월이라 완전히
+ * 같지 않다 — 정상 상태에서도 0이 아닐 수 있는 참고 지표다. `차액`이 아니라 `차이`로 쓴다.
+ * 🔴 `ourLineCount === 0` 은 <b>그 달 매출내역 미적재</b>다(D4-1). 서버가 `diff` 를 담아 보내도
+ * 그리지 않는다 — 0원을 우리 집계인 척 보여주면 방금 지운 −전액이 한 줄 아래에서 부활한다.
+ * 적재 유도는 상단의 `정산 내역` 링크(목록의 [과거 정산 불러오기])로 보낸다 — 백필 다이얼로그를
+ * 이 화면에 <b>복제하지 않는다</b>(2609_31 이 소유자다).
+ * 🔴 금액을 화면에서 다시 계산하지 않는다 — `diff` 는 서버 값을 그대로 쓴다.
+ */
+function MonthCheckRow({ monthCheck, typeLabel }: { monthCheck: MonthCheck; typeLabel: string }) {
+  const loaded = monthCheck.ourLineCount > 0;
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="font-semibold text-gray-900">
+          {monthLabel(monthCheck.revenueRecognitionMonth)} 전체 대조
+        </span>
+        <span className="px-2 py-0.5 text-xs rounded border bg-white text-gray-500 border-gray-200">
+          참고
+        </span>
+      </div>
+
+      <dl className="space-y-1">
+        {loaded && (
+          <div className="flex items-center justify-between">
+            <dt>
+              이 달 우리 집계{' '}
+              <span className="text-xs text-gray-500">
+                (판매 {monthCheck.ourLineCount.toLocaleString('ko-KR')}건)
+              </span>
+            </dt>
+            <dd className="font-medium text-gray-900">{formatMoney(monthCheck.ourLineTotal)}</dd>
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <dt>
+            이 달 쿠팡 지급 합계{' '}
+            <span className="text-xs text-gray-500">
+              (지급 {monthCheck.payoutCount.toLocaleString('ko-KR')}건
+              {/* 🔴 미수신 건을 밝히지 않으면 차이가 항상 우리 쪽 초과로 보인다(D6). */}
+              {monthCheck.pendingPayoutCount > 0 &&
+                ` · 지급액 미수신 ${monthCheck.pendingPayoutCount.toLocaleString('ko-KR')}건`}
+              )
+            </span>
+          </dt>
+          <dd className="font-medium text-gray-900">{formatMoney(monthCheck.payoutTotal)}</dd>
+        </div>
+        {loaded && (
+          <div className="flex items-center justify-between">
+            <dt>차이</dt>
+            <dd className="font-medium text-gray-900">{formatSigned(monthCheck.diff)}</dd>
+          </div>
+        )}
+      </dl>
+
+      {loaded ? (
+        <p className="text-xs text-gray-500">
+          이 {typeLabel}은 이 지급 합계에 이미 포함돼 있습니다.
+        </p>
+      ) : (
+        <p className="text-xs text-gray-500">
+          이 달 매출내역을 아직 불러오지 않아 대조할 수 없습니다. 정산 내역 목록의 [과거 정산 불러오기]
+          로 먼저 적재하세요.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) {
   const settlementUseCase = useMemo(
@@ -247,6 +329,14 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
           ⓘ 금액만 기록된 지급입니다 — 쿠팡이 어느 주문이 포함됐는지 알려주지 않아 판매 내역을 대조할 수
           없습니다.
         </div>
+      )}
+
+      {/* 🔴 대조 불가 유형에서만 서버가 채워 보낸다 — 주정산·월정산은 null 이라 그리지 않는다(D5). */}
+      {report.monthCheck && (
+        <MonthCheckRow
+          monthCheck={report.monthCheck}
+          typeLabel={settlementTypeLabel(payout.settlementType)}
+        />
       )}
 
       <ReconBlockA blockA={report.blockA} onShowUnmatched={handleShowUnmatched} />
