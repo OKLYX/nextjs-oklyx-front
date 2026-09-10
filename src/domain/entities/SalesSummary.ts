@@ -6,6 +6,11 @@
  * 화면은 기간을 바꿔도 안 변하는 이 값에 반드시 `기간 무관 · 미지급 잔액` 라벨을 붙인다 —
  * 라벨이 없으면 버그로 오해받는다.
  *
+ * 🔴 <b>대사 상태 건수(금액 차이 N)는 이 응답에 없다</b>(FEATURE_2609_34). 지급 묶음은 매출인식일 축이라
+ * 기간을 좁혀도 건수가 변하지 않는데, 그것을 기간 필터가 달린 행에 배지로 걸면 "이번 달에 N건이 어긋났다"로
+ * 읽힌다(실제로는 그 채널의 전체 건수였다). 대사 상태는 채널을 펼쳤을 때 나오는 인식월별 정산 목록이
+ * 건별로 보여준다 — 배지를 되살리지 말 것.
+ *
  * 🔴 `estNetProfit === null`(= `costBasisReady === false`)은 <b>"아직 모른다"</b>는 뜻이다.
  * 0 으로 그리지 않는다 — 0 은 "안 남았다"는 뜻이라 정반대다(D15).
  *
@@ -28,7 +33,6 @@ export interface SellerSales {
   costBasisReady: boolean;
   /** 🔴 기간 무관 "정산 예정 금액". 기간 필터와 함께 묶어 라벨링하지 말 것(D4). */
   pendingPayout: number;
-  unreconciledPayouts: number;
   /**
    * 조회 기간에 이 판매자의 채널들이 부담하는 월 고정비 합 (PLAN 2609_33 D4 · D7).
    * 🔴 `estNetProfit` 에는 이미 반영돼 있다 — 화면에서 다시 빼지 않는다.
@@ -54,16 +58,6 @@ export interface ChannelSales {
   /** 현금주의(지급 확정). 🔴 채널에만 있다 — 정산 주기가 채널마다 달라 판매자 합산은 뜻을 잃는다(D4-1). */
   paidAmount: number;
   lastSettlementSyncAt: string | null;
-  unreconciledPayouts: number;
-  /** 라인 없이 금액만 있는 묶음 수(추가정산·유보금). 0 이 아닌 것이 정상이다(D5-5). */
-  amountOnlyPayouts: number;
-  /**
-   * 🔴 전체 지급 묶음 수. <b>0 = 정산 이력 없음</b>.
-   *
-   * 이 값 없이 `unreconciledPayouts === 0` 만 보면 "전부 금액이 맞음"과 "아직 정산이 안 들어옴"이
-   * 같은 초록 배지가 된다. 정산 전 채널이 훨씬 흔하므로 그 오해가 기본값이 되어 버린다.
-   */
-  payoutCount: number;
   /**
    * 조회 기간에 이 채널이 부담하는 월 고정비 합 (PLAN 2609_33 D4 · D7).
    * 🔴 `estNetProfit` 에는 이미 반영돼 있다 — 화면에서 다시 빼지 않는다.
