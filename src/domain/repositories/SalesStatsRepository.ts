@@ -1,5 +1,14 @@
-import type { ChannelSales, ProductProfit, SellerSales } from '@/domain/entities/SalesSummary';
-import type { ProductProfitParams, SalesStatsParams } from '@/application/dto/SalesDTOs';
+import type {
+  ChannelSales,
+  ProductProfit,
+  SalesLine,
+  SellerSales,
+} from '@/domain/entities/SalesSummary';
+import type {
+  ProductProfitParams,
+  SalesLinesParams,
+  SalesStatsParams,
+} from '@/application/dto/SalesDTOs';
 
 /**
  * 매출 집계 API (FEATURE_2609_30 / 백엔드 03). 전 경로가 `/api/admin/sales/**` — ADMIN 전용(PLAN D17).
@@ -14,4 +23,6 @@ export interface SalesStatsRepository {
   getChannelSales(params: SalesStatsParams): Promise<ChannelSales[]>;
   /** ③ 상품별 수익성. `crossChannel` 은 서버 파라미터라 값이 바뀌면 재조회한다. */
   getProductProfit(params: ProductProfitParams): Promise<ProductProfit[]>;
+  /** ④ 판매 내역 — 한 채널의 주문 라인 목록. 🔴 `accountId` 필수(없으면 서버 400). */
+  getSalesLines(params: SalesLinesParams): Promise<SalesLine[]>;
 }
