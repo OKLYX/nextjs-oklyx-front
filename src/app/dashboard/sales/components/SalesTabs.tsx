@@ -9,10 +9,11 @@ import { ROUTES } from '@/config/routes';
  *
  * ⚠️ 정산 내역(`ROUTES.SETTLEMENT_PAYOUTS`)은 여기 탭이 아니다 — 축(매출인식일)과 정본(쿠팡 배치)이
  * 달라서 한 화면에 섞으면 "어제 매출이 왜 바뀌었지"가 나온다(PLAN 2609_30 D2). 진입은 채널 행의
- * `[정산 내역 →]` 과 사이드바 메뉴로만 한다.
+ * 정산 목록·사이드바 메뉴로만 한다.
  */
 const TABS: { href: string; label: string }[] = [
   { href: ROUTES.SALES_SUMMARY, label: '통합 매출 조회' },
+  { href: ROUTES.SALES_BY_CHANNEL, label: '채널별 매출' },
   { href: ROUTES.SALES_BY_PRODUCT, label: '상품별 매출' },
 ];
 

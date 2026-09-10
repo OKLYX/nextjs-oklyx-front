@@ -11,7 +11,7 @@ import {
   formatMoney,
   formatProfit,
 } from '@/domain/entities/SalesSummary';
-import { ChannelPayoutList } from './ChannelPayoutList';
+import { ChannelPayoutList } from '../../components/ChannelPayoutList';
 
 interface SellerChannelRowsProps {
   channels: ChannelSales[];
@@ -21,8 +21,8 @@ interface SellerChannelRowsProps {
   payouts: PayoutSummary[];
   payoutsLoading: boolean;
   payoutsError: string;
-  /** 정산 <b>목록</b> 화면(채널 필터). 건별 이동은 `onOpenPayout` 이다. */
-  onOpenSettlement: (accountId: number) => void;
+  /** 채널 행 클릭 — 그 채널로 좁힌 채널별 매출 화면으로 간다. */
+  onOpenChannel: (accountId: number) => void;
   /** 정산 <b>상세</b> 화면(건별). */
   onOpenPayout: (payoutId: number) => void;
 }
@@ -52,7 +52,7 @@ export function SellerChannelRows({
   payouts,
   payoutsLoading,
   payoutsError,
-  onOpenSettlement,
+  onOpenChannel,
   onOpenPayout,
 }: SellerChannelRowsProps) {
   if (isLoading) {
@@ -85,7 +85,7 @@ export function SellerChannelRows({
           </th>
           <th className="px-3 py-2 text-right font-medium">순이익(추정)</th>
           <th className="px-3 py-2 text-right font-medium">
-            정산 예정 금액
+            정산 추정 금액
             <span className="block text-[11px] font-normal text-gray-400">기간 무관 · 미지급 잔액</span>
           </th>
           <th className="px-3 py-2 text-right font-medium">
@@ -96,55 +96,71 @@ export function SellerChannelRows({
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-200">
-        {channels.map((channel) => (
-          <Fragment key={channel.accountId}>
-          <tr>
-            <td className="px-3 py-2 text-gray-700">└ {channelLabel(channel)}</td>
-            <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.grossSales)}</td>
-            <td className="px-3 py-2 text-right text-gray-500">{formatMoney(channel.discount)}</td>
-            {/* 🔴 경고색을 쓰지 않는다 — 정상 비용이다. 순이익이 `—`(원가 미확정)여도 이 칸은 숫자다(D6). */}
-            <td
-              className="px-3 py-2 text-right text-gray-700"
-              title={
-                (channel.fixedCost ?? 0) > 0 ? `${channel.fixedCostMonths ?? 0}개월분` : undefined
-              }
-            >
-              {formatFixedCost(channel.fixedCost)}
-            </td>
-            <td
-              className="px-3 py-2 text-right text-gray-900"
-              title={channel.costBasisReady ? undefined : PROFIT_PENDING_HINT}
-            >
-              {formatProfit(channel)}
-            </td>
-            <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.pendingPayout)}</td>
-            <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.paidAmount)}</td>
-            <td className="px-3 py-2 text-right">
-              <button
-                type="button"
-                onClick={() => onOpenSettlement(channel.accountId)}
-                className="text-blue-700 hover:underline"
+        {channels.map((channel) => {
+          // 🔴 이 채널의 정산 건. 없으면 [정산 내역] 버튼 자체를 그리지 않는다 — 눌러도 볼 것이 없는
+          //    버튼은 "정산이 있는데 화면이 못 찾는 건가"로 읽힌다.
+          const channelPayouts = payouts.filter((payout) => payout.accountId === channel.accountId);
+          return (
+            <Fragment key={channel.accountId}>
+            <tr onClick={() => onOpenChannel(channel.accountId)} className="hover:bg-gray-50 cursor-pointer">
+              <td className="px-3 py-2 text-gray-700">└ {channelLabel(channel)}</td>
+              <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.grossSales)}</td>
+              <td className="px-3 py-2 text-right text-gray-500">{formatMoney(channel.discount)}</td>
+              {/* 🔴 경고색을 쓰지 않는다 — 정상 비용이다. 순이익이 `—`(원가 미확정)여도 이 칸은 숫자다(D6). */}
+              <td
+                className="px-3 py-2 text-right text-gray-700"
+                title={
+                  (channel.fixedCost ?? 0) > 0 ? `${channel.fixedCostMonths ?? 0}개월분` : undefined
+                }
               >
-                정산 내역 →
-              </button>
-            </td>
-          </tr>
-          {/* 🔴 이 기간 매출에 대한 정산을 건별로 편다(FEATURE_2609_34). 합계 배지 하나로 뭉치면
-              "13건이 어긋났다"로 읽히지만 실제로는 그 채널의 정산 전건이었다 — 건별 링크가 그 오해를 막는다. */}
-          <tr>
-            <td colSpan={COLUMN_COUNT} className="px-3 pb-3 pt-0 text-xs">
-              <div className="ml-4 border-l border-gray-200 pl-3">
-                <ChannelPayoutList
-                  payouts={payouts.filter((payout) => payout.accountId === channel.accountId)}
-                  isLoading={payoutsLoading}
-                  error={payoutsError}
-                  onOpen={onOpenPayout}
-                />
-              </div>
-            </td>
-          </tr>
-          </Fragment>
-        ))}
+                {formatFixedCost(channel.fixedCost)}
+              </td>
+              <td
+                className="px-3 py-2 text-right text-gray-900"
+                title={channel.costBasisReady ? undefined : PROFIT_PENDING_HINT}
+              >
+                {formatProfit(channel)}
+              </td>
+              <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.pendingPayout)}</td>
+              <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.paidAmount)}</td>
+              <td className="px-3 py-2 text-right">
+                {/* 🔴 로딩 중에는 그리지 않는다 — 도착하자마자 사라지는 버튼은 잘못 눌린다. */}
+                {!payoutsLoading && channelPayouts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenPayout(channelPayouts[0].payoutId);
+                    }}
+                    className="text-blue-700 hover:underline"
+                    title={
+                      channelPayouts.length > 1
+                        ? `이 기간 정산 ${channelPayouts.length}건 중 가장 최근 건으로 이동합니다`
+                        : undefined
+                    }
+                  >
+                    정산 내역 →
+                  </button>
+                )}
+              </td>
+            </tr>
+            {/* 🔴 이 기간 매출에 대한 정산을 건별로 편다(FEATURE_2609_34). 합계 배지 하나로 뭉치면
+                "13건이 어긋났다"로 읽히지만 실제로는 그 채널의 정산 전건이었다 — 건별 링크가 그 오해를 막는다. */}
+            <tr>
+              <td colSpan={COLUMN_COUNT} className="px-3 pb-3 pt-0 text-xs">
+                <div className="ml-4 border-l border-gray-200 pl-3">
+                  <ChannelPayoutList
+                    payouts={channelPayouts}
+                    isLoading={payoutsLoading}
+                    error={payoutsError}
+                    onOpen={onOpenPayout}
+                  />
+                </div>
+              </td>
+            </tr>
+            </Fragment>
+          );
+        })}
       </tbody>
     </table>
   );
