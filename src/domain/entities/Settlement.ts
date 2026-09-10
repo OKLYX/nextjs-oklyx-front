@@ -280,3 +280,76 @@ export const formatDateTime = (value: string | null): string => {
   const pad = (n: number) => `${n}`.padStart(2, '0');
   return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
+
+/** `yyyy-MM-dd` 조립용. 🔴 `toISOString()` 은 KST 에서 하루 밀린다 — 절대 쓰지 않는다. */
+const pad2 = (n: number): string => `${n}`.padStart(2, '0');
+
+/** `Date` → 로컬(KST) 기준 `yyyy-MM-dd`. UTC 변환을 거치지 않는다. */
+const toLocalDate = (date: Date): string =>
+  `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+
+/**
+ * 백필용 월 옵션 (FEATURE_2609_31 / PLAN 2609_31 D4).
+ *
+ * 최근 12개월(당월 포함), 최신이 위. `value = 'yyyy-MM'` · `label = '2026년 9월'`.
+ *
+ * ⚠️ 주문의 `buildPeriodOptions`(OrderPeriod.ts)를 재사용하지 않는다 — 그쪽은 `최근 2주` 옵션과
+ * `(데이터 없음)` 라벨이 섞여 있어 정산 백필의 선택지로 쓰면 안 되는 값이 들어온다.
+ */
+export const buildSettlementMonthOptions = (
+  months = 12,
+  today: Date = new Date()
+): { value: string; label: string }[] => {
+  const options: { value: string; label: string }[] = [];
+  for (let i = 0; i < months; i += 1) {
+    const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    options.push({
+      value: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`,
+      label: `${date.getFullYear()}년 ${date.getMonth() + 1}월`,
+    });
+  }
+  return options;
+};
+
+/**
+ * `'yyyy-MM'` → 그 달의 `[from, to]`(`yyyy-MM-dd`) (FEATURE_2609_31 / PLAN 2609_31 D5 · D10).
+ *
+ * 🔴 `to` 는 <b>오늘(KST)을 넘지 않는다</b> — 어댑터에 클램프가 없어 미래 인식일이 그대로 쿠팡에 나간다.
+ * 🔴 날짜는 `getFullYear()/getMonth()/getDate()` 로 직접 조립한다(`toISOString()` 금지, KST 하루 밀림).
+ */
+export const monthRange = (
+  month: string,
+  today: Date = new Date()
+): { from: string; to: string } => {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate(); // day 0 of next month = last day
+  const from = `${year}-${pad2(monthNumber)}-01`;
+  const lastDate = `${year}-${pad2(monthNumber)}-${pad2(lastDay)}`;
+  const todayDate = toLocalDate(today);
+  // 문자열 비교로 클램프한다(`yyyy-MM-dd` 는 사전순 = 시간순).
+  return { from, to: lastDate > todayDate ? todayDate : lastDate };
+};
+
+/** `'yyyy-MM'` → `'2026년 9월'`. 진행률·결과 문구에서 쓴다. */
+export const monthLabel = (month: string): string => {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return year && monthNumber ? `${year}년 ${monthNumber}월` : month;
+};
+
+/**
+ * `fromMonth`..`toMonth` 오름차순 월 목록 (`yyyy-MM` 문자열 비교로 만든다).
+ * 역순 구간이면 빈 배열이다 — 호출부가 [불러오기] 를 막는다.
+ */
+export const monthsBetween = (fromMonth: string, toMonth: string): string[] => {
+  if (!fromMonth || !toMonth || fromMonth > toMonth) return [];
+  const [year, monthNumber] = fromMonth.split('-').map(Number);
+  const months: string[] = [];
+  // 최근 12개월 옵션에서 고르므로 상한 24회면 충분하다 — 잘못된 입력에도 무한 루프가 되지 않는다.
+  for (let step = 0; step < 24; step += 1) {
+    const cursor = new Date(year, monthNumber - 1 + step, 1);
+    const value = `${cursor.getFullYear()}-${pad2(cursor.getMonth() + 1)}`;
+    if (value > toMonth) break;
+    months.push(value);
+  }
+  return months;
+};

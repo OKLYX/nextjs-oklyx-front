@@ -69,10 +69,25 @@ export class SettlementRepositoryImpl implements SettlementRepository {
   }
 
   // `month` 를 보내지 않으면 서버가 계정별로 대상 월을 정한다(최초면 백필, 아니면 당월+직전월).
-  async syncPayouts(accountId?: number): Promise<PayoutSyncResult> {
-    const params: Record<string, number> = {};
+  // `month`('yyyy-MM')를 보내면 그 달만 읽고 앵커를 갱신하지 않는다(PLAN 2609_31 D3).
+  async syncPayouts(accountId?: number, month?: string): Promise<PayoutSyncResult> {
+    const params: Record<string, number | string> = {};
     if (accountId != null) params.accountId = accountId;
+    if (month) params.month = month;
     const response = await axiosInstance.post('/api/admin/settlement/payout/sync', null, { params });
+    return response.data.data;
+  }
+
+  // 매출내역(정산 라인) 기간 백필 — 계정 1건 · 한 달. 서버가 31일 초과 구간을 어댑터에서 자르지만
+  // 호출부가 월 단위로 쪼개 보낸다(PLAN 2609_31 D5).
+  async syncRevenuePeriod(
+    accountId: number,
+    from: string,
+    to: string
+  ): Promise<SettlementSyncResult> {
+    const response = await axiosInstance.post('/api/admin/settlement/sync/period', null, {
+      params: { accountId, from, to },
+    });
     return response.data.data;
   }
 

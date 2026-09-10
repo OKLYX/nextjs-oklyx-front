@@ -31,8 +31,20 @@ export interface SettlementRepository {
   exportReport(payoutId: number): Promise<Blob>;
   /** 🔴 마켓 호출. 사용자가 [갱신] 을 누를 때만 부른다. */
   syncSettlement(accountId?: number, sellerId?: number): Promise<SettlementSyncResult>;
-  /** 🔴 마켓 호출. 주 1회 스케줄이 기본이고 이 버튼은 수동 보정용이다. */
-  syncPayouts(accountId?: number): Promise<PayoutSyncResult>;
+  /**
+   * 🔴 마켓 호출. 주 1회 스케줄이 기본이고 이 버튼은 수동 보정용이다.
+   *
+   * `month`('yyyy-MM')를 주면 그 달만 읽고 <b>마지막 갱신 앵커를 건드리지 않는다</b>
+   * (백엔드 2609_31 / 01 · PLAN 2609_31 D3) — 과거 달 백필이 초기 백필 기회를 소진하지 않는다.
+   */
+  syncPayouts(accountId?: number, month?: string): Promise<PayoutSyncResult>;
+  /**
+   * 🔴 마켓 호출. 매출내역(정산 라인) 기간 백필 — 계정 1건.
+   *
+   * 한 번에 <b>한 달만</b> 보낸다(PLAN 2609_31 D5). 여러 달을 한 요청에 맡기면 서버가 창을 직렬로
+   * 다 돌아 504 가 된다. 이 경로는 앵커를 갱신하지 않는다.
+   */
+  syncRevenuePeriod(accountId: number, from: string, to: string): Promise<SettlementSyncResult>;
   /** 대상 채널 + 마지막 갱신 시각. 자격증명은 포함되지 않는다. */
   getSyncTargets(sellerId?: number): Promise<SettlementSyncTarget[]>;
 }

@@ -12,10 +12,17 @@ import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { PayoutSummary, SettlementSyncTarget } from '@/domain/entities/Settlement';
-import { formatDateTime } from '@/domain/entities/Settlement';
+import {
+  channelLabel,
+  formatDateTime,
+  monthLabel,
+  monthRange,
+  monthsBetween,
+} from '@/domain/entities/Settlement';
 import { PayoutFilter, type PayoutFilterValue } from './PayoutFilter';
 import { SyncBar } from './SyncBar';
 import { PayoutTable } from './PayoutTable';
+import { SettlementBackfillDialog } from './SettlementBackfillDialog';
 
 /**
  * 지급 묶음 목록 화면의 상태 소유자 (FEATURE_2609_30 / 05 Step 2 · Step 4).
@@ -68,6 +75,9 @@ export function PayoutListContainer() {
 
   const [syncing, setSyncing] = useState(false);
   const [payoutSyncing, setPayoutSyncing] = useState(false);
+  const [backfillOpen, setBackfillOpen] = useState(false);
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillProgress, setBackfillProgress] = useState('');
   const [syncNotice, setSyncNotice] = useState('');
   const [syncError, setSyncError] = useState('');
   // 429 쿨다운 문구는 서버가 준 것을 그대로 쓴다(해제 시각이 들어 있다). 값이 있으면 버튼을 감춘다.
@@ -235,6 +245,109 @@ export function PayoutListContainer() {
     }
   }, [settlementUseCase, filter.accountId, load, loadTargets, handleSyncFailure]);
 
+  /**
+   * 과거 정산 백필 (FEATURE_2609_31 / 02 · PLAN 2609_31 D2 · D5 · D6 · D8 · D10 · D11).
+   *
+   * 🔴 <b>매출내역 전 구간 → 지급내역 전 구간</b> 순서를 지킨다(D2). 라인 귀속은 라인이 이미
+   *    적재돼 있다는 전제 위에서 돈다 — 월별로 번갈아 부르면 `attributedLines = 0` 인 정산 건만 쌓인다.
+   * 🔴 <b>순차 실행</b>이다. `Promise.all` 로 월을 병렬로 던지면 429(쿨다운)를 자초한다.
+   * 🔴 429 를 만나면 <b>즉시 중단</b>한다(D6) — 남은 회차는 쿨다운 중이라 왕복만 낭비한다.
+   * ⚠️ 끝나면 목록·대상만 다시 읽고 <b>사용자의 기간 필터는 건드리지 않는다</b>(D8). 그래서 필터 밖의
+   *    과거 정산은 목록에 안 보일 수 있어 결과 문구에 한 줄을 덧붙인다(D11).
+   * ⚠️ `[지급내역: n일 전]` 라벨은 백필 후에도 바뀌지 않는다 — `month` 지정 적재는 앵커를 찍지 않는
+   *    것이 의도다(D3). 초기 백필 기회를 소진하지 않기 위한 규칙이다.
+   * ⚠️ <b>`useEffect` 에서 부르지 않는다</b>(D7). 트리거는 다이얼로그의 [불러오기] 뿐이다.
+   */
+  const handleBackfill = useCallback(
+    async (accountId: number, fromMonth: string, toMonth: string) => {
+      const months = monthsBetween(fromMonth, toMonth);
+      if (months.length === 0) return;
+      const total = months.length * 2; // 매출 1 + 지급 1 (진행률 분모)
+      const target = channels.find((channel) => channel.accountId === accountId);
+      const name = target ? channelLabel(target) : `채널 #${accountId}`;
+      const periodLabel = `${monthLabel(months[0])}~${monthLabel(months[months.length - 1])}`;
+      // 같은 달이 매출·지급 양쪽에서 실패할 수 있다 — 문구에 두 번 찍히지 않게 Set 으로 모은다.
+      const failedMonths = new Set<string>();
+      let done = 0;
+      let rateLimited = false;
+      let payouts = 0;
+      let adjustments = 0;
+      let attributedLines = 0;
+
+      const isRateLimit = (e: unknown) =>
+        axios.isAxiosError(e) && e.response?.status === 429;
+
+      setBackfillRunning(true);
+      setSyncNotice('');
+      setSyncError('');
+      try {
+        // 1단계 — 매출내역(정산 라인). 실패한 달은 접어두고 계속한다: 라인이 없으면
+        // `attributedLines` 가 0 일 뿐이고 정산 건 자체는 보인다(2609_30 D5-5).
+        for (const month of months) {
+          setBackfillProgress(`${name} · 매출 ${monthLabel(month)} (${done + 1}/${total})`);
+          try {
+            const { from, to } = monthRange(month); // `to` 는 오늘을 넘지 않는다(D10)
+            const result = await settlementUseCase.syncRevenuePeriod(accountId, from, to);
+            // 계정 단위 실패는 서버가 200 안에 담아 보낸다(2609_30 관례).
+            if (result.failedAccounts.length > 0) failedMonths.add(monthLabel(month));
+          } catch (e) {
+            if (isRateLimit(e)) {
+              rateLimited = true;
+              handleSyncFailure(e, '쿠팡 호출이 일시 제한되었습니다.');
+              break;
+            }
+            failedMonths.add(monthLabel(month));
+          }
+          done += 1;
+        }
+
+        // 2단계 — 지급내역(정산 건). 매출이 다 끝난 뒤에 돈다(D2).
+        if (!rateLimited) {
+          for (const month of months) {
+            setBackfillProgress(`${name} · 지급 ${monthLabel(month)} (${done + 1}/${total})`);
+            try {
+              const result = await settlementUseCase.syncPayouts(accountId, month);
+              payouts += result.payouts;
+              adjustments += result.adjustments;
+              attributedLines += result.attributedLines;
+              if (result.failedAccounts.length > 0) failedMonths.add(monthLabel(month));
+            } catch (e) {
+              if (isRateLimit(e)) {
+                rateLimited = true;
+                handleSyncFailure(e, '쿠팡 호출이 일시 제한되었습니다.');
+                break;
+              }
+              failedMonths.add(monthLabel(month));
+            }
+            done += 1;
+          }
+        }
+
+        if (!rateLimited) {
+          // 정산 0건은 실패가 아니다 — 그 기간에 쿠팡이 통보한 정산이 없었을 뿐이다.
+          const summary =
+            payouts === 0
+              ? `${periodLabel}에 쿠팡이 통보한 정산이 없습니다.`
+              : `${periodLabel} · 정산 ${payouts}건 · 조정 ${adjustments}건 불러왔습니다 (판매 건 연결 ${attributedLines}건)`;
+          const filtered = filter.from || filter.to
+            ? ' 지급일 필터가 걸려 있어 그 밖의 정산은 목록에 보이지 않습니다.'
+            : '';
+          setSyncNotice(`${summary}${filtered}`);
+        }
+        if (failedMonths.size > 0) {
+          setSyncError(`실패: ${Array.from(failedMonths).join(', ')}`);
+        }
+      } finally {
+        setBackfillRunning(false);
+        setBackfillProgress('');
+        setBackfillOpen(false);
+        await loadTargets();
+        await load();
+      }
+    },
+    [settlementUseCase, channels, filter.from, filter.to, load, loadTargets, handleSyncFailure]
+  );
+
   const invalidRange = Boolean(filter.from && filter.to && filter.from > filter.to);
 
   return (
@@ -254,8 +367,22 @@ export function PayoutListContainer() {
         rateLimitedMessage={rateLimited}
         notice={syncNotice}
         error={syncError}
+        backfillRunning={backfillRunning}
         onSync={handleSync}
         onSyncPayout={handleSyncPayout}
+        onBackfill={() => setBackfillOpen(true)}
+      />
+
+      <SettlementBackfillDialog
+        open={backfillOpen}
+        channels={channels}
+        running={backfillRunning}
+        progress={backfillProgress}
+        onConfirm={handleBackfill}
+        // 진행 중에는 닫지 않는다 — 실행이 컨테이너 소유라 다이얼로그를 닫으면 진행률만 사라진다.
+        onClose={() => {
+          if (!backfillRunning) setBackfillOpen(false);
+        }}
       />
 
       <PayoutFilter
