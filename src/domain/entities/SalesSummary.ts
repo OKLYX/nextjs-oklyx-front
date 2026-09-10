@@ -47,6 +47,7 @@ export interface ChannelSales {
   accountAlias: string | null;
   platform: string;
   sellerId: number;
+  sellerName: string | null;
   grossSales: number;
   discount: number;
   netQty: number;
@@ -70,6 +71,34 @@ export interface ChannelSales {
    * ⚠️ 판매자 행(`SellerSales`)에는 없다 — 채널마다 부과된 달이 달라 합칠 수 없는 숫자다(D11-2).
    */
   fixedCostMonths: number;
+}
+
+/**
+ * ④ 판매 내역 한 줄 — <b>접지 않은 주문 라인</b>. `GET /api/admin/sales/lines`
+ *
+ * 🔴 ③(상품별)이 <i>무엇이</i> 팔렸는지를 말한다면 이쪽은 <i>어느 주문에서</i> 팔렸는지를 말한다.
+ * 마켓 관리자 화면과 대조할 수 있는 유일한 축이라 주문번호를 그대로 싣는다.
+ *
+ * ⚠️ 금액은 서버가 집계와 <b>같은 식</b>으로 계산해 내려준다 — 화면에서 다시 곱하지 말 것.
+ */
+export interface SalesLine {
+  orderLineId: number;
+  accountId: number;
+  /** 판매일(결제 시각). */
+  orderedAt: string;
+  externalOrderId: string;
+  /** 주문 당시 채널이 준 옵션명. 마스터 연결이 없어도 이건 있다. */
+  itemName: string | null;
+  /** 🔴 null = 채널 옵션에 연결되지 않은 주문. 숨기지 않는다 — 숨기면 합계가 어긋난다. */
+  masterProductName: string | null;
+  orderQty: number;
+  cancelQty: number;
+  /** 환불대기. 유효수량에서 빼지 않는다(D14) — 표시만 한다. */
+  holdQty: number;
+  netQty: number;
+  unitPrice: number;
+  grossSales: number;
+  discount: number;
 }
 
 /** ③ 상품별 수익성 한 줄. `GET /api/admin/sales/by-product` */

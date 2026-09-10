@@ -11,6 +11,18 @@ export interface SalesStatsParams {
   sellerId?: number;
 }
 
+/**
+ * 판매 내역 전용 파라미터.
+ *
+ * 🔴 `accountId` 는 <b>필수</b>다 — 접지 않은 목록이라 채널을 지정하지 않으면 전 채널 라인이 통째로
+ * 나온다(서버도 400 이다).
+ */
+export interface SalesLinesParams {
+  from?: string;
+  to?: string;
+  accountId: number;
+}
+
 /** 상품별 수익성 전용 파라미터. */
 export interface ProductProfitParams extends SalesStatsParams {
   /** true = 마스터 상품 1행 / false = 마스터 × 채널. 서버 기본값은 true. */
