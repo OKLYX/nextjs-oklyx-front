@@ -29,6 +29,12 @@ export interface SellerSales {
   /** 🔴 기간 무관 "정산 예정 금액". 기간 필터와 함께 묶어 라벨링하지 말 것(D4). */
   pendingPayout: number;
   unreconciledPayouts: number;
+  /**
+   * 조회 기간에 이 판매자의 채널들이 부담하는 월 고정비 합 (PLAN 2609_33 D4 · D7).
+   * 🔴 `estNetProfit` 에는 이미 반영돼 있다 — 화면에서 다시 빼지 않는다.
+   * 🔴 순이익이 null(원가 미확정)이어도 이 값은 온다(D6).
+   */
+  fixedCost: number;
 }
 
 /** ② 채널(계정)별 한 줄. `GET /api/admin/sales/by-channel` */
@@ -58,6 +64,18 @@ export interface ChannelSales {
    * 같은 초록 배지가 된다. 정산 전 채널이 훨씬 흔하므로 그 오해가 기본값이 되어 버린다.
    */
   payoutCount: number;
+  /**
+   * 조회 기간에 이 채널이 부담하는 월 고정비 합 (PLAN 2609_33 D4 · D7).
+   * 🔴 `estNetProfit` 에는 이미 반영돼 있다 — 화면에서 다시 빼지 않는다.
+   * 🔴 순이익이 null(원가 미확정)이어도 이 값은 온다(D6).
+   */
+  fixedCost: number;
+  /**
+   * 이 기간에 고정비가 실제로 부과된 달 수 (PLAN 2609_33 D2 · D4). 0 = 임계 미달이거나 설정이 없다.
+   *
+   * ⚠️ 판매자 행(`SellerSales`)에는 없다 — 채널마다 부과된 달이 달라 합칠 수 없는 숫자다(D11-2).
+   */
+  fixedCostMonths: number;
 }
 
 /** ③ 상품별 수익성 한 줄. `GET /api/admin/sales/by-product` */
@@ -96,6 +114,20 @@ export const formatMoney = (value: number | null | undefined): string =>
  */
 export const formatProfit = (row: { estNetProfit: number | null; costBasisReady: boolean }): string =>
   row.costBasisReady && row.estNetProfit != null ? formatMoney(row.estNetProfit) : '—';
+
+/**
+ * 채널 고정비 표시 (PLAN 2609_33 D7). 🔴 비용이므로 <b>음수 부호</b>를 붙인다.
+ *
+ * `0` / `undefined`(백엔드 미배포) 는 `—` 다.
+ * ⚠️ 경고색을 쓰지 말 것 — 정상적으로 나가는 비용이지 문제가 아니다.
+ * 🔴 `0` 인 이유(임계 미달인지 설정이 없는지)를 화면이 매출과 비교해 추측하지 않는다(D2 — 판정은 서버).
+ */
+export const formatFixedCost = (value: number | null | undefined): string =>
+  value ? `−${formatMoney(value)}` : '—';
+
+/** 고정비 열 헤더 툴팁. 월 단위 조건부 부과라는 규칙을 화면에서 설명한다(D2 · D4). */
+export const FIXED_COST_HINT =
+  '그 달 상품 매출이 기준 이상인 달에만 부과됩니다. 일할 계산은 없습니다.';
 
 /** 순이익이 비어 있는 이유를 셀 툴팁으로 설명한다(헤더 툴팁만으론 행마다 다른 상태를 못 보여준다). */
 export const PROFIT_PENDING_HINT =
