@@ -1,6 +1,6 @@
 'use client';
 
-import { RefreshCw } from 'lucide-react';
+import { History, RefreshCw } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { formatRelativeTime } from '@/domain/entities/Settlement';
 
@@ -14,7 +14,11 @@ import { formatRelativeTime } from '@/domain/entities/Settlement';
  * 지급내역 갱신은 스케줄의 수동 보정용이라 따로 둔다.
  *
  * ⚠️ <b>per-action 스피너</b> — 누른 버튼만 비활성이고 표는 그대로 쓸 수 있다.
- * ⚠️ 429(쿨다운) 중에는 두 버튼을 <b>감춘다</b>. 연타가 쿠팡 밴을 연장하기 때문에 비활성보다 강하게 막는다.
+ * ⚠️ 429(쿨다운) 중에는 세 버튼을 <b>감춘다</b>. 연타가 쿠팡 밴을 연장하기 때문에 비활성보다 강하게 막는다.
+ *
+ * 🔴 <b>[과거 정산 불러오기]</b>(FEATURE_2609_31 / 02)는 다이얼로그를 여는 것뿐이고, 실제 월 루프는
+ * `PayoutListContainer.handleBackfill` 이 돈다. `backfillRunning` 중에도 다른 버튼을 비활성한다 —
+ * 백필이 쿠팡을 수십 번 부르는 중에 [갱신] 을 겹치면 쿨다운을 자초한다.
  */
 interface SyncBarProps {
   lastSyncedAt: string | null;
@@ -26,8 +30,12 @@ interface SyncBarProps {
   /** 정상 안내(스킵·적재 결과). 실패가 아니다. */
   notice: string;
   error: string;
+  /** 백필 월 루프 진행 중. 세 버튼 모두 비활성 사유다. */
+  backfillRunning: boolean;
   onSync: () => void;
   onSyncPayout: () => void;
+  /** 백필 다이얼로그 열기 (마켓 호출은 여기서 나가지 않는다). */
+  onBackfill: () => void;
 }
 
 export function SyncBar({
@@ -38,10 +46,12 @@ export function SyncBar({
   rateLimitedMessage,
   notice,
   error,
+  backfillRunning,
   onSync,
   onSyncPayout,
+  onBackfill,
 }: SyncBarProps) {
-  const busy = syncing || payoutSyncing;
+  const busy = syncing || payoutSyncing || backfillRunning;
 
   return (
     <div className="bg-white rounded-lg shadow px-6 py-4 space-y-3">
@@ -79,6 +89,21 @@ export function SyncBar({
               className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
             >
               {payoutSyncing ? <Spinner label="갱신 중..." /> : '지급내역 갱신'}
+            </button>
+            <button
+              type="button"
+              onClick={onBackfill}
+              disabled={busy}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+            >
+              {backfillRunning ? (
+                <Spinner label="불러오는 중..." />
+              ) : (
+                <>
+                  <History size={16} />
+                  과거 정산 불러오기
+                </>
+              )}
             </button>
           </div>
         )}

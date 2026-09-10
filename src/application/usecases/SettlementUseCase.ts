@@ -39,8 +39,18 @@ export class SettlementUseCase {
     return this.repository.syncSettlement(accountId, sellerId);
   }
 
-  async syncPayouts(accountId?: number): Promise<PayoutSyncResult> {
-    return this.repository.syncPayouts(accountId);
+  /** `month`('yyyy-MM')를 주면 그 달만 읽는다(앵커 미갱신 — PLAN 2609_31 D3). */
+  async syncPayouts(accountId?: number, month?: string): Promise<PayoutSyncResult> {
+    return this.repository.syncPayouts(accountId, month);
+  }
+
+  /** 매출내역 기간 백필. 호출부가 월 단위로 쪼개 순차 호출한다(PLAN 2609_31 D5). */
+  async syncRevenuePeriod(
+    accountId: number,
+    from: string,
+    to: string
+  ): Promise<SettlementSyncResult> {
+    return this.repository.syncRevenuePeriod(accountId, from, to);
   }
 
   async getSyncTargets(sellerId?: number): Promise<SettlementSyncTarget[]> {
