@@ -36,6 +36,22 @@ export function ChannelSummaryCard({ channel }: ChannelSummaryCardProps) {
       value: formatProfit(channel),
       hint: channel.costBasisReady ? undefined : PROFIT_PENDING_HINT,
     },
+    {
+      label: '취소수량',
+      // ⚠️ 백엔드가 먼저 배포되지 않은 순간에도 화면이 죽지 않게 — `formatMoney` 는 이미 null 을 받는다.
+      value: (channel.cancelQty ?? 0).toLocaleString('ko-KR'),
+      hint: '취소가 확정된 수량입니다. 매출액에서는 이미 빠져 있습니다',
+    },
+    {
+      label: '환불완료 금액',
+      value: formatMoney(channel.refundedAmount),
+      hint: '취소 확정으로 매출에서 빠진 금액입니다',
+    },
+    {
+      label: '환불대기 금액',
+      value: formatMoney(channel.pendingRefundAmount),
+      hint: '아직 매출에 남아 있지만, 취소가 확정되면 빠질 금액입니다',
+    },
   ];
 
   return (
@@ -51,8 +67,8 @@ export function ChannelSummaryCard({ channel }: ChannelSummaryCardProps) {
       {channel.holdQty > 0 && (
         // 환불대기는 유효수량에서 빼지 않는다(D14) — 빼면 확정될 때마다 매출이 출렁인다.
         <p className="mt-3 text-xs text-gray-500">
-          환불대기 {channel.holdQty.toLocaleString('ko-KR')}개는 아직 확정이 아니라 매출에서 빼지
-          않았습니다.
+          환불대기 {channel.holdQty.toLocaleString('ko-KR')}개는 아직 확정이 아니라 매출액에 남아
+          있습니다.
         </p>
       )}
     </div>

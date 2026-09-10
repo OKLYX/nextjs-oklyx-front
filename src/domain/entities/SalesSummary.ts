@@ -55,6 +55,15 @@ export interface ChannelSales {
   estFee: number;
   estNetProfit: number | null;
   costBasisReady: boolean;
+  /** 취소 확정 수량. 매출액에서는 이미 빠져 있다. */
+  cancelQty: number;
+  /** 취소 확정으로 <b>매출에서 빠진</b> 금액("환불완료"). */
+  refundedAmount: number;
+  /**
+   * 아직 매출에 남아 있지만 빠질 수 있는 금액("환불대기").
+   * 🔴 서버가 유효수량 상한을 걸어 준 값이다 — 이미 취소 확정된 몫을 다시 세지 않는다.
+   */
+  pendingRefundAmount: number;
   pendingPayout: number;
   /** 현금주의(지급 확정). 🔴 채널에만 있다 — 정산 주기가 채널마다 달라 판매자 합산은 뜻을 잃는다(D4-1). */
   paidAmount: number;
