@@ -27,14 +27,12 @@ interface SellerSummaryTableProps {
   onToggle: (sellerId: number) => void;
   onRetry: () => void;
   onOpenSettlement: (accountId: number) => void;
-  /** 금액 차이 배지 클릭 — 해당 판매자로 좁힌 정산 화면으로 간다. */
-  onOpenUnreconciled: (sellerId: number) => void;
   /** 정산 건 클릭 — 그 지급 묶음 상세로 바로 간다. */
   onOpenPayout: (payoutId: number) => void;
 }
 
 // 🔴 열을 추가하면 이 수를 같이 올린다 — 빈 상태 행과 채널 펼침 블록의 `colSpan` 이 이 값을 먹는다.
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 7;
 
 /**
  * 판매자별 매출 표 (FEATURE_2609_30 / 04 Step 3). 한 행 = 판매자, 클릭하면 채널 행이 펼쳐진다.
@@ -43,6 +41,10 @@ const COLUMN_COUNT = 8;
  * 필터를 따라 움직이지 않아서, 라벨이 없으면 사용자가 버그로 신고한다. 툴팁으로 대체 불가.
  *
  * 🔴 순이익이 없으면 `—` 다. 0 으로 그리면 "안 남았다"로 읽힌다 — 실제는 "아직 모른다"다(D15).
+ *
+ * 🔴 <b>대사 상태 배지를 이 표에 다시 넣지 말 것</b>(FEATURE_2609_34). 지급 묶음은 매출인식일 축이라
+ * 기간을 바꿔도 건수가 안 변하는데, 기간 필터 옆에 있으면 "이번 달에 13건이 어긋났다"로 읽힌다.
+ * 대사 상태는 판매자를 펼쳤을 때 나오는 인식월별 정산 목록이 건별로 보여준다.
  *
  * ⚠️ 표시 전용이다. 조회·펼침 상태는 Container 가 소유한다.
  */
@@ -60,7 +62,6 @@ export function SellerSummaryTable({
   onToggle,
   onRetry,
   onOpenSettlement,
-  onOpenUnreconciled,
   onOpenPayout,
 }: SellerSummaryTableProps) {
   if (error) {
@@ -130,7 +131,6 @@ export function SellerSummaryTable({
               {/* 🔴 이 라벨이 없으면 "기간을 바꿨는데 값이 안 변한다"가 버그 신고로 온다(D4). */}
               <span className="block text-[11px] font-normal text-gray-500">기간 무관 · 미지급 잔액</span>
             </th>
-            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">상태</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -180,20 +180,6 @@ export function SellerSummaryTable({
                     <td className="px-6 py-3 text-sm text-right text-gray-900">
                       {formatMoney(row.pendingPayout)}
                     </td>
-                    <td className="px-6 py-3 text-sm">
-                      {row.unreconciledPayouts > 0 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenUnreconciled(row.sellerId);
-                          }}
-                          className="px-2 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200"
-                        >
-                          ⚠ 금액 차이 {row.unreconciledPayouts}
-                        </button>
-                      )}
-                    </td>
                   </tr>
                   {isExpanded && (
                     <tr className="bg-gray-50">
@@ -241,7 +227,6 @@ export function SellerSummaryTable({
               <td className="px-6 py-3 text-sm text-right font-semibold text-gray-900">
                 {formatMoney(totals.pendingPayout)}
               </td>
-              <td />
             </tr>
           </tfoot>
         )}

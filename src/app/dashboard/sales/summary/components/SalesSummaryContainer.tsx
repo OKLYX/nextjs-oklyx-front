@@ -149,11 +149,6 @@ export function SalesSummaryContainer() {
     (accountId: number) => router.push(`${ROUTES.SETTLEMENT_PAYOUTS}?accountId=${accountId}`),
     [router]
   );
-  const openUnreconciled = useCallback(
-    (sellerId: number) =>
-      router.push(`${ROUTES.SETTLEMENT_PAYOUTS}?sellerId=${sellerId}&reconStatus=UNRECONCILED`),
-    [router]
-  );
   // 정산 건별 이동 — 목록을 거치지 않고 그 지급 묶음 상세로 바로 간다.
   const openPayout = useCallback(
     (payoutId: number) => router.push(ROUTES.SETTLEMENT_PAYOUT_DETAIL(payoutId)),
@@ -215,7 +210,6 @@ export function SalesSummaryContainer() {
         onToggle={handleToggle}
         onRetry={() => setReloadTick((tick) => tick + 1)}
         onOpenSettlement={openSettlement}
-        onOpenUnreconciled={openUnreconciled}
         onOpenPayout={openPayout}
       />
     </PageContainer>
