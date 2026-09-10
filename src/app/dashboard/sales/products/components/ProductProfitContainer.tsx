@@ -15,7 +15,7 @@ import { ProductProfitTable } from './ProductProfitTable';
 import type { ProductProfitSortKey } from './ProductProfitTable';
 
 /**
- * 상품별 수익성 화면의 상태 소유자 (FEATURE_2609_30 / 04 Step 4).
+ * 상품별 매출 화면의 상태 소유자 (FEATURE_2609_30 / 04 Step 4).
  *
  * 소유 상태 = 기간 · 판매자 필터 · `crossChannel` · 정렬. `crossChannel` 은 <b>서버 파라미터</b>라
  * 바뀌면 재조회한다(행 수가 실제로 달라진다).
@@ -72,7 +72,7 @@ export function ProductProfitContainer() {
       setRows(result);
     } catch {
       if (requestId !== requestIdRef.current) return;
-      setError('상품별 수익성 조회에 실패했습니다.');
+      setError('상품별 매출 조회에 실패했습니다.');
       setRows([]);
     } finally {
       if (requestId === requestIdRef.current) setIsLoading(false);
@@ -127,7 +127,7 @@ export function ProductProfitContainer() {
   return (
     <PageContainer>
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-gray-900">상품별 수익성</h1>
+        <h1 className="text-2xl font-bold text-gray-900">상품별 매출</h1>
         <p className="text-sm text-gray-500">판매일 기준 집계입니다.</p>
       </div>
 
