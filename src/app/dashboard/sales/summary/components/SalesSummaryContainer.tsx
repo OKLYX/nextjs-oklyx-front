@@ -148,16 +148,17 @@ export function SalesSummaryContainer() {
   /**
    * 채널 행 클릭 — 채널별 매출 화면으로 넘긴다.
    *
-   * 🔴 보고 있던 기간·판매자를 쿼리로 함께 넘긴다. 안 넘기면 9월을 보다가 채널을 눌렀는데 이번 달로
-   * 돌아가 버려 "왜 숫자가 다르지"가 된다. 받는 쪽은 이 값을 <b>초기값으로만</b> 쓴다.
+   * 🔴 보고 있던 기간을 함께 넘긴다. 안 넘기면 9월을 보다가 채널을 눌렀는데 이번 달로 돌아가 버려
+   * "왜 숫자가 다르지"가 된다. 받는 쪽은 이 값을 <b>초기값으로만</b> 쓴다.
+   *
+   * ⚠️ 판매자는 넘기지 않는다 — 저쪽은 채널 하나만 보는 화면이라 판매자 필터가 없다.
    */
   const openChannel = useCallback(
     (accountId: number) => {
       const query = new URLSearchParams({ from, to, accountId: String(accountId) });
-      if (expandedSellerId != null) query.set('sellerId', String(expandedSellerId));
       router.push(`${ROUTES.SALES_BY_CHANNEL}?${query.toString()}`);
     },
-    [router, from, to, expandedSellerId]
+    [router, from, to]
   );
   // 정산 건별 이동 — 목록을 거치지 않고 그 지급 묶음 상세로 바로 간다.
   const openPayout = useCallback(

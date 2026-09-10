@@ -1,7 +1,16 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { SalesStatsRepository } from '@/domain/repositories/SalesStatsRepository';
-import type { ChannelSales, ProductProfit, SellerSales } from '@/domain/entities/SalesSummary';
-import type { ProductProfitParams, SalesStatsParams } from '@/application/dto/SalesDTOs';
+import type {
+  ChannelSales,
+  ProductProfit,
+  SalesLine,
+  SellerSales,
+} from '@/domain/entities/SalesSummary';
+import type {
+  ProductProfitParams,
+  SalesLinesParams,
+  SalesStatsParams,
+} from '@/application/dto/SalesDTOs';
 
 /**
  * `/api/admin/sales/**` 호출부 (FEATURE_2609_30 / 백엔드 03).
@@ -29,6 +38,14 @@ export class SalesStatsRepositoryImpl implements SalesStatsRepository {
     const response = await axiosInstance.get('/api/admin/sales/by-channel', {
       params: this.toQuery(params),
     });
+    return response.data.data;
+  }
+
+  async getSalesLines(params: SalesLinesParams): Promise<SalesLine[]> {
+    const query: Record<string, string | number> = { accountId: params.accountId };
+    if (params.from) query.from = params.from;
+    if (params.to) query.to = params.to;
+    const response = await axiosInstance.get('/api/admin/sales/lines', { params: query });
     return response.data.data;
   }
 
