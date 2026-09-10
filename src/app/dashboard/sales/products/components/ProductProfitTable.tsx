@@ -21,7 +21,7 @@ interface ProductProfitTableProps {
 const UNCATEGORIZED_HINT = '채널 옵션 연결이 없는 주문';
 
 /**
- * 상품별 수익성 표 (FEATURE_2609_30 / 04 Step 4).
+ * 상품별 매출 표 (FEATURE_2609_30 / 04 Step 4).
  *
  * 🔴 `미분류` 행을 숨기지 않는다. 맨 아래 회색으로 남긴다 — 숨기면 이 목록의 합계가 판매자 요약과
  * 어긋나는 이유를 아무도 설명하지 못한다.
