@@ -6,7 +6,10 @@ import { PageContainer } from '@/presentation/components/PageContainer';
 import { ROUTES } from '@/config/routes';
 import { SalesStatsUseCase } from '@/application/usecases/SalesStatsUseCase';
 import { SalesStatsRepositoryImpl } from '@/infrastructure/repositories/SalesStatsRepositoryImpl';
+import { SettlementUseCase } from '@/application/usecases/SettlementUseCase';
+import { SettlementRepositoryImpl } from '@/infrastructure/repositories/SettlementRepositoryImpl';
 import type { ChannelSales, SellerSales } from '@/domain/entities/SalesSummary';
+import type { PayoutSummary } from '@/domain/entities/Settlement';
 import { SalesTabs } from '../../components/SalesTabs';
 import { PeriodFilter, currentMonthRange } from '../../components/PeriodFilter';
 import { SellerSummaryTable } from './SellerSummaryTable';
@@ -42,6 +45,11 @@ export function SalesSummaryContainer() {
     () => new SalesStatsUseCase(new SalesStatsRepositoryImpl()),
     []
   );
+  // 정산 건 목록은 정산 도메인이 소유한다 — 매출 API 에 목록을 얹지 않는다(축이 다르다).
+  const settlementUseCase = useMemo(
+    () => new SettlementUseCase(new SettlementRepositoryImpl()),
+    []
+  );
 
   const initialRange = useMemo(() => currentMonthRange(), []);
   const [from, setFrom] = useState(initialRange.from);
@@ -57,6 +65,11 @@ export function SalesSummaryContainer() {
   const [channels, setChannels] = useState<ChannelSales[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [channelsError, setChannelsError] = useState('');
+
+  // 펼친 판매자의 정산 건 — 🔴 판매자당 1회만 부른다(채널마다 부르면 채널 수만큼 요청이 나간다).
+  const [payouts, setPayouts] = useState<PayoutSummary[]>([]);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [payoutsError, setPayoutsError] = useState('');
 
   // 프리셋을 빠르게 연타하면 응답이 역순으로 도착할 수 있다 — 마지막 요청의 결과만 반영한다.
   const requestIdRef = useRef(0);
@@ -95,6 +108,8 @@ export function SalesSummaryContainer() {
     setExpandedSellerId(null);
     setChannels([]);
     setChannelsError('');
+    setPayouts([]);
+    setPayoutsError('');
   }, []);
 
   const handleToggle = useCallback(
@@ -107,15 +122,26 @@ export function SalesSummaryContainer() {
       setChannels([]);
       setChannelsError('');
       setChannelsLoading(true);
-      try {
-        setChannels(await salesStatsUseCase.getChannelSales({ from, to, sellerId }));
-      } catch {
-        setChannelsError('채널별 매출 조회에 실패했습니다.');
-      } finally {
-        setChannelsLoading(false);
-      }
+      setPayouts([]);
+      setPayoutsError('');
+      setPayoutsLoading(true);
+
+      // 채널 매출과 정산 건은 서로를 기다릴 이유가 없다 — 한쪽이 실패해도 다른 쪽은 그린다.
+      const channelSales = salesStatsUseCase
+        .getChannelSales({ from, to, sellerId })
+        .then((channelRows) => setChannels(channelRows))
+        .catch(() => setChannelsError('채널별 매출 조회에 실패했습니다.'))
+        .finally(() => setChannelsLoading(false));
+
+      const channelPayouts = settlementUseCase
+        .getPayoutsByRecognition({ from, to, sellerId })
+        .then((payoutRows) => setPayouts(payoutRows))
+        .catch(() => setPayoutsError('정산 내역 조회에 실패했습니다.'))
+        .finally(() => setPayoutsLoading(false));
+
+      await Promise.all([channelSales, channelPayouts]);
     },
-    [salesStatsUseCase, expandedSellerId, from, to]
+    [salesStatsUseCase, settlementUseCase, expandedSellerId, from, to]
   );
 
   // 05 머지 전에는 404 가 정상이다(라우트만 먼저 확정해 둔다).
@@ -126,6 +152,11 @@ export function SalesSummaryContainer() {
   const openUnreconciled = useCallback(
     (sellerId: number) =>
       router.push(`${ROUTES.SETTLEMENT_PAYOUTS}?sellerId=${sellerId}&reconStatus=UNRECONCILED`),
+    [router]
+  );
+  // 정산 건별 이동 — 목록을 거치지 않고 그 지급 묶음 상세로 바로 간다.
+  const openPayout = useCallback(
+    (payoutId: number) => router.push(ROUTES.SETTLEMENT_PAYOUT_DETAIL(payoutId)),
     [router]
   );
 
@@ -178,10 +209,14 @@ export function SalesSummaryContainer() {
         channels={channels}
         channelsLoading={channelsLoading}
         channelsError={channelsError}
+        payouts={payouts}
+        payoutsLoading={payoutsLoading}
+        payoutsError={payoutsError}
         onToggle={handleToggle}
         onRetry={() => setReloadTick((tick) => tick + 1)}
         onOpenSettlement={openSettlement}
         onOpenUnreconciled={openUnreconciled}
+        onOpenPayout={openPayout}
       />
     </PageContainer>
   );

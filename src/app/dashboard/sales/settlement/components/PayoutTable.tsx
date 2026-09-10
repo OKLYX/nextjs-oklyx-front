@@ -53,9 +53,11 @@ function reconBadge(row: PayoutSummary): Badge {
         className: 'bg-gray-50 text-gray-600 border-gray-200',
       };
     default:
-      // 🔴 PENDING 은 실패가 아니다.
+      // 🔴 PENDING 은 실패가 아니다. 결손 방향이 둘이라 문구를 나눈다 —
+      //    지급액을 못 받았거나(`finalAmount` 없음), 대조할 판매 내역을 아직 못 실었거나.
+      //    둘 다 "금액이 어긋났다"가 아니므로 경고색을 쓰지 않는다.
       return {
-        text: '⏳ 지급내역 대기',
+        text: row.finalAmount == null ? '⏳ 지급내역 대기' : '⏳ 대사 전 — 판매 내역 미적재',
         className: 'bg-gray-50 text-gray-600 border-gray-200',
       };
   }

@@ -1,6 +1,8 @@
 'use client';
 
+import { Fragment } from 'react';
 import type { ChannelSales } from '@/domain/entities/SalesSummary';
+import type { PayoutSummary } from '@/domain/entities/Settlement';
 import {
   FIXED_COST_HINT,
   PROFIT_PENDING_HINT,
@@ -9,14 +11,24 @@ import {
   formatMoney,
   formatProfit,
 } from '@/domain/entities/SalesSummary';
+import { ChannelPayoutList } from './ChannelPayoutList';
 
 interface SellerChannelRowsProps {
   channels: ChannelSales[];
   isLoading: boolean;
   error: string;
-  /** `05` 정산 화면으로 가는 유일한 진입점. */
+  /** 이 판매자의 <b>모든</b> 채널 정산 — 채널별 분배는 여기서 한다(요청은 판매자당 1회다). */
+  payouts: PayoutSummary[];
+  payoutsLoading: boolean;
+  payoutsError: string;
+  /** 정산 <b>목록</b> 화면(채널 필터). 건별 이동은 `onOpenPayout` 이다. */
   onOpenSettlement: (accountId: number) => void;
+  /** 정산 <b>상세</b> 화면(건별). */
+  onOpenPayout: (payoutId: number) => void;
 }
+
+// 🔴 열을 추가하면 이 수를 같이 올린다 — 채널마다 붙는 정산 목록 행의 `colSpan` 이 이 값을 먹는다.
+const COLUMN_COUNT = 9;
 
 /**
  * 판매자 행을 펼쳤을 때 나오는 채널 표 (FEATURE_2609_30 / 04 Step 3).
@@ -33,7 +45,11 @@ export function SellerChannelRows({
   channels,
   isLoading,
   error,
+  payouts,
+  payoutsLoading,
+  payoutsError,
   onOpenSettlement,
+  onOpenPayout,
 }: SellerChannelRowsProps) {
   if (isLoading) {
     return (
@@ -78,7 +94,8 @@ export function SellerChannelRows({
       </thead>
       <tbody className="divide-y divide-gray-200">
         {channels.map((channel) => (
-          <tr key={channel.accountId}>
+          <Fragment key={channel.accountId}>
+          <tr>
             <td className="px-3 py-2 text-gray-700">└ {channelLabel(channel)}</td>
             <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.grossSales)}</td>
             <td className="px-3 py-2 text-right text-gray-500">{formatMoney(channel.discount)}</td>
@@ -129,6 +146,21 @@ export function SellerChannelRows({
               </button>
             </td>
           </tr>
+          {/* 🔴 이 기간 매출에 대한 정산을 건별로 편다(FEATURE_2609_34). 합계 배지 하나로 뭉치면
+              "13건이 어긋났다"로 읽히지만 실제로는 그 채널의 정산 전건이었다 — 건별 링크가 그 오해를 막는다. */}
+          <tr>
+            <td colSpan={COLUMN_COUNT} className="px-3 pb-3 pt-0 text-xs">
+              <div className="ml-4 border-l border-gray-200 pl-3">
+                <ChannelPayoutList
+                  payouts={payouts.filter((payout) => payout.accountId === channel.accountId)}
+                  isLoading={payoutsLoading}
+                  error={payoutsError}
+                  onOpen={onOpenPayout}
+                />
+              </div>
+            </td>
+          </tr>
+          </Fragment>
         ))}
       </tbody>
     </table>

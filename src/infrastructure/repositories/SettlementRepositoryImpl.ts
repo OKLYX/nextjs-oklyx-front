@@ -7,6 +7,7 @@ import type {
   PayoutQuery,
   PayoutSummary,
   PayoutSyncResult,
+  RecognitionPayoutQuery,
   ReconLineQuery,
   ReconLineView,
   ReconReport,
@@ -28,6 +29,16 @@ export class SettlementRepositoryImpl implements SettlementRepository {
     if (query.from) params.from = query.from;
     if (query.to) params.to = query.to;
     const response = await axiosInstance.get('/api/admin/settlement/payouts', { params });
+    return response.data.data;
+  }
+
+  async getPayoutsByRecognition(query: RecognitionPayoutQuery): Promise<PayoutSummary[]> {
+    const params: Record<string, string | number> = { from: query.from, to: query.to };
+    if (query.sellerId != null) params.sellerId = query.sellerId;
+    if (query.accountId != null) params.accountId = query.accountId;
+    const response = await axiosInstance.get('/api/admin/settlement/payouts/by-recognition', {
+      params,
+    });
     return response.data.data;
   }
 

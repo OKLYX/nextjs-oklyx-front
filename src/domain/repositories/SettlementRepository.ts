@@ -2,6 +2,7 @@ import type {
   PayoutDetail,
   PayoutQuery,
   PayoutSummary,
+  RecognitionPayoutQuery,
   PayoutSyncResult,
   ReconLineQuery,
   ReconLineView,
@@ -19,8 +20,14 @@ import type {
  * 열 때마다 마켓 API 호출이 나간다. D11 이 막으려는 것이 정확히 이것이다.
  */
 export interface SettlementRepository {
-  /** 지급 묶음 목록. `lineCount === 0` 인 묶음도 그대로 내려온다(정상, D5-4). */
+  /** 지급 묶음 목록 — <b>지급일</b> 축. `lineCount === 0` 인 묶음도 그대로 내려온다(정상, D5-4). */
   getPayouts(query: PayoutQuery): Promise<PayoutSummary[]>;
+  /**
+   * 지급 묶음 목록 — <b>매출인식월</b> 축 (FEATURE_2609_34). 매출 화면이 판매자를 펼칠 때 1회 부른다.
+   *
+   * 🔴 채널마다 부르지 않는다 — 판매자 단위로 한 번 받아 화면에서 채널×월로 나눈다.
+   */
+  getPayoutsByRecognition(query: RecognitionPayoutQuery): Promise<PayoutSummary[]>;
   /** 묶음 1건 + 조정 + 검증식 요약. 리포트가 필요한 화면은 `getReport` 를 쓴다(같은 값을 포함한다). */
   getPayout(payoutId: number): Promise<PayoutDetail>;
   /** 라벨·미분류 필터는 <b>서버가</b> 적용한다. */
