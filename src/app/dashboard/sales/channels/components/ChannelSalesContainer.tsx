@@ -239,7 +239,9 @@ export function ChannelSalesContainer() {
 
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-gray-900">상품별 매출</h2>
-            <div className="bg-white rounded-lg shadow px-6 py-4 list-table-scroll">
+            {/* 🔴 `list-table-scroll`(최소폭 736px + nowrap)을 쓰지 않는다 — 판매 내역과 같은 이유로
+                상품명이 길면 표가 가로로 밀린다(사용자 요청 2026-09-10). */}
+            <div className="bg-white rounded-lg shadow px-6 py-4">
               <ChannelSalesLines
                 rows={products.filter((row) => row.accountId === selected.accountId)}
                 isLoading={productsLoading}
