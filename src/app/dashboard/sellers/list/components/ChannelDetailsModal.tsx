@@ -1,7 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
+import type { AccountFixedCost } from '@/domain/entities/FixedCost';
+import {
+  appliedPeriodLabel,
+  chargeModeLabel,
+  formatFixedCostAmount,
+} from '@/domain/entities/FixedCost';
+import type { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
 
 // Mirror of ChannelRegistrationForm's PLATFORM_OPTIONS for display labels.
 const PLATFORM_LABELS: Record<string, string> = {
@@ -21,6 +28,8 @@ interface ChannelDetailsModalProps {
   onShippingClick?: (channel: MarketplaceAccount) => void;
   thumbTemplates: TemplateOption[];
   detailTemplates: TemplateOption[];
+  /** 고정비 조회용 (FEATURE_2609_33). useCase 는 SellerChannelSection 이 소유해 주입한다. */
+  fixedCostUseCase: FixedCostUseCase;
 }
 
 // Resolve an assigned template id to a display name. null id = tenant default;
@@ -53,7 +62,37 @@ export function ChannelDetailsModal({
   onShippingClick,
   thumbTemplates,
   detailTemplates,
+  fixedCostUseCase,
 }: ChannelDetailsModalProps) {
+  const [fixedCosts, setFixedCosts] = useState<AccountFixedCost[]>([]);
+  const [fixedCostsLoading, setFixedCostsLoading] = useState(false);
+  const [fixedCostsError, setFixedCostsError] = useState('');
+  const channelId = channel?.id ?? null;
+
+  // 인라인 async IIFE — 이펙트 본문에서 setState 를 동기 호출하지 않기 위한 프로젝트 관례.
+  useEffect(() => {
+    if (!isOpen || channelId == null) return;
+    let alive = true;
+    void (async () => {
+      setFixedCostsLoading(true);
+      setFixedCostsError('');
+      try {
+        const list = await fixedCostUseCase.listForAccount(channelId);
+        if (alive) setFixedCosts(list);
+      } catch {
+        if (alive) {
+          setFixedCostsError('고정비 목록을 불러오지 못했습니다.');
+          setFixedCosts([]);
+        }
+      } finally {
+        if (alive) setFixedCostsLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [isOpen, channelId, fixedCostUseCase]);
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -146,6 +185,39 @@ export function ChannelDetailsModal({
             <p className="text-sm text-gray-900">
               {suffixLabel(channel.optionCheckSuffix)}
             </p>
+          </div>
+
+          <div>
+            {/* 🔴 모드(매출 기준 자동 / 항상 부과 / 부과 안 함)를 반드시 함께 보여준다 —
+                모드가 없으면 '부과 안 함'으로 덮은 채널이 '부과 중'처럼 읽힌다. */}
+            <label className="block text-sm font-medium mb-1">고정비</label>
+            {fixedCostsLoading ? (
+              <p className="text-sm text-gray-500">불러오는 중...</p>
+            ) : fixedCostsError ? (
+              <p className="text-sm text-red-600">{fixedCostsError}</p>
+            ) : fixedCosts.length === 0 ? (
+              <p className="text-sm text-gray-900">부과 중인 고정비 없음</p>
+            ) : (
+              <ul className="space-y-2">
+                {fixedCosts.map((cost) => {
+                  const period = appliedPeriodLabel(cost.appliedFrom, cost.appliedTo);
+                  return (
+                    <li key={cost.fixedCostId}>
+                      <p className="text-sm text-gray-900">
+                        {cost.name} 월 {formatFixedCostAmount(cost.amount)}원 ·{' '}
+                        {chargeModeLabel(cost.chargeMode)}
+                      </p>
+                      {cost.chargeMode === 'AUTO' && (
+                        <p className="text-xs text-gray-500">
+                          기준 {formatFixedCostAmount(cost.thresholdAmount)}원 이상인 달만
+                        </p>
+                      )}
+                      {period && <p className="text-xs text-gray-500">{period}</p>}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
 
           <div>

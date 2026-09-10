@@ -10,6 +10,9 @@ import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/Detai
 import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import { ShippingRepositoryImpl } from '@/infrastructure/repositories/ShippingRepositoryImpl';
 import { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
+import { FixedCostRepositoryImpl } from '@/infrastructure/repositories/FixedCostRepositoryImpl';
+import { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
+import type { PlatformFixedCost } from '@/domain/entities/FixedCost';
 import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 import type { CreateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
 import { CreateChannelModal } from './CreateChannelModal';
@@ -40,6 +43,9 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
   const [deleteChannel, setDeleteChannel] = useState<MarketplaceAccount | null>(null);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   const [shippingChannel, setShippingChannel] = useState<MarketplaceAccount | null>(null);
+  const [fixedCosts, setFixedCosts] = useState<PlatformFixedCost[]>([]);
+  const [fixedCostsLoading, setFixedCostsLoading] = useState(false);
+  const [fixedCostsError, setFixedCostsError] = useState('');
   const [thumbTemplates, setThumbTemplates] = useState<TemplateOption[]>([]);
   const [detailTemplates, setDetailTemplates] = useState<TemplateOption[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -58,6 +64,30 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
     [],
   );
   const shippingUseCase = useMemo(() => new ShippingUseCase(new ShippingRepositoryImpl()), []);
+  const fixedCostUseCase = useMemo(() => new FixedCostUseCase(new FixedCostRepositoryImpl()), []);
+
+  // 고정비 카탈로그는 채널 상세·수정이 함께 쓰므로 섹션이 한 번 로드해 prop 으로 내린다
+  // (모달·폼 안에서 useCase 를 새로 만들지 않는다). 🔴 조회 실패를 "등록된 항목 없음" 으로
+  // 흘리지 않도록 에러를 그대로 들고 내려간다 — 이미 등록한 사용자에게 거짓 안내가 된다.
+  const loadFixedCosts = useCallback(async () => {
+    setFixedCostsLoading(true);
+    setFixedCostsError('');
+    try {
+      setFixedCosts(await fixedCostUseCase.list());
+    } catch {
+      setFixedCostsError('고정비 목록을 불러오지 못했습니다.');
+      setFixedCosts([]);
+    } finally {
+      setFixedCostsLoading(false);
+    }
+  }, [fixedCostUseCase]);
+
+  // 인라인 async IIFE — 이펙트 본문에서 setState 를 동기 호출하지 않기 위한 프로젝트 관례.
+  useEffect(() => {
+    void (async () => {
+      await loadFixedCosts();
+    })();
+  }, [loadFixedCosts]);
 
   const loadChannels = useCallback(async () => {
     try {
@@ -240,6 +270,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         onShippingClick={(channel) => setShippingChannel(channel)}
         thumbTemplates={thumbTemplates}
         detailTemplates={detailTemplates}
+        fixedCostUseCase={fixedCostUseCase}
       />
 
       <ShippingConfigModal
@@ -258,6 +289,11 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         thumbTemplates={thumbTemplates}
         detailTemplates={detailTemplates}
         templatesLoading={templatesLoading}
+        fixedCostUseCase={fixedCostUseCase}
+        fixedCosts={fixedCosts}
+        fixedCostsLoading={fixedCostsLoading}
+        fixedCostsError={fixedCostsError}
+        onReloadFixedCosts={loadFixedCosts}
       />
 
       <DeleteChannelConfirmation
