@@ -12,7 +12,7 @@ import { ROUTES } from '@/config/routes';
  * `[정산 내역 →]` 과 사이드바 메뉴로만 한다.
  */
 const TABS: { href: string; label: string }[] = [
-  { href: ROUTES.SALES_SUMMARY, label: '매출 조회' },
+  { href: ROUTES.SALES_SUMMARY, label: '통합 매출 조회' },
   { href: ROUTES.SALES_BY_PRODUCT, label: '상품별 매출' },
 ];
 
