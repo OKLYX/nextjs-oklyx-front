@@ -19,6 +19,7 @@ import type {
   ManualShipmentResult,
   ShippingLabelExportRow,
 } from '@/application/dto/ShippingLabelDTOs';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
  * 주문 상세 모달 — 읽기전용 정보 + (ADMIN·쿠팡) 단건 송장 접수시트 조회·다운로드
@@ -413,11 +414,9 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     { label: '마켓 계정 ID', value: order.marketplaceAccountId },
   ];
 
+  // 기하 고정(D1) — 시트를 펼쳐도 모달 크기가 변하지 않는다. `fullHeight` 가 그 역할을 승계한다.
   return (
-    <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50">
-      {/* Fixed geometry from the first paint — expanding the sheet must not resize the modal (D1). */}
-      <div className="bg-white rounded-lg shadow-lg w-full mx-4 max-w-4xl h-[90vh] flex flex-col p-8">
-        <h3 className="shrink-0 text-2xl font-semibold text-gray-900 mb-6">주문 상세</h3>
+    <Modal isOpen onClose={handleClose} title="주문 상세" fullHeight>
 
         {/* Only this middle band scrolls — the table keeps no scroller of its own (D2). */}
         <div className="flex-1 min-h-0 overflow-y-auto modal-scroll-body">
@@ -879,7 +878,6 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -7,6 +7,7 @@ import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { ListingOptionSummary } from '@/domain/entities/ListingRegistrationEntity';
 import { Button } from '@/presentation/components/ui/Button';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface ChannelOptionNameModalProps {
   listingId: number;
@@ -116,118 +117,108 @@ export function ChannelOptionNameModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900">채널별 옵션명</h2>
-            <p className="truncate text-xs text-gray-500">{channelLabel}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 text-sm text-gray-500 hover:text-gray-800"
-          >
-            닫기
-          </button>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="채널별 옵션명"
+    >
+      <p className="truncate text-xs text-gray-500">{channelLabel}</p>
+
+      {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+      {isLoading ? (
+        <div className="flex min-h-32 items-center justify-center">
+          <Spinner size={24} label="불러오는 중..." />
         </div>
-
-        {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-
-        {isLoading ? (
-          <div className="flex min-h-32 items-center justify-center">
-            <Spinner size={24} label="불러오는 중..." />
-          </div>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-gray-500">이 채널에 옵션이 없습니다.</p>
-        ) : (
-          <>
-            <p className="mb-3 text-[11px] text-gray-500">
-              입력한 이름은 이 채널에만 적용됩니다. 마스터 옵션명으로 되돌리려면 [기본값으로 변경]을
-              누르세요.
-            </p>
-            <ul className="max-h-80 space-y-2 overflow-y-auto">
-              {rows.map((r) => {
-                const willRestore = restore.has(r.optionId);
-                const value = raw(r.optionId);
-                const empty = !willRestore && value.trim() === '';
-                return (
-                  <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        disabled={willRestore || isSaving}
-                        className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
-                        value={value}
-                        onChange={(e) =>
-                          setDraft((prev) => ({ ...prev, [r.optionId]: e.target.value }))
-                        }
-                      />
-                      {r.channelOnly === true && (
-                        <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
-                          채널 전용
-                        </span>
-                      )}
-                      {r.optionNameSource === 'MANUAL_OVERRIDE' && (
-                        <span className="shrink-0 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-600">
-                          이름 직접 지정
-                        </span>
-                      )}
-                      {/* 채널 전용 옵션은 되돌릴 마스터 이름이 없다 → 버튼 자체를 렌더하지 않는다. */}
-                      {r.channelOnly !== true && (
-                        <button
-                          type="button"
-                          onClick={() => toggleRestore(r.optionId)}
-                          disabled={isSaving}
-                          className={`shrink-0 rounded border px-2 py-1 text-[11px] font-medium disabled:opacity-50 ${
-                            willRestore
-                              ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-                              : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          기본값으로 변경
-                        </button>
-                      )}
-                    </div>
-                    {willRestore && (
-                      <p className="mt-1 text-[11px] text-gray-500">
-                        저장하면 마스터 옵션명으로 돌아갑니다
-                      </p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-gray-500">이 채널에 옵션이 없습니다.</p>
+      ) : (
+        <>
+          <p className="mb-3 text-[11px] text-gray-500">
+            입력한 이름은 이 채널에만 적용됩니다. 마스터 옵션명으로 되돌리려면 [기본값으로 변경]을
+            누르세요.
+          </p>
+          <ul className="max-h-80 space-y-2 overflow-y-auto">
+            {rows.map((r) => {
+              const willRestore = restore.has(r.optionId);
+              const value = raw(r.optionId);
+              const empty = !willRestore && value.trim() === '';
+              return (
+                <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      disabled={willRestore || isSaving}
+                      className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+                      value={value}
+                      onChange={(e) =>
+                        setDraft((prev) => ({ ...prev, [r.optionId]: e.target.value }))
+                      }
+                    />
+                    {r.channelOnly === true && (
+                      <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+                        채널 전용
+                      </span>
                     )}
-                    {empty && (
-                      <p className="mt-1 text-[11px] text-gray-500">
-                        이름을 입력하거나 [기본값으로 변경]을 누르세요
-                      </p>
+                    {r.optionNameSource === 'MANUAL_OVERRIDE' && (
+                      <span className="shrink-0 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-600">
+                        이름 직접 지정
+                      </span>
                     )}
-                  </li>
-                );
-              })}
-            </ul>
-          </>
+                    {/* 채널 전용 옵션은 되돌릴 마스터 이름이 없다 → 버튼 자체를 렌더하지 않는다. */}
+                    {r.channelOnly !== true && (
+                      <button
+                        type="button"
+                        onClick={() => toggleRestore(r.optionId)}
+                        disabled={isSaving}
+                        className={`shrink-0 rounded border px-2 py-1 text-[11px] font-medium disabled:opacity-50 ${
+                          willRestore
+                            ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                            : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        기본값으로 변경
+                      </button>
+                    )}
+                  </div>
+                  {willRestore && (
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      저장하면 마스터 옵션명으로 돌아갑니다
+                    </p>
+                  )}
+                  {empty && (
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      이름을 입력하거나 [기본값으로 변경]을 누르세요
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isSaving}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+        >
+          취소
+        </button>
+        {rows.length > 0 && (
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={isLoading || isSaving || invalid || dirty.length === 0}
+            size="sm"
+            className="flex items-center gap-1"
+          >
+            {isSaving ? <Spinner label="저장 중..." /> : '저장'}
+          </Button>
         )}
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSaving}
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          >
-            취소
-          </button>
-          {rows.length > 0 && (
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={isLoading || isSaving || invalid || dirty.length === 0}
-              size="sm"
-              className="flex items-center gap-1"
-            >
-              {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-            </Button>
-          )}
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

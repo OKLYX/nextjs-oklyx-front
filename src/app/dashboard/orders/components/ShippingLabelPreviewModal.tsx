@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { X } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { addressHead } from '@/infrastructure/utils/address';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { ShippingLabelExportRow } from '@/application/dto/ShippingLabelDTOs';
 import { Button } from '@/presentation/components/ui/Button';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
  * 송장 접수시트 미리보기·택배수량 편집 모달 (Shipping Label V2)
@@ -139,91 +139,82 @@ export function ShippingLabelPreviewModal({
   const isEmpty = hasLoaded && rows.length === 0;
 
   return (
-    <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-semibold text-gray-900">주문목록 확인</h3>
-          <button
-            onClick={handleClose}
-            aria-label="닫기"
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={24} />
-          </button>
+    <Modal
+      isOpen
+      onClose={handleClose}
+      title="주문목록 확인"
+    >
+      {isPreviewing ? (
+        <div className="flex items-center justify-center py-16">
+          <Spinner size={28} label="불러오는 중..." />
         </div>
-
-        {isPreviewing ? (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size={28} label="불러오는 중..." />
-          </div>
-        ) : previewError ? (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-            {previewError}
-          </div>
-        ) : isEmpty ? (
-          <div className="py-16 text-center text-gray-500">발송 대상 주문이 없습니다.</div>
-        ) : (
-          <div className="flex-1 overflow-y-auto modal-scroll-body">
-            <div className="border border-gray-200 rounded-lg list-table-scroll">
-              <table>
-                <thead className="bg-gray-100 border-b border-gray-200">
-                  <tr className="text-left text-xs font-medium text-gray-500">
-                    <th className="px-4 py-2">이름</th>
-                    <th className="px-4 py-2">배송지</th>
-                    <th className="px-4 py-2">상품명</th>
-                    <th className="px-4 py-2 text-right">내품수량</th>
-                    <th className="px-4 py-2 text-right">택배수량</th>
+      ) : previewError ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+          {previewError}
+        </div>
+      ) : isEmpty ? (
+        <div className="py-16 text-center text-gray-500">발송 대상 주문이 없습니다.</div>
+      ) : (
+        <div className="flex-1 overflow-y-auto modal-scroll-body">
+          <div className="border border-gray-200 rounded-lg list-table-scroll">
+            <table>
+              <thead className="bg-gray-100 border-b border-gray-200">
+                <tr className="text-left text-xs font-medium text-gray-500">
+                  <th className="px-4 py-2">이름</th>
+                  <th className="px-4 py-2">배송지</th>
+                  <th className="px-4 py-2">상품명</th>
+                  <th className="px-4 py-2 text-right">내품수량</th>
+                  <th className="px-4 py-2 text-right">택배수량</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
+                {rows.map((row) => (
+                  <tr key={row.rowKey}>
+                    <td className="px-4 py-2">{row.receiverName}</td>
+                    <td className="px-4 py-2">{addressHead(row.address)}</td>
+                    <td className="px-4 py-2">{row.productName}</td>
+                    <td className="px-4 py-2 text-right">{row.quantity}</td>
+                    <td className="px-4 py-2 text-right">
+                      <input
+                        type="number"
+                        min={1}
+                        value={row.parcelQuantity}
+                        onChange={(e) => handleParcelChange(row.rowKey, e.target.value)}
+                        className={`w-20 px-2 py-1 border rounded text-right outline-none focus:ring-2 focus:ring-blue-500 ${
+                          invalidRowKey === row.rowKey
+                            ? 'border-red-500 ring-2 ring-red-300'
+                            : 'border-gray-300'
+                        }`}
+                      />
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
-                  {rows.map((row) => (
-                    <tr key={row.rowKey}>
-                      <td className="px-4 py-2">{row.receiverName}</td>
-                      <td className="px-4 py-2">{addressHead(row.address)}</td>
-                      <td className="px-4 py-2">{row.productName}</td>
-                      <td className="px-4 py-2 text-right">{row.quantity}</td>
-                      <td className="px-4 py-2 text-right">
-                        <input
-                          type="number"
-                          min={1}
-                          value={row.parcelQuantity}
-                          onChange={(e) => handleParcelChange(row.rowKey, e.target.value)}
-                          className={`w-20 px-2 py-1 border rounded text-right outline-none focus:ring-2 focus:ring-blue-500 ${
-                            invalidRowKey === row.rowKey
-                              ? 'border-red-500 ring-2 ring-red-300'
-                              : 'border-gray-300'
-                          }`}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-
-        {exportError && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-            {exportError}
-          </div>
-        )}
-
-        <div className="flex justify-end gap-2 pt-6">
-          <button
-            onClick={handleClose}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
-          >
-            닫기
-          </button>
-          <Button
-            onClick={handleExport}
-            disabled={isPreviewing || isExporting || isEmpty || !!previewError}
-          >
-            {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
-          </Button>
         </div>
+      )}
+
+      {exportError && (
+        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+          {exportError}
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 pt-6">
+        <button
+          onClick={handleClose}
+          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+        >
+          닫기
+        </button>
+        <Button
+          onClick={handleExport}
+          disabled={isPreviewing || isExporting || isEmpty || !!previewError}
+        >
+          {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 }

@@ -57,6 +57,7 @@ import {
 } from '../../[id]/components/categoryMetaValidation';
 import { Input } from '@/presentation/components/ui/Input';
 import { Card } from '@/presentation/components/ui/Card';
+import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
 
 // Per-platform create-mode meta: user values + the loaded schema (for the submit gate).
@@ -1180,24 +1181,13 @@ export function MasterProductCreateForm({
       </Card>
 
       {detailProduct && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setDetailProduct(null)}
+        <Modal
+          isOpen
+          onClose={() => setDetailProduct(null)}
+          title="상품 상세"
+          nested
+          closeOnOverlayClick
         >
-          <div
-            className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-gray-900">상품 상세</h3>
-              <button
-                type="button"
-                onClick={() => setDetailProduct(null)}
-                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              >
-                ✕
-              </button>
-            </div>
             <div className="flex gap-4">
               <div className="shrink-0">
                 {(() => {
@@ -1261,8 +1251,7 @@ export function MasterProductCreateForm({
                 </p>
               </div>
             )}
-          </div>
-        </div>
+        </Modal>
       )}
 
       <ConfirmDialog

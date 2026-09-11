@@ -10,6 +10,7 @@ import type {
   ChannelPriceUpdateResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import { Button } from '@/presentation/components/ui/Button';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface ChannelPriceModalProps {
   listingId: number;
@@ -150,149 +151,139 @@ export function ChannelPriceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900">채널별 판매가</h2>
-            <p className="truncate text-xs text-gray-500">{channelLabel}</p>
-          </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="채널별 판매가"
+    >
+      <p className="truncate text-xs text-gray-500">{channelLabel}</p>
+
+      {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+      {result && (
+        <div className="mb-4 space-y-1">
+          {result.pushed > 0 && (
+            <p className="rounded bg-green-50 px-3 py-2 text-sm text-green-700">
+              마켓에 {result.pushed}건 반영했습니다.
+            </p>
+          )}
+          {result.skipped.length > 0 && (
+            <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
+              아직 마켓에 없는 옵션은 저장만 했습니다: {result.skipped.join(', ')}. [마켓 등록] 시
+              이 가격으로 올라갑니다.
+            </p>
+          )}
+          {result.failed.map((f) => (
+            <p
+              key={f.optionName}
+              className="rounded bg-red-50 px-3 py-2 text-sm text-red-700"
+            >
+              마켓 반영 실패(저장되지 않음): {f.optionName} — {f.message}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex min-h-32 items-center justify-center">
+          <Spinner size={24} label="불러오는 중..." />
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-gray-500">이 채널에서 판매 중인 옵션이 없습니다.</p>
+      ) : (
+        <>
+          <p className="mb-3 text-[11px] text-gray-500">
+            입력한 가격은 이 채널에만 적용됩니다. 자동계산가로 되돌리려면 [기본값으로 변경]을
+            누르세요.
+          </p>
+          <ul className="max-h-80 space-y-2 overflow-y-auto">
+            {rows.map((r) => {
+              const willRestore = restore.has(r.optionId);
+              const value = raw(r.optionId);
+              const empty = !willRestore && value.trim() === '';
+              return (
+                <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    {/* min-w-0 so a long option name truncates instead of squeezing the input. */}
+                    <span className="flex min-w-0 flex-1 items-center gap-1">
+                      <span className="truncate text-sm text-gray-900">{r.optionName}</span>
+                      {r.priceSource === 'MANUAL_OVERRIDE' && (
+                        <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+                          수동
+                        </span>
+                      )}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        disabled={willRestore || isSaving}
+                        className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+                        value={value}
+                        onChange={(e) =>
+                          setDraft((prev) => ({ ...prev, [r.optionId]: e.target.value }))
+                        }
+                      />
+                      <span className="text-xs text-gray-500">원</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleRestore(r.optionId)}
+                      disabled={isSaving}
+                      className={`shrink-0 rounded border px-2 py-1 text-[11px] font-medium disabled:opacity-50 ${
+                        willRestore
+                          ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      기본값으로 변경
+                    </button>
+                  </div>
+                  {willRestore && (
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      저장하면 자동계산가로 돌아갑니다
+                    </p>
+                  )}
+                  {empty && (
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      값을 입력하거나 [기본값으로 변경]을 누르세요
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+
+      <div className="mt-5 flex flex-col items-end gap-1">
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 text-sm text-gray-500 hover:text-gray-800"
+            disabled={isSaving}
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           >
-            닫기
+            취소
           </button>
-        </div>
-
-        {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-
-        {result && (
-          <div className="mb-4 space-y-1">
-            {result.pushed > 0 && (
-              <p className="rounded bg-green-50 px-3 py-2 text-sm text-green-700">
-                마켓에 {result.pushed}건 반영했습니다.
-              </p>
-            )}
-            {result.skipped.length > 0 && (
-              <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                아직 마켓에 없는 옵션은 저장만 했습니다: {result.skipped.join(', ')}. [마켓 등록] 시
-                이 가격으로 올라갑니다.
-              </p>
-            )}
-            {result.failed.map((f) => (
-              <p
-                key={f.optionName}
-                className="rounded bg-red-50 px-3 py-2 text-sm text-red-700"
-              >
-                마켓 반영 실패(저장되지 않음): {f.optionName} — {f.message}
-              </p>
-            ))}
-          </div>
-        )}
-
-        {isLoading ? (
-          <div className="flex min-h-32 items-center justify-center">
-            <Spinner size={24} label="불러오는 중..." />
-          </div>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-gray-500">이 채널에서 판매 중인 옵션이 없습니다.</p>
-        ) : (
-          <>
-            <p className="mb-3 text-[11px] text-gray-500">
-              입력한 가격은 이 채널에만 적용됩니다. 자동계산가로 되돌리려면 [기본값으로 변경]을
-              누르세요.
-            </p>
-            <ul className="max-h-80 space-y-2 overflow-y-auto">
-              {rows.map((r) => {
-                const willRestore = restore.has(r.optionId);
-                const value = raw(r.optionId);
-                const empty = !willRestore && value.trim() === '';
-                return (
-                  <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      {/* min-w-0 so a long option name truncates instead of squeezing the input. */}
-                      <span className="flex min-w-0 flex-1 items-center gap-1">
-                        <span className="truncate text-sm text-gray-900">{r.optionName}</span>
-                        {r.priceSource === 'MANUAL_OVERRIDE' && (
-                          <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
-                            수동
-                          </span>
-                        )}
-                      </span>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          disabled={willRestore || isSaving}
-                          className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
-                          value={value}
-                          onChange={(e) =>
-                            setDraft((prev) => ({ ...prev, [r.optionId]: e.target.value }))
-                          }
-                        />
-                        <span className="text-xs text-gray-500">원</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleRestore(r.optionId)}
-                        disabled={isSaving}
-                        className={`shrink-0 rounded border px-2 py-1 text-[11px] font-medium disabled:opacity-50 ${
-                          willRestore
-                            ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-                            : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        기본값으로 변경
-                      </button>
-                    </div>
-                    {willRestore && (
-                      <p className="mt-1 text-[11px] text-gray-500">
-                        저장하면 자동계산가로 돌아갑니다
-                      </p>
-                    )}
-                    {empty && (
-                      <p className="mt-1 text-[11px] text-gray-500">
-                        값을 입력하거나 [기본값으로 변경]을 누르세요
-                      </p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-
-        <div className="mt-5 flex flex-col items-end gap-1">
-          <div className="flex justify-end gap-2">
-            <button
+          {rows.length > 0 && (
+            <Button
               type="button"
-              onClick={onClose}
-              disabled={isSaving}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              onClick={handleSave}
+              disabled={isLoading || isSaving || invalid || dirty.length === 0}
+              size="sm"
+              className="flex items-center gap-1"
             >
-              취소
-            </button>
-            {rows.length > 0 && (
-              <Button
-                type="button"
-                onClick={handleSave}
-                disabled={isLoading || isSaving || invalid || dirty.length === 0}
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-              </Button>
-            )}
-          </div>
-          {isSaving && (
-            <p className="text-[11px] text-gray-500">
-              마켓에 반영하는 중이라 몇 초 걸릴 수 있습니다.
-            </p>
+              {isSaving ? <Spinner label="저장 중..." /> : '저장'}
+            </Button>
           )}
         </div>
+        {isSaving && (
+          <p className="text-[11px] text-gray-500">
+            마켓에 반영하는 중이라 몇 초 걸릴 수 있습니다.
+          </p>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

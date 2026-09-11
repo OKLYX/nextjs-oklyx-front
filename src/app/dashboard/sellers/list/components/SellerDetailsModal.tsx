@@ -5,6 +5,7 @@ import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerReposi
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { Button } from '@/presentation/components/ui/Button';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface SellerDetailsModalProps {
   isOpen: boolean;
@@ -72,21 +73,8 @@ export function SellerDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">판매자 정보</h2>
-            {seller && <p className="text-xs text-gray-500 mt-1">ID: {seller.id}</p>}
-          </div>
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-          >
-            ✕
-          </button>
-        </div>
+    <Modal isOpen onClose={onClose} title="판매자 정보" disableClose={isLoading}>
+      {seller && <p className="mb-4 text-xs text-gray-500">ID: {seller.id}</p>}
 
         {isLoading && (
           <div className="p-6 space-y-4">
@@ -171,7 +159,6 @@ export function SellerDetailsModal({
             </Button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

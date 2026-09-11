@@ -6,6 +6,7 @@ import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { CreateSellerRequest } from '@/application/dto/SellerDTOs';
 import { EditSellerForm } from './EditSellerForm';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface EditSellerModalProps {
   isOpen: boolean;
@@ -81,39 +82,29 @@ export function EditSellerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">판매자 정보 수정</h2>
-          <button
-            onClick={onClose}
-            disabled={isLoading || isFetching}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4">
-          {isFetching ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i}>
-                  <div className="h-4 bg-gray-200 rounded w-24 animate-pulse mb-2"></div>
-                  <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              ))}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="판매자 정보 수정"
+      disableClose={isLoading || isFetching}
+    >
+      {isFetching ? (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i}>
+              <div className="h-4 bg-gray-200 rounded w-24 animate-pulse mb-2"></div>
+              <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
             </div>
-          ) : (
-            <EditSellerForm
-              seller={seller}
-              isLoading={isLoading}
-              onSubmit={handleSubmit}
-              onCancel={onClose}
-            />
-          )}
+          ))}
         </div>
-      </div>
-    </div>
+      ) : (
+        <EditSellerForm
+          seller={seller}
+          isLoading={isLoading}
+          onSubmit={handleSubmit}
+          onCancel={onClose}
+        />
+      )}
+    </Modal>
   );
 }

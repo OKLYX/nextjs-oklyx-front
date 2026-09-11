@@ -5,6 +5,7 @@ import axios from 'axios';
 import { Spinner } from '@/presentation/components/Spinner';
 import type { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
 import type { DetailImageGroup } from '@/domain/entities/DetailImageGroupEntity';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
  * 상세 이미지 그룹 관리 팝업 — 템플릿 이미지 블록이 고를 수 있는 공용 존 카탈로그의 CRUD.
@@ -130,127 +131,118 @@ export function DetailImageGroupModal({ useCase, onClose, onChanged }: DetailIma
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-          <h3 className="text-base font-semibold text-gray-900">이미지 그룹 관리</h3>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="이미지 그룹 관리"
+    >
+      <div className="min-h-40 flex-1 space-y-3 overflow-y-auto p-5">
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="새 그룹 이름 (예: 제품 사진)"
+            className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+          />
           <button
             type="button"
-            onClick={onClose}
-            className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+            onClick={handleCreate}
+            disabled={!newName.trim() || isCreating}
+            className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            닫기
+            {isCreating ? '추가 중...' : '추가'}
           </button>
         </div>
 
-        <div className="min-h-40 flex-1 space-y-3 overflow-y-auto p-5">
-          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="새 그룹 이름 (예: 제품 사진)"
-              className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={!newName.trim() || isCreating}
-              className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isCreating ? '추가 중...' : '추가'}
-            </button>
+        {isLoading ? (
+          <div className="flex min-h-32 items-center justify-center">
+            <Spinner size={24} label="불러오는 중..." />
           </div>
-
-          {isLoading ? (
-            <div className="flex min-h-32 items-center justify-center">
-              <Spinner size={24} label="불러오는 중..." />
-            </div>
-          ) : groups.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-gray-300 py-8 text-center text-sm text-gray-500">
-              등록된 이미지 그룹이 없습니다. 위에서 추가하세요.
-            </p>
-          ) : (
-            <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
-              {groups.map((g) => {
-                const inUse = g.templateCount > 0;
-                const busy = busyId === g.id;
-                return (
-                  <li key={g.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
-                    {renamingId === g.id ? (
-                      <>
-                        <input
-                          type="text"
-                          value={renameDraft}
-                          onChange={(e) => setRenameDraft(e.target.value)}
-                          className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRename(g.id)}
-                          disabled={!renameDraft.trim() || busy}
-                          className="rounded border border-blue-600 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
-                        >
-                          {busy ? '저장 중...' : '저장'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRenamingId(null)}
-                          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
-                        >
-                          취소
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="min-w-0 flex-1 truncate text-sm text-gray-900">{g.name}</span>
-                        <span className="shrink-0 text-xs text-gray-500">
-                          사용 템플릿 {g.templateCount} · 사진 {g.imageCount}
+        ) : groups.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-gray-300 py-8 text-center text-sm text-gray-500">
+            등록된 이미지 그룹이 없습니다. 위에서 추가하세요.
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+            {groups.map((g) => {
+              const inUse = g.templateCount > 0;
+              const busy = busyId === g.id;
+              return (
+                <li key={g.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                  {renamingId === g.id ? (
+                    <>
+                      <input
+                        type="text"
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRename(g.id)}
+                        disabled={!renameDraft.trim() || busy}
+                        className="rounded border border-blue-600 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                      >
+                        {busy ? '저장 중...' : '저장'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRenamingId(null)}
+                        className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                      >
+                        취소
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="min-w-0 flex-1 truncate text-sm text-gray-900">{g.name}</span>
+                      <span className="shrink-0 text-xs text-gray-500">
+                        사용 템플릿 {g.templateCount} · 사진 {g.imageCount}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenamingId(g.id);
+                          setRenameDraft(g.name);
+                        }}
+                        className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                      >
+                        이름변경
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(g)}
+                        disabled={inUse || busy}
+                        className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {busy ? '삭제 중...' : '삭제'}
+                      </button>
+                      {inUse && (
+                        <span className="w-full text-[11px] text-gray-400">
+                          {g.usedByTemplateNames.join(' · ')} 에서 사용 중
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRenamingId(g.id);
-                            setRenameDraft(g.name);
-                          }}
-                          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
-                        >
-                          이름변경
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(g)}
-                          disabled={inUse || busy}
-                          className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                        >
-                          {busy ? '삭제 중...' : '삭제'}
-                        </button>
-                        {inUse && (
-                          <span className="w-full text-[11px] text-gray-400">
-                            {g.usedByTemplateNames.join(' · ')} 에서 사용 중
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-
-        <div className="flex justify-end border-t border-gray-200 px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            닫기
-          </button>
-        </div>
+                      )}
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
-    </div>
+
+      <div className="flex justify-end border-t border-gray-200 px-5 py-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+        >
+          닫기
+        </button>
+      </div>
+    </Modal>
   );
 }

@@ -10,6 +10,7 @@ import type {
 import { DEFAULT_THRESHOLD_AMOUNT } from '@/domain/entities/FixedCost';
 import { platformLabel } from '@/domain/entities/Settlement';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 // 고정비 항목이 확인된 플랫폼만 둔다 — 실제 청구서를 본 뒤에 늘린다(PLAN 2609_33 "이번 범위 밖").
 const PLATFORM_VALUES = ['COUPANG'];
@@ -102,132 +103,122 @@ export function FixedCostInputModal({
     'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {isEdit ? '고정비 항목 수정' : '고정비 항목 추가'}
-          </h2>
-          <button
-            onClick={onClose}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={`${isEdit ? '고정비 항목 수정' : '고정비 항목 추가'}`}
+      disableClose={isLoading}
+    >
+      <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {error && (
+          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <div>{error}</div>
+          </div>
+        )}
+
+        {!isEdit && (
+          <div>
+            <label htmlFor="fixedCostPlatform" className="block text-sm font-medium mb-1">
+              플랫폼 <span className="text-red-600">*</span>
+            </label>
+            <select
+              id="fixedCostPlatform"
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+              disabled={isLoading}
+              className={`${inputCls} bg-white`}
+            >
+              {PLATFORM_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {platformLabel(value)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="fixedCostName" className="block text-sm font-medium mb-1">
+            항목명 <span className="text-red-600">*</span>
+          </label>
+          <input
+            id="fixedCostName"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="예: 판매자서비스이용료"
             disabled={isLoading}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-          >
-            ✕
-          </button>
+            className={inputCls}
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-              <div>{error}</div>
-            </div>
-          )}
+        <div>
+          <label htmlFor="fixedCostAmount" className="block text-sm font-medium mb-1">
+            월 금액 <span className="text-red-600">*</span>
+          </label>
+          <input
+            id="fixedCostAmount"
+            type="number"
+            min={0}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="예: 55000"
+            disabled={isLoading}
+            className={inputCls}
+          />
+          <p className="mt-1 text-xs text-gray-500">부가세가 포함된 금액을 그대로 입력하세요.</p>
+        </div>
 
-          {!isEdit && (
-            <div>
-              <label htmlFor="fixedCostPlatform" className="block text-sm font-medium mb-1">
-                플랫폼 <span className="text-red-600">*</span>
-              </label>
-              <select
-                id="fixedCostPlatform"
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
-                disabled={isLoading}
-                className={`${inputCls} bg-white`}
-              >
-                {PLATFORM_VALUES.map((value) => (
-                  <option key={value} value={value}>
-                    {platformLabel(value)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        <div>
+          <label htmlFor="fixedCostThreshold" className="block text-sm font-medium mb-1">
+            부과 임계 <span className="text-red-600">*</span>
+          </label>
+          <input
+            id="fixedCostThreshold"
+            type="number"
+            min={0}
+            value={threshold}
+            onChange={(e) => setThreshold(e.target.value)}
+            disabled={isLoading}
+            className={inputCls}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            그 달 상품 매출(배송비 제외)이 임계 이상인 달에만 부과됩니다.
+          </p>
+        </div>
 
-          <div>
-            <label htmlFor="fixedCostName" className="block text-sm font-medium mb-1">
-              항목명 <span className="text-red-600">*</span>
-            </label>
+        {isEdit && (
+          <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
-              id="fixedCostName"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="예: 판매자서비스이용료"
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
               disabled={isLoading}
-              className={inputCls}
+              className="h-4 w-4"
             />
-          </div>
+            사용
+          </label>
+        )}
 
-          <div>
-            <label htmlFor="fixedCostAmount" className="block text-sm font-medium mb-1">
-              월 금액 <span className="text-red-600">*</span>
-            </label>
-            <input
-              id="fixedCostAmount"
-              type="number"
-              min={0}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="예: 55000"
-              disabled={isLoading}
-              className={inputCls}
-            />
-            <p className="mt-1 text-xs text-gray-500">부가세가 포함된 금액을 그대로 입력하세요.</p>
-          </div>
-
-          <div>
-            <label htmlFor="fixedCostThreshold" className="block text-sm font-medium mb-1">
-              부과 임계 <span className="text-red-600">*</span>
-            </label>
-            <input
-              id="fixedCostThreshold"
-              type="number"
-              min={0}
-              value={threshold}
-              onChange={(e) => setThreshold(e.target.value)}
-              disabled={isLoading}
-              className={inputCls}
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              그 달 상품 매출(배송비 제외)이 임계 이상인 달에만 부과됩니다.
-            </p>
-          </div>
-
-          {isEdit && (
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={active}
-                onChange={(e) => setActive(e.target.checked)}
-                disabled={isLoading}
-                className="h-4 w-4"
-              />
-              사용
-            </label>
-          )}
-
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isLoading}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400"
-            >
-              {isLoading ? '저장 중...' : '저장'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLoading}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            취소
+          </button>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400"
+          >
+            {isLoading ? '저장 중...' : '저장'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

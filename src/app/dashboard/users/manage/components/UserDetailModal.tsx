@@ -6,6 +6,7 @@ import { UserRepositoryImpl } from '@/infrastructure/repositories/UserRepository
 import { UpdateUserUseCase } from '@/application/usecases/UpdateUserUseCase';
 import type { User } from '@/domain/entities/User';
 import type { UpdateUserRequest } from '@/domain/repositories/UserRepository';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface UserDetailModalProps {
   user: User;
@@ -150,9 +151,7 @@ export function UserDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">회원 정보 수정</h2>
+    <Modal isOpen onClose={onClose} title="회원 정보 수정">
 
         {error && (
           <div className="mb-6 bg-red-50 border-l-4 border-red-200 p-4 text-red-700">
@@ -301,7 +300,6 @@ export function UserDetailModal({
             닫기
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

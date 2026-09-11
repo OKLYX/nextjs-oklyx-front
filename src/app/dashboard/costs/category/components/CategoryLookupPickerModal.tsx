@@ -5,6 +5,7 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
 import type { CategoryNode } from '@/domain/entities/CategoryLookupEntity';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
  * 마켓 카테고리 조회 피커(트리 드릴다운 + 상품명 추천) — 코드 손타이핑 없이 선택.
@@ -117,16 +118,7 @@ export function CategoryLookupPickerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-lg flex flex-col max-h-[85vh]">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">
-            카테고리 조회 <span className="text-sm font-normal text-gray-500">({platform})</span>
-          </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            ✕
-          </button>
-        </div>
+    <Modal isOpen onClose={onClose} title={`카테고리 조회 (${platform})`}>
 
         <div className="flex border-b">
           <button
@@ -278,7 +270,6 @@ export function CategoryLookupPickerModal({
             닫기
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 // Natural width the generated detail HTML is authored against. The thumbnail
 // renders the page at this width then scales it down, so the miniature keeps
@@ -117,21 +118,10 @@ export function ChannelPreviewModal({
   if (!data) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={data.title}
-    >
-      <div
-        className="flex h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* key resets the active tab whenever a different cell/tab opens the modal. */}
-        <ChannelPreviewInner key={`${data.title}:${data.initialTab}`} data={data} onClose={onClose} />
-      </div>
-    </div>
+    <Modal isOpen onClose={onClose} title={data.title} fullHeight>
+      {/* key resets the active tab whenever a different cell/tab opens the modal. */}
+      <ChannelPreviewInner key={`${data.title}:${data.initialTab}`} data={data} onClose={onClose} />
+    </Modal>
   );
 }
 

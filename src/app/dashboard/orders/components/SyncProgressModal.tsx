@@ -1,8 +1,8 @@
 'use client';
 
-import { X } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
 import type { SyncTarget } from '@/application/dto/OrderDTOs';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 /** 채널(계정) 1개의 동기화 진행 상태. 순서 = 서버가 준 동기화 대상 순서. */
 export type ChannelProgress = {
@@ -83,20 +83,47 @@ export function SyncProgressModal({
     : `동기화 완료 · 성공 ${successCount} / 실패 ${failedCount}${canceled ? ' · 중단됨' : ''}`;
 
   return (
-    <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-lg w-full mx-4 max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold text-gray-900">{heading}</h3>
-          {!isRunning && (
-            <button
-              onClick={onClose}
-              aria-label="닫기"
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X size={24} />
-            </button>
-          )}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={heading}
+      disableClose={isRunning}
+      footer={
+        <div className="flex w-full items-center justify-between gap-2">
+          <p className="text-xs text-gray-500">
+            {isRunning ? '진행 중인 채널은 끝까지 조회한 뒤 멈춥니다.' : ''}
+          </p>
+          <div className="flex gap-2">
+            {isRunning ? (
+              <button
+                onClick={onCancel}
+                title="진행 중인 채널은 끝까지 조회한 뒤 멈춥니다."
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+              >
+                취소
+              </button>
+            ) : (
+              <>
+                {failedCount > 0 && (
+                  <button
+                    onClick={onRetryFailed}
+                    className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    실패한 채널만 다시 조회
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+                >
+                  닫기
+                </button>
+              </>
+            )}
+          </div>
         </div>
+      }
+    >
 
         <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
           <div
@@ -138,40 +165,6 @@ export function SyncProgressModal({
           ))}
         </ul>
 
-        <div className="flex items-center justify-between gap-2 pt-6">
-          <p className="text-xs text-gray-500">
-            {isRunning ? '진행 중인 채널은 끝까지 조회한 뒤 멈춥니다.' : ''}
-          </p>
-          <div className="flex gap-2">
-            {isRunning ? (
-              <button
-                onClick={onCancel}
-                title="진행 중인 채널은 끝까지 조회한 뒤 멈춥니다."
-                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
-              >
-                취소
-              </button>
-            ) : (
-              <>
-                {failedCount > 0 && (
-                  <button
-                    onClick={onRetryFailed}
-                    className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    실패한 채널만 다시 조회
-                  </button>
-                )}
-                <button
-                  onClick={onClose}
-                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
-                >
-                  닫기
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
