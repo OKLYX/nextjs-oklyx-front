@@ -6,6 +6,7 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { UpdateCarrierRateRequest } from '@/application/dto/UpdateCarrierRateRequest';
 import type { Carrier } from '@/domain/entities/CarrierEntity';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface EditCarrierRateModalProps {
   isOpen: boolean;
@@ -55,25 +56,14 @@ export function EditCarrierRateModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
-          <div className="flex items-center justify-between p-4 border-b">
-            <div>
-              <h2 className="text-lg font-semibold">택배비 수정</h2>
-              {carrierRate && (
-                <p className="text-xs text-gray-500 mt-1">ID: {carrierRate.id}</p>
-              )}
-            </div>
-            <button
-              onClick={onClose}
-              disabled={isLoading || isDeletingCarrier}
-              className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="p-4">
+      <Modal
+        isOpen
+        onClose={onClose}
+        title="택배비 수정"
+        disableClose={isLoading || isDeletingCarrier}
+      >
+        {carrierRate && <p className="mb-4 text-xs text-gray-500">ID: {carrierRate.id}</p>}
+        <div>
             {deleteError && (
               <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 mb-4">
                 <p className="font-semibold">삭제 실패</p>
@@ -91,9 +81,8 @@ export function EditCarrierRateModal({
                 onOpenDeleteConfirm={onOpenDeleteConfirm}
               />
             )}
-          </div>
         </div>
-      </div>
+      </Modal>
 
       {carrierRate && (
         <ConfirmDialog

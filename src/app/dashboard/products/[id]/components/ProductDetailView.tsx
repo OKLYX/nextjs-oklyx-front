@@ -6,7 +6,7 @@ import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
-import { Button } from '@/presentation/components/ui/Button';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 
 interface ProductDetailViewProps {
   product: Product;
@@ -132,33 +132,16 @@ export function ProductDetailView({ product, onDelete, imageUseCase }: ProductDe
       <ProductImageGallery productId={product.id} useCase={imageUseCase} />
 
       {/* Delete Confirmation Dialog */}
-      {showDeleteConfirmation && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">상품 삭제</h2>
-            <p className="text-gray-600 mb-8">
-              이 상품을 삭제할까요? 되돌릴 수 없습니다.
-            </p>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setShowDeleteConfirmation(false)}
-                disabled={isDeleting}
-                className="flex-1 px-4 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                취소
-              </button>
-              <Button
-                onClick={handleDeleteConfirm}
-                disabled={isDeleting}
-                variant="danger"
-                className="flex-1"
-              >
-                {isDeleting ? '삭제 중...' : '삭제'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={showDeleteConfirmation}
+        title="상품 삭제"
+        message="이 상품을 삭제할까요? 되돌릴 수 없습니다."
+        confirmText="삭제"
+        isDangerous
+        isLoading={isDeleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setShowDeleteConfirmation(false)}
+      />
     </div>
   );
 }

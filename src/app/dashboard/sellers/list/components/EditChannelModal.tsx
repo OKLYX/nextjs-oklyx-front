@@ -13,6 +13,7 @@ import type {
 } from '@/domain/entities/FixedCost';
 import type { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
 import { ChannelEditForm } from './ChannelEditForm';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface EditChannelModalProps {
   isOpen: boolean;
@@ -151,36 +152,26 @@ export function EditChannelModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">판매채널 수정 — {sellerName}</h2>
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4">
-          <ChannelEditForm
-            channel={channel}
-            isLoading={isLoading}
-            onSubmit={handleSubmit}
-            onCancel={onClose}
-            thumbTemplates={thumbTemplates}
-            detailTemplates={detailTemplates}
-            templatesLoading={templatesLoading}
-            fixedCosts={fixedCosts}
-            fixedCostLinks={fixedCostLinks}
-            fixedCostsLoading={fixedCostsLoading || linksLoading}
-            fixedCostsError={fixedCostsError || linksError}
-            onRetryFixedCosts={retryFixedCosts}
-          />
-        </div>
-      </div>
-    </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={`판매채널 수정 — ${sellerName}`}
+      disableClose={isLoading}
+    >
+      <ChannelEditForm
+        channel={channel}
+        isLoading={isLoading}
+        onSubmit={handleSubmit}
+        onCancel={onClose}
+        thumbTemplates={thumbTemplates}
+        detailTemplates={detailTemplates}
+        templatesLoading={templatesLoading}
+        fixedCosts={fixedCosts}
+        fixedCostLinks={fixedCostLinks}
+        fixedCostsLoading={fixedCostsLoading || linksLoading}
+        fixedCostsError={fixedCostsError || linksError}
+        onRetryFixedCosts={retryFixedCosts}
+      />
+    </Modal>
   );
 }

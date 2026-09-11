@@ -7,6 +7,7 @@ import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { ImportPreviewResponse } from '@/domain/entities/ListingRegistrationEntity';
 import { Button } from '@/presentation/components/ui/Button';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface ImportCoupangProductModalProps {
   masterId: number;
@@ -173,168 +174,158 @@ export function ImportCoupangProductModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex shrink-0 items-center justify-between">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900">쿠팡 상품 가져오기</h2>
-            <p className="truncate text-xs text-gray-500">
-              {sellerName} · {platform}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="쿠팡 상품 가져오기"
+      disableClose={busy}
+    >
+      <p className="truncate text-xs text-gray-500">
+        {sellerName} · {platform}
+      </p>
+
+      <div className="mb-3 flex shrink-0 items-center gap-2">
+        <label className="text-sm text-gray-700" htmlFor="coupang-product-id">
+          쿠팡 상품 ID
+        </label>
+        <input
+          id="coupang-product-id"
+          type="text"
+          inputMode="numeric"
+          disabled={busy}
+          className="w-48 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100"
+          value={productId}
+          onChange={(e) => setProductId(e.target.value)}
+        />
+        <button
+          type="button"
+          onClick={handleLookup}
+          disabled={productId.trim() === '' || busy}
+          className="flex items-center gap-1 rounded border border-blue-300 px-3 py-1 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+        >
+          {busy && preview == null ? '조회 중…' : '조회'}
+        </button>
+      </div>
+
+      {error && (
+        <p className="mb-3 shrink-0 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
+
+      {preview && (
+        <>
+          <div className="shrink-0 space-y-2">
+            <p className="text-sm text-gray-900">
+              <span className="font-medium">{preview.productName}</span>
+              <span className="text-gray-500">
+                {' '}
+                · {STATUS_LABEL[preview.status] ?? preview.status} · 카테고리 {preview.categoryCode}{' '}
+                · 태그 {preview.channelTags.length}개
+              </span>
             </p>
+            {preview.categoryWarning && (
+              <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                {preview.categoryWarning}
+              </p>
+            )}
           </div>
+
+          <ul className="my-3 min-h-0 flex-1 space-y-3 overflow-y-auto">
+            {preview.options.map((o) => {
+              const key = optionKey(o);
+              const row = rowOf(key);
+              return (
+                <li key={key} className="rounded border border-gray-200 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-sm font-medium text-gray-900">
+                      {o.itemName}
+                    </span>
+                    <span className="shrink-0 text-xs text-gray-500">
+                      판매가 {o.salePrice.toLocaleString('ko-KR')}
+                      {o.stockQuantity != null && ` · 재고 ${o.stockQuantity}`}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="shrink-0 text-xs text-gray-500">마스터 옵션명</span>
+                    <input
+                      type="text"
+                      disabled={busy}
+                      className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100"
+                      value={row.masterOptionName}
+                      onChange={(e) => patchRow(key, { masterOptionName: e.target.value })}
+                    />
+                  </div>
+                  {row.masterOptionName.trim() === '' && (
+                    <p className="mt-1 text-[11px] text-gray-500">마스터 옵션명을 입력하세요</p>
+                  )}
+
+                  <p className="mt-2 text-xs text-gray-500">구성</p>
+                  <ul className="mt-1 space-y-1">
+                    {preview.components.map((c) => {
+                      const value = row.quantities[c.productId] ?? '';
+                      return (
+                        <li key={c.productId} className="flex items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate text-sm text-gray-900">
+                            {c.brand ? `${c.brand} ` : ''}
+                            {c.productName}
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            disabled={busy}
+                            className="w-20 shrink-0 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100"
+                            value={value}
+                            onChange={(e) =>
+                              patchRow(key, {
+                                quantities: { ...row.quantities, [c.productId]: e.target.value },
+                              })
+                            }
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              );
+            })}
+          </ul>
+
+          <p className="shrink-0 text-[11px] text-gray-500">
+            구성이 마스터의 기존 옵션과 같으면 그 옵션에 연결되고, 다르면 새 옵션이 만들어집니다.
+          </p>
+        </>
+      )}
+
+      <div className="mt-4 flex shrink-0 flex-col items-end gap-1">
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="shrink-0 text-sm text-gray-500 hover:text-gray-800 disabled:opacity-50"
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           >
-            닫기
+            취소
           </button>
-        </div>
-
-        <div className="mb-3 flex shrink-0 items-center gap-2">
-          <label className="text-sm text-gray-700" htmlFor="coupang-product-id">
-            쿠팡 상품 ID
-          </label>
-          <input
-            id="coupang-product-id"
-            type="text"
-            inputMode="numeric"
-            disabled={busy}
-            className="w-48 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100"
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={handleLookup}
-            disabled={productId.trim() === '' || busy}
-            className="flex items-center gap-1 rounded border border-blue-300 px-3 py-1 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-          >
-            {busy && preview == null ? '조회 중…' : '조회'}
-          </button>
-        </div>
-
-        {error && (
-          <p className="mb-3 shrink-0 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        )}
-
-        {preview && (
-          <>
-            <div className="shrink-0 space-y-2">
-              <p className="text-sm text-gray-900">
-                <span className="font-medium">{preview.productName}</span>
-                <span className="text-gray-500">
-                  {' '}
-                  · {STATUS_LABEL[preview.status] ?? preview.status} · 카테고리 {preview.categoryCode}{' '}
-                  · 태그 {preview.channelTags.length}개
-                </span>
-              </p>
-              {preview.categoryWarning && (
-                <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                  {preview.categoryWarning}
-                </p>
-              )}
-            </div>
-
-            <ul className="my-3 min-h-0 flex-1 space-y-3 overflow-y-auto">
-              {preview.options.map((o) => {
-                const key = optionKey(o);
-                const row = rowOf(key);
-                return (
-                  <li key={key} className="rounded border border-gray-200 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="min-w-0 truncate text-sm font-medium text-gray-900">
-                        {o.itemName}
-                      </span>
-                      <span className="shrink-0 text-xs text-gray-500">
-                        판매가 {o.salePrice.toLocaleString('ko-KR')}
-                        {o.stockQuantity != null && ` · 재고 ${o.stockQuantity}`}
-                      </span>
-                    </div>
-
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="shrink-0 text-xs text-gray-500">마스터 옵션명</span>
-                      <input
-                        type="text"
-                        disabled={busy}
-                        className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100"
-                        value={row.masterOptionName}
-                        onChange={(e) => patchRow(key, { masterOptionName: e.target.value })}
-                      />
-                    </div>
-                    {row.masterOptionName.trim() === '' && (
-                      <p className="mt-1 text-[11px] text-gray-500">마스터 옵션명을 입력하세요</p>
-                    )}
-
-                    <p className="mt-2 text-xs text-gray-500">구성</p>
-                    <ul className="mt-1 space-y-1">
-                      {preview.components.map((c) => {
-                        const value = row.quantities[c.productId] ?? '';
-                        return (
-                          <li key={c.productId} className="flex items-center gap-2">
-                            <span className="min-w-0 flex-1 truncate text-sm text-gray-900">
-                              {c.brand ? `${c.brand} ` : ''}
-                              {c.productName}
-                            </span>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              disabled={busy}
-                              className="w-20 shrink-0 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100"
-                              value={value}
-                              onChange={(e) =>
-                                patchRow(key, {
-                                  quantities: { ...row.quantities, [c.productId]: e.target.value },
-                                })
-                              }
-                            />
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </li>
-                );
-              })}
-            </ul>
-
-            <p className="shrink-0 text-[11px] text-gray-500">
-              구성이 마스터의 기존 옵션과 같으면 그 옵션에 연결되고, 다르면 새 옵션이 만들어집니다.
-            </p>
-          </>
-        )}
-
-        <div className="mt-4 flex shrink-0 flex-col items-end gap-1">
-          <div className="flex justify-end gap-2">
-            <button
+          {preview && (
+            <Button
               type="button"
-              onClick={onClose}
-              disabled={busy}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              onClick={handleImport}
+              disabled={!canImport}
+              size="sm"
+              className="flex items-center gap-1"
             >
-              취소
-            </button>
-            {preview && (
-              <Button
-                type="button"
-                onClick={handleImport}
-                disabled={!canImport}
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                {busy ? <Spinner label="가져오는 중…" /> : '가져오기'}
-              </Button>
-            )}
-          </div>
-          {/* 비활성 사유를 숨기지 않는다 — 왜 못 누르는지 보여준다. */}
-          {preview && !busy && nameMissing && (
-            <p className="text-[11px] text-gray-500">마스터 옵션명을 모두 입력하세요</p>
-          )}
-          {preview && !busy && !nameMissing && quantityInvalid && (
-            <p className="text-[11px] text-gray-500">수량은 1 이상의 정수여야 합니다</p>
+              {busy ? <Spinner label="가져오는 중…" /> : '가져오기'}
+            </Button>
           )}
         </div>
+        {/* 비활성 사유를 숨기지 않는다 — 왜 못 누르는지 보여준다. */}
+        {preview && !busy && nameMissing && (
+          <p className="text-[11px] text-gray-500">마스터 옵션명을 모두 입력하세요</p>
+        )}
+        {preview && !busy && !nameMissing && quantityInvalid && (
+          <p className="text-[11px] text-gray-500">수량은 1 이상의 정수여야 합니다</p>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

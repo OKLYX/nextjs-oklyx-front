@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/presentation/components/ui/Button';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
  * 마스터 이미지 풀 관리 팝업 — 업로드한 마스터 이미지를 다중 선택해 삭제.
@@ -47,78 +48,69 @@ export function MasterPoolManageModal({ images, onDelete, onClose }: MasterPoolM
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-          <h3 className="text-base font-semibold text-gray-900">마스터 이미지 관리</h3>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="마스터 이미지 관리"
+    >
+      <div className="min-h-40 flex-1 overflow-y-auto p-5">
+        {images.length === 0 ? (
+          <p className="py-8 text-center text-sm text-gray-500">관리할 마스터 이미지가 없습니다.</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+            {images.map((img) => {
+              const checked = selected.includes(img.token);
+              return (
+                <button
+                  key={img.token}
+                  type="button"
+                  onClick={() => toggle(img.token)}
+                  className={`relative rounded-lg border-2 p-1 ${
+                    checked ? 'border-red-500' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="aspect-square overflow-hidden rounded bg-gray-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.url} alt="마스터 이미지" className="h-full w-full object-contain" />
+                  </div>
+                  {img.inUse && (
+                    <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 py-0.5 text-[10px] text-white">
+                      사용중
+                    </span>
+                  )}
+                  {checked && (
+                    <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[11px] text-white">
+                      ✓
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3">
+        <span className="text-xs text-gray-500">{selected.length}개 선택</span>
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
           >
             닫기
           </button>
-        </div>
-
-        <div className="min-h-40 flex-1 overflow-y-auto p-5">
-          {images.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">관리할 마스터 이미지가 없습니다.</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {images.map((img) => {
-                const checked = selected.includes(img.token);
-                return (
-                  <button
-                    key={img.token}
-                    type="button"
-                    onClick={() => toggle(img.token)}
-                    className={`relative rounded-lg border-2 p-1 ${
-                      checked ? 'border-red-500' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="aspect-square overflow-hidden rounded bg-gray-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img.url} alt="마스터 이미지" className="h-full w-full object-contain" />
-                    </div>
-                    {img.inUse && (
-                      <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 py-0.5 text-[10px] text-white">
-                        사용중
-                      </span>
-                    )}
-                    {checked && (
-                      <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[11px] text-white">
-                        ✓
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3">
-          <span className="text-xs text-gray-500">{selected.length}개 선택</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              닫기
-            </button>
-            <Button
-              type="button"
-              onClick={handleDelete}
-              disabled={selected.length === 0 || busy}
-              variant="danger"
-              size="sm"
-            >
-              {busy ? '삭제 중...' : '선택 삭제'}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            onClick={handleDelete}
+            disabled={selected.length === 0 || busy}
+            variant="danger"
+            size="sm"
+          >
+            {busy ? '삭제 중...' : '선택 삭제'}
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

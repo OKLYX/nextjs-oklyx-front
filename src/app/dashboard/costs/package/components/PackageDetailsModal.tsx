@@ -8,6 +8,7 @@ import type { Package } from '@/domain/entities/PackageEntity';
 import type { UpdatePackageRequest } from '@/application/dto/UpdatePackageRequest';
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
 import { Button } from '@/presentation/components/ui/Button';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 const packageSchema = z.object({
   type: z.string().min(1, '패키지 타입을 입력하세요').max(50, '50자 이내'),
@@ -132,159 +133,150 @@ export function PackageDetailsModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">상자비 수정</h2>
-            <p className="text-xs text-gray-500 mt-1">ID: {pkg.id}</p>
-          </div>
-          <button
-            onClick={onClose}
-            disabled={isSubmitting || isLoading}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-          >
-            ✕
-          </button>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="상자비 수정"
+      disableClose={isSubmitting || isLoading}
+    >
+      <p className="text-xs text-gray-500 mt-1">ID: {pkg.id}</p>
+
+      {requestError && (
+        <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+          {requestError}
+        </div>
+      )}
+
+      {deleteError && (
+        <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+          {deleteError}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="p-6 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            패키지 타입
+          </label>
+          <Controller
+            name="type"
+            control={control}
+            render={({ field }) => (
+              <input
+                {...field}
+                type="text"
+                disabled={isSubmitting || isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                placeholder="패키지 타입 입력 (예: A-36, B-120)"
+              />
+            )}
+          />
+          {errors.type && (
+            <p className="mt-1 text-xs text-red-600">{errors.type.message}</p>
+          )}
         </div>
 
-        {requestError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
-            {requestError}
-          </div>
-        )}
-
-        {deleteError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
-            {deleteError}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              패키지 타입
-            </label>
-            <Controller
-              name="type"
-              control={control}
-              render={({ field }) => (
-                <input
-                  {...field}
-                  type="text"
-                  disabled={isSubmitting || isLoading}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  placeholder="패키지 타입 입력 (예: A-36, B-120)"
-                />
-              )}
-            />
-            {errors.type && (
-              <p className="mt-1 text-xs text-red-600">{errors.type.message}</p>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            비용 (원)
+          </label>
+          <Controller
+            name="cost"
+            control={control}
+            render={({ field }) => (
+              <input
+                {...field}
+                type="number"
+                disabled={isSubmitting || isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                placeholder="비용 입력"
+                step="0.01"
+                min="0"
+                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+              />
             )}
-          </div>
+          />
+          {errors.cost && (
+            <p className="mt-1 text-xs text-red-600">{errors.cost.message}</p>
+          )}
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              비용 (원)
-            </label>
-            <Controller
-              name="cost"
-              control={control}
-              render={({ field }) => (
-                <input
-                  {...field}
-                  type="number"
-                  disabled={isSubmitting || isLoading}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  placeholder="비용 입력"
-                  step="0.01"
-                  min="0"
-                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                />
-              )}
-            />
-            {errors.cost && (
-              <p className="mt-1 text-xs text-red-600">{errors.cost.message}</p>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            유효일
+          </label>
+          <Controller
+            name="effectiveDate"
+            control={control}
+            render={({ field }) => (
+              <input
+                {...field}
+                type="date"
+                disabled={isSubmitting || isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              />
             )}
-          </div>
+          />
+          {errors.effectiveDate && (
+            <p className="mt-1 text-xs text-red-600">{errors.effectiveDate.message}</p>
+          )}
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              유효일
-            </label>
-            <Controller
-              name="effectiveDate"
-              control={control}
-              render={({ field }) => (
-                <input
-                  {...field}
-                  type="date"
-                  disabled={isSubmitting || isLoading}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-              )}
-            />
-            {errors.effectiveDate && (
-              <p className="mt-1 text-xs text-red-600">{errors.effectiveDate.message}</p>
+        <div className="flex items-center">
+          <Controller
+            name="isDefault"
+            control={control}
+            render={({ field }) => (
+              <input
+                type="checkbox"
+                checked={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                disabled={isSubmitting || isLoading}
+                className="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
             )}
-          </div>
+          />
+          <label className="ml-2 text-sm font-medium text-gray-700">기본값</label>
+        </div>
 
-          <div className="flex items-center">
-            <Controller
-              name="isDefault"
-              control={control}
-              render={({ field }) => (
-                <input
-                  type="checkbox"
-                  checked={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  disabled={isSubmitting || isLoading}
-                  className="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                />
-              )}
-            />
-            <label className="ml-2 text-sm font-medium text-gray-700">기본값</label>
-          </div>
+        <div className="flex gap-3 pt-4 border-t">
+          <button
+            type="button"
+            onClick={() => {
+              reset();
+              onClose();
+            }}
+            disabled={isSubmitting || isLoading || isDeleting}
+            className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            type="submit"
+            disabled={!isValid || isSubmitting || isLoading || isDeleting}
+            className="flex-1 px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors"
+          >
+            {isSubmitting || isLoading ? '저장 중...' : '수정'}
+          </button>
+          <Button
+            type="button"
+            onClick={handleDeleteClick}
+            disabled={isSubmitting || isLoading || isDeleting}
+            variant="danger"
+          >
+            {isDeleting ? '삭제 중...' : '삭제'}
+          </Button>
+        </div>
+      </form>
 
-          <div className="flex gap-3 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => {
-                reset();
-                onClose();
-              }}
-              disabled={isSubmitting || isLoading || isDeleting}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 transition-colors"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={!isValid || isSubmitting || isLoading || isDeleting}
-              className="flex-1 px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors"
-            >
-              {isSubmitting || isLoading ? '저장 중...' : '수정'}
-            </button>
-            <Button
-              type="button"
-              onClick={handleDeleteClick}
-              disabled={isSubmitting || isLoading || isDeleting}
-              variant="danger"
-            >
-              {isDeleting ? '삭제 중...' : '삭제'}
-            </Button>
-          </div>
-        </form>
-
-        <DeleteConfirmationDialog
-          isOpen={isDeleteDialogOpen}
-          packageName={pkg?.type}
-          isLoading={isDeleting}
-          onConfirm={handleConfirmDelete}
-          onCancel={() => setIsDeleteDialogOpen(false)}
-        />
-      </div>
-    </div>
+      <DeleteConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        packageName={pkg?.type}
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setIsDeleteDialogOpen(false)}
+      />
+    </Modal>
   );
 }
