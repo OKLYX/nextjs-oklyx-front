@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { CarrierRateForm } from './CarrierRateForm';
 import type { CreateCarrierRateRequest } from '@/application/dto/CreateCarrierRateRequest';
 import type { Carrier } from '@/domain/entities/CarrierEntity';
@@ -21,19 +20,6 @@ export function CreateCarrierRateModal({
   isLoading,
   carriers,
 }: CreateCarrierRateModalProps) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isLoading, onClose]);
-
   if (!isOpen) {
     return null;
   }

@@ -419,7 +419,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     <Modal isOpen onClose={handleClose} title="주문 상세" fullHeight>
 
         {/* Only this middle band scrolls — the table keeps no scroller of its own (D2). */}
-        <div className="flex-1 min-h-0 overflow-y-auto modal-scroll-body">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <dl className="divide-y divide-gray-200">
             {fields.map((field) => (
               <div key={field.label} className="flex justify-between py-2">

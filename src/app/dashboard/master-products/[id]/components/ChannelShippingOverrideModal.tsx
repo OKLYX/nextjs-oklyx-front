@@ -75,14 +75,6 @@ export function ChannelShippingOverrideModal({
     inherited != null &&
     (inherited.outboundShippingPlaceCode == null || inherited.returnCenterCode == null);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isSaving && !isResetting) onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isSaving, isResetting, onClose]);
-
   // Fetch outbound/return for this channel's account + the inherited baseline used to pre-fill the
   // form (master ?? account). Prefer the backend-resolved baseline (getInheritedShipping); if that
   // fails, fall back to the account's own config (getConfig, the 72 endpoint the seller 배송관리 uses)

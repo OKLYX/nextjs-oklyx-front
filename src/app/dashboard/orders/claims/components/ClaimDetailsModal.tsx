@@ -76,7 +76,7 @@ export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetails
       title={`${typeLabel} 상세`}
     >
       {/* Only this middle band scrolls, so the close button stays reachable. */}
-      <div className="flex-1 min-h-0 overflow-y-auto modal-scroll-body">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <Section title="접수">
           <Row label="접수번호" value={claim.externalClaimId} />
           <Row label="접수일" value={formatDate(claim.receivedAt)} />

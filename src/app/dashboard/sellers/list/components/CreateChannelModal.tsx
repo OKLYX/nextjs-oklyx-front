@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { ChannelRegistrationForm } from './ChannelRegistrationForm';
 import type { CreateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
 import type { TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
@@ -27,19 +26,6 @@ export function CreateChannelModal({
   detailTemplates,
   templatesLoading,
 }: CreateChannelModalProps) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isLoading, onClose]);
-
   if (!isOpen) {
     return null;
   }

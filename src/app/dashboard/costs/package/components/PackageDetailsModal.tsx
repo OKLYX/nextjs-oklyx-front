@@ -70,16 +70,6 @@ export function PackageDetailsModal({
     }
   }, [pkg, isOpen, reset]);
 
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && !isSubmitting && !isLoading) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, isSubmitting, isLoading, onClose]);
-
   const handleFormSubmit = async (data: PackageFormData) => {
     setIsSubmitting(true);
     setRequestError('');

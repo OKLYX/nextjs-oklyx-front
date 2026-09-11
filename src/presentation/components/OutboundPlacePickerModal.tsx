@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import type { OutboundPlace } from '@/domain/entities/ShippingEntity';
 import { Modal } from '@/presentation/components/ui/Modal';
 
@@ -24,16 +23,6 @@ export function OutboundPlacePickerModal({
   onSelect,
   onClose,
 }: OutboundPlacePickerModalProps) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   return (

@@ -79,16 +79,6 @@ export function ShippingConfigModal({ isOpen, account, onClose, useCase }: Shipp
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isSaving) onClose();
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isSaving, onClose]);
-
   // Open-load: fetch config + lookups in parallel. Each fetch is caught
   // independently — a lookup failure degrades to manual entry, not a blocker.
   useEffect(() => {
