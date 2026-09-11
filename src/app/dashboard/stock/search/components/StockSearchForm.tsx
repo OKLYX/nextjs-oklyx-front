@@ -32,7 +32,7 @@ export function StockSearchForm({
   };
 
   return (
-    <Card title="재고 조회">
+    <Card>
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">상품명</label>

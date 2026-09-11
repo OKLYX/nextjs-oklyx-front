@@ -26,8 +26,6 @@ export function ProductListingSearchCard({
 
   return (
     <Card>
-      <h2 className="text-2xl font-semibold mb-6 text-gray-900">판매상품 조회</h2>
-
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">플랫폼</label>

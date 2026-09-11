@@ -48,10 +48,6 @@ export function InquirySearchCard({
 }: InquirySearchCardProps) {
   return (
     <Card>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">고객문의</h2>
-      </div>
-
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">채널</label>

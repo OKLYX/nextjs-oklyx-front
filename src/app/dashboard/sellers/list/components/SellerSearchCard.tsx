@@ -22,8 +22,6 @@ export function SellerSearchCard({
 }: SellerSearchCardProps) {
   return (
     <Card>
-      <h2 className="text-2xl font-semibold mb-6 text-gray-900">판매자 검색</h2>
-
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">판매자명</label>

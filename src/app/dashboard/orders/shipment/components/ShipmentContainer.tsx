@@ -23,7 +23,7 @@ import { ShippingLabelPreviewModal } from '../../components/ShippingLabelPreview
 import { SyncProgressModal } from '../../components/SyncProgressModal';
 import { channelOptionLabel } from '../../components/OrderSearchCard';
 import type { ChannelOption } from '../../components/OrderSearchCard';
-import { ShipmentFilterCard } from './ShipmentFilterCard';
+import { ShipmentFilterCard, formatSyncedAt } from './ShipmentFilterCard';
 import { AcknowledgeBar } from './AcknowledgeBar';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
@@ -362,7 +362,16 @@ export function ShipmentContainer() {
   const showEmpty = hasSearched && !isLoading && error === '' && sorted.length === 0;
 
   return (
-    <PageContainer width="xl">
+    <PageContainer
+      width="xl"
+      title="출고관리"
+      action={
+        <p className="text-sm text-gray-500 whitespace-nowrap">
+          마지막 동기화:{' '}
+          <span className="font-medium text-gray-700">{formatSyncedAt(lastSyncedAt)}</span>
+        </p>
+      }
+    >
       <ShipmentFilterCard
         sellers={sellers}
         selectedSellerId={selectedSellerId}
@@ -375,7 +384,6 @@ export function ShipmentContainer() {
         isLoading={isLoading}
         isSyncing={isSyncing}
         resultCount={visible.length}
-        lastSyncedAt={lastSyncedAt}
         canDownload={isAdmin}
         onDownload={() => setIsPreviewOpen(true)}
         onOpenConfirm={() => setIsConfirmOpen(true)}

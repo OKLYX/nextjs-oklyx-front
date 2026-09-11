@@ -73,7 +73,7 @@ export function UserManageContainer() {
   }, []);
 
   return (
-    <PageContainer>
+    <PageContainer title="회원 검색">
       <UserSearchForm
         nameSearch={nameSearch}
         emailSearch={emailSearch}
