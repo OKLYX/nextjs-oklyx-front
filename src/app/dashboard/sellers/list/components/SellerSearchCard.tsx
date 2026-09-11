@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/presentation/components/ui/Card';
+
 interface SellerSearchCardProps {
   searchName: string;
   onSearchChange: (value: string) => void;
@@ -18,7 +20,7 @@ export function SellerSearchCard({
   onCreateClick,
 }: SellerSearchCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card>
       <h2 className="text-2xl font-semibold mb-6 text-gray-900">판매자 검색</h2>
 
       <div className="space-y-4">
@@ -56,6 +58,6 @@ export function SellerSearchCard({
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

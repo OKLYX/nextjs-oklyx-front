@@ -415,8 +415,8 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
       {/* 주문 줄 — 읽기 전용. 구매수량도 입력 컨트롤도 없다(D7) */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-600">
-            <tr>
+          <thead className="bg-gray-100 border-b border-gray-200">
+            <tr className="text-gray-600">
               <th className="px-4 py-2 text-left font-medium">채널</th>
               <th className="px-4 py-2 text-left font-medium">주문번호</th>
               <th className="px-4 py-2 text-right font-medium">필요</th>

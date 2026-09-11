@@ -165,8 +165,8 @@ export function ShippingLabelPreviewModal({
           <div className="flex-1 overflow-y-auto modal-scroll-body">
             <div className="border border-gray-200 rounded-lg list-table-scroll">
               <table>
-                <thead>
-                  <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                <thead className="bg-gray-100 border-b border-gray-200">
+                  <tr className="text-left text-xs font-medium text-gray-500">
                     <th className="px-4 py-2">이름</th>
                     <th className="px-4 py-2">배송지</th>
                     <th className="px-4 py-2">상품명</th>

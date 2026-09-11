@@ -280,8 +280,8 @@ export function MarginPolicyTable() {
           </div>
         ) : (
           <table>
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-sm text-gray-600">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-left text-sm text-gray-600">
                 <th className="px-4 py-3">판매자</th>
                 <th className="px-4 py-3">플랫폼</th>
                 <th className="px-4 py-3">마진율</th>

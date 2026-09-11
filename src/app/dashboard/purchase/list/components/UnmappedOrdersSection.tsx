@@ -1,6 +1,7 @@
 'use client';
 
 import type { UnmappedOrder } from '@/domain/entities/PurchaseListEntity';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface UnmappedOrdersSectionProps {
   orders: UnmappedOrder[];
@@ -11,7 +12,7 @@ export function UnmappedOrdersSection({ orders, isLoading }: UnmappedOrdersSecti
   if (isLoading || orders.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-lg shadow list-table-scroll border border-amber-200">
+    <TableCard className="border border-amber-200">
       <div className="px-6 py-4 border-b border-amber-200 bg-amber-50">
         <h2 className="text-lg font-semibold text-amber-800">등록 필요</h2>
         <p className="mt-1 text-xs text-amber-700">
@@ -20,8 +21,8 @@ export function UnmappedOrdersSection({ orders, isLoading }: UnmappedOrdersSecti
       </div>
 
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-gray-600">
-          <tr>
+        <thead className="bg-gray-100 border-b border-gray-200">
+          <tr className="text-gray-600">
             <th className="px-4 py-3 text-left font-medium">옵션 ID</th>
             <th className="px-4 py-3 text-left font-medium">상품명</th>
             <th className="px-4 py-3 text-right font-medium">주문 수</th>
@@ -39,6 +40,6 @@ export function UnmappedOrdersSection({ orders, isLoading }: UnmappedOrdersSecti
           ))}
         </tbody>
       </table>
-    </div>
+    </TableCard>
   );
 }

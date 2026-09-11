@@ -25,6 +25,8 @@ import { channelOptionLabel } from '../../components/OrderSearchCard';
 import type { ChannelOption } from '../../components/OrderSearchCard';
 import { ShipmentFilterCard } from './ShipmentFilterCard';
 import { AcknowledgeBar } from './AcknowledgeBar';
+import { Card } from '@/presentation/components/ui/Card';
+import { StateBlock } from '@/presentation/components/ui/StateBlock';
 
 const SHIPMENT_STATUS_LIST = SHIPMENT_STATUSES as readonly string[];
 
@@ -404,9 +406,9 @@ export function ShipmentContainer() {
       />
 
       {showEmpty ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-          발송할 주문이 없습니다.
-        </div>
+        <Card padded={false}>
+          <StateBlock variant="empty" message="발송할 주문이 없습니다." />
+        </Card>
       ) : (
         <OrderTable
           orders={paged}

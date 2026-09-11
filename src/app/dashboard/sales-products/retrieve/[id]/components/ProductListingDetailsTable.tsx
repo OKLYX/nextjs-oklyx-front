@@ -1,58 +1,38 @@
 'use client';
 
 import type { ProductListingOption } from '@/domain/entities/ProductListingEntity';
+import { StateBlock } from '@/presentation/components/ui/StateBlock';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface ProductListingDetailsTableProps {
   options?: ProductListingOption[];
   isLoading: boolean;
 }
 
-export function ProductListingDetailsTable({ options = [], isLoading }: ProductListingDetailsTableProps) {
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">📋 옵션 및 구성상품</h2>
-        </div>
-        <div className="px-6 py-6">
-          <div className="animate-pulse space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!options || options.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">📋 옵션 및 구성상품</h2>
-        </div>
-        <div className="px-6 py-6">
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-600 text-sm text-center">
-            등록된 옵션이 없습니다.
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+export function ProductListingDetailsTable({
+  options = [],
+  isLoading,
+}: ProductListingDetailsTableProps) {
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    // 카드 머리말은 로딩·빈 상태에서도 남는다 — 상태 블록만 본문 자리에서 바뀐다.
+    <TableCard>
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900">📋 옵션 및 구성상품</h2>
       </div>
 
-      <div className="list-table-scroll">
+      {isLoading ? (
+        <StateBlock variant="loading" message="불러오는 중..." />
+      ) : options.length === 0 ? (
+        <StateBlock variant="empty" message="등록된 옵션이 없습니다." />
+      ) : (
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-100 border-b border-gray-200">
             <tr>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">옵션명</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">판매가</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">플랫폼 옵션 ID</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                플랫폼 옵션 ID
+              </th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">구성상품</th>
             </tr>
           </thead>
@@ -63,7 +43,9 @@ export function ProductListingDetailsTable({ options = [], isLoading }: ProductL
                 <td className="px-6 py-4 text-sm text-gray-900">
                   {option.sellingPrice?.toLocaleString('ko-KR') || '-'}원
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500">{option.platformOptionId || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {option.platformOptionId || '-'}
+                </td>
                 <td className="px-6 py-4 text-sm">
                   {option.products && option.products.length > 0 ? (
                     <div className="space-y-1">
@@ -81,7 +63,7 @@ export function ProductListingDetailsTable({ options = [], isLoading }: ProductL
             ))}
           </tbody>
         </table>
-      </div>
-    </div>
+      )}
+    </TableCard>
   );
 }

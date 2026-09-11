@@ -502,8 +502,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                         <div className="mt-4">
                           <div className="border border-gray-200 rounded-lg list-table-scroll">
                             <table>
-                              <thead>
-                                <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                              <thead className="bg-gray-100 border-b border-gray-200">
+                                <tr className="text-left text-xs font-medium text-gray-500">
                                   <th className="px-4 py-2">이름</th>
                                   <th className="px-4 py-2">배송지</th>
                                   <th className="px-4 py-2">상품명</th>
@@ -672,8 +672,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                           extracted into a shared component (2609_01 D5). Coupang wording verbatim (D6). */}
                       <div className="mt-3 border border-gray-200 rounded-lg list-table-scroll">
                         <table>
-                          <thead>
-                            <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                          <thead className="bg-gray-100 border-b border-gray-200">
+                            <tr className="text-left text-xs font-medium text-gray-500">
                               <th className="px-4 py-2">박스 ID</th>
                               <th className="px-4 py-2">코드</th>
                               <th className="px-4 py-2">메시지</th>

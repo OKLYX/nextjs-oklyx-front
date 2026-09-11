@@ -13,6 +13,7 @@ import {
   type ShippingOverride,
 } from '@/domain/entities/ShippingEntity';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import { Card } from '@/presentation/components/ui/Card';
 
 /** One registered channel cell of this master — the force-apply selection unit (79). */
 export interface ForceApplyChannel {
@@ -206,7 +207,7 @@ export function MasterShippingOverridePanel({
   const busy = isSaving || isApplying;
 
   return (
-    <div className="rounded-lg bg-white p-4 shadow">
+    <Card>
       <h2 className="mb-1 text-sm font-semibold text-gray-900">배송 설정 (전 채널)</h2>
       <p className="mb-3 text-xs text-gray-500">
         비운 값은 판매채널의 기본 배송 설정을 그대로 쓰고, 채워진 값은 이 마스터의 전 채널에 적용됩니다.
@@ -332,6 +333,6 @@ export function MasterShippingOverridePanel({
         onConfirm={handleForceApply}
         onCancel={() => setConfirmApply(false)}
       />
-    </div>
+    </Card>
   );
 }

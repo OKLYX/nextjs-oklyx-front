@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/presentation/components/ui/Card';
+
 interface ProductListingSearchCardProps {
   searchPlatform: string;
   onSearchChange: (value: string) => void;
@@ -22,7 +24,7 @@ export function ProductListingSearchCard({
 }: ProductListingSearchCardProps) {
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card>
       <h2 className="text-2xl font-semibold mb-6 text-gray-900">판매상품 조회</h2>
 
       <div className="space-y-4">
@@ -68,6 +70,6 @@ export function ProductListingSearchCard({
           </button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

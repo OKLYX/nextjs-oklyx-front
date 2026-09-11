@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/presentation/components/ui/Card';
+
 interface CommissionRateSearchCardProps {
   selectedPlatform: string;
   onPlatformChange: (value: string) => void;
@@ -26,7 +28,7 @@ export function CommissionRateSearchCard({
   onCreateClick,
 }: CommissionRateSearchCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card>
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="flex-1 flex gap-2">
           <select
@@ -67,6 +69,6 @@ export function CommissionRateSearchCard({
         </button>
       </div>
       <p className="text-sm text-gray-600">검색 결과: {hasSearched ? resultCount : 0}건</p>
-    </div>
+    </Card>
   );
 }

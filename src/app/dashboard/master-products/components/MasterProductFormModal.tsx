@@ -836,7 +836,7 @@ export function MasterProductFormModal({
             {/* 선택된 구성상품만 목록으로. */}
             <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-gray-100 text-xs text-gray-500">
+                <thead className="sticky top-0 bg-gray-100 border-b border-gray-200 text-xs text-gray-500">
                   <tr>
                     <th className="px-2 py-1.5 text-left font-medium">이미지</th>
                     <th className="px-2 py-1.5 text-left font-medium">제품명</th>

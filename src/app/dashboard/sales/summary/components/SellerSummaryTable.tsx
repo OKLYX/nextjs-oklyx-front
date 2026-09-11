@@ -11,6 +11,8 @@ import {
   formatProfit,
 } from '@/domain/entities/SalesSummary';
 import { SellerChannelRows } from './SellerChannelRows';
+import { Card } from '@/presentation/components/ui/Card';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface SellerSummaryTableProps {
   rows: SellerSales[];
@@ -67,7 +69,7 @@ export function SellerSummaryTable({
 }: SellerSummaryTableProps) {
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-3">
+      <Card className="space-y-3">
         <p className="text-sm text-red-600">{error}</p>
         <button
           type="button"
@@ -76,18 +78,7 @@ export function SellerSummaryTable({
         >
           다시 시도
         </button>
-      </div>
-    );
-  }
-
-  // 첫 조회에만 스켈레톤. 기간을 바꾼 재조회는 이전 값을 지우지 않고 위에 로딩 줄만 띄운다(깜빡임 방지).
-  if (loading && rows.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-2">
-        {[0, 1, 2].map((row) => (
-          <div key={row} className="h-8 bg-gray-100 rounded animate-pulse" />
-        ))}
-      </div>
+      </Card>
     );
   }
 
@@ -107,7 +98,12 @@ export function SellerSummaryTable({
   const totalProfitReady = rows.length > 0 && rows.every((row) => row.costBasisReady);
 
   return (
-    <div className="bg-white rounded-lg shadow list-table-scroll">
+    // 첫 조회에만 로딩 블록. 기간을 바꾼 재조회는 이전 값을 지우지 않고 위에 로딩 줄만 띄운다(깜빡임 방지).
+    <TableCard
+      isLoading={loading && rows.length === 0}
+      isEmpty={rows.length === 0}
+      emptyMessage="해당 기간에 판매된 주문이 없습니다."
+    >
       {loading && rows.length > 0 && (
         <div className="px-6 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
           조회 중...
@@ -126,82 +122,81 @@ export function SellerSummaryTable({
             >
               고정비
             </th>
-            <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">순이익(추정)</th>
+            <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+              순이익(추정)
+            </th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
               정산 추정 금액
               {/* 🔴 이 라벨이 없으면 "기간을 바꿨는데 값이 안 변한다"가 버그 신고로 온다(D4). */}
-              <span className="block text-[11px] font-normal text-gray-500">기간 무관 · 미지급 잔액</span>
+              <span className="block text-[11px] font-normal text-gray-500">
+                기간 무관 · 미지급 잔액
+              </span>
             </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={COLUMN_COUNT} className="px-6 py-8 text-center text-gray-500">
-                해당 기간에 판매된 주문이 없습니다.
-              </td>
-            </tr>
-          ) : (
-            rows.map((row) => {
-              const isExpanded = expandedSellerId === row.sellerId;
-              return (
-                <Fragment key={row.sellerId}>
-                  <tr onClick={() => onToggle(row.sellerId)} className="hover:bg-gray-50 cursor-pointer">
-                    <td className="px-6 py-3 text-sm text-gray-700">
-                      {isExpanded ? '▾' : '▸'} {row.sellerName}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-right text-gray-700">
-                      {row.netQty.toLocaleString('ko-KR')}
-                      {row.holdQty > 0 && (
-                        // 환불대기는 유효수량에서 빼지 않는다(D14) — 빼면 확정될 때마다 매출이 출렁인다.
-                        <span
-                          className="ml-1 text-xs text-gray-500"
-                          title="환불대기 수량입니다. 아직 확정이 아니라 매출에서 빼지 않았습니다"
-                        >
-                          (대기 {row.holdQty})
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-right font-semibold text-gray-900">
-                      {formatMoney(row.grossSales)}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-right text-gray-500">
-                      {formatMoney(row.discount)}
-                    </td>
-                    {/* 🔴 서버가 준 판매자 행의 값이다 — 채널 값을 화면에서 더하지 않는다(D7). */}
-                    <td className="px-6 py-3 text-sm text-right text-gray-700">
-                      {formatFixedCost(row.fixedCost)}
-                    </td>
-                    <td
-                      className="px-6 py-3 text-sm text-right text-gray-900"
-                      title={row.costBasisReady ? undefined : PROFIT_PENDING_HINT}
-                    >
-                      {formatProfit(row)}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-right text-gray-900">
-                      {formatMoney(row.pendingPayout)}
+          {rows.map((row) => {
+            const isExpanded = expandedSellerId === row.sellerId;
+            return (
+              <Fragment key={row.sellerId}>
+                <tr
+                  onClick={() => onToggle(row.sellerId)}
+                  className="hover:bg-gray-50 cursor-pointer"
+                >
+                  <td className="px-6 py-3 text-sm text-gray-700">
+                    {isExpanded ? '▾' : '▸'} {row.sellerName}
+                  </td>
+                  <td className="px-6 py-3 text-sm text-right text-gray-700">
+                    {row.netQty.toLocaleString('ko-KR')}
+                    {row.holdQty > 0 && (
+                      // 환불대기는 유효수량에서 빼지 않는다(D14) — 빼면 확정될 때마다 매출이 출렁인다.
+                      <span
+                        className="ml-1 text-xs text-gray-500"
+                        title="환불대기 수량입니다. 아직 확정이 아니라 매출에서 빼지 않았습니다"
+                      >
+                        (대기 {row.holdQty})
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-3 text-sm text-right font-semibold text-gray-900">
+                    {formatMoney(row.grossSales)}
+                  </td>
+                  <td className="px-6 py-3 text-sm text-right text-gray-500">
+                    {formatMoney(row.discount)}
+                  </td>
+                  {/* 🔴 서버가 준 판매자 행의 값이다 — 채널 값을 화면에서 더하지 않는다(D7). */}
+                  <td className="px-6 py-3 text-sm text-right text-gray-700">
+                    {formatFixedCost(row.fixedCost)}
+                  </td>
+                  <td
+                    className="px-6 py-3 text-sm text-right text-gray-900"
+                    title={row.costBasisReady ? undefined : PROFIT_PENDING_HINT}
+                  >
+                    {formatProfit(row)}
+                  </td>
+                  <td className="px-6 py-3 text-sm text-right text-gray-900">
+                    {formatMoney(row.pendingPayout)}
+                  </td>
+                </tr>
+                {isExpanded && (
+                  <tr className="bg-gray-50">
+                    <td colSpan={COLUMN_COUNT} className="px-6 py-3">
+                      <SellerChannelRows
+                        channels={channels}
+                        isLoading={channelsLoading}
+                        error={channelsError}
+                        payouts={payouts}
+                        payoutsLoading={payoutsLoading}
+                        payoutsError={payoutsError}
+                        onOpenChannel={onOpenChannel}
+                        onOpenPayout={onOpenPayout}
+                      />
                     </td>
                   </tr>
-                  {isExpanded && (
-                    <tr className="bg-gray-50">
-                      <td colSpan={COLUMN_COUNT} className="px-6 py-3">
-                        <SellerChannelRows
-                          channels={channels}
-                          isLoading={channelsLoading}
-                          error={channelsError}
-                          payouts={payouts}
-                          payoutsLoading={payoutsLoading}
-                          payoutsError={payoutsError}
-                          onOpenChannel={onOpenChannel}
-                          onOpenPayout={onOpenPayout}
-                        />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })
-          )}
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
         {rows.length > 0 && (
           <tfoot className="bg-gray-50 border-t border-gray-200">
@@ -232,6 +227,6 @@ export function SellerSummaryTable({
           </tfoot>
         )}
       </table>
-    </div>
+    </TableCard>
   );
 }

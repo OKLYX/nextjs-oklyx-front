@@ -14,6 +14,7 @@ import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/T
 import type { ImageOp, ImageOpAnchor } from '@/domain/entities/ProcessingPresetEntity';
 import type { TemplateAsset } from '@/domain/entities/ThumbnailEntity';
 import { AssetPickerModal } from '@/app/dashboard/thumbnail-templates/components/AssetPickerModal';
+import { Card } from '@/presentation/components/ui/Card';
 
 // 3×3 grid in reading order (row-major) so a `grid-cols-3` render matches the
 // spatial position each anchor maps to on the base image.
@@ -278,7 +279,7 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {/* Meta */}
-      <div className="rounded-lg bg-white p-4 shadow">
+      <Card>
         <label className="block">
           <span className="block text-xs font-medium text-gray-600">이름</span>
           <input
@@ -290,7 +291,7 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
           />
           {nameError && <span className="mt-1 block text-xs text-red-600">{nameError}</span>}
         </label>
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
         {/* Op list */}
@@ -421,7 +422,7 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
         </div>
 
         {/* Approximate preview (CSS overlays over a switchable sample background) */}
-        <div className="rounded-lg bg-white p-4 shadow">
+        <Card>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-gray-700">미리보기</h2>
             <div className="flex gap-1">
@@ -461,7 +462,7 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
           <p className="mt-3 text-xs text-gray-400">
             배경을 바꿔 워터마크·배지의 대비를 확인하세요. 실제 결과는 채널 상세 재생성 시 확인합니다(배치 근사·특정 상품 미리보기 불가).
           </p>
-        </div>
+        </Card>
       </div>
 
       <AssetPickerModal

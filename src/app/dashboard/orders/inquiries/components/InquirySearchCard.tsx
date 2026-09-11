@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
 import type { ChannelOption } from '@/app/dashboard/orders/components/OrderSearchCard';
+import { Card } from '@/presentation/components/ui/Card';
 
 /**
  * 고객문의 조회 조건 카드 — `ClaimSearchCard` + `OrderSearchCard` 의 채널 select 를 합친 형태다.
@@ -45,7 +46,7 @@ export function InquirySearchCard({
   resultCount,
 }: InquirySearchCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold text-gray-900">고객문의</h2>
       </div>
@@ -132,6 +133,6 @@ export function InquirySearchCard({
           </button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

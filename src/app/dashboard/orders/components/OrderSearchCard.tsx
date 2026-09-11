@@ -4,6 +4,7 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
 import { OrderSearchInput } from './OrderSearchInput';
+import { Card } from '@/presentation/components/ui/Card';
 
 /**
  * 채널(계정) 셀렉트 옵션. 출고관리 필터 카드도 같은 shape 을 쓴다.
@@ -84,7 +85,7 @@ export function OrderSearchCard({
   showStaleNotice,
 }: OrderSearchCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold text-gray-900">주문내역</h2>
         <p className="text-sm text-gray-500">
@@ -177,6 +178,6 @@ export function OrderSearchCard({
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

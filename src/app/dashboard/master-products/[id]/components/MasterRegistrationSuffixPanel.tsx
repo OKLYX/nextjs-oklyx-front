@@ -5,6 +5,7 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { OptionCheckSuffixControl } from '@/presentation/components/OptionCheckSuffixControl';
 import type { OptionCheckSuffixConfig } from '@/domain/entities/OptionCheckSuffix';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import { Card } from '@/presentation/components/ui/Card';
 
 interface MasterRegistrationSuffixPanelProps {
   masterId: number;
@@ -79,7 +80,7 @@ export function MasterRegistrationSuffixPanel({
   };
 
   return (
-    <div className="rounded-lg bg-white p-4 shadow">
+    <Card>
       <h2 className="mb-3 text-sm font-semibold text-gray-900">등록상품명 추가 문구</h2>
 
       {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -114,6 +115,6 @@ export function MasterRegistrationSuffixPanel({
           </button>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

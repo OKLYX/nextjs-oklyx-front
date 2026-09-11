@@ -10,6 +10,7 @@ import { ROUTES } from '@/config/routes';
 import { ProductListingDetailsCard } from './ProductListingDetailsCard';
 import { ProductListingDetailsTable } from './ProductListingDetailsTable';
 import { ProductListingDeleteDialog } from './ProductListingDeleteDialog';
+import { Card } from '@/presentation/components/ui/Card';
 
 interface ProductListingDetailsContainerProps {
   id: string;
@@ -81,11 +82,11 @@ export function ProductListingDetailsContainer({ id }: ProductListingDetailsCont
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-        <div className="bg-white rounded-lg shadow p-6 space-y-4">
+        <Card className="space-y-4">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-6 bg-gray-200 rounded"></div>
           ))}
-        </div>
+        </Card>
       </div>
     );
   }

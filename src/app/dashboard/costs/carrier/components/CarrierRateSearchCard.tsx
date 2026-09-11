@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/presentation/components/ui/Card';
+
 interface CarrierRateSearchCardProps {
   searchCarrier: string;
   onSearchChange: (value: string) => void;
@@ -18,7 +20,7 @@ export function CarrierRateSearchCard({
   onAddClick,
 }: CarrierRateSearchCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card>
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="flex-1 flex gap-2">
           <input
@@ -46,6 +48,6 @@ export function CarrierRateSearchCard({
         </button>
       </div>
       <p className="text-sm text-gray-600">검색 결과: {resultCount}건</p>
-    </div>
+    </Card>
   );
 }

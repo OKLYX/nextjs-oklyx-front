@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReconBlockA as BlockA } from '@/domain/entities/Settlement';
+import { Card } from '@/presentation/components/ui/Card';
 import {
   adjustmentLabel,
   adjustmentSign,
@@ -43,7 +44,7 @@ export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
     !pending && Math.abs(blockA.diff ?? 0) <= Math.abs(blockA.tolerance ?? 0);
 
   return (
-    <section className="bg-white rounded-lg shadow p-6 space-y-4">
+    <Card className="space-y-4">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-gray-900">정산 상세 내역</h2>
         <p className="text-sm text-gray-500">쿠팡이 알려준 금액 구성입니다.</p>
@@ -136,6 +137,6 @@ export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
           </span>
         )}
       </div>
-    </section>
+    </Card>
   );
 }

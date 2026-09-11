@@ -3,6 +3,7 @@
 import { Fragment } from 'react';
 import type { StockBalance, StockMovement } from '@/domain/entities/StockEntity';
 import { StockMovementTable } from '../../components/StockMovementTable';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface StockSearchTableProps {
   balances: StockBalance[];
@@ -32,79 +33,58 @@ export function StockSearchTable({
   historyError,
   onToggle,
 }: StockSearchTableProps) {
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-2">
-        {[0, 1, 2].map((row) => (
-          <div key={row} className="h-8 bg-gray-100 rounded animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="list-table-scroll">
-        <table className="w-full">
-          <thead className="bg-gray-100 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">상품</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">판매자</th>
-              <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">잔량</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {balances.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
-                  조회 결과가 없습니다.
-                </td>
-              </tr>
-            ) : (
-              balances.map((balance) => {
-                const key = balanceKey(balance);
-                const isExpanded = expandedKey === key;
-                return (
-                  <Fragment key={key}>
-                    <tr
-                      onClick={() => onToggle(balance)}
-                      className="hover:bg-gray-50 cursor-pointer"
-                    >
-                      <td className="px-6 py-3 text-sm text-gray-700">
-                        {isExpanded ? '▾' : '▸'} {balance.productName}
-                      </td>
-                      <td className="px-6 py-3 text-sm text-gray-700">{balance.sellerName}</td>
-                      <td
-                        className={`px-6 py-3 text-sm text-right font-semibold ${
-                          balance.onHand < 0 ? 'text-red-600' : 'text-gray-900'
-                        }`}
-                        title={
-                          balance.onHand < 0 ? '입고 기록이 빠졌을 수 있습니다' : undefined
-                        }
-                      >
-                        {balance.onHand}
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr className="bg-gray-50">
-                        <td colSpan={3} className="px-6 py-3">
-                          <StockMovementTable
-                            movements={movements}
-                            isLoading={isHistoryLoading}
-                            error={historyError}
-                            showSeller={false}
-                            emptyMessage="이 기간(최근 30일)에 기록된 이동이 없습니다."
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <TableCard
+      isLoading={isLoading}
+      isEmpty={balances.length === 0}
+      emptyMessage="조회 결과가 없습니다."
+    >
+      <table className="w-full">
+        <thead className="bg-gray-100 border-b border-gray-200">
+          <tr>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">상품</th>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">판매자</th>
+            <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">잔량</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {balances.map((balance) => {
+            const key = balanceKey(balance);
+            const isExpanded = expandedKey === key;
+            return (
+              <Fragment key={key}>
+                <tr onClick={() => onToggle(balance)} className="hover:bg-gray-50 cursor-pointer">
+                  <td className="px-6 py-3 text-sm text-gray-700">
+                    {isExpanded ? '▾' : '▸'} {balance.productName}
+                  </td>
+                  <td className="px-6 py-3 text-sm text-gray-700">{balance.sellerName}</td>
+                  <td
+                    className={`px-6 py-3 text-sm text-right font-semibold ${
+                      balance.onHand < 0 ? 'text-red-600' : 'text-gray-900'
+                    }`}
+                    title={balance.onHand < 0 ? '입고 기록이 빠졌을 수 있습니다' : undefined}
+                  >
+                    {balance.onHand}
+                  </td>
+                </tr>
+                {isExpanded && (
+                  <tr className="bg-gray-50">
+                    <td colSpan={3} className="px-6 py-3">
+                      <StockMovementTable
+                        movements={movements}
+                        isLoading={isHistoryLoading}
+                        error={historyError}
+                        showSeller={false}
+                        emptyMessage="이 기간(최근 30일)에 기록된 이동이 없습니다."
+                      />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </TableCard>
   );
 }
