@@ -38,7 +38,6 @@ interface OrderSearchCardProps {
   isLoading: boolean;
   isSyncing: boolean;
   resultCount: number;
-  lastSyncedAt: string | null;
   channelOptions: ChannelOption[];
   selectedAccountId: number | '';
   onAccountChange: (value: number | '') => void;
@@ -55,7 +54,7 @@ interface OrderSearchCardProps {
   showStaleNotice: boolean;
 }
 
-function formatSyncedAt(value: string | null): string {
+export function formatSyncedAt(value: string | null): string {
   if (!value) return '동기화 기록 없음';
   const date = new Date(value);
   if (isNaN(date.getTime())) return '동기화 기록 없음';
@@ -71,7 +70,6 @@ export function OrderSearchCard({
   isLoading,
   isSyncing,
   resultCount,
-  lastSyncedAt,
   channelOptions,
   selectedAccountId,
   onAccountChange,
@@ -87,13 +85,6 @@ export function OrderSearchCard({
 }: OrderSearchCardProps) {
   return (
     <Card>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">주문내역</h2>
-        <p className="text-sm text-gray-500">
-          마지막 동기화: <span className="font-medium text-gray-700">{formatSyncedAt(lastSyncedAt)}</span>
-        </p>
-      </div>
-
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">판매자</label>
