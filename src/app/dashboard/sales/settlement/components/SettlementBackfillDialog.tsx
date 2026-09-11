@@ -7,6 +7,7 @@ import {
   channelLabel,
   type SettlementSyncTarget,
 } from '@/domain/entities/Settlement';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
  * 과거 정산 백필 다이얼로그 (FEATURE_2609_31 / 02 · PLAN 2609_31 D1 · D4 · D7).
@@ -55,14 +56,10 @@ export function SettlementBackfillDialog({
   const disabled = running || selectedAccountId == null || invalidRange;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">과거 정산 불러오기</h2>
-          <p className="mt-1 text-xs text-gray-500">
-            선택한 달마다 쿠팡을 2번씩 조회합니다. 기간이 길수록 오래 걸립니다.
-          </p>
-        </div>
+    <Modal isOpen onClose={onClose} title="과거 정산 불러오기" disableClose={running}>
+        <p className="mb-4 text-xs text-gray-500">
+          선택한 달마다 쿠팡을 2번씩 조회합니다. 기간이 길수록 오래 걸립니다.
+        </p>
 
         {channels.length === 0 ? (
           <p className="text-sm text-gray-500">불러올 채널이 없습니다.</p>
@@ -156,7 +153,6 @@ export function SettlementBackfillDialog({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { ChannelRegistrationForm } from './ChannelRegistrationForm';
 import type { CreateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
 import type { TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface CreateChannelModalProps {
   isOpen: boolean;
@@ -44,30 +45,20 @@ export function CreateChannelModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">판매채널 추가 — {sellerName}</h2>
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4">
-          <ChannelRegistrationForm
-            isLoading={isLoading}
-            onSubmit={onSubmit}
-            onCancel={onClose}
-            thumbTemplates={thumbTemplates}
-            detailTemplates={detailTemplates}
-            templatesLoading={templatesLoading}
-          />
-        </div>
-      </div>
-    </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={`판매채널 추가 — ${sellerName}`}
+      disableClose={isLoading}
+    >
+      <ChannelRegistrationForm
+        isLoading={isLoading}
+        onSubmit={onSubmit}
+        onCancel={onClose}
+        thumbTemplates={thumbTemplates}
+        detailTemplates={detailTemplates}
+        templatesLoading={templatesLoading}
+      />
+    </Modal>
   );
 }

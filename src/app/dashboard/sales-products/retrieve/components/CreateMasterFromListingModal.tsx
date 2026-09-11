@@ -10,6 +10,7 @@ import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/Prod
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { ListingMasterPreview, ProductListing } from '@/domain/entities/ProductListingEntity';
 import { Button } from '@/presentation/components/ui/Button';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface CreateMasterFromListingModalProps {
   listing: ProductListing;
@@ -123,225 +124,213 @@ export function CreateMasterFromListingModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-y-auto rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex shrink-0 items-center justify-between">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900">
-              마스터 생성 — {step}/2
-            </h2>
-            <p className="truncate text-xs text-gray-500">
-              {listing.name} · {listing.platform} · 상품 ID {listing.platformProductId}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="shrink-0 text-sm text-gray-500 hover:text-gray-800 disabled:opacity-50"
-          >
-            닫기
-          </button>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={`마스터 생성 — ${step}/2`}
+      disableClose={busy}
+    >
+      <p className="truncate text-xs text-gray-500">
+        {listing.name} · {listing.platform} · 상품 ID {listing.platformProductId}
+      </p>
+
+      {error && (
+        <p className="mb-3 shrink-0 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
+
+      {busy && preview == null && !error && (
+        <div className="flex shrink-0 items-center justify-center py-10 text-gray-500">
+          <Spinner size={20} label="쿠팡 상품을 조회하는 중…" />
         </div>
+      )}
 
-        {error && (
-          <p className="mb-3 shrink-0 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        )}
-
-        {busy && preview == null && !error && (
-          <div className="flex shrink-0 items-center justify-center py-10 text-gray-500">
-            <Spinner size={20} label="쿠팡 상품을 조회하는 중…" />
-          </div>
-        )}
-
-        {/* ── Step 1: 대조 리포트 ────────────────────────────────── */}
-        {preview && step === 1 && (
-          <>
-            <div className="shrink-0 space-y-2">
-              <p className="text-sm text-gray-900">
-                <span className="font-medium">{preview.coupangProductName}</span>
-                <span className="text-gray-500">
-                  {' '}
-                  · {STATUS_LABEL[preview.status] ?? preview.status} · 쿠팡 카테고리 코드{' '}
-                  {preview.categoryCode}
-                </span>
+      {/* ── Step 1: 대조 리포트 ────────────────────────────────── */}
+      {preview && step === 1 && (
+        <>
+          <div className="shrink-0 space-y-2">
+            <p className="text-sm text-gray-900">
+              <span className="font-medium">{preview.coupangProductName}</span>
+              <span className="text-gray-500">
+                {' '}
+                · {STATUS_LABEL[preview.status] ?? preview.status} · 쿠팡 카테고리 코드{' '}
+                {preview.categoryCode}
+              </span>
+            </p>
+            {preview.coupangOnlyOptions.length > 0 && (
+              <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                쿠팡에만 있는 옵션은 가져오지 않습니다: {preview.coupangOnlyOptions.join(', ')}
               </p>
-              {preview.coupangOnlyOptions.length > 0 && (
-                <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                  쿠팡에만 있는 옵션은 가져오지 않습니다: {preview.coupangOnlyOptions.join(', ')}
-                </p>
-              )}
-            </div>
+            )}
+          </div>
 
-            <div className="my-3 min-h-0 flex-1 overflow-x-auto overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100 border-b border-gray-200">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-800">옵션</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-800">쿠팡 옵션명</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-800">
-                      상품ID(현재 → 쿠팡)
-                    </th>
-                    <th className="px-3 py-2 text-right font-semibold text-gray-800">
-                      판매가(현재 / 쿠팡)
-                    </th>
+          <div className="my-3 min-h-0 flex-1 overflow-x-auto overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-100 border-b border-gray-200">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-800">옵션</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-800">쿠팡 옵션명</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-800">
+                    상품ID(현재 → 쿠팡)
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-800">
+                    판매가(현재 / 쿠팡)
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {preview.options.map((o) => (
+                  <tr key={o.optionName} className={o.optionIdMismatch ? 'bg-amber-50' : ''}>
+                    <td className="px-3 py-2 text-gray-900">{o.optionName}</td>
+                    <td className="px-3 py-2 text-gray-700">{o.coupangItemName}</td>
+                    <td className="px-3 py-2 text-gray-700">
+                      {o.optionIdMismatch ? (
+                        <span className="text-amber-700">
+                          {o.currentOptionId ?? '-'} → {o.coupangVendorItemId ?? '-'}
+                          <span className="ml-1 text-xs">⚠️ 커밋 시 쿠팡 값으로 교정됩니다</span>
+                        </span>
+                      ) : (
+                        (o.currentOptionId ?? o.coupangVendorItemId ?? '-')
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-700">
+                      {won(o.currentPrice)} / {won(o.coupangPrice)}
+                      {o.priceMismatch && (
+                        <span className="ml-1 text-xs text-gray-500">
+                          판매가는 현재 값이 유지됩니다
+                        </span>
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {preview.options.map((o) => (
-                    <tr key={o.optionName} className={o.optionIdMismatch ? 'bg-amber-50' : ''}>
-                      <td className="px-3 py-2 text-gray-900">{o.optionName}</td>
-                      <td className="px-3 py-2 text-gray-700">{o.coupangItemName}</td>
-                      <td className="px-3 py-2 text-gray-700">
-                        {o.optionIdMismatch ? (
-                          <span className="text-amber-700">
-                            {o.currentOptionId ?? '-'} → {o.coupangVendorItemId ?? '-'}
-                            <span className="ml-1 text-xs">⚠️ 커밋 시 쿠팡 값으로 교정됩니다</span>
-                          </span>
-                        ) : (
-                          (o.currentOptionId ?? o.coupangVendorItemId ?? '-')
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-700">
-                        {won(o.currentPrice)} / {won(o.coupangPrice)}
-                        {o.priceMismatch && (
-                          <span className="ml-1 text-xs text-gray-500">
-                            판매가는 현재 값이 유지됩니다
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {/* ── Step 2: 마스터명 + 표준 카테고리 ───────────────────── */}
-        {preview && step === 2 && (
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="master-name">
-                마스터명
-              </label>
-              <input
-                id="master-name"
-                type="text"
-                disabled={busy}
-                value={masterName}
-                onChange={(e) => setMasterName(e.target.value)}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-900 disabled:bg-gray-100"
-              />
-            </div>
-
-            <div>
-              <p className="mb-1 text-sm font-medium text-gray-700">표준 카테고리</p>
-              {categoryId != null && !pickingCategory ? (
-                <div className="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate text-sm text-gray-900">
-                    {preview.suggestedCategoryId === categoryId
-                      ? `쿠팡 카테고리에서 자동 인식: ${categoryName ?? categoryId}`
-                      : (categoryName ?? `카테고리 #${categoryId}`)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPickingCategory(true)}
-                    disabled={busy}
-                    className="shrink-0 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                  >
-                    다시 고르기
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {preview.suggestedCategoryId == null && (
-                    <p className="mb-2 text-xs text-gray-500">
-                      쿠팡 카테고리를 인식하지 못했습니다. 표준 카테고리를 선택하세요.
-                    </p>
-                  )}
-                  {/* miller-columns 는 컬럼이 늘수록 가로로 자란다 — 스크롤을 트리 안에 가둔다. */}
-                  <div className="max-h-[45vh] overflow-x-auto overflow-y-auto">
-                    <CategoryTreeColumns
-                      browse={browse}
-                      selectedId={categoryId}
-                      onSelectLeaf={(leaf) => {
-                        setCategoryId(leaf.id);
-                        setCategoryName(leaf.name);
-                        setPickingCategory(false);
-                      }}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div>
-              <p className="mb-1 text-sm font-medium text-gray-700">
-                구성 — 이 구성으로 마스터가 만들어집니다
-              </p>
-              <ul className="space-y-1 rounded border border-gray-200 px-3 py-2">
-                {preview.components.map((c) => (
-                  <li key={c.productId} className="truncate text-sm text-gray-900">
-                    {c.brand ? `${c.brand} ` : ''}
-                    {c.productName}
-                  </li>
                 ))}
-              </ul>
-            </div>
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
-            <p className="text-xs text-gray-500">
-              마스터는 이름·카테고리·구성만 채워집니다. 사진·태그·상세는 마스터 상세에서 이어서
-              등록하세요.
+      {/* ── Step 2: 마스터명 + 표준 카테고리 ───────────────────── */}
+      {preview && step === 2 && (
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="master-name">
+              마스터명
+            </label>
+            <input
+              id="master-name"
+              type="text"
+              disabled={busy}
+              value={masterName}
+              onChange={(e) => setMasterName(e.target.value)}
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-900 disabled:bg-gray-100"
+            />
+          </div>
+
+          <div>
+            <p className="mb-1 text-sm font-medium text-gray-700">표준 카테고리</p>
+            {categoryId != null && !pickingCategory ? (
+              <div className="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
+                <span className="min-w-0 flex-1 truncate text-sm text-gray-900">
+                  {preview.suggestedCategoryId === categoryId
+                    ? `쿠팡 카테고리에서 자동 인식: ${categoryName ?? categoryId}`
+                    : (categoryName ?? `카테고리 #${categoryId}`)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPickingCategory(true)}
+                  disabled={busy}
+                  className="shrink-0 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  다시 고르기
+                </button>
+              </div>
+            ) : (
+              <>
+                {preview.suggestedCategoryId == null && (
+                  <p className="mb-2 text-xs text-gray-500">
+                    쿠팡 카테고리를 인식하지 못했습니다. 표준 카테고리를 선택하세요.
+                  </p>
+                )}
+                {/* miller-columns 는 컬럼이 늘수록 가로로 자란다 — 스크롤을 트리 안에 가둔다. */}
+                <div className="max-h-[45vh] overflow-x-auto overflow-y-auto">
+                  <CategoryTreeColumns
+                    browse={browse}
+                    selectedId={categoryId}
+                    onSelectLeaf={(leaf) => {
+                      setCategoryId(leaf.id);
+                      setCategoryName(leaf.name);
+                      setPickingCategory(false);
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-1 text-sm font-medium text-gray-700">
+              구성 — 이 구성으로 마스터가 만들어집니다
             </p>
+            <ul className="space-y-1 rounded border border-gray-200 px-3 py-2">
+              {preview.components.map((c) => (
+                <li key={c.productId} className="truncate text-sm text-gray-900">
+                  {c.brand ? `${c.brand} ` : ''}
+                  {c.productName}
+                </li>
+              ))}
+            </ul>
           </div>
-        )}
 
-        <div className="mt-4 flex shrink-0 flex-col items-end gap-1">
-          <div className="flex justify-end gap-2">
-            {step === 2 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setError('');
-                  setStep(1);
-                }}
-                disabled={busy}
-                className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-              >
-                이전
-              </button>
-            )}
-            {preview && step === 1 && (
-              <button
-                type="button"
-                onClick={goToStep2}
-                className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                다음
-              </button>
-            )}
-            {preview && step === 2 && (
-              <Button
-                type="button"
-                onClick={handleCreate}
-                disabled={!canCreate}
-                size="sm"
-                className="flex items-center gap-1"
-              >
-                {busy ? <Spinner label="생성 중…" /> : '생성'}
-              </Button>
-            )}
-          </div>
-          {/* 비활성 사유를 숨기지 않는다 — 왜 못 누르는지 보여준다. */}
-          {step === 2 && !busy && masterName.trim() === '' && (
-            <p className="text-[11px] text-gray-500">마스터명을 입력하세요</p>
+          <p className="text-xs text-gray-500">
+            마스터는 이름·카테고리·구성만 채워집니다. 사진·태그·상세는 마스터 상세에서 이어서
+            등록하세요.
+          </p>
+        </div>
+      )}
+
+      <div className="mt-4 flex shrink-0 flex-col items-end gap-1">
+        <div className="flex justify-end gap-2">
+          {step === 2 && (
+            <button
+              type="button"
+              onClick={() => {
+                setError('');
+                setStep(1);
+              }}
+              disabled={busy}
+              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            >
+              이전
+            </button>
           )}
-          {step === 2 && !busy && masterName.trim() !== '' && categoryId == null && (
-            <p className="text-[11px] text-gray-500">표준 카테고리를 선택하세요</p>
+          {preview && step === 1 && (
+            <button
+              type="button"
+              onClick={goToStep2}
+              className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              다음
+            </button>
+          )}
+          {preview && step === 2 && (
+            <Button
+              type="button"
+              onClick={handleCreate}
+              disabled={!canCreate}
+              size="sm"
+              className="flex items-center gap-1"
+            >
+              {busy ? <Spinner label="생성 중…" /> : '생성'}
+            </Button>
           )}
         </div>
+        {/* 비활성 사유를 숨기지 않는다 — 왜 못 누르는지 보여준다. */}
+        {step === 2 && !busy && masterName.trim() === '' && (
+          <p className="text-[11px] text-gray-500">마스터명을 입력하세요</p>
+        )}
+        {step === 2 && !busy && masterName.trim() !== '' && categoryId == null && (
+          <p className="text-[11px] text-gray-500">표준 카테고리를 선택하세요</p>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

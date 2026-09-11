@@ -7,6 +7,7 @@ import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { ListingOptionSummary } from '@/domain/entities/ListingRegistrationEntity';
 import { Button } from '@/presentation/components/ui/Button';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface ChannelStockModalProps {
   listingId: number;
@@ -115,109 +116,99 @@ export function ChannelStockModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900">채널별 재고 설정</h2>
-            <p className="truncate text-xs text-gray-500">{channelLabel}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 text-sm text-gray-500 hover:text-gray-800"
-          >
-            닫기
-          </button>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="채널별 재고 설정"
+    >
+      <p className="truncate text-xs text-gray-500">{channelLabel}</p>
+
+      {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {notice && (
+        <p className="mb-4 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">{notice}</p>
+      )}
+
+      {isLoading ? (
+        <div className="flex min-h-32 items-center justify-center">
+          <Spinner size={24} label="불러오는 중..." />
         </div>
-
-        {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        {notice && (
-          <p className="mb-4 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">{notice}</p>
-        )}
-
-        {isLoading ? (
-          <div className="flex min-h-32 items-center justify-center">
-            <Spinner size={24} label="불러오는 중..." />
-          </div>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-gray-500">이 채널에 재고를 설정할 활성 옵션이 없습니다.</p>
-        ) : (
-          <>
-            <p className="mb-3 text-[11px] text-gray-500">
-              비우면 마스터 재고를 그대로 사용하고, 0은 품절입니다. 마스터 재고보다 크게 설정할 수
-              없습니다.
-            </p>
-            <ul className="max-h-80 space-y-2 overflow-y-auto">
-              {rows.map((r) => {
-                const value = draft[r.optionId] ?? '';
-                const over = value !== '' && Number(value) > r.maxStock;
-                return (
-                  <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      {/* min-w-0 so a long option name truncates instead of squeezing the badge. */}
-                      <span className="min-w-0 flex-1 truncate text-sm text-gray-900">
-                        {r.optionName}
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-gray-500">이 채널에 재고를 설정할 활성 옵션이 없습니다.</p>
+      ) : (
+        <>
+          <p className="mb-3 text-[11px] text-gray-500">
+            비우면 마스터 재고를 그대로 사용하고, 0은 품절입니다. 마스터 재고보다 크게 설정할 수
+            없습니다.
+          </p>
+          <ul className="max-h-80 space-y-2 overflow-y-auto">
+            {rows.map((r) => {
+              const value = draft[r.optionId] ?? '';
+              const over = value !== '' && Number(value) > r.maxStock;
+              return (
+                <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    {/* min-w-0 so a long option name truncates instead of squeezing the badge. */}
+                    <span className="min-w-0 flex-1 truncate text-sm text-gray-900">
+                      {r.optionName}
+                    </span>
+                    {value === '' ? (
+                      <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-blue-700">
+                        마스터 재고 기본값 사용중
                       </span>
-                      {value === '' ? (
-                        <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-blue-700">
-                          마스터 재고 기본값 사용중
+                    ) : (
+                      Number(value) === 0 && (
+                        <span className="shrink-0 rounded bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
+                          품절
                         </span>
-                      ) : (
-                        Number(value) === 0 && (
-                          <span className="shrink-0 rounded bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
-                            품절
-                          </span>
-                        )
-                      )}
-                      <input
-                        type="number"
-                        min={0}
-                        max={r.maxStock}
-                        step={1}
-                        className="w-24 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
-                        placeholder={`마스터 ${r.maxStock}`}
-                        value={value}
-                        onChange={(e) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            [r.optionId]: e.target.value === '' ? '' : Number(e.target.value),
-                          }))
-                        }
-                      />
-                    </div>
-                    {over && (
-                      <p className="mt-1 text-[11px] text-red-600">
-                        마스터 재고({r.maxStock})보다 클 수 없습니다
-                      </p>
+                      )
                     )}
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
+                    <input
+                      type="number"
+                      min={0}
+                      max={r.maxStock}
+                      step={1}
+                      className="w-24 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                      placeholder={`마스터 ${r.maxStock}`}
+                      value={value}
+                      onChange={(e) =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          [r.optionId]: e.target.value === '' ? '' : Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+                  {over && (
+                    <p className="mt-1 text-[11px] text-red-600">
+                      마스터 재고({r.maxStock})보다 클 수 없습니다
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSaving}
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          >
-            취소
-          </button>
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={isLoading || isSaving || invalid || dirty.length === 0}
-            size="sm"
-            className="flex items-center gap-1"
-          >
-            {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-          </Button>
-        </div>
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isSaving}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+        >
+          취소
+        </button>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={isLoading || isSaving || invalid || dirty.length === 0}
+          size="sm"
+          className="flex items-center gap-1"
+        >
+          {isSaving ? <Spinner label="저장 중..." /> : '저장'}
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 }

@@ -11,6 +11,7 @@ import type { UpdateProductListingRequest, UpdateProductListingOptionRequest } f
 import type { ProductListing, ProductListingOption } from '@/domain/entities/ProductListingEntity';
 import type { Product } from '@/domain/entities/Product';
 import { ROUTES } from '@/config/routes';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 const PLATFORMS = ['COUPANG', 'GMARKET', 'AUCTION', 'SMARTSTORE'];
 
@@ -87,6 +88,13 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [productModalSearchQuery, setProductModalSearchQuery] = useState('');
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
+  /** 상품 검색 팝업 닫기 — 검색어·결과까지 함께 비운다(다음에 열 때 이전 검색이 남지 않게). */
+  const closeProductModal = () => {
+    setIsProductModalOpen(false);
+    setProductModalSearchQuery('');
+    setSearchProducts([]);
+  };
 
   // Section 3: 배송사, carrier rate, 패키지
   const [selectedCarrier, setSelectedCarrier] = useState('');
@@ -1262,21 +1270,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
 
       {/* Product Search Modal */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 h-[85vh] flex flex-col">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">상품 검색</h2>
-              <button
-                onClick={() => {
-                  setIsProductModalOpen(false);
-                  setProductModalSearchQuery('');
-                  setSearchProducts([]);
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
+        <Modal isOpen onClose={closeProductModal} title="상품 검색" fullHeight>
 
             <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <input
@@ -1335,8 +1329,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                 <p className="text-sm text-gray-600 text-center py-8">상품을 검색해주세요</p>
               )}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

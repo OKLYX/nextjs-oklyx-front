@@ -19,6 +19,7 @@ import {
 import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 import type { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import type { GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface ChannelShippingOverrideModalProps {
   listingId: number;
@@ -150,79 +151,69 @@ export function ChannelShippingOverrideModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">배송 설정 — {channelLabel}</h2>
+      <Modal
+        isOpen
+        onClose={onClose}
+        title={`배송 설정 — ${channelLabel}`}
+        disableClose={busy}
+      >
+        <p className="text-xs text-gray-500">
+          판매자·마스터 배송 설정이 채워져 있습니다. 바꾼 값만 이 채널에 저장되고, 그대로 둔 값은 기본 설정을
+          그대로 따릅니다.
+        </p>
+
+        {error && (
+          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <div>{error}</div>
+          </div>
+        )}
+
+        <ShippingOverrideFields
+          level="listing"
+          value={override}
+          onChange={setOverride}
+          platform={platform}
+          outbound={outbound}
+          returns={returns}
+          inherited={inherited ?? undefined}
+          placesLoading={placesLoading}
+          disabled={busy}
+        />
+
+        {/* Destructive action sits on its own line, left-aligned as a text button, so it never
+            reads as a peer of [저장]. */}
+        <div className="pt-2">
           <button
-            onClick={onClose}
-            disabled={busy}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
+            type="button"
+            onClick={() => setIsConfirmOpen(true)}
+            disabled={busy || !hasOverride}
+            title={hasOverride ? undefined : '이 채널에는 개별 배송 설정이 없습니다.'}
+            className="text-xs text-gray-500 underline hover:text-gray-700 disabled:opacity-50"
           >
-            ✕
+            처음 설정으로 초기화
           </button>
         </div>
 
-        <div className="p-4 space-y-5">
-          <p className="text-xs text-gray-500">
-            판매자·마스터 배송 설정이 채워져 있습니다. 바꾼 값만 이 채널에 저장되고, 그대로 둔 값은 기본 설정을
-            그대로 따릅니다.
-          </p>
-
-          {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-              <div>{error}</div>
-            </div>
-          )}
-
-          <ShippingOverrideFields
-            level="listing"
-            value={override}
-            onChange={setOverride}
-            platform={platform}
-            outbound={outbound}
-            returns={returns}
-            inherited={inherited ?? undefined}
-            placesLoading={placesLoading}
+        <div className="flex gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
             disabled={busy}
-          />
-
-          {/* Destructive action sits on its own line, left-aligned as a text button, so it never
-              reads as a peer of [저장]. */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => setIsConfirmOpen(true)}
-              disabled={busy || !hasOverride}
-              title={hasOverride ? undefined : '이 채널에는 개별 배송 설정이 없습니다.'}
-              className="text-xs text-gray-500 underline hover:text-gray-700 disabled:opacity-50"
-            >
-              처음 설정으로 초기화
-            </button>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={busy}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              닫기
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={busy}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400 transition-colors flex items-center justify-center gap-2"
-            >
-              {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-            </button>
-          </div>
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            닫기
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={busy}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400 transition-colors flex items-center justify-center gap-2"
+          >
+            {isSaving ? <Spinner label="저장 중..." /> : '저장'}
+          </button>
         </div>
-        </div>
-      </div>
+      </Modal>
 
       <ConfirmDialog
         isOpen={isConfirmOpen}

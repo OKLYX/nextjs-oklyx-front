@@ -27,7 +27,8 @@
  *                confirmText="목록으로" onConfirm={goList} />
  * ```
  *
- * ⚠️ `isLoading` 중에는 ESC · 바깥 클릭으로 닫히지 않는다 (API 호출 중 이탈 방지).
+ * ⚠️ `isLoading` 중에는 ✕ · ESC 로 닫히지 않는다 (API 호출 중 이탈 방지).
+ * ⚠️ 배경은 일반 팝업보다 짙다(`variant="alert"`) — 위층이라는 신호다. 폭도 좁다.
  * ❌ 이 파일에 폼·입력 필드를 넣지 않는다. 입력이 필요하면 `Modal` 을 직접 쓴다.
  */
 
@@ -68,9 +69,9 @@ export function ConfirmDialog({
       isOpen={isOpen}
       onClose={() => (onCancel ?? onConfirm)()}
       title={title}
-      size="lg"
+      variant="alert"
       nested={nested}
-      closeOnOverlayClick={!isLoading}
+      disableClose={isLoading}
       footer={
         <>
           {onCancel && (

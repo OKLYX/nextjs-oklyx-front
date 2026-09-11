@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { CarrierRateForm } from './CarrierRateForm';
 import type { CreateCarrierRateRequest } from '@/application/dto/CreateCarrierRateRequest';
 import type { Carrier } from '@/domain/entities/CarrierEntity';
+import { Modal } from '@/presentation/components/ui/Modal';
 
 interface CreateCarrierRateModalProps {
   isOpen: boolean;
@@ -38,28 +39,18 @@ export function CreateCarrierRateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">택배비 추가</h2>
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4">
-          <CarrierRateForm
-            isLoading={isLoading}
-            carriers={carriers}
-            onSubmit={onSubmit}
-            onCancel={onClose}
-          />
-        </div>
-      </div>
-    </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="택배비 추가"
+      disableClose={isLoading}
+    >
+      <CarrierRateForm
+        isLoading={isLoading}
+        carriers={carriers}
+        onSubmit={onSubmit}
+        onCancel={onClose}
+      />
+    </Modal>
   );
 }
