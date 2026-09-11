@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { SellerRegistrationForm } from '../../create/components/SellerRegistrationForm';
 import type { CreateSellerRequest } from '@/application/dto/SellerDTOs';
 import { Modal } from '@/presentation/components/ui/Modal';
@@ -18,19 +17,6 @@ export function CreateSellerModal({
   onSubmit,
   isLoading,
 }: CreateSellerModalProps) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isLoading, onClose]);
-
   if (!isOpen) {
     return null;
   }

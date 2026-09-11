@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { PackageInputForm } from './PackageInputForm';
 import type { CreatePackageRequest } from '@/application/dto/CreatePackageRequest';
 import { Modal } from '@/presentation/components/ui/Modal';
@@ -18,19 +17,6 @@ export function PackageInputModal({
   onSubmit,
   isLoading,
 }: PackageInputModalProps) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isLoading, onClose]);
-
   if (!isOpen) {
     return null;
   }

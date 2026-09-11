@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { CommissionRateForm } from './CommissionRateForm';
 import type {
   CreateCommissionRateFormData,
@@ -23,19 +22,6 @@ export function CreateCommissionRateModal({
   onSubmit,
   isSubmitting,
 }: CreateCommissionRateModalProps) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isSubmitting) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isSubmitting, onClose]);
-
   if (!isOpen) return null;
 
   return (

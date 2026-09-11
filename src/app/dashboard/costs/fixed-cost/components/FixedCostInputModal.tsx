@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import type {
   CreateFixedCostRequest,
@@ -49,14 +49,6 @@ export function FixedCostInputModal({
   );
   const [active, setActive] = useState(item?.active ?? true);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading) onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isLoading, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
