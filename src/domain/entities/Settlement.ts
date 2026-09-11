@@ -68,7 +68,7 @@ export interface ReconLineView {
   /** 실측 수수료율(0~1). 기준표(카테고리)와 다르면 그 차이가 `FEE_RATE` 라벨이 된다. */
   serviceFeeRatio: number | null;
   settlementAmount: number | null;
-  /** 예상 − 실정산. 미분류 라인은 추정 자체가 불가능해 null 이다. */
+  /** 실정산 − 예상(통장 기준: + 면 더 받음). 미분류 라인은 추정 자체가 불가능해 null 이다. */
   diff: number | null;
   label: string;
   /** 붙일 주문 라인이 없는 상태. <b>정상</b>이며 합계에는 포함된다(D7). */

@@ -50,10 +50,12 @@ function groupByMonth(payouts: PayoutSummary[]): { month: string; rows: PayoutSu
 }
 
 /**
- * 대사 상태 한 줄.
+ * 금액 확인 상태 한 줄.
  *
  * 🔴 `PENDING` 을 경고색으로 칠하지 않는다 — 아직 대조할 판매 내역이 없다는 뜻이지 금액이 틀렸다는 뜻이
  * 아니다. 이 구분이 없으면 정상 입금 전건이 경고로 뜬다(이 화면이 실제로 그랬다).
+ * 🔴 문구는 정산 내역 목록(`PayoutTable.reconBadge`)과 <b>같은 말</b>을 쓴다 — 같은 상태를 두 화면이
+ * 다르게 부르면 사용자가 다른 일이 일어난 줄 안다. 한쪽만 바꾸지 말 것.
  */
 function reconNote(payout: PayoutSummary): { text: string; className: string } {
   switch (payout.reconStatus) {
@@ -65,7 +67,7 @@ function reconNote(payout: PayoutSummary): { text: string; className: string } {
       return { text: '금액만 기록', className: 'text-gray-500' };
     default:
       return {
-        text: payout.finalAmount == null ? '지급내역 대기' : '대사 전',
+        text: payout.finalAmount == null ? '지급내역 대기' : '확인 대기',
         className: 'text-gray-500',
       };
   }
