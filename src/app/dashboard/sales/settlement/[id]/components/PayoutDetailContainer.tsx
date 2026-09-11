@@ -374,14 +374,6 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
         />
       )}
 
-      {/* 🔴 차이 리포트보다 <b>먼저</b> 놓는다 — "이 돈이 어느 주문 값인가"가 "왜 어긋났나"보다 앞선다. */}
-      <PayoutOrderList
-        lines={orderLines}
-        loading={orderLinesLoading}
-        error={orderLinesError}
-        onCopyIdentifiers={handleCopyIdentifiers}
-      />
-
       <ReconBlockA blockA={report.blockA} onShowUnmatched={handleShowUnmatched} />
 
       {showBlockB && (
@@ -397,6 +389,15 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
           onCopyIdentifiers={handleCopyIdentifiers}
         />
       )}
+
+      {/* 🔴 목록은 <b>맨 아래</b>다(사용자 요청 2026-09-11) — 요약·원인 분석은 몇 줄이라 먼저 읽히고,
+          수백 줄짜리 목록이 위에 있으면 그 둘에 닿으려고 매번 스크롤해야 한다. */}
+      <PayoutOrderList
+        lines={orderLines}
+        loading={orderLinesLoading}
+        error={orderLinesError}
+        onCopyIdentifiers={handleCopyIdentifiers}
+      />
     </PageContainer>
   );
 }
