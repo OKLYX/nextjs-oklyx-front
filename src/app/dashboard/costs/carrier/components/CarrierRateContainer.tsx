@@ -147,7 +147,7 @@ export function CarrierRateContainer() {
   );
 
   return (
-    <PageContainer title="택배비" width="sm">
+    <PageContainer title="택배비">
         <CarrierRateSearchCard
           searchCarrier={searchCarrier}
           onSearchChange={setSearchCarrier}

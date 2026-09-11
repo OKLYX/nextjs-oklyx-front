@@ -3,7 +3,7 @@ import { SellerRegistrationForm } from './components/SellerRegistrationForm';
 
 export default function SellerCreatePage() {
   return (
-    <PageContainer width="sm">
+    <PageContainer>
       <SellerRegistrationForm />
     </PageContainer>
   );

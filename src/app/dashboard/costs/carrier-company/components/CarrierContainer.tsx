@@ -107,7 +107,6 @@ export function CarrierContainer() {
   return (
     <PageContainer
       title="택배사 관리"
-      width="md"
       action={
         <button
           onClick={() => setIsCreateOpen(true)}

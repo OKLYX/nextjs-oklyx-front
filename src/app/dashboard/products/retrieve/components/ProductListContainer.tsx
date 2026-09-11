@@ -71,7 +71,6 @@ export function ProductListContainer() {
   return (
     <PageContainer
       title="상품 목록"
-      width="full"
       action={<span className="text-gray-600">총 {totalElements}개</span>}
     >
       <SearchBar onSearch={handleSearch} />

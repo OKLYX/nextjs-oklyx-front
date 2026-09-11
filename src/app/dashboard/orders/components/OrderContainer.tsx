@@ -439,7 +439,6 @@ export function OrderContainer() {
 
   return (
     <PageContainer
-      width="xl"
       title="주문내역"
       action={
         <p className="text-sm text-gray-500 whitespace-nowrap">

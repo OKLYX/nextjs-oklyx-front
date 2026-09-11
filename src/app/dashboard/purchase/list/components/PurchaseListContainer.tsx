@@ -183,7 +183,7 @@ export function PurchaseListContainer() {
   };
 
   return (
-    <PageContainer width="xl">
+    <PageContainer>
       <PurchaseTabs activeTab={activeTab} onChange={handleTabChange} />
 
         {activeTab === 'list' && (
