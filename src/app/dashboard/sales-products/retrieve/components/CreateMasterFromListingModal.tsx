@@ -9,6 +9,7 @@ import { ProductListingUseCase } from '@/application/usecases/ProductListingUseC
 import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/ProductListingRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { ListingMasterPreview, ProductListing } from '@/domain/entities/ProductListingEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface CreateMasterFromListingModalProps {
   listing: ProductListing;
@@ -174,7 +175,7 @@ export function CreateMasterFromListingModal({
 
             <div className="my-3 min-h-0 flex-1 overflow-x-auto overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-100">
+                <thead className="bg-gray-100 border-b border-gray-200">
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold text-gray-800">옵션</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-800">쿠팡 옵션명</th>
@@ -321,14 +322,15 @@ export function CreateMasterFromListingModal({
               </button>
             )}
             {preview && step === 2 && (
-              <button
+              <Button
                 type="button"
                 onClick={handleCreate}
                 disabled={!canCreate}
-                className="flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                size="sm"
+                className="flex items-center gap-1"
               >
                 {busy ? <Spinner label="생성 중…" /> : '생성'}
-              </button>
+              </Button>
             )}
           </div>
           {/* 비활성 사유를 숨기지 않는다 — 왜 못 누르는지 보여준다. */}

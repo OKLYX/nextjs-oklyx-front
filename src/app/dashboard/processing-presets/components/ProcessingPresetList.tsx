@@ -9,6 +9,7 @@ import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { ProcessingPresetUseCase } from '@/application/usecases/ProcessingPresetUseCase';
 import { ProcessingPresetRepositoryImpl } from '@/infrastructure/repositories/ProcessingPresetRepositoryImpl';
 import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 export function ProcessingPresetList() {
   const router = useRouter();
@@ -69,18 +70,17 @@ export function ProcessingPresetList() {
   }
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">이미지 처리 프리셋</h1>
-        <button
+    <PageContainer
+      title="이미지 처리 프리셋"
+      action={
+        <Button
           type="button"
           onClick={() => router.push(ROUTES.PROCESSING_PRESET_NEW)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           + 새 프리셋
-        </button>
-      </div>
-
+        </Button>
+      }
+    >
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {isLoading ? (
@@ -94,8 +94,8 @@ export function ProcessingPresetList() {
       ) : (
         <div className="rounded-lg bg-white shadow list-table-scroll">
           <table className="text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-600">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-left text-gray-600">
                 <th className="px-4 py-3">ID</th>
                 <th className="px-4 py-3">이름</th>
                 <th className="px-4 py-3">오버레이 수</th>

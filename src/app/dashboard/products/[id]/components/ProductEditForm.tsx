@@ -6,6 +6,7 @@ import type { Product } from '@/domain/entities/Product';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
+import { Input } from '@/presentation/components/ui/Input';
 
 interface ProductEditFormValues {
   productName: string;
@@ -112,8 +113,6 @@ export function ProductEditForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
-      <h1 className="text-3xl font-bold">상품 수정</h1>
-
       <fieldset className="border border-gray-300 rounded-lg p-6 bg-gray-50">
         <legend className="text-lg font-semibold text-gray-900 px-2">필수 항목</legend>
         <div className="space-y-4">
@@ -121,13 +120,12 @@ export function ProductEditForm({
             <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
               바코드 ID
             </label>
-            <input
+            <Input
               id="barcodeId"
               type="text"
               placeholder="바코드 ID를 입력해주세요 (선택)"
               {...register('barcodeId')}
               onBlur={handleBarcodeBlur}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {barcodeError && <p className="text-red-600 text-sm mt-1">{barcodeError}</p>}
           </div>
@@ -136,12 +134,11 @@ export function ProductEditForm({
             <label htmlFor="productName" className="block text-sm font-medium text-gray-900 mb-1">
               상품명
             </label>
-            <input
+            <Input
               id="productName"
               type="text"
               placeholder="상품명을 입력해주세요"
               {...register('productName')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -155,12 +152,11 @@ export function ProductEditForm({
               <label htmlFor="brand" className="block text-sm font-medium text-gray-900 mb-1">
                 브랜드
               </label>
-              <input
+              <Input
                 id="brand"
                 type="text"
                 placeholder="브랜드명을 입력해주세요"
                 {...register('brand')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -168,14 +164,13 @@ export function ProductEditForm({
               <label htmlFor="price" className="block text-sm font-medium text-gray-900 mb-1">
                 가격
               </label>
-              <input
+              <Input
                 id="price"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0.00"
                 {...register('price')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -220,14 +215,13 @@ export function ProductEditForm({
               <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
                 높이
               </label>
-              <input
+              <Input
                 id="packageHeight"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 {...register('packageHeight')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -235,14 +229,13 @@ export function ProductEditForm({
               <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
                 길이
               </label>
-              <input
+              <Input
                 id="packageLength"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 {...register('packageLength')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -252,14 +245,13 @@ export function ProductEditForm({
               <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
                 너비
               </label>
-              <input
+              <Input
                 id="packageWidth"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 {...register('packageWidth')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -267,14 +259,13 @@ export function ProductEditForm({
               <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
                 내용물 양
               </label>
-              <input
+              <Input
                 id="netContent"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="0"
                 {...register('netContent')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>

@@ -8,6 +8,7 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
 import type { ThumbnailTemplate } from '@/domain/entities/ThumbnailEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 export function TemplateListContainer() {
   const router = useRouter();
@@ -54,18 +55,17 @@ export function TemplateListContainer() {
   };
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">썸네일 템플릿</h1>
-        <button
+    <PageContainer
+      title="썸네일 템플릿"
+      action={
+        <Button
           type="button"
           onClick={() => router.push(ROUTES.THUMBNAIL_TEMPLATE_NEW)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           + 템플릿 생성
-        </button>
-      </div>
-
+        </Button>
+      }
+    >
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {isLoading ? (
@@ -79,8 +79,8 @@ export function TemplateListContainer() {
       ) : (
         <div className="rounded-lg bg-white shadow list-table-scroll">
           <table className="text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-600">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-left text-gray-600">
                 <th className="px-4 py-3">ID</th>
                 <th className="px-4 py-3">이름</th>
                 <th className="px-4 py-3">기본</th>

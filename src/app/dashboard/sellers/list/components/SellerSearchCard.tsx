@@ -1,5 +1,8 @@
 'use client';
 
+import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
+
 interface SellerSearchCardProps {
   searchName: string;
   onSearchChange: (value: string) => void;
@@ -18,9 +21,7 @@ export function SellerSearchCard({
   onCreateClick,
 }: SellerSearchCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-2xl font-semibold mb-6 text-gray-900">판매자 검색</h2>
-
+    <Card>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">판매자명</label>
@@ -46,16 +47,15 @@ export function SellerSearchCard({
             >
               판매자 추가
             </button>
-            <button
+            <Button
               onClick={onSearch}
               disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
             >
               {isLoading ? '검색 중...' : '검색'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

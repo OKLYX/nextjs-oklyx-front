@@ -147,10 +147,7 @@ export function CarrierRateContainer() {
   );
 
   return (
-    <PageContainer contentClassName="max-w-2xl space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">택배비</h1>
-        </div>
+    <PageContainer title="택배비" width="sm">
         <CarrierRateSearchCard
           searchCarrier={searchCarrier}
           onSearchChange={setSearchCarrier}

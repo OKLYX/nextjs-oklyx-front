@@ -7,6 +7,7 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { addressHead } from '@/infrastructure/utils/address';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { ShippingLabelExportRow } from '@/application/dto/ShippingLabelDTOs';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 송장 접수시트 미리보기·택배수량 편집 모달 (Shipping Label V2)
@@ -138,7 +139,7 @@ export function ShippingLabelPreviewModal({
   const isEmpty = hasLoaded && rows.length === 0;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-semibold text-gray-900">주문목록 확인</h3>
@@ -165,8 +166,8 @@ export function ShippingLabelPreviewModal({
           <div className="flex-1 overflow-y-auto modal-scroll-body">
             <div className="border border-gray-200 rounded-lg list-table-scroll">
               <table>
-                <thead>
-                  <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                <thead className="bg-gray-100 border-b border-gray-200">
+                  <tr className="text-left text-xs font-medium text-gray-500">
                     <th className="px-4 py-2">이름</th>
                     <th className="px-4 py-2">배송지</th>
                     <th className="px-4 py-2">상품명</th>
@@ -215,13 +216,12 @@ export function ShippingLabelPreviewModal({
           >
             닫기
           </button>
-          <button
+          <Button
             onClick={handleExport}
             disabled={isPreviewing || isExporting || isEmpty || !!previewError}
-            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
             {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,12 +1,14 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { CSSProperties, useRef, useState } from 'react';
 import axios from 'axios';
-import { X, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
+import { Modal } from '@/presentation/components/ui/Modal';
 import { getOrderStatusLabel } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { ShipmentConfirmResult } from '@/application/dto/ShippingLabelDTOs';
+import { Button } from '@/presentation/components/ui/Button';
 
 // Buckets whose detail table can be opened from a summary chip = the three the server returns a
 // *list* for (PLAN 2609_12 D2). 요청 건수·매칭·성공 are counts only, so they stay static chips —
@@ -49,8 +51,8 @@ function ResultTable({
   return (
     <div className={`border border-gray-200 rounded-lg ${wide ? 'list-table-scroll' : 'overflow-x-auto'}`}>
       <table className="w-full">
-        <thead>
-          <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+        <thead className="bg-gray-100 border-b border-gray-200">
+          <tr className="text-left text-xs font-medium text-gray-500">
             {headers.map((h) => (
               <th key={h} className="px-4 py-2">
                 {h}
@@ -110,22 +112,21 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
   const [hasSucceeded, setHasSucceeded] = useState(false);
   const [selected, setSelected] = useState<ResultBucket | null>(null);
 
-  if (!isOpen) return null;
-
   const reset = () => {
     setFile(null);
     setResult(null);
     setError('');
     setIsUploading(false);
-    // The modal is never unmounted, so a stale selection would open a table for the next result.
+    // This component is never unmounted (only Modal's panel is), so a stale selection would open
+    // a table for the next result.
     setSelected(null);
   };
 
   const handleClose = () => {
     reset();
-    // The modal is never unmounted (`if (!isOpen) return null` sits after the hooks), so this flag
-    // survives close→reopen unless it is cleared right here — otherwise the next plain close would
-    // refetch the list for nothing.
+    // This component is never unmounted (Modal only unmounts its own panel), so this flag survives
+    // close→reopen unless it is cleared right here — otherwise the next plain close would refetch
+    // the list for nothing.
     setHasSucceeded(false);
     onClose(hasSucceeded);
   };
@@ -179,29 +180,50 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
     .map(({ status, count }) => `${statusLabel(status)} ${count}`)
     .join(' · ');
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
-      {/* Upload screen sizes to its content; the result screen is pinned to h-[85vh] so switching
-          buckets never resizes the modal (PLAN 2609_12 D6). Either way the close button stays put. */}
-      <div
-        className={`bg-white rounded-lg shadow-lg w-full mx-4 max-w-2xl flex flex-col p-8 ${
-          result == null ? 'max-h-[85vh]' : 'h-[85vh]'
-        }`}
+  const footer =
+    result == null ? (
+      <Button
+        onClick={handleUpload}
+        disabled={!file || isUploading}
       >
-        <div className="shrink-0 flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-semibold text-gray-900">발송처리 (운송장 업로드)</h3>
-          <button
-            onClick={handleClose}
-            aria-label="닫기"
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={24} />
-          </button>
-        </div>
+        {isUploading ? <Spinner label="처리 중..." /> : '업로드'}
+      </Button>
+    ) : (
+      <>
+        <button
+          onClick={reset}
+          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+        >
+          다른 파일 업로드
+        </button>
+        <button
+          onClick={handleClose}
+          className="px-6 py-2 bg-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-400 transition-colors"
+        >
+          닫기
+        </button>
+      </>
+    );
 
+  return (
+    /* Upload screen sizes to its content; the result screen is pinned to 85vh (`fullHeight`) so
+       switching buckets never resizes the modal (PLAN 2609_12 D6). */
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="발송처리 (운송장 업로드)"
+      size="xl"
+      fullHeight={result != null}
+      closeOnOverlayClick={!isUploading}
+      footer={footer}
+    >
+      <div className="flex flex-1 min-h-0 flex-col">
         {result == null ? (
           /* Only band that scrolls. */
-          <div className="flex-1 min-h-0 overflow-y-auto modal-scroll-body">
+          <div
+            className="flex-1 min-h-0 modal-scroll-body"
+            style={{ '--modal-scroll-pad': '1.5rem' } as CSSProperties}
+          >
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
                 택배사가 운송장번호를 채운 결과 xlsx를 업로드하세요. 서버가 주문번호로 매칭해 쿠팡에 송장을 등록합니다.
@@ -277,7 +299,10 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
             </div>
 
             {/* Only band that scrolls — no inner vertical scroller (list-table-scroll stays: it is horizontal). */}
-            <div className="flex-1 min-h-0 overflow-y-auto modal-scroll-body">
+            <div
+              className="flex-1 min-h-0 modal-scroll-body"
+              style={{ '--modal-scroll-pad': '1.5rem' } as CSSProperties}
+            >
               {selected === null &&
                 (result.unmatched.length === 0 &&
                 result.failed.length === 0 &&
@@ -327,33 +352,7 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
           </>
         )}
 
-        <div className="shrink-0 border-t border-gray-200 mt-4 pt-4 flex justify-end gap-2">
-          {result == null ? (
-            <button
-              onClick={handleUpload}
-              disabled={!file || isUploading}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
-            >
-              {isUploading ? <Spinner label="처리 중..." /> : '업로드'}
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={reset}
-                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
-              >
-                다른 파일 업로드
-              </button>
-              <button
-                onClick={handleClose}
-                className="px-6 py-2 bg-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-400 transition-colors"
-              >
-                닫기
-              </button>
-            </>
-          )}
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

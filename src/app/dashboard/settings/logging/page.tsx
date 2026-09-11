@@ -5,6 +5,7 @@ import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
 import { useLoggingStatus, useLoggingTargets, useSetLoggingLevel } from './hooks';
 import type { LoggingStatus } from './api';
+import { Card } from '@/presentation/components/ui/Card';
 
 function LevelBadge({ level }: { level: LoggingStatus['level'] }) {
   const isDebug = level === 'DEBUG';
@@ -52,7 +53,7 @@ function StatusCard({ target }: { target: string }) {
   const toggleLabel = isDebug ? 'INFO 끄기' : 'DEBUG 켜기';
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 space-y-4">
+    <Card className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm text-gray-600">{status.label}</p>
@@ -92,7 +93,7 @@ function StatusCard({ target }: { target: string }) {
       {setLevel.isError && (
         <p className="text-sm text-red-600">레벨 변경에 실패했습니다. 다시 시도해주세요.</p>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -101,12 +102,8 @@ export default function LoggingSettingsPage() {
   const [selectedTarget, setSelectedTarget] = useState('');
 
   return (
-    <PageContainer contentClassName="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">로그 설정</h1>
-      </div>
-
-      <div className="bg-white rounded-lg shadow p-6">
+    <PageContainer title="로그 설정" width="md">
+      <Card>
         {isError ? (
           <p className="text-sm text-red-600">대상 목록을 불러오지 못했습니다.</p>
         ) : (
@@ -124,7 +121,7 @@ export default function LoggingSettingsPage() {
             ))}
           </select>
         )}
-      </div>
+      </Card>
 
       {selectedTarget && <StatusCard target={selectedTarget} />}
     </PageContainer>

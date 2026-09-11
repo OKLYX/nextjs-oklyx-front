@@ -54,7 +54,7 @@ export function ChannelSalesLines({ rows, isLoading, error }: ChannelSalesLinesP
         <col className="w-[14%]" />
         <col className="w-[14%]" />
       </colgroup>
-      <thead>
+      <thead className="bg-gray-100 border-b border-gray-200">
         <tr className="text-gray-500">
           <th className="px-2 py-1 text-left font-medium">상품</th>
           <th className="px-2 py-1 text-right font-medium">판매수량</th>

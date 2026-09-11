@@ -70,7 +70,7 @@ import { MasterShippingOverridePanel } from './MasterShippingOverridePanel';
 import { CellActions } from './CellActions';
 import { ImportCoupangProductModal } from './ImportCoupangProductModal';
 import { DisplayNameRow } from './DisplayNameRow';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 
 interface CoverageMatrixProps {
   id: string;
@@ -589,12 +589,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     }
   };
 
-  // [채널에 반영하기] = 확인 모달만 연다. PopupDialogModal 은 선언형이라 window.confirm 처럼
+  // [채널에 반영하기] = 확인 모달만 연다. ConfirmDialog 은 선언형이라 window.confirm 처럼
   // 한 줄로 치환할 수 없어 핸들러를 열기/실행 둘로 쪼갠다.
   const handlePropagateClick = () => setConfirmOpen(true);
 
   const handlePropagateConfirm = async () => {
-    // ⚠️ PopupDialogModal 에 disabled prop 이 없다 → 재진입 가드는 호출부 책임
+    // ⚠️ ConfirmDialog 에 isLoading 을 넘기지 않는다 → 재진입 가드는 호출부 책임
     // (ChannelShippingOverrideModal 선례).
     if (isPropagating) return;
     setConfirmOpen(false);
@@ -625,7 +625,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   // [옵션명 일괄 적용](2609_22/D4): 채널이 따로 지정한 옵션명을 마스터 기준으로 되돌린다.
   const handleApplyNamesConfirm = async () => {
-    // ⚠️ PopupDialogModal 에 disabled prop 이 없다 → 재진입 가드는 호출부 책임.
+    // ⚠️ ConfirmDialog 에 isLoading 을 넘기지 않는다 → 재진입 가드는 호출부 책임.
     if (isApplyingNames) return;
     setApplyNamesOpen(false);
     setIsApplyingNames(true);
@@ -865,7 +865,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       {/* 반영 확인(90): 기존 공통 모달 재사용 — 신규 확인 모달을 만들지 말 것(82 선례). */}
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={confirmOpen}
         title="채널에 반영"
         message={
@@ -886,7 +886,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       />
 
       {/* 옵션명 일괄 적용 확인(2609_22/D4). 기존 공통 모달 재사용 — 신규 확인 모달을 만들지 말 것. */}
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={applyNamesOpen}
         title="옵션명 일괄 적용"
         message="채널에서 따로 지정한 옵션명이 마스터 옵션명으로 되돌아갑니다. 진행할까요?"
@@ -1037,8 +1037,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           </p>
         ) : (
           <table>
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-sm text-gray-600">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-left text-sm text-gray-600">
                 <th className="px-4 py-3">
                   {isAdmin && unregisteredRows.length > 0 ? (
                     <label className="flex items-center gap-1 text-xs font-normal">

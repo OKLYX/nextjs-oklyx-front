@@ -3,6 +3,7 @@
 import { INQUIRY_STATUS_LABEL } from '@/domain/entities/InquiryEntity';
 import type { Inquiry, InquiryStatus } from '@/domain/entities/InquiryEntity';
 import { channelOptionLabel } from '@/app/dashboard/orders/components/OrderSearchCard';
+import { Card } from '@/presentation/components/ui/Card';
 
 interface InquiryDetailHeaderProps {
   inquiry: Inquiry;
@@ -37,7 +38,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 
 export function InquiryDetailHeader({ inquiry, typeLabel }: InquiryDetailHeaderProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6 space-y-4">
+    <Card className="space-y-4">
       {/* 본문 첫 줄만 요약으로 — 전문은 좌측 스레드가 그린다. */}
       <h1 className="text-lg font-semibold text-gray-900 truncate" title={inquiry.content}>
         {inquiry.content}
@@ -69,6 +70,6 @@ export function InquiryDetailHeader({ inquiry, typeLabel }: InquiryDetailHeaderP
         <Meta label="문의번호" value={inquiry.externalInquiryId} />
         {inquiry.category && <Meta label="문의유형" value={inquiry.category} />}
       </dl>
-    </div>
+    </Card>
   );
 }

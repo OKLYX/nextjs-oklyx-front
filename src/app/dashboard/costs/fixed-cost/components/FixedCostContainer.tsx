@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageContainer } from '@/presentation/components/PageContainer';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
@@ -86,7 +86,7 @@ export function FixedCostContainer() {
     }
   };
 
-  // PopupDialogModal 에는 disabled prop 이 없다 → 재진입 가드는 호출부가 진다.
+  // ConfirmDialog 에 isLoading 을 넘기지 않는다 → 재진입 가드는 호출부가 진다.
   const handleDelete = async () => {
     if (isDeleting || !deleteTarget) return;
     setIsDeleting(true);
@@ -106,7 +106,7 @@ export function FixedCostContainer() {
 
   if (!isAdmin) {
     return (
-      <PageContainer contentClassName="max-w-3xl space-y-6">
+      <PageContainer width="md">
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
           관리자만 접근할 수 있습니다.
         </p>
@@ -115,11 +115,7 @@ export function FixedCostContainer() {
   }
 
   return (
-    <PageContainer contentClassName="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">채널 고정비</h1>
-      </div>
-
+    <PageContainer title="채널 고정비" width="md">
       <div className="space-y-1 text-sm text-gray-600">
         <p>여기서 금액·임계를 고치면 이 항목을 쓰는 모든 채널에 반영됩니다.</p>
         <p>그 달 상품 매출(배송비 제외)이 임계 이상인 달에만 부과됩니다.</p>
@@ -168,7 +164,7 @@ export function FixedCostContainer() {
         />
       )}
 
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={deleteTarget !== null}
         title="고정비 항목 삭제"
         message={`"${deleteTarget?.name ?? ''}"을(를) 삭제하시겠습니까?`}

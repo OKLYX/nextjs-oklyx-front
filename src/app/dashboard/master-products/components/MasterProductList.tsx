@@ -28,6 +28,7 @@ import type { MasterProductResponse } from '@/domain/entities/MasterProductEntit
 import { parseQuery, toApiParams, toSearchParams, type MasterListQuery } from '../masterListQuery';
 import { MasterProductToolbar } from './MasterProductToolbar';
 import { MasterProductFormModal } from './MasterProductFormModal';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 판매상품 마스터 목록(서버 페이징·정렬·검색) + **생성** 모달 진입점 (83B / 111).
@@ -167,21 +168,20 @@ export function MasterProductList() {
   }
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold text-gray-900">판매상품 마스터</h1>
+    <PageContainer
+      title="판매상품 마스터"
+      action={
+        <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">총 {totalElements}개</span>
+          <Button
+            type="button"
+            onClick={openCreate}
+          >
+            마스터 추가
+          </Button>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          마스터 추가
-        </button>
-      </div>
-
+      }
+    >
       <MasterProductToolbar query={query} onChange={updateQuery} />
 
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -193,8 +193,8 @@ export function MasterProductList() {
           </div>
         ) : (
           <table>
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-sm text-gray-600">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-left text-sm text-gray-600">
                 <th className="px-4 py-3">사진</th>
                 <th className="px-4 py-3">이름</th>
                 <th className="px-4 py-3">상태</th>

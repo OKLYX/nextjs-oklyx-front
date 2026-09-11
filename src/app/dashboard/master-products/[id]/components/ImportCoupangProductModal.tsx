@@ -6,6 +6,7 @@ import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegist
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { ImportPreviewResponse } from '@/domain/entities/ListingRegistrationEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface ImportCoupangProductModalProps {
   masterId: number;
@@ -314,14 +315,15 @@ export function ImportCoupangProductModal({
               취소
             </button>
             {preview && (
-              <button
+              <Button
                 type="button"
                 onClick={handleImport}
                 disabled={!canImport}
-                className="flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                size="sm"
+                className="flex items-center gap-1"
               >
                 {busy ? <Spinner label="가져오는 중…" /> : '가져오기'}
-              </button>
+              </Button>
             )}
           </div>
           {/* 비활성 사유를 숨기지 않는다 — 왜 못 누르는지 보여준다. */}

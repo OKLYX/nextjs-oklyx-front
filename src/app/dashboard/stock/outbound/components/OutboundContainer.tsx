@@ -12,6 +12,8 @@ import type { OutboundOrder, OutboundUnexpanded } from '@/domain/entities/StockE
 import { SHIPMENT_STATUSES, getOrderStatusLabel } from '@/domain/entities/OrderEntity';
 import { OutboundOrderCard } from './OutboundOrderCard';
 import { OutboundUnexpandedSection } from './OutboundUnexpandedSection';
+import { Card } from '@/presentation/components/ui/Card';
+import { StateBlock } from '@/presentation/components/ui/StateBlock';
 
 // 로컬 타임존 기준 오늘(YYYY-MM-DD). toISOString(UTC)은 KST에서 하루 어긋날 수 있어 직접 조립.
 const today = () => {
@@ -123,7 +125,7 @@ export function OutboundContainer() {
   };
 
   return (
-    <PageContainer contentClassName="max-w-6xl mx-auto flex flex-col gap-4">
+    <PageContainer>
       <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">판매자</label>
@@ -180,9 +182,9 @@ export function OutboundContainer() {
           ))}
         </div>
       ) : orders.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-          출고를 기다리는 주문이 없습니다.
-        </div>
+        <Card padded={false}>
+          <StateBlock variant="empty" message="출고를 기다리는 주문이 없습니다." />
+        </Card>
       ) : (
         orders.map((order) => (
           <OutboundOrderCard

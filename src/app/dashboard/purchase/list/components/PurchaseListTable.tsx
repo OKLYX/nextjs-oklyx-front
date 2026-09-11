@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 import type { PurchaseListItem } from '@/domain/entities/PurchaseListEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PurchaseGroupDetail } from './PurchaseGroupDetail';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface PurchaseListTableProps {
   items: PurchaseListItem[];
@@ -27,15 +28,16 @@ export function PurchaseListTable({
   onRecorded,
 }: PurchaseListTableProps) {
   return (
-    <div className="bg-white rounded-lg shadow list-table-scroll">
+    // 카드 머리말(제목·안내)이 로딩·빈 상태에서도 남아야 해 상태 행은 tbody 가 그대로 그린다.
+    <TableCard>
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900">구매 목록</h2>
         <p className="mt-1 text-xs text-gray-500">잔여 수량이 남은 구성품만 표시됩니다.</p>
       </div>
 
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-gray-600">
-          <tr>
+        <thead className="bg-gray-100 border-b border-gray-200">
+          <tr className="text-gray-600">
             <th className="w-10 px-4 py-3"></th>
             <th className="px-4 py-3 text-left font-medium">구성품</th>
             <th className="px-4 py-3 text-right font-medium">필요</th>
@@ -121,6 +123,6 @@ export function PurchaseListTable({
             })}
         </tbody>
       </table>
-    </div>
+    </TableCard>
   );
 }

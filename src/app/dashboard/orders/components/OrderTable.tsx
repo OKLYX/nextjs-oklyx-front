@@ -2,6 +2,7 @@
 
 import { getCustomerName } from '@/domain/entities/OrderEntity';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface OrderTableProps {
   orders: OrderItem[];
@@ -74,125 +75,77 @@ export function OrderTable({
   onPageChange,
   selection,
 }: OrderTableProps) {
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="list-table-scroll">
-          <table className="w-full">
-            <thead className="bg-gray-100 border-b border-gray-200">
-              <tr>
-                {/* 선택 열이 있으면 스켈레톤도 같은 열 수를 그린다 — 안 그리면 로딩 중에만 표가 흔들린다. */}
-                {selection && <th className="w-10 px-3 py-3" />}
-                {COLUMNS.map((col) => (
-                  <th key={col.key} className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[...Array(5)].map((_, i) => (
-                <tr key={i} className="border-b border-gray-200">
-                  {selection && <td className="px-3 py-3" />}
-                  {[...Array(COLUMNS.length)].map((_, j) => (
-                    <td key={j} className="px-6 py-3">
-                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-        {error}
-      </div>
-    );
-  }
-
-  if (!hasSearched) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-        조회를 수행해주세요.
-      </div>
-    );
-  }
-
-  if (orders.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-        조회 결과가 없습니다.
-      </div>
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="list-table-scroll">
-        <table className="w-full">
-          <thead className="bg-gray-100 border-b border-gray-200">
-            <tr>
+    <TableCard
+      isLoading={isLoading}
+      isEmpty={!hasSearched || orders.length === 0}
+      emptyMessage={hasSearched ? '조회 결과가 없습니다.' : '조회를 수행해주세요.'}
+    >
+      <table className="w-full">
+        <thead className="bg-gray-100 border-b border-gray-200">
+          <tr>
+            {selection && (
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={selection.isPageAllSelected}
+                  disabled={!orders.some(selection.isSelectable)}
+                  onChange={selection.onTogglePage}
+                  aria-label="현재 페이지 전체 선택"
+                  className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+                />
+              </th>
+            )}
+            {COLUMNS.map((col) => (
+              <th
+                key={col.key}
+                onClick={() => onSort(col.key)}
+                className={`px-6 py-3 text-sm font-semibold text-gray-900 cursor-pointer select-none hover:bg-gray-200 transition-colors ${alignClass(col.align)}`}
+              >
+                {col.label}
+                {sortKey === col.key && (
+                  <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {orders.map((order) => (
+            <tr
+              key={order.id}
+              onClick={() => onRowClick(order)}
+              className="hover:bg-gray-50 transition-colors cursor-pointer"
+            >
+              {/* stopPropagation 은 <td> 에 건다 — 체크박스 주변 여백을 눌러도 행 클릭(상세 모달)이 새지 않게. */}
               {selection && (
-                <th className="w-10 px-3 py-3">
+                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
-                    checked={selection.isPageAllSelected}
-                    disabled={!orders.some(selection.isSelectable)}
-                    onChange={selection.onTogglePage}
-                    aria-label="현재 페이지 전체 선택"
+                    checked={selection.selectedIds.has(order.id)}
+                    disabled={!selection.isSelectable(order)}
+                    onChange={() => selection.onToggle(order.id)}
+                    aria-label={`${order.externalOrderId} 선택`}
                     className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
                   />
-                </th>
+                </td>
               )}
-              {COLUMNS.map((col) => (
-                <th
-                  key={col.key}
-                  onClick={() => onSort(col.key)}
-                  className={`px-6 py-3 text-sm font-semibold text-gray-900 cursor-pointer select-none hover:bg-gray-200 transition-colors ${alignClass(col.align)}`}
-                >
-                  {col.label}
-                  {sortKey === col.key && <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>}
-                </th>
-              ))}
+              <td className="px-6 py-3 text-sm text-gray-700">{order.externalOrderId}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">{getCustomerName(order)}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">{order.itemName || '-'}</td>
+              <td className="px-6 py-3 text-sm text-right text-gray-700">{order.orderCount}</td>
+              <td className="px-6 py-3 text-sm text-right text-gray-700">{order.cancelCount}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">{formatDate(order.paidAt)}</td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {orders.map((order) => (
-              <tr
-                key={order.id}
-                onClick={() => onRowClick(order)}
-                className="hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                {/* stopPropagation 은 <td> 에 건다 — 체크박스 주변 여백을 눌러도 행 클릭(상세 모달)이 새지 않게. */}
-                {selection && (
-                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selection.selectedIds.has(order.id)}
-                      disabled={!selection.isSelectable(order)}
-                      onChange={() => selection.onToggle(order.id)}
-                      aria-label={`${order.externalOrderId} 선택`}
-                      className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
-                    />
-                  </td>
-                )}
-                <td className="px-6 py-3 text-sm text-gray-700">{order.externalOrderId}</td>
-                <td className="px-6 py-3 text-sm text-gray-700">{getCustomerName(order)}</td>
-                <td className="px-6 py-3 text-sm text-gray-700">{order.itemName || '-'}</td>
-                <td className="px-6 py-3 text-sm text-right text-gray-700">{order.orderCount}</td>
-                <td className="px-6 py-3 text-sm text-right text-gray-700">{order.cancelCount}</td>
-                <td className="px-6 py-3 text-sm text-gray-700">{formatDate(order.paidAt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
 
       {totalPages > 1 && (
         <div className="px-6 py-4 flex items-center justify-center gap-4 border-t border-gray-200">
@@ -215,6 +168,6 @@ export function OrderTable({
           </button>
         </div>
       )}
-    </div>
+    </TableCard>
   );
 }

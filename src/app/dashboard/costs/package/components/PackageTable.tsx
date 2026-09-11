@@ -1,6 +1,7 @@
 'use client';
 
 import type { Package } from '@/domain/entities/PackageEntity';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface PackageTableProps {
   packages: Package[];
@@ -9,25 +10,6 @@ interface PackageTableProps {
   hasSearched: boolean;
   selectedId?: number;
   onRowClick?: (pkg: Package) => void;
-}
-
-function SkeletonRow() {
-  return (
-    <tr className="border-b">
-      <td className="px-6 py-3">
-        <div className="h-4 bg-gray-200 rounded animate-pulse w-32" />
-      </td>
-      <td className="px-6 py-3">
-        <div className="h-4 bg-gray-200 rounded animate-pulse w-16" />
-      </td>
-      <td className="px-6 py-3">
-        <div className="h-4 bg-gray-200 rounded animate-pulse w-24" />
-      </td>
-      <td className="px-6 py-3">
-        <div className="h-4 bg-gray-200 rounded animate-pulse w-10" />
-      </td>
-    </tr>
-  );
 }
 
 function formatDate(date: string | null | undefined): string {
@@ -46,36 +28,6 @@ export function PackageTable({
   selectedId,
   onRowClick,
 }: PackageTableProps) {
-  if (isLoading && hasSearched) {
-    return (
-      <div className="bg-white rounded-lg shadow list-table-scroll">
-        <table className="w-full">
-          <thead className="bg-gray-100 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">패키지 타입</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">비용</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">유효일</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">기본값</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <SkeletonRow key={i} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  if (!hasSearched) {
-    return (
-      <div className="bg-white rounded-lg shadow p-12 text-center">
-        <p className="text-gray-600 text-lg">검색 버튼을 클릭하여 상자비 정보를 조회해주세요.</p>
-      </div>
-    );
-  }
-
   const errorBanner = error ? (
     <div
       role="alert"
@@ -85,23 +37,18 @@ export function PackageTable({
     </div>
   ) : null;
 
-  if (packages.length === 0) {
-    return (
-      <>
-        {errorBanner}
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <p className="text-gray-600 text-lg">조회 결과가 없습니다.</p>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       {errorBanner}
-      <div className="bg-white rounded-lg shadow list-table-scroll">
+      <TableCard
+        isLoading={isLoading && hasSearched}
+        isEmpty={packages.length === 0}
+        emptyMessage={
+          hasSearched ? '조회 결과가 없습니다.' : '검색 버튼을 클릭하여 상자비 정보를 조회해주세요.'
+        }
+      >
         <table className="w-full" role="grid" aria-label="상자비 목록">
-          <thead className="bg-gray-100 border-b">
+          <thead className="bg-gray-100 border-b border-gray-200">
             <tr>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">패키지 타입</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">비용</th>
@@ -142,7 +89,7 @@ export function PackageTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableCard>
     </>
   );
 }

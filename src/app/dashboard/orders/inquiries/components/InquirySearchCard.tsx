@@ -4,6 +4,8 @@ import { X } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
 import type { ChannelOption } from '@/app/dashboard/orders/components/OrderSearchCard';
+import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 고객문의 조회 조건 카드 — `ClaimSearchCard` + `OrderSearchCard` 의 채널 select 를 합친 형태다.
@@ -45,11 +47,7 @@ export function InquirySearchCard({
   resultCount,
 }: InquirySearchCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">고객문의</h2>
-      </div>
-
+    <Card>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">채널</label>
@@ -123,15 +121,14 @@ export function InquirySearchCard({
           <div>
             {resultCount > 0 && <p className="text-sm text-gray-600">{resultCount}개의 결과</p>}
           </div>
-          <button
+          <Button
             onClick={onSearch}
             disabled={isLoading}
-            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
             {isLoading ? '조회 중...' : '조회'}
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

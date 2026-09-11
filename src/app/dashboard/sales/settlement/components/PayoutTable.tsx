@@ -1,6 +1,8 @@
 'use client';
 
 import type { PayoutSummary } from '@/domain/entities/Settlement';
+import { Card } from '@/presentation/components/ui/Card';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 import {
   channelLabel,
   formatDateRange,
@@ -8,6 +10,7 @@ import {
   payoutStatusLabel,
   settlementTypeLabel,
 } from '@/domain/entities/Settlement';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 지급 묶음 목록 표 (FEATURE_2609_30 / 05 Step 2).
@@ -29,8 +32,6 @@ interface PayoutTableProps {
   onOpen: (payoutId: number) => void;
   onRetry: () => void;
 }
-
-const COLUMN_COUNT = 6;
 
 type Badge = { text: string; className: string };
 
@@ -68,32 +69,25 @@ function reconBadge(row: PayoutSummary): Badge {
 export function PayoutTable({ rows, loading, error, onOpen, onRetry }: PayoutTableProps) {
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-3">
+      <Card className="space-y-3">
         <p className="text-sm text-red-600">{error}</p>
-        <button
+        <Button
           type="button"
           onClick={onRetry}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           다시 시도
-        </button>
-      </div>
-    );
-  }
-
-  // 첫 조회에만 스켈레톤. 필터를 바꾼 재조회는 이전 값을 지우지 않는다(깜빡임 방지).
-  if (loading && rows.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-2">
-        {[0, 1, 2].map((row) => (
-          <div key={row} className="h-8 bg-gray-100 rounded animate-pulse" />
-        ))}
-      </div>
+        </Button>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow list-table-scroll">
+    // 첫 조회에만 로딩 블록. 필터를 바꾼 재조회는 이전 값을 지우지 않는다(깜빡임 방지).
+    <TableCard
+      isLoading={loading && rows.length === 0}
+      isEmpty={rows.length === 0}
+      emptyMessage="아직 수신된 정산 내역이 없습니다. [갱신] 을 눌러 불러오세요."
+    >
       {loading && rows.length > 0 && (
         <div className="px-6 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
           조회 중...
@@ -111,54 +105,48 @@ export function PayoutTable({ rows, loading, error, onOpen, onRetry }: PayoutTab
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={COLUMN_COUNT} className="px-6 py-8 text-center text-gray-500">
-                아직 수신된 정산 내역이 없습니다. [갱신] 을 눌러 불러오세요.
-              </td>
-            </tr>
-          ) : (
-            rows.map((row) => {
-              const badge = reconBadge(row);
-              return (
-                <tr
-                  key={row.payoutId}
-                  onClick={() => onOpen(row.payoutId)}
-                  className="hover:bg-gray-50 cursor-pointer"
-                >
-                  <td className="px-6 py-3 text-sm text-gray-900">
-                    {channelLabel(row)}
-                    <span className="block text-xs text-gray-500">{row.sellerName ?? '—'}</span>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-900">
-                    {settlementTypeLabel(row.settlementType)}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-900">
-                    {formatDateRange(row.recognitionFrom, row.recognitionTo)}
-                    <span className="block text-xs text-gray-500">
-                      {row.revenueRecognitionMonth ?? '—'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-900">
-                    {row.finalSettlementDate ?? row.settlementDate ?? '—'}
-                    <span className="block text-xs text-gray-500">
-                      {payoutStatusLabel(row.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-right text-gray-900 font-medium">
-                    {formatMoney(row.finalAmount)}
-                  </td>
-                  <td className="px-6 py-3 text-sm">
-                    <span className={`inline-block px-2 py-1 rounded border text-xs ${badge.className}`}>
-                      {badge.text}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })
-          )}
+          {rows.map((row) => {
+            const badge = reconBadge(row);
+            return (
+              <tr
+                key={row.payoutId}
+                onClick={() => onOpen(row.payoutId)}
+                className="hover:bg-gray-50 cursor-pointer"
+              >
+                <td className="px-6 py-3 text-sm text-gray-900">
+                  {channelLabel(row)}
+                  <span className="block text-xs text-gray-500">{row.sellerName ?? '—'}</span>
+                </td>
+                <td className="px-6 py-3 text-sm text-gray-900">
+                  {settlementTypeLabel(row.settlementType)}
+                </td>
+                <td className="px-6 py-3 text-sm text-gray-900">
+                  {formatDateRange(row.recognitionFrom, row.recognitionTo)}
+                  <span className="block text-xs text-gray-500">
+                    {row.revenueRecognitionMonth ?? '—'}
+                  </span>
+                </td>
+                <td className="px-6 py-3 text-sm text-gray-900">
+                  {row.finalSettlementDate ?? row.settlementDate ?? '—'}
+                  <span className="block text-xs text-gray-500">
+                    {payoutStatusLabel(row.status)}
+                  </span>
+                </td>
+                <td className="px-6 py-3 text-sm text-right text-gray-900 font-medium">
+                  {formatMoney(row.finalAmount)}
+                </td>
+                <td className="px-6 py-3 text-sm">
+                  <span
+                    className={`inline-block px-2 py-1 rounded border text-xs ${badge.className}`}
+                  >
+                    {badge.text}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
-    </div>
+    </TableCard>
   );
 }

@@ -11,6 +11,8 @@ import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerReposi
 import { PLATFORMS } from '@/config/platforms';
 import type { MarginPolicyResponse } from '@/domain/entities/MarginPolicyEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import { Button } from '@/presentation/components/ui/Button';
+import { Input } from '@/presentation/components/ui/Input';
 
 // marginRate is a 0~1 decimal on the backend; the UI works in whole percents.
 // Round-trips (0.15 -> 15% -> 0.15) are guarded against float error.
@@ -170,18 +172,17 @@ export function MarginPolicyTable() {
   }
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">마진 프리셋</h1>
-        <button
+    <PageContainer
+      title="마진 프리셋"
+      action={
+        <Button
           type="button"
           onClick={openCreate}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           새 프리셋
-        </button>
-      </div>
-
+        </Button>
+      }
+    >
       {showForm && (
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-semibold text-gray-900">
@@ -223,25 +224,25 @@ export function MarginPolicyTable() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">마진율 (%)</label>
-              <input
+              <Input
                 type="number"
                 min={0}
                 max={100}
                 step={0.1}
-                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                size="sm"
                 value={formPct}
                 onChange={(e) => setFormPct(e.target.value)}
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">표시 할인율 (0~0.5)</label>
-              <input
+              <Input
                 type="number"
                 min={0}
                 max={0.5}
                 step={0.01}
                 placeholder="0 = 할인 없음"
-                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                size="sm"
                 value={formDiscount}
                 onChange={(e) => setFormDiscount(e.target.value)}
               />
@@ -280,8 +281,8 @@ export function MarginPolicyTable() {
           </div>
         ) : (
           <table>
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-sm text-gray-600">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-left text-sm text-gray-600">
                 <th className="px-4 py-3">판매자</th>
                 <th className="px-4 py-3">플랫폼</th>
                 <th className="px-4 py-3">마진율</th>

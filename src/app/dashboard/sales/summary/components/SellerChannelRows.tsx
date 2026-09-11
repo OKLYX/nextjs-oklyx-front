@@ -75,7 +75,7 @@ export function SellerChannelRows({
 
   return (
     <table className="w-full text-sm">
-      <thead>
+      <thead className="bg-gray-100 border-b border-gray-200">
         <tr className="text-gray-500">
           <th className="px-3 py-2 text-left font-medium">채널</th>
           <th className="px-3 py-2 text-right font-medium">매출액</th>

@@ -3,6 +3,9 @@
 import { Fragment } from 'react';
 import type { SaleMonthSettlement } from '@/domain/entities/Settlement';
 import { formatMoney, monthLabel } from '@/domain/entities/Settlement';
+import { Card } from '@/presentation/components/ui/Card';
+import { TableCard } from '@/presentation/components/ui/TableCard';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 판매월 기준 정산 표 — "그 달 판매가 언제 얼마로 정산됐나" (FEATURE_2609_34).
@@ -44,39 +47,24 @@ const sum = (rows: SaleMonthSettlement[], pick: (row: SaleMonthSettlement) => nu
 export function SaleMonthTable({ rows, loading, error, onRetry }: SaleMonthTableProps) {
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-3">
+      <Card className="space-y-3">
         <p className="text-sm text-red-600">{error}</p>
-        <button
+        <Button
           type="button"
           onClick={onRetry}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           다시 시도
-        </button>
-      </div>
-    );
-  }
-
-  if (loading && rows.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-2">
-        {[0, 1, 2].map((row) => (
-          <div key={row} className="h-8 bg-gray-100 rounded animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (rows.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow px-6 py-8 text-center text-sm text-gray-500">
-        이 기간에 정산된 판매가 없습니다. 아직 정산되지 않은 판매는 여기 나오지 않습니다.
-      </div>
+        </Button>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow list-table-scroll">
+    <TableCard
+      isLoading={loading && rows.length === 0}
+      isEmpty={rows.length === 0}
+      emptyMessage="이 기간에 정산된 판매가 없습니다. 아직 정산되지 않은 판매는 여기 나오지 않습니다."
+    >
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-200">
           <tr>
@@ -138,6 +126,6 @@ export function SaleMonthTable({ rows, loading, error, onRetry }: SaleMonthTable
           ))}
         </tbody>
       </table>
-    </div>
+    </TableCard>
   );
 }

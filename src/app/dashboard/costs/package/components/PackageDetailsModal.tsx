@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { Package } from '@/domain/entities/PackageEntity';
 import type { UpdatePackageRequest } from '@/application/dto/UpdatePackageRequest';
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
+import { Button } from '@/presentation/components/ui/Button';
 
 const packageSchema = z.object({
   type: z.string().min(1, '패키지 타입을 입력하세요').max(50, '50자 이내'),
@@ -131,7 +132,7 @@ export function PackageDetailsModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
           <div>
@@ -265,14 +266,14 @@ export function PackageDetailsModal({
             >
               {isSubmitting || isLoading ? '저장 중...' : '수정'}
             </button>
-            <button
+            <Button
               type="button"
               onClick={handleDeleteClick}
               disabled={isSubmitting || isLoading || isDeleting}
-              className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors"
+              variant="danger"
             >
               {isDeleting ? '삭제 중...' : '삭제'}
-            </button>
+            </Button>
           </div>
         </form>
 

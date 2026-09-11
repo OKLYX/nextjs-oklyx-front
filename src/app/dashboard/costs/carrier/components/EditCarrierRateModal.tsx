@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { CarrierRateForm } from './CarrierRateForm';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { UpdateCarrierRateRequest } from '@/application/dto/UpdateCarrierRateRequest';
 import type { Carrier } from '@/domain/entities/CarrierEntity';
@@ -96,7 +96,7 @@ export function EditCarrierRateModal({
       </div>
 
       {carrierRate && (
-        <PopupDialogModal
+        <ConfirmDialog
           isOpen={isDeleteConfirmOpen}
           title="택배비 삭제"
           message="정말로 삭제하시겠습니까?"
@@ -105,6 +105,7 @@ export function EditCarrierRateModal({
           onCancel={onCloseDeleteConfirm}
           onConfirm={() => onDelete(carrierRate.id)}
           isDangerous
+          nested
         />
       )}
     </>

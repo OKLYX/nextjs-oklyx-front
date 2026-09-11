@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { ShippingOverrideFields } from '@/presentation/components/ShippingOverrideFields';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import {
@@ -13,6 +13,8 @@ import {
   type ShippingOverride,
 } from '@/domain/entities/ShippingEntity';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 /** One registered channel cell of this master — the force-apply selection unit (79). */
 export interface ForceApplyChannel {
@@ -206,7 +208,7 @@ export function MasterShippingOverridePanel({
   const busy = isSaving || isApplying;
 
   return (
-    <div className="rounded-lg bg-white p-4 shadow">
+    <Card>
       <h2 className="mb-1 text-sm font-semibold text-gray-900">배송 설정 (전 채널)</h2>
       <p className="mb-3 text-xs text-gray-500">
         비운 값은 판매채널의 기본 배송 설정을 그대로 쓰고, 채워진 값은 이 마스터의 전 채널에 적용됩니다.
@@ -252,14 +254,14 @@ export function MasterShippingOverridePanel({
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={handleSave}
               disabled={busy}
-              className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
+              className="inline-flex items-center gap-2"
             >
               {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-            </button>
+            </Button>
 
             <button
               type="button"
@@ -279,7 +281,7 @@ export function MasterShippingOverridePanel({
         </div>
       )}
 
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={confirmApply}
         title="선택한 채널에 강제 적용"
         message={
@@ -332,6 +334,6 @@ export function MasterShippingOverridePanel({
         onConfirm={handleForceApply}
         onCancel={() => setConfirmApply(false)}
       />
-    </div>
+    </Card>
   );
 }

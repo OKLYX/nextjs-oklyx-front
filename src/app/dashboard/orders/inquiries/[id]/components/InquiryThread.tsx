@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import type { Inquiry, InquiryReply } from '@/domain/entities/InquiryEntity';
+import { Card } from '@/presentation/components/ui/Card';
 
 interface InquiryThreadProps {
   inquiry: Inquiry;
@@ -72,7 +73,7 @@ export function InquiryThread({ inquiry, footer }: InquiryThreadProps) {
   const replies = inquiry.replies ?? [];
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 space-y-4">
+    <Card className="space-y-4">
       <h2 className="text-base font-semibold text-gray-900">문의 내용</h2>
 
       <Bubble
@@ -103,6 +104,6 @@ export function InquiryThread({ inquiry, footer }: InquiryThreadProps) {
       )}
 
       {footer}
-    </div>
+    </Card>
   );
 }

@@ -2,6 +2,7 @@
 
 import type { Category } from '@/domain/entities/CategoryEntity';
 import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 /**
  * 표준 카테고리 목록 테이블: 표준명 · 몰별 매핑 배지 · 액션(이름수정/매핑/삭제).
@@ -29,24 +30,15 @@ export function CategoryTable({
   onMap,
   onDelete,
 }: CategoryTableProps) {
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">로딩 중...</div>
-    );
-  }
-
-  if (categories.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-        표준 카테고리가 없습니다.
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white rounded-lg shadow list-table-scroll">
+    <TableCard
+      isLoading={isLoading}
+      loadingMessage="로딩 중..."
+      isEmpty={categories.length === 0}
+      emptyMessage="표준 카테고리가 없습니다."
+    >
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
+        <thead className="bg-gray-100 border-b border-gray-200">
           <tr>
             <th className="px-6 py-3 text-left font-medium text-gray-700">표준 카테고리명</th>
             <th className="px-6 py-3 text-left font-medium text-gray-700">몰별 매핑</th>
@@ -109,6 +101,6 @@ export function CategoryTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableCard>
   );
 }

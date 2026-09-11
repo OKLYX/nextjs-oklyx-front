@@ -12,6 +12,7 @@ import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroup
 import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import type { DetailTemplateResponse } from '@/domain/entities/DetailTemplateEntity';
 import { DetailImageGroupModal } from './DetailImageGroupModal';
+import { Button } from '@/presentation/components/ui/Button';
 
 export function DetailTemplateList() {
   const router = useRouter();
@@ -76,9 +77,9 @@ export function DetailTemplateList() {
   }
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">상세 템플릿</h1>
+    <PageContainer
+      title="상세 템플릿"
+      action={
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -87,16 +88,15 @@ export function DetailTemplateList() {
           >
             이미지 그룹 관리
           </button>
-          <button
+          <Button
             type="button"
             onClick={() => router.push(ROUTES.DETAIL_TEMPLATE_NEW)}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             + 새 템플릿
-          </button>
+          </Button>
         </div>
-      </div>
-
+      }
+    >
       {groupModalOpen && (
         <DetailImageGroupModal useCase={groupUseCase} onClose={() => setGroupModalOpen(false)} />
       )}
@@ -114,8 +114,8 @@ export function DetailTemplateList() {
       ) : (
         <div className="rounded-lg bg-white shadow list-table-scroll">
           <table className="text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-600">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-left text-gray-600">
                 <th className="px-4 py-3">ID</th>
                 <th className="px-4 py-3">이름</th>
                 <th className="px-4 py-3">기본</th>

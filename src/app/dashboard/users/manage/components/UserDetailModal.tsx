@@ -150,7 +150,7 @@ export function UserDetailModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">회원 정보 수정</h2>
 

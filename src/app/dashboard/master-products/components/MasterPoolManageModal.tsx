@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 마스터 이미지 풀 관리 팝업 — 업로드한 마스터 이미지를 다중 선택해 삭제.
@@ -106,14 +107,15 @@ export function MasterPoolManageModal({ images, onDelete, onClose }: MasterPoolM
             >
               닫기
             </button>
-            <button
+            <Button
               type="button"
               onClick={handleDelete}
               disabled={selected.length === 0 || busy}
-              className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              variant="danger"
+              size="sm"
             >
               {busy ? '삭제 중...' : '선택 삭제'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

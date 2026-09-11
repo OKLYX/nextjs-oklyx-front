@@ -5,6 +5,8 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { ChannelOption } from '../../components/OrderSearchCard';
 import { OrderSearchInput } from '../../components/OrderSearchInput';
+import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 출고관리 화면의 필터·액션 카드.
@@ -30,7 +32,6 @@ interface ShipmentFilterCardProps {
   isLoading: boolean;
   isSyncing: boolean;
   resultCount: number;
-  lastSyncedAt: string | null;
   /** ADMIN 전용 액션 2개(접수시트·발송처리)의 권한 게이트. */
   canDownload: boolean;
   onDownload: () => void;
@@ -42,7 +43,7 @@ interface ShipmentFilterCardProps {
   onSearchTermChange: (value: string) => void;
 }
 
-function formatSyncedAt(value: string | null): string {
+export function formatSyncedAt(value: string | null): string {
   if (!value) return '동기화 기록 없음';
   const date = new Date(value);
   if (isNaN(date.getTime())) return '동기화 기록 없음';
@@ -61,7 +62,6 @@ export function ShipmentFilterCard({
   isLoading,
   isSyncing,
   resultCount,
-  lastSyncedAt,
   canDownload,
   onDownload,
   onOpenConfirm,
@@ -71,18 +71,10 @@ export function ShipmentFilterCard({
   onSearchTermChange,
 }: ShipmentFilterCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900">출고관리</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            목록은 최근 14일 기준입니다. 접수시트는 30일까지 포함합니다.
-          </p>
-        </div>
-        <p className="text-sm text-gray-500 whitespace-nowrap">
-          마지막 동기화: <span className="font-medium text-gray-700">{formatSyncedAt(lastSyncedAt)}</span>
-        </p>
-      </div>
+    <Card>
+      <p className="mb-6 text-sm text-gray-500">
+        목록은 최근 14일 기준입니다. 접수시트는 30일까지 포함합니다.
+      </p>
 
       <div className="space-y-4">
         <div>
@@ -161,16 +153,15 @@ export function ShipmentFilterCard({
             >
               {isSyncing ? '동기화 중...' : '동기화'}
             </button>
-            <button
+            <Button
               onClick={onSearch}
               disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
             >
               {isLoading ? '조회 중...' : '조회'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

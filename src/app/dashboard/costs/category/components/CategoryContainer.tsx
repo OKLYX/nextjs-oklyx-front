@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { PageContainer } from '@/presentation/components/PageContainer';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Spinner } from '@/presentation/components/Spinner';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
@@ -271,11 +271,7 @@ export function CategoryContainer() {
   );
 
   return (
-    <PageContainer contentClassName="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">표준 카테고리</h1>
-      </div>
-
+    <PageContainer title="표준 카테고리" width="md">
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
       )}
@@ -438,7 +434,7 @@ export function CategoryContainer() {
       )}
 
       {deleteTarget && (
-        <PopupDialogModal
+        <ConfirmDialog
           isOpen={deleteTarget !== null}
           title="표준 카테고리 삭제"
           message={`"${deleteTarget.name}"을(를) 삭제하시겠습니까?`}

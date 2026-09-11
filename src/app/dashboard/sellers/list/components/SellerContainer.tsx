@@ -129,7 +129,7 @@ export function SellerContainer() {
   };
 
   return (
-    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+    <PageContainer width="xl" title="판매자 검색">
         <SellerSearchCard
           searchName={searchName}
           onSearchChange={setSearchName}

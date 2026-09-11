@@ -17,6 +17,7 @@ import {
 } from './measureAttributes';
 import { isOptionField, isOptionNotice } from './optionMetaFields';
 import { unitPlaceholder, unitSuffix } from './basicUnit';
+import { Input } from '@/presentation/components/ui/Input';
 
 const GROUP_ETC = '기타';
 
@@ -204,9 +205,9 @@ export function CategoryMetaFields({
                   ))}
                 </select>
               ) : (
-                <input
+                <Input
                   type={a.inputType === 'NUMBER' ? 'number' : 'text'}
-                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                  size="sm"
                   placeholder={unitPlaceholder(a)}
                   value={attrValues[a.name] ?? ''}
                   onChange={(e) => onAttrChange(a.name, e.target.value)}

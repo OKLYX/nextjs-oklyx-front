@@ -90,7 +90,7 @@ export function StockSearchContainer() {
   };
 
   return (
-    <PageContainer>
+    <PageContainer title="재고 조회">
       <StockSearchForm
         keyword={keyword}
         sellerId={sellerId}

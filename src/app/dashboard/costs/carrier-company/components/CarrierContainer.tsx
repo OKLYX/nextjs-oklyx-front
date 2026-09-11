@@ -105,18 +105,18 @@ export function CarrierContainer() {
   };
 
   return (
-    <PageContainer contentClassName="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">택배사 관리</h1>
-        </div>
+    <PageContainer
+      title="택배사 관리"
+      width="md"
+      action={
         <button
           onClick={() => setIsCreateOpen(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
         >
           택배사 추가
         </button>
-      </div>
+      }
+    >
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">

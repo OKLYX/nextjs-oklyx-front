@@ -4,6 +4,8 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
 import { OrderSearchInput } from './OrderSearchInput';
+import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 채널(계정) 셀렉트 옵션. 출고관리 필터 카드도 같은 shape 을 쓴다.
@@ -36,7 +38,6 @@ interface OrderSearchCardProps {
   isLoading: boolean;
   isSyncing: boolean;
   resultCount: number;
-  lastSyncedAt: string | null;
   channelOptions: ChannelOption[];
   selectedAccountId: number | '';
   onAccountChange: (value: number | '') => void;
@@ -53,7 +54,7 @@ interface OrderSearchCardProps {
   showStaleNotice: boolean;
 }
 
-function formatSyncedAt(value: string | null): string {
+export function formatSyncedAt(value: string | null): string {
   if (!value) return '동기화 기록 없음';
   const date = new Date(value);
   if (isNaN(date.getTime())) return '동기화 기록 없음';
@@ -69,7 +70,6 @@ export function OrderSearchCard({
   isLoading,
   isSyncing,
   resultCount,
-  lastSyncedAt,
   channelOptions,
   selectedAccountId,
   onAccountChange,
@@ -84,14 +84,7 @@ export function OrderSearchCard({
   showStaleNotice,
 }: OrderSearchCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">주문내역</h2>
-        <p className="text-sm text-gray-500">
-          마지막 동기화: <span className="font-medium text-gray-700">{formatSyncedAt(lastSyncedAt)}</span>
-        </p>
-      </div>
-
+    <Card>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">판매자</label>
@@ -167,16 +160,15 @@ export function OrderSearchCard({
             >
               {isSyncing ? '동기화 중...' : '동기화'}
             </button>
-            <button
+            <Button
               onClick={onSearch}
               disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
             >
               {isLoading ? '조회 중...' : '조회'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

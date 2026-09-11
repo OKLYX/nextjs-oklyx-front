@@ -162,11 +162,7 @@ export function CommissionRateContainer() {
   const filteredCount = hasSearched ? commissionRates.length : 0;
 
   return (
-    <PageContainer contentClassName="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">수수료</h1>
-      </div>
-
+    <PageContainer title="수수료" width="sm">
       <CommissionRateSearchCard
         selectedPlatform={selectedPlatform}
         onPlatformChange={setSelectedPlatform}

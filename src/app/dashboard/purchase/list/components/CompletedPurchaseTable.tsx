@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 import type { PurchaseListItem } from '@/domain/entities/PurchaseListEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PurchaseGroupDetail } from './PurchaseGroupDetail';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 // 완료 그룹이라도 추가 입고·정정이 있을 수 있어 토글 내용물은 구매목록 탭과 같다(PLAN 2609_29 D21).
 interface CompletedPurchaseTableProps {
@@ -28,15 +29,16 @@ export function CompletedPurchaseTable({
   onRecorded,
 }: CompletedPurchaseTableProps) {
   return (
-    <div className="bg-white rounded-lg shadow list-table-scroll">
+    // 카드 머리말(제목·안내)이 로딩·빈 상태에서도 남아야 해 상태 행은 tbody 가 그대로 그린다.
+    <TableCard>
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900">구매 완료 내역</h2>
         <p className="mt-1 text-xs text-gray-500">구매가 완료된(잔여 ≤ 0) 구성품만 표시됩니다.</p>
       </div>
 
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-gray-600">
-          <tr>
+        <thead className="bg-gray-100 border-b border-gray-200">
+          <tr className="text-gray-600">
             <th className="w-10 px-4 py-3"></th>
             <th className="px-4 py-3 text-left font-medium">구성품</th>
             <th className="px-4 py-3 text-right font-medium">필요</th>
@@ -122,6 +124,6 @@ export function CompletedPurchaseTable({
             })}
         </tbody>
       </table>
-    </div>
+    </TableCard>
   );
 }

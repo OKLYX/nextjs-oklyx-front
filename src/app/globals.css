@@ -70,7 +70,9 @@ html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* --font-sans is wired to the Geist Sans next/font variable in @theme inline above.
+     Arial/Helvetica stay as fallbacks in case the variable is unset. */
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
 /* ---- Surfaces (backgrounds) ---- */
@@ -144,6 +146,11 @@ body {
    Soft -50/-100 tints and text-* badges are intentionally left
    as-is so info/success alert semantics stay readable.
    To tune the brand, edit ONLY the --brand-* vars in :root.
+
+   New component rules:
+   - Primary action = bg-blue-600 / hover:bg-blue-700 (the remap turns it
+     into the brand yellow) or bg-brand.
+   - No arbitrary HEX (bg-[#...]). There are currently 0 in src; keep it so.
    ============================================================ */
 /* Primary action → Main (#D99026) */
 .bg-blue-400 { background-color: var(--brand-main-light); }

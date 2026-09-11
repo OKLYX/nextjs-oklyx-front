@@ -414,7 +414,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50">
       {/* Fixed geometry from the first paint — expanding the sheet must not resize the modal (D1). */}
       <div className="bg-white rounded-lg shadow-lg w-full mx-4 max-w-4xl h-[90vh] flex flex-col p-8">
         <h3 className="shrink-0 text-2xl font-semibold text-gray-900 mb-6">주문 상세</h3>
@@ -502,8 +502,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                         <div className="mt-4">
                           <div className="border border-gray-200 rounded-lg list-table-scroll">
                             <table>
-                              <thead>
-                                <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                              <thead className="bg-gray-100 border-b border-gray-200">
+                                <tr className="text-left text-xs font-medium text-gray-500">
                                   <th className="px-4 py-2">이름</th>
                                   <th className="px-4 py-2">배송지</th>
                                   <th className="px-4 py-2">상품명</th>
@@ -672,8 +672,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                           extracted into a shared component (2609_01 D5). Coupang wording verbatim (D6). */}
                       <div className="mt-3 border border-gray-200 rounded-lg list-table-scroll">
                         <table>
-                          <thead>
-                            <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+                          <thead className="bg-gray-100 border-b border-gray-200">
+                            <tr className="text-left text-xs font-medium text-gray-500">
                               <th className="px-4 py-2">박스 ID</th>
                               <th className="px-4 py-2">코드</th>
                               <th className="px-4 py-2">메시지</th>

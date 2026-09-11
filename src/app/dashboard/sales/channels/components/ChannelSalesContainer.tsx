@@ -12,6 +12,7 @@ import { PeriodFilter, currentMonthRange } from '../../components/PeriodFilter';
 import { ChannelSummaryCard } from './ChannelSummaryCard';
 import { ChannelSalesLines } from './ChannelSalesLines';
 import { ChannelSaleRecords } from './ChannelSaleRecords';
+import { Button } from '@/presentation/components/ui/Button';
 
 /** `yyyy-MM-dd` 모양일 때만 URL 값을 믿는다 — 아무 문자열이나 그대로 서버에 보내면 400 이 난다. */
 const asDate = (value: string | null): string | null =>
@@ -177,11 +178,7 @@ export function ChannelSalesContainer() {
   const invalidRange = Boolean(from && to && from > to);
 
   return (
-    <PageContainer>
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-gray-900">매출</h1>
-      </div>
-
+    <PageContainer title="매출">
       <SalesTabs />
 
       <PeriodFilter from={from} to={to} isLoading={isLoading} onChange={handlePeriodChange}>
@@ -212,13 +209,12 @@ export function ChannelSalesContainer() {
       {error && (
         <div className="bg-white rounded-lg shadow p-6 space-y-3">
           <p className="text-sm text-red-600">{error}</p>
-          <button
+          <Button
             type="button"
             onClick={() => setReloadTick((tick) => tick + 1)}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             다시 시도
-          </button>
+          </Button>
         </div>
       )}
 

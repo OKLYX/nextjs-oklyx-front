@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { TagChipsInput } from '@/presentation/components/TagChipsInput';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { getImageUrl } from '@/infrastructure/utils/imageUrl';
 import { ShippingOverrideFields } from '@/presentation/components/ShippingOverrideFields';
 import {
@@ -55,6 +55,7 @@ import {
   noticesToSubmit,
   submitNoticeGroup,
 } from '../[id]/components/categoryMetaValidation';
+import { Input } from '@/presentation/components/ui/Input';
 
 // Per-platform create-mode meta: user values + the loaded schema (for the submit gate).
 type MetaEntry = { attributes: CategoryAttribute[]; notices: CategoryNotice[] } & CategoryMetaCreateValue;
@@ -730,8 +731,8 @@ export function MasterProductFormModal({
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">마스터 이름 *</label>
-            <input
-              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+            <Input
+              size="sm"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -836,7 +837,7 @@ export function MasterProductFormModal({
             {/* 선택된 구성상품만 목록으로. */}
             <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-gray-100 text-xs text-gray-500">
+                <thead className="sticky top-0 bg-gray-100 border-b border-gray-200 text-xs text-gray-500">
                   <tr>
                     <th className="px-2 py-1.5 text-left font-medium">이미지</th>
                     <th className="px-2 py-1.5 text-left font-medium">제품명</th>
@@ -1029,8 +1030,8 @@ export function MasterProductFormModal({
                 {fields.map((f) => (
                   <div key={f.key}>
                     <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
-                    <input
-                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                    <Input
+                      size="sm"
                       value={fieldValues[f.key] ?? ''}
                       placeholder={
                         (BUILTIN_FIELD_KEYS as readonly string[]).includes(f.key)
@@ -1253,7 +1254,7 @@ export function MasterProductFormModal({
         </div>
       )}
 
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={confirmDialog != null}
         title="옵션 삭제 확인"
         message={confirmDialog?.message ?? ''}
@@ -1265,6 +1266,7 @@ export function MasterProductFormModal({
           setConfirmDialog(null);
         }}
         onCancel={() => setConfirmDialog(null)}
+        nested
       />
     </div>
   );

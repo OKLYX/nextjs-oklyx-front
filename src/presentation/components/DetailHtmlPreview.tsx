@@ -93,7 +93,7 @@ export interface ChannelPreviewData {
  * (상세 HTML을 격리 iframe에 세로 스크롤 렌더)을 한 모달에서 전환하며 확인한다.
  * backdrop 클릭/ESC로 닫힘. `data`가 null이면 렌더하지 않음.
  *
- * ⚠️ confirm 다이얼로그용 `PopupDialogModal`과 구분(read-only 미리보기 전용).
+ * ⚠️ confirm 다이얼로그용 `ConfirmDialog`과 구분(read-only 미리보기 전용).
  *
  * @param {ChannelPreviewData | null} data - 미리보기 데이터 (null이면 return null)
  * @param {() => void} onClose - 닫기 콜백

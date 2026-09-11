@@ -21,6 +21,7 @@ import type { FontAsset } from '@/domain/entities/FontEntity';
 import type { DetailImageGroup } from '@/domain/entities/DetailImageGroupEntity';
 import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import { BlockRow } from './BlockRow';
+import { Card } from '@/presentation/components/ui/Card';
 
 type AppendableType = 'text' | 'spacer' | 'imageZone';
 
@@ -367,11 +368,9 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
   }
 
   return (
-    <PageContainer contentClassName="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {templateId ? '상세 템플릿 수정' : '상세 템플릿 생성'}
-        </h1>
+    <PageContainer
+      title={templateId ? '상세 템플릿 수정' : '상세 템플릿 생성'}
+      action={
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -392,12 +391,12 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
             {isSaving ? <Spinner label="저장 중..." /> : '저장'}
           </button>
         </div>
-      </div>
-
+      }
+    >
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {/* Meta */}
-      <div className="rounded-lg bg-white p-4 shadow">
+      <Card>
         <label className="block">
           <span className="block text-xs font-medium text-gray-600">이름</span>
           <input
@@ -460,7 +459,7 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
           </span>
           {fontsError && <span className="mt-1 block text-xs text-red-600">{fontsError}</span>}
         </label>
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
         {/* Block list */}
@@ -520,7 +519,7 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
         </div>
 
         {/* Structure preview (derived from edit state, no fetch) */}
-        <div className="rounded-lg bg-white p-4 shadow">
+        <Card>
           <h2 className="mb-3 text-sm font-semibold text-gray-700">구조 미리보기</h2>
           <div className="space-y-2">
             {blocks.length === 0 && <p className="text-sm text-gray-400">블록 없음</p>}
@@ -641,7 +640,7 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
           <p className="mt-3 text-xs text-gray-400">
             실제 값이 채워진 HTML 미리보기는 상세 편집기(채널별)에서 확인합니다.
           </p>
-        </div>
+        </Card>
       </div>
     </PageContainer>
   );

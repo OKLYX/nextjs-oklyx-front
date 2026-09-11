@@ -206,7 +206,7 @@ export function ProductListingContainer() {
   };
 
   return (
-    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+    <PageContainer width="xl" title="판매상품 조회">
       <ProductListingSearchCard
           searchPlatform={searchPlatform}
           onSearchChange={setSearchPlatform}

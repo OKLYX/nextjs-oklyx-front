@@ -19,7 +19,7 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { useOrderSync } from '@/presentation/hooks/useOrderSync';
 import { OrderSearchCard } from './OrderSearchCard';
-import { channelOptionLabel } from './OrderSearchCard';
+import { channelOptionLabel, formatSyncedAt } from './OrderSearchCard';
 import type { ChannelOption } from './OrderSearchCard';
 import { OrderStatusFilter } from './OrderStatusFilter';
 import { OrderTable } from './OrderTable';
@@ -438,7 +438,16 @@ export function OrderContainer() {
   );
 
   return (
-    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+    <PageContainer
+      width="xl"
+      title="주문내역"
+      action={
+        <p className="text-sm text-gray-500 whitespace-nowrap">
+          마지막 동기화:{' '}
+          <span className="font-medium text-gray-700">{formatSyncedAt(lastSyncedAt)}</span>
+        </p>
+      }
+    >
         <OrderSearchCard
           sellers={sellers}
           selectedSellerId={selectedSellerId}
@@ -460,7 +469,6 @@ export function OrderContainer() {
           searchTerm={searchTerm}
           onSearchTermChange={handleSearchTermChange}
           showStaleNotice={isMonthPeriod(appliedPeriod)}
-          lastSyncedAt={lastSyncedAt}
         />
 
         {syncResult && (

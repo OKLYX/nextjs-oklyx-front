@@ -1,6 +1,7 @@
 'use client';
 
 import type { Seller } from '@/domain/entities/SellerEntity';
+import { Card } from '@/presentation/components/ui/Card';
 
 interface StockSearchFormProps {
   keyword: string;
@@ -31,9 +32,7 @@ export function StockSearchForm({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900">재고 조회</h2>
-
+    <Card>
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">상품명</label>
@@ -72,6 +71,6 @@ export function StockSearchForm({
           {isLoading ? '조회 중...' : '조회'}
         </button>
       </div>
-    </div>
+    </Card>
   );
 }

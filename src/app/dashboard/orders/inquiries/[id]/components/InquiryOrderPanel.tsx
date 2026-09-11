@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/config/routes';
 import { getOrderStatusLabel } from '@/domain/entities/OrderEntity';
 import type { Inquiry } from '@/domain/entities/InquiryEntity';
+import { Card } from '@/presentation/components/ui/Card';
 
 interface InquiryOrderPanelProps {
   inquiry: Inquiry;
@@ -38,7 +39,7 @@ export function InquiryOrderPanel({ inquiry }: InquiryOrderPanelProps) {
 
   if (order) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-4">
+      <Card className="space-y-4">
         <h2 className="text-base font-semibold text-gray-900">관련 주문</h2>
 
         <dl className="divide-y divide-gray-200">
@@ -86,13 +87,13 @@ export function InquiryOrderPanel({ inquiry }: InquiryOrderPanelProps) {
         >
           주문내역에서 찾기
         </button>
-      </div>
+      </Card>
     );
   }
 
   if (listing) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-4">
+      <Card className="space-y-4">
         <h2 className="text-base font-semibold text-gray-900">관련 상품</h2>
         <p className="text-sm text-gray-500">
           이 문의는 주문과 연결되지 않았습니다. (구매 전 문의이거나 주문이 아직 적재되지 않았습니다)
@@ -110,7 +111,7 @@ export function InquiryOrderPanel({ inquiry }: InquiryOrderPanelProps) {
         >
           상품 상세로
         </button>
-      </div>
+      </Card>
     );
   }
 
