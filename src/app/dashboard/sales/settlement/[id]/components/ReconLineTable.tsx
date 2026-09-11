@@ -28,6 +28,12 @@ interface ReconLineTableProps {
   lines: ReconLineView[];
   loading: boolean;
   error: string;
+  /**
+   * 스크롤 상자 안에서 쓸 때 머리글을 위에 붙인다.
+   * ⚠️ 기본값은 <b>끔</b>이다 — 스크롤 상자가 아닌 곳에서 켜면 페이지를 내릴 때 머리글이 화면 맨 위에
+   * 들러붙어 다른 섹션을 덮는다.
+   */
+  stickyHeader?: boolean;
   onCopyIdentifiers: (line: ReconLineView) => void;
 }
 
@@ -35,7 +41,13 @@ interface ReconLineTableProps {
 const lineKey = (line: ReconLineView, index: number): string =>
   `${line.externalOrderId ?? '-'}|${line.platformOptionId ?? '-'}|${line.recognitionDate ?? '-'}|${index}`;
 
-export function ReconLineTable({ lines, loading, error, onCopyIdentifiers }: ReconLineTableProps) {
+export function ReconLineTable({
+  lines,
+  loading,
+  error,
+  stickyHeader = false,
+  onCopyIdentifiers,
+}: ReconLineTableProps) {
   const [copiedKey, setCopiedKey] = useState('');
 
   if (loading) {
@@ -57,7 +69,7 @@ export function ReconLineTable({ lines, loading, error, onCopyIdentifiers }: Rec
   return (
     <div className="list-table-scroll border-t border-gray-200">
       <table className="w-full">
-        <thead className="bg-gray-50">
+        <thead className={`bg-gray-50 ${stickyHeader ? 'sticky top-0 z-10' : ''}`}>
           <tr className="text-left text-xs font-medium text-gray-500">
             <th className="px-4 py-2">주문번호</th>
             <th className="px-4 py-2">옵션ID</th>
