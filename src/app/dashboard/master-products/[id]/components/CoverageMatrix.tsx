@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
@@ -249,6 +249,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // Propagate (A-layer) summary banner
   const [isPropagating, setIsPropagating] = useState(false);
   const [banner, setBanner] = useState<{ text: string; tone: 'green' | 'amber' } | null>(null);
+  // 생성 페이지가 "마스터는 만들어졌지만 후속 저장 일부가 실패" 로 보낼 때 `?notice=` 로 사유를 넘긴다.
+  // state 로 옮기지 않고 URL 에서 바로 파생한다 — 이펙트 안 setState 는 렌더를 한 번 더 돌리고,
+  // 이 값은 URL 이 이미 단일 출처다. 이 화면이 스스로 만든 `banner` 가 있으면 그쪽이 이긴다(최신 동작).
+  const searchParams = useSearchParams();
+  const createNotice = searchParams.get('notice');
+  const shownBanner = banner ?? (createNotice ? { text: createNotice, tone: 'amber' as const } : null);
   // 반영 전 미리보기(90). null = 미로드/조회 중/실패/비-ADMIN → 아무것도 주장하지 않는다
   // (배너 숨김 + 버튼은 기존대로 활성). 로딩 전용 스피너를 두지 않는 이유이기도 하다.
   const [syncPreview, setSyncPreview] = useState<ChannelSyncPreview | null>(null);
@@ -802,13 +808,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         </div>
       )}
 
-      {banner && (
+      {shownBanner && (
         <p
           className={`rounded px-3 py-2 text-sm ${
-            banner.tone === 'green' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+            shownBanner.tone === 'green' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
           }`}
         >
-          {banner.text}
+          {shownBanner.text}
         </p>
       )}
 

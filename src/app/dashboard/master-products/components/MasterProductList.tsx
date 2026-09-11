@@ -10,25 +10,9 @@ import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { ROUTES } from '@/config/routes';
 import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
-import { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
-import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
-import { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
-import { CarrierRateRepositoryImpl } from '@/infrastructure/repositories/CarrierRateRepositoryImpl';
-import { PackageUseCase } from '@/application/usecases/PackageUseCase';
-import { PackageRepositoryImpl } from '@/infrastructure/repositories/PackageRepositoryImpl';
-import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
-import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
-import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
-import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
-import { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
-import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
-import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
-import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import { parseQuery, toApiParams, toSearchParams, type MasterListQuery } from '../masterListQuery';
 import { MasterProductToolbar } from './MasterProductToolbar';
-import { MasterProductFormModal } from './MasterProductFormModal';
-import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 판매상품 마스터 목록(서버 페이징·정렬·검색) + **생성** 모달 진입점 (83B / 111).
@@ -50,23 +34,9 @@ export function MasterProductList() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.role === 'ADMIN';
 
+  // 목록은 마스터 유즈케이스 하나만 쓴다. 생성 폼이 쓰던 나머지 7개는 생성 페이지가 소유한다
+  // (`master-products/new/components/MasterProductCreateContainer.tsx`).
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
-  const productsUseCase = useMemo(() => new GetProductsUseCase(new ProductRepositoryImpl()), []);
-  const carrierRateUseCase = useMemo(() => new CarrierRateUseCase(new CarrierRateRepositoryImpl()), []);
-  const packageUseCase = useMemo(() => new PackageUseCase(new PackageRepositoryImpl()), []);
-  const thumbnailTemplateUseCase = useMemo(
-    () => new ThumbnailTemplateUseCase(new ThumbnailTemplateRepositoryImpl()),
-    [],
-  );
-  const detailUseCase = useMemo(
-    () => new DetailContentUseCase(new DetailContentRepositoryImpl()),
-    [],
-  );
-  const productImageUseCase = useMemo(
-    () => new ProductImageUseCase(new ProductImageRepositoryImpl()),
-    [],
-  );
-  const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
 
   // URL 문자열로 memo — useSearchParams 객체 동일성에 기대면 부모 리렌더마다 파생값이 새로 생긴다.
   const searchKey = searchParams.toString();
@@ -81,7 +51,6 @@ export function MasterProductList() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
-  const [modalOpen, setModalOpen] = useState(false);
 
   /**
    * 조회 조건 갱신 단일 진입점(툴바·페이지네이션 공용).
@@ -125,20 +94,8 @@ export function MasterProductList() {
     };
   }, [useCase, isAdmin, page, size, sort, q, reloadTick, updateQuery]);
 
-  const openCreate = () => setModalOpen(true);
-
   /** 삭제 후: URL 은 그대로 두고 현재 페이지만 재조회. */
   const reloadCurrent = useCallback(() => setReloadTick((tick) => tick + 1), []);
-
-  /**
-   * 생성 후: 검색어·뒷페이지가 걸린 상태에서 그냥 재조회하면 방금 만든 마스터가 화면에 없다.
-   * 1페이지·검색 해제로 되돌리고, URL 이 이미 기본값이던 경우를 위해 항상 재조회도 강제한다.
-   * ⚠️ 모달은 부분 실패 경로에서도 마스터가 생성된 상태로 이 콜백을 부른다 — 분기하지 말 것.
-   */
-  const resetToFirstPage = useCallback(() => {
-    updateQuery({ page: 0, q: undefined });
-    setReloadTick((tick) => tick + 1);
-  }, [updateQuery]);
 
   const handleDelete = async (m: MasterProductResponse) => {
     if (!confirm(`마스터 "${m.name}" 을(를) 삭제하시겠습니까?`)) return;
@@ -170,17 +127,7 @@ export function MasterProductList() {
   return (
     <PageContainer
       title="판매상품 마스터"
-      action={
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">총 {totalElements}개</span>
-          <Button
-            type="button"
-            onClick={openCreate}
-          >
-            마스터 추가
-          </Button>
-        </div>
-      }
+      action={<span className="text-sm text-gray-600">총 {totalElements}개</span>}
     >
       <MasterProductToolbar query={query} onChange={updateQuery} />
 
@@ -270,21 +217,6 @@ export function MasterProductList() {
           currentPage={page}
           totalPages={totalPages}
           onPageChange={(next) => updateQuery({ page: next })}
-        />
-      )}
-
-      {modalOpen && (
-        <MasterProductFormModal
-          useCase={useCase}
-          productsUseCase={productsUseCase}
-          carrierRateUseCase={carrierRateUseCase}
-          packageUseCase={packageUseCase}
-          thumbnailTemplateUseCase={thumbnailTemplateUseCase}
-          detailUseCase={detailUseCase}
-          productImageUseCase={productImageUseCase}
-          categoryUseCase={categoryUseCase}
-          onClose={() => setModalOpen(false)}
-          onDataChanged={resetToFirstPage}
         />
       )}
     </PageContainer>

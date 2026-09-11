@@ -34,28 +34,30 @@ import { BUILTIN_FIELD_KEYS, type TemplateField } from '@/domain/entities/Thumbn
 import { SOURCE_ZONE } from '@/domain/entities/DetailTemplateEntity';
 import { CategoryTreeColumns } from '@/presentation/components/CategoryTreeColumns';
 import { ROUTES } from '@/config/routes';
-import { MasterOptionEditor } from './MasterOptionEditor';
+import { MasterOptionEditor } from '../../components/MasterOptionEditor';
 import {
   MasterImagePool,
   type ImageField,
   type ImageFieldFilter,
   type MasterImageBuffer,
-} from './MasterImagePool';
-import { deriveMasterImageFields } from './masterImageFields';
+} from '../../components/MasterImagePool';
+import { deriveMasterImageFields } from '../../components/masterImageFields';
 import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
 import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
-import { MetaPlatformTabs } from '../[id]/components/MetaPlatformTabs';
+import { MetaPlatformTabs } from '../../[id]/components/MetaPlatformTabs';
 import {
   CategoryMetaCreateFields,
   EMPTY_META_VALUE,
   type CategoryMetaCreateValue,
-} from '../[id]/components/CategoryMetaCreateFields';
+} from '../../[id]/components/CategoryMetaCreateFields';
 import {
   computeMissingRequired,
   noticesToSubmit,
   submitNoticeGroup,
-} from '../[id]/components/categoryMetaValidation';
+} from '../../[id]/components/categoryMetaValidation';
 import { Input } from '@/presentation/components/ui/Input';
+import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 // Per-platform create-mode meta: user values + the loaded schema (for the submit gate).
 type MetaEntry = { attributes: CategoryAttribute[]; notices: CategoryNotice[] } & CategoryMetaCreateValue;
@@ -67,7 +69,7 @@ const formatWon = (v: number | null | undefined) =>
 // Cap category name-search results (client filter over the full list) — bounds the render.
 const CATEGORY_SEARCH_LIMIT = 50;
 
-interface MasterProductFormModalProps {
+interface MasterProductCreateFormProps {
   useCase: MasterProductUseCase;
   productsUseCase: GetProductsUseCase;
   carrierRateUseCase: CarrierRateUseCase;
@@ -77,23 +79,34 @@ interface MasterProductFormModalProps {
   productImageUseCase: ProductImageUseCase;
   // Create-mode standard-category step: miller-columns tree drilldown (browseTree).
   categoryUseCase: CategoryUseCase;
-  onClose: () => void;
-  onDataChanged: () => Promise<void> | void; // reload parent list
+  /** 생성 성공 시 호출 — 새 마스터 id 를 넘긴다. 완료 화면 표시는 호출부가 정한다. */
+  onCreated: (masterId: number) => void;
+  /** 폼을 떠날 때(취소). 호출부가 목록으로 보낸다. */
+  onCancel: () => void;
+  /** 후속 저장 일부가 실패해 "생성은 됐지만 미완" 인 경우. 상세로 직행시킨다. */
+  onCreatedWithWarning: (masterId: number, warning: string) => void;
 }
 
 /**
- * 판매상품 마스터 **생성 전용** 마법사 모달 (83B).
- * File: src/app/dashboard/master-products/components/MasterProductFormModal.tsx
+ * 판매상품 마스터 **생성 전용** 마법사 폼 (83B).
+ * File: src/app/dashboard/master-products/new/components/MasterProductCreateForm.tsx
  *
- * ⚠️ **수정은 이 모달이 하지 않는다** — 이름·구성상품·카테고리·필수속성·필드값·태그·기본 택배/상자·
+ * ⚠️ **수정은 이 폼이 하지 않는다** — 이름·구성상품·카테고리·필수속성·필드값·태그·기본 택배/상자·
  * 옵션·이미지·배송 설정 전부 **마스터 상세 페이지의 토글 섹션**에서 수정한다(편집 지점 단일화, 83A/83B).
  * 여기에 수정 분기를 다시 추가하지 말 것 — 같은 값을 두 곳에서 편집하게 된다.
+ *
+ * ⚠️ 2026-09-11: 모달에서 **페이지(`/dashboard/master-products/new`)로 옮겼다.** 폼이 1200줄이 넘어
+ * 모달 안에서 스크롤로만 다루기 어려웠다. 폼 내용은 그대로이고 바깥 껍데기만 `PageContainer`/`Card` 다.
+ * 모달로 되돌리지 말 것.
  *
  * 생성은 한 화면에서 끝난다(단일 마법사): create 로 마스터+옵션을 원자 생성한 뒤 카테고리 지정 →
  * 카테고리 메타 → 배송 설정 → 태그 → 이미지 풀 업로드·매핑을 순차 적용한다(각 단계 실패는 graceful
  * 배너, 롤백 없음 — 마스터는 이미 존재하므로 상세에서 이어서 채운다).
+ *
+ * ⚠️ 후속 단계가 실패하면 `onCreatedWithWarning` 으로 **상세 페이지에 직행**시킨다. 완료 화면의
+ * 3지선다를 보여주면 안 된다 — 무엇을 마저 채워야 하는지 알 수 있는 곳이 상세뿐이다.
  */
-export function MasterProductFormModal({
+export function MasterProductCreateForm({
   useCase,
   productsUseCase,
   carrierRateUseCase,
@@ -102,9 +115,10 @@ export function MasterProductFormModal({
   detailUseCase,
   productImageUseCase,
   categoryUseCase,
-  onClose,
-  onDataChanged,
-}: MasterProductFormModalProps) {
+  onCreated,
+  onCancel,
+  onCreatedWithWarning,
+}: MasterProductCreateFormProps) {
   // 이미지 그룹 카탈로그(공용 목록)는 이 모달이 직접 만든다 — 부모 props 계약을 넓히지 않는다.
   const groupUseCase = useMemo(
     () => new DetailImageGroupUseCase(new DetailImageGroupRepositoryImpl()),
@@ -112,6 +126,20 @@ export function MasterProductFormModal({
   );
   const [name, setName] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  // 모달이던 시절엔 ✕ 하나로만 닫혔지만, 페이지가 된 뒤로는 브라우저 뒤로가기·주소창·탭 닫기로도
+  // 이탈한다. 1200줄짜리 폼이 말없이 날아가지 않게 작성 흔적이 있으면 브라우저 경고를 띄운다.
+  // (좌측 네비 클릭은 Next.js 클라이언트 라우팅이라 이 이벤트가 안 뜬다 — `onCancel` 의 확인
+  // 다이얼로그가 그쪽을 맡는다.)
+  const hasInput = name.trim() !== '' || selectedIds.length > 0;
+  // [취소] 확인 — 작성 흔적이 없으면 묻지 않고 바로 나간다.
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  useEffect(() => {
+    if (!hasInput) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [hasInput]);
 
   // 혼합구성 판정 = 구성품 종수 ≥ 2 (백엔드 63 미러, 중립 도메인 사실).
   const isBundle = selectedIds.length >= 2;
@@ -616,8 +644,7 @@ export function MasterProductFormModal({
       try {
         await useCase.setCategory(created.id, { categoryId: Number(selectedCategoryId) });
       } catch {
-        setError('마스터는 생성되었습니다. 카테고리 지정에 실패했습니다(상세에서 재지정).');
-        await onDataChanged();
+        onCreatedWithWarning(created.id, '마스터는 생성되었습니다. 카테고리 지정에 실패했습니다(상세에서 재지정).');
         setIsSubmitting(false);
         return;
       }
@@ -638,8 +665,7 @@ export function MasterProductFormModal({
             noticeGroup: group,
           });
         } catch {
-          setError('마스터는 생성되었습니다. 카테고리 속성 저장에 실패했습니다(상세에서 재입력).');
-          await onDataChanged();
+          onCreatedWithWarning(created.id, '마스터는 생성되었습니다. 카테고리 속성 저장에 실패했습니다(상세에서 재입력).');
           setIsSubmitting(false);
           return;
         }
@@ -650,8 +676,7 @@ export function MasterProductFormModal({
         try {
           await useCase.updateShippingOverride(created.id, { override: shippingMap });
         } catch {
-          setError('마스터는 생성되었습니다. 배송 설정 저장에 실패했습니다(상세에서 재지정).');
-          await onDataChanged();
+          onCreatedWithWarning(created.id, '마스터는 생성되었습니다. 배송 설정 저장에 실패했습니다(상세에서 재지정).');
           setIsSubmitting(false);
           return;
         }
@@ -697,13 +722,11 @@ export function MasterProductFormModal({
           }
         }
       } catch {
-        setError('마스터·옵션은 생성되었습니다. 이미지 일부 업로드/매핑에 실패했습니다.');
-        await onDataChanged();
+        onCreatedWithWarning(created.id, '마스터·옵션은 생성되었습니다. 이미지 일부 업로드/매핑에 실패했습니다.');
         setIsSubmitting(false);
         return;
       }
-      await onDataChanged();
-      onClose();
+      onCreated(created.id);
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
       setError(status === 400 ? '입력값을 확인하세요.' : '저장에 실패했습니다.');
@@ -713,19 +736,8 @@ export function MasterProductFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className="my-8 w-full max-w-4xl rounded-lg bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">마스터 추가</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          >
-            ✕
-          </button>
-        </div>
-
+    <>
+      <Card>
         {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
         <div className="space-y-4">
@@ -1149,24 +1161,23 @@ export function MasterProductFormModal({
           {saveBlockReason && (
             <span className="mr-auto text-[11px] text-amber-700">{saveBlockReason}</span>
           )}
-          <button
-            type="button"
-            onClick={onClose}
+          <Button
+            variant="secondary"
+            onClick={() => (hasInput ? setLeaveConfirmOpen(true) : onCancel())}
             disabled={isSubmitting}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           >
-            닫기
-          </button>
-          <button
-            type="button"
+            취소
+          </Button>
+          <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || saveBlockReason != null}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            disabled={saveBlockReason != null}
+            isLoading={isSubmitting}
+            loadingText="저장 중..."
           >
-            {isSubmitting ? <Spinner label="저장 중..." /> : '저장'}
-          </button>
+            저장
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {detailProduct && (
         <div
@@ -1268,6 +1279,17 @@ export function MasterProductFormModal({
         onCancel={() => setConfirmDialog(null)}
         nested
       />
-    </div>
+
+      <ConfirmDialog
+        isOpen={leaveConfirmOpen}
+        title="작성 취소"
+        message="작성 중인 내용이 저장되지 않고 사라집니다. 나가시겠습니까?"
+        confirmText="나가기"
+        cancelText="계속 작성"
+        isDangerous
+        onConfirm={onCancel}
+        onCancel={() => setLeaveConfirmOpen(false)}
+      />
+    </>
   );
 }
