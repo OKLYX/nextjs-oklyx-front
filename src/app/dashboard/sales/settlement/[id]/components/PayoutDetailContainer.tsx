@@ -19,6 +19,7 @@ import {
   payoutStatusLabel,
   settlementTypeLabel,
 } from '@/domain/entities/Settlement';
+import { PayoutOrderList } from './PayoutOrderList';
 import { ReconBlockA } from './ReconBlockA';
 import { ReconBlockB } from './ReconBlockB';
 import { ExportButton } from './ExportButton';
@@ -137,6 +138,12 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
   const [expandedLabel, setExpandedLabel] = useState('');
   const [unmatchedOnly, setUnmatchedOnly] = useState(false);
   const [lines, setLines] = useState<ReconLineView[]>([]);
+
+  // 🔴 차이 리포트의 드릴다운(`lines`)과 <b>따로</b> 든다 — 저쪽은 라벨로 좁힌 목록이고 이쪽은 전체다.
+  //    한 state 를 공유하면 라벨을 펼치는 순간 "이 정산에 포함된 주문"이 그 라벨만 남는다.
+  const [orderLines, setOrderLines] = useState<ReconLineView[]>([]);
+  const [orderLinesLoading, setOrderLinesLoading] = useState(false);
+  const [orderLinesError, setOrderLinesError] = useState('');
   const [linesLoading, setLinesLoading] = useState(false);
   const [linesError, setLinesError] = useState('');
 
@@ -164,6 +171,28 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
       await loadReport();
     })();
   }, [loadReport, reloadTick]);
+
+  // 필터 없이 전량 조회 — 서버는 label·unmatched 가 없으면 그 묶음의 라인을 그대로 돌려준다.
+  const loadOrderLines = useCallback(async () => {
+    setOrderLinesLoading(true);
+    setOrderLinesError('');
+    try {
+      setOrderLines(await settlementUseCase.getPayoutLines(payoutId, {}));
+    } catch (e) {
+      setOrderLinesError(extractErrorMessage(e, '주문 목록 조회에 실패했습니다.'));
+      setOrderLines([]);
+    } finally {
+      setOrderLinesLoading(false);
+    }
+  }, [settlementUseCase, payoutId]);
+
+  useEffect(() => {
+    // 이펙트 본문에서 곧바로 setState 를 부르면 프로젝트 lint(`react-hooks/set-state-in-effect`)가
+    // 막는다 — 조회를 useCallback 으로 감싸 effect 는 호출만 한다.
+    void (async () => {
+      await loadOrderLines();
+    })();
+  }, [loadOrderLines, reloadTick]);
 
   const loadLines = useCallback(async () => {
     if (!unmatchedOnly && !expandedLabel) {
@@ -344,6 +373,14 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
           typeLabel={settlementTypeLabel(payout.settlementType)}
         />
       )}
+
+      {/* 🔴 차이 리포트보다 <b>먼저</b> 놓는다 — "이 돈이 어느 주문 값인가"가 "왜 어긋났나"보다 앞선다. */}
+      <PayoutOrderList
+        lines={orderLines}
+        loading={orderLinesLoading}
+        error={orderLinesError}
+        onCopyIdentifiers={handleCopyIdentifiers}
+      />
 
       <ReconBlockA blockA={report.blockA} onShowUnmatched={handleShowUnmatched} />
 
