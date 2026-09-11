@@ -151,7 +151,7 @@ export function ProductRegistrationForm({
   const isSubmitDisabled = !hasProductName || hasBarcodeWithoutValidation;
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
       {/* Required Fields */}
       <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
         <legend className="text-lg font-semibold text-gray-900 px-2">필수 항목</legend>
