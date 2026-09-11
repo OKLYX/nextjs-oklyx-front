@@ -1,6 +1,7 @@
 'use client';
 
 import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface UserSearchFormProps {
   nameSearch: string;
@@ -65,13 +66,12 @@ export function UserSearchForm({
         </div>
 
         <div className="flex justify-end pt-2">
-          <button
+          <Button
             onClick={onSearch}
             disabled={isLoading}
-            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
             {isLoading ? '조회 중...' : '조회'}
-          </button>
+          </Button>
         </div>
       </div>
     </Card>

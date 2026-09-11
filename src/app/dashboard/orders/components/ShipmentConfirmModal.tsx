@@ -8,6 +8,7 @@ import { Modal } from '@/presentation/components/ui/Modal';
 import { getOrderStatusLabel } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { ShipmentConfirmResult } from '@/application/dto/ShippingLabelDTOs';
+import { Button } from '@/presentation/components/ui/Button';
 
 // Buckets whose detail table can be opened from a summary chip = the three the server returns a
 // *list* for (PLAN 2609_12 D2). 요청 건수·매칭·성공 are counts only, so they stay static chips —
@@ -181,13 +182,12 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
 
   const footer =
     result == null ? (
-      <button
+      <Button
         onClick={handleUpload}
         disabled={!file || isUploading}
-        className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
       >
         {isUploading ? <Spinner label="처리 중..." /> : '업로드'}
-      </button>
+      </Button>
     ) : (
       <>
         <button

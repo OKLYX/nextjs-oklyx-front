@@ -23,6 +23,7 @@ import { PayoutOrderList } from './PayoutOrderList';
 import { ReconBlockA } from './ReconBlockA';
 import { ReconBlockB } from './ReconBlockB';
 import { ExportButton } from './ExportButton';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 지급 묶음 상세(차이 리포트) 화면의 상태 소유자 (FEATURE_2609_30 / 05 Step 3 · PLAN D11 · D12).
@@ -298,13 +299,12 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
         <div className="bg-white rounded-lg shadow p-6 space-y-3">
           <p className="text-sm text-red-600">{error || '지급 묶음을 찾을 수 없습니다.'}</p>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => setReloadTick((tick) => tick + 1)}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               다시 시도
-            </button>
+            </Button>
             <Link
               href={ROUTES.SETTLEMENT_PAYOUTS}
               className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100"

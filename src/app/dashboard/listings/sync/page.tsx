@@ -8,6 +8,7 @@ import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories
 import type { PendingSyncResponse } from '@/domain/entities/ListingRegistrationEntity';
 import { PendingSyncTable } from './components/PendingSyncTable';
 import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface Banner {
   text: string;
@@ -114,14 +115,15 @@ export default function ListingsSyncPage() {
               등록 요청 후 승인은 이후 확인이 필요합니다. 자동 폴링은 없습니다.
             </p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={handleSweep}
             disabled={isSweeping}
-            className="flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            size="sm"
+            className="flex items-center gap-1"
           >
             {isSweeping ? <Spinner label="확인 중..." /> : '승인 일괄 확인'}
-          </button>
+          </Button>
         </div>
         {sweepBanner && (
           <p className={`rounded px-3 py-2 text-sm ${bannerClass(sweepBanner.tone)}`}>
@@ -134,14 +136,15 @@ export default function ListingsSyncPage() {
       <Card>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-gray-900">마켓 반영 대기</h2>
-          <button
+          <Button
             type="button"
             onClick={handlePush}
             disabled={isPushing || selected.length === 0}
-            className="flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            size="sm"
+            className="flex items-center gap-1"
           >
             {isPushing ? <Spinner label="반영 중..." /> : `선택 항목 마켓 반영 (${selected.length})`}
-          </button>
+          </Button>
         </div>
 
         {pushBanner && (

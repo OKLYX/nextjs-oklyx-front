@@ -6,6 +6,7 @@ import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { ChannelOption } from '../../components/OrderSearchCard';
 import { OrderSearchInput } from '../../components/OrderSearchInput';
 import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 출고관리 화면의 필터·액션 카드.
@@ -162,13 +163,12 @@ export function ShipmentFilterCard({
             >
               {isSyncing ? '동기화 중...' : '동기화'}
             </button>
-            <button
+            <Button
               onClick={onSearch}
               disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
             >
               {isLoading ? '조회 중...' : '조회'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

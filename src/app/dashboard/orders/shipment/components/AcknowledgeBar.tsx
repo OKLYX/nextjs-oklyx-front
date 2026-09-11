@@ -1,6 +1,7 @@
 'use client';
 
 import { Spinner } from '@/presentation/components/Spinner';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 출고관리 표 상단 선택 액션 바 — 선택 건수 · [발주처리] · 페이지 크기 · 결과 메시지.
@@ -44,13 +45,12 @@ export function AcknowledgeBar({
 
         <div className="flex items-center gap-3">
           {canAcknowledge && (
-            <button
+            <Button
               onClick={onAcknowledge}
               disabled={selectedCount === 0 || isOverLimit || isSubmitting}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
             >
               {isSubmitting ? <Spinner label="전송 중..." /> : `발주처리 (${selectedCount}건)`}
-            </button>
+            </Button>
           )}
 
           <select

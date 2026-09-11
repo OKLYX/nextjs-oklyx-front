@@ -6,6 +6,7 @@ import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface ProductDetailViewProps {
   product: Product;
@@ -146,13 +147,14 @@ export function ProductDetailView({ product, onDelete, imageUseCase }: ProductDe
               >
                 취소
               </button>
-              <button
+              <Button
                 onClick={handleDeleteConfirm}
                 disabled={isDeleting}
-                className="flex-1 px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                variant="danger"
+                className="flex-1"
               >
                 {isDeleting ? '삭제 중...' : '삭제'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

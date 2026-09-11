@@ -4,6 +4,7 @@ import type { ProductProfit } from '@/domain/entities/SalesSummary';
 import { PROFIT_PENDING_HINT, formatMoney, formatProfit } from '@/domain/entities/SalesSummary';
 import { Card } from '@/presentation/components/ui/Card';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { Button } from '@/presentation/components/ui/Button';
 
 /** 정렬 가능한 축. 문자열 축(상품명)은 정렬하지 않는다 — 이 표의 질문은 "얼마 남나"다. */
 export type ProductProfitSortKey = 'netQty' | 'grossSales' | 'estNetProfit';
@@ -44,13 +45,12 @@ export function ProductProfitTable({
     return (
       <Card className="space-y-3">
         <p className="text-sm text-red-600">{error}</p>
-        <button
+        <Button
           type="button"
           onClick={onRetry}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           다시 시도
-        </button>
+        </Button>
       </Card>
     );
   }

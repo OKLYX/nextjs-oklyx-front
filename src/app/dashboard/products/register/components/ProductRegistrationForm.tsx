@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from '@/app/dashboard/products/[id]/components/ProductImageGallery';
+import { Input } from '@/presentation/components/ui/Input';
 
 interface ProductRegistrationFormValues {
   productName: string;
@@ -160,13 +161,12 @@ export function ProductRegistrationForm({
             <label htmlFor="productName" className="block text-sm font-medium text-gray-900 mb-1">
               상품명
             </label>
-            <input
+            <Input
               id="productName"
               type="text"
               placeholder="상품명을 입력해주세요"
               disabled={isLoading}
               {...register('productName')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
             {errors.productName && <p className="text-red-600 text-sm mt-1">{errors.productName.message}</p>}
           </div>
@@ -184,13 +184,12 @@ export function ProductRegistrationForm({
             </label>
             <div className="flex gap-2">
               <div className="flex-1">
-                <input
+                <Input
                   id="barcodeId"
                   type="text"
                   placeholder="바코드 ID를 입력해주세요 (선택)"
                   {...register('barcodeId')}
                   disabled={validatedBarcode !== null}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
               {validatedBarcode !== null ? (
@@ -232,13 +231,12 @@ export function ProductRegistrationForm({
               <label htmlFor="brand" className="block text-sm font-medium text-gray-900 mb-1">
                 브랜드
               </label>
-              <input
+              <Input
                 id="brand"
                 type="text"
                 placeholder="브랜드명을 입력해주세요"
                 disabled={isLoading}
                 {...register('brand')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -246,7 +244,7 @@ export function ProductRegistrationForm({
               <label htmlFor="price" className="block text-sm font-medium text-gray-900 mb-1">
                 가격
               </label>
-              <input
+              <Input
                 id="price"
                 type="text"
                 inputMode="numeric"
@@ -254,7 +252,6 @@ export function ProductRegistrationForm({
                 placeholder="0.00"
                 disabled={isLoading}
                 {...register('price')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.price && <p className="text-red-600 text-sm mt-1">{errors.price.message}</p>}
             </div>
@@ -302,7 +299,7 @@ export function ProductRegistrationForm({
               <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
                 높이
               </label>
-              <input
+              <Input
                 id="packageHeight"
                 type="text"
                 inputMode="numeric"
@@ -310,7 +307,6 @@ export function ProductRegistrationForm({
                 placeholder="0"
                 disabled={isLoading}
                 {...register('packageHeight')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.packageHeight && <p className="text-red-600 text-sm mt-1">{errors.packageHeight.message}</p>}
             </div>
@@ -319,7 +315,7 @@ export function ProductRegistrationForm({
               <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
                 길이
               </label>
-              <input
+              <Input
                 id="packageLength"
                 type="text"
                 inputMode="numeric"
@@ -327,7 +323,6 @@ export function ProductRegistrationForm({
                 placeholder="0"
                 disabled={isLoading}
                 {...register('packageLength')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.packageLength && <p className="text-red-600 text-sm mt-1">{errors.packageLength.message}</p>}
             </div>
@@ -338,7 +333,7 @@ export function ProductRegistrationForm({
               <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
                 너비
               </label>
-              <input
+              <Input
                 id="packageWidth"
                 type="text"
                 inputMode="numeric"
@@ -346,7 +341,6 @@ export function ProductRegistrationForm({
                 placeholder="0"
                 disabled={isLoading}
                 {...register('packageWidth')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.packageWidth && <p className="text-red-600 text-sm mt-1">{errors.packageWidth.message}</p>}
             </div>
@@ -355,7 +349,7 @@ export function ProductRegistrationForm({
               <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
                 내용물 양
               </label>
-              <input
+              <Input
                 id="netContent"
                 type="text"
                 inputMode="numeric"
@@ -363,7 +357,6 @@ export function ProductRegistrationForm({
                 placeholder="0"
                 disabled={isLoading}
                 {...register('netContent')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
               {errors.netContent && <p className="text-red-600 text-sm mt-1">{errors.netContent.message}</p>}
             </div>

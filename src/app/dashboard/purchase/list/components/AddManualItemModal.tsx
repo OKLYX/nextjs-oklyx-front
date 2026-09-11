@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { AddManualItemRequest } from '@/application/dto/PurchaseListDTOs';
+import { Input } from '@/presentation/components/ui/Input';
 
 const isIntStr = (v: string) => v.trim() !== '' && Number.isInteger(Number(v));
 
@@ -87,11 +88,10 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
           <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">구성품(Product) ID</label>
-              <input
+              <Input
                 {...register('productId')}
                 type="number"
                 placeholder="예: 100"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {errors.productId && (
                 <p className="mt-1 text-xs text-red-600">{errors.productId.message}</p>
@@ -100,10 +100,9 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">수량</label>
-              <input
+              <Input
                 {...register('quantity')}
                 type="number"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {errors.quantity && (
                 <p className="mt-1 text-xs text-red-600">{errors.quantity.message}</p>

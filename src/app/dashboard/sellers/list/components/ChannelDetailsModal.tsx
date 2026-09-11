@@ -9,6 +9,7 @@ import {
   formatFixedCostAmount,
 } from '@/domain/entities/FixedCost';
 import type { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
+import { Button } from '@/presentation/components/ui/Button';
 
 // Mirror of ChannelRegistrationForm's PLATFORM_OPTIONS for display labels.
 const PLATFORM_LABELS: Record<string, string> = {
@@ -252,12 +253,13 @@ export function ChannelDetailsModal({
               </button>
             )}
             {onDeleteClick && (
-              <button
+              <Button
                 onClick={() => onDeleteClick(channel)}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+                variant="danger"
+                className="flex-1"
               >
                 삭제
-              </button>
+              </Button>
             )}
           </div>
         )}

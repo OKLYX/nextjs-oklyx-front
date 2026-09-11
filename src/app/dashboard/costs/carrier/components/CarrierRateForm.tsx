@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { CreateCarrierRateRequest } from '@/application/dto/CreateCarrierRateRequest';
 import type { UpdateCarrierRateRequest } from '@/application/dto/UpdateCarrierRateRequest';
 import type { Carrier } from '@/domain/entities/CarrierEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 const carrierRateSchema = z.object({
   carrierId: z.string().min(1, '택배사를 선택하세요'),
@@ -246,14 +247,14 @@ export function CarrierRateForm({
 
       <div className="flex justify-between gap-3 pt-4 border-t">
         {onOpenDeleteConfirm && (
-          <button
+          <Button
             type="button"
             onClick={onOpenDeleteConfirm}
             disabled={isLoading || isDeletingCarrier}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            variant="danger"
           >
             삭제
-          </button>
+          </Button>
         )}
         <div className="flex gap-3 ml-auto">
           <button
