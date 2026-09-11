@@ -178,8 +178,9 @@ export function Modal({
             </div>
 
             {/* 본문 — 넘치는 만큼만 여기서 스크롤된다 */}
+            {/* 푸터가 없으면 본문이 패널 바닥에 붙으므로 아래 여백을 본문이 가진다. */}
             <div
-              className="modal-scroll-body flex min-h-0 flex-1 flex-col px-6"
+              className={`modal-scroll-body flex min-h-0 flex-1 flex-col px-6 ${footer ? '' : 'pb-6'}`}
               style={{ '--modal-scroll-pad': '1.5rem' } as CSSProperties}
             >
               {children}
