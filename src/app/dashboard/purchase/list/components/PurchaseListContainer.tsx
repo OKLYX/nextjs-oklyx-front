@@ -183,7 +183,7 @@ export function PurchaseListContainer() {
   };
 
   return (
-    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+    <PageContainer width="xl">
       <PurchaseTabs activeTab={activeTab} onChange={handleTabChange} />
 
         {activeTab === 'list' && (

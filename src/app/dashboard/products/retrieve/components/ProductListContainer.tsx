@@ -69,11 +69,11 @@ export function ProductListContainer() {
   }, []);
 
   return (
-    <PageContainer contentClassName="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl md:text-3xl font-bold">상품 목록</h1>
-        <span className="text-gray-600">총 {totalElements}개</span>
-      </div>
+    <PageContainer
+      title="상품 목록"
+      width="full"
+      action={<span className="text-gray-600">총 {totalElements}개</span>}
+    >
       <SearchBar onSearch={handleSearch} />
       <ProductTable
         products={products}

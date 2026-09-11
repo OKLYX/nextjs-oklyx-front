@@ -271,11 +271,7 @@ export function CategoryContainer() {
   );
 
   return (
-    <PageContainer contentClassName="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">표준 카테고리</h1>
-      </div>
-
+    <PageContainer title="표준 카테고리" width="md">
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
       )}

@@ -167,21 +167,21 @@ export function MasterProductList() {
   }
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold text-gray-900">판매상품 마스터</h1>
+    <PageContainer
+      title="판매상품 마스터"
+      action={
+        <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">총 {totalElements}개</span>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            마스터 추가
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          마스터 추가
-        </button>
-      </div>
-
+      }
+    >
       <MasterProductToolbar query={query} onChange={updateQuery} />
 
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

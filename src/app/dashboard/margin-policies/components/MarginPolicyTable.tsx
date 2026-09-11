@@ -170,9 +170,9 @@ export function MarginPolicyTable() {
   }
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">마진 프리셋</h1>
+    <PageContainer
+      title="마진 프리셋"
+      action={
         <button
           type="button"
           onClick={openCreate}
@@ -180,8 +180,8 @@ export function MarginPolicyTable() {
         >
           새 프리셋
         </button>
-      </div>
-
+      }
+    >
       {showForm && (
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-semibold text-gray-900">

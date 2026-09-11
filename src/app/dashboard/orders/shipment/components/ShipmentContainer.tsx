@@ -360,7 +360,7 @@ export function ShipmentContainer() {
   const showEmpty = hasSearched && !isLoading && error === '' && sorted.length === 0;
 
   return (
-    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+    <PageContainer width="xl">
       <ShipmentFilterCard
         sellers={sellers}
         selectedSellerId={selectedSellerId}

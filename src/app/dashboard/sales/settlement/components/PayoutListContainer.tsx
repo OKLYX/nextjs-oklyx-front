@@ -396,11 +396,7 @@ export function PayoutListContainer() {
   const invalidRange = Boolean(filter.from && filter.to && filter.from > filter.to);
 
   return (
-    <PageContainer>
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-gray-900">정산 내역</h1>
-      </div>
-
+    <PageContainer title="정산 내역">
       <SyncBar
         lastSyncedAt={lastSyncedAt}
         lastPayoutSyncedAt={lastPayoutSyncedAt}

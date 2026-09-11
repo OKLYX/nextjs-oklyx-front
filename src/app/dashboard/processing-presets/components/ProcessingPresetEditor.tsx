@@ -253,11 +253,9 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
   }
 
   return (
-    <PageContainer contentClassName="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {presetId ? '이미지 처리 프리셋 수정' : '이미지 처리 프리셋 생성'}
-        </h1>
+    <PageContainer
+      title={presetId ? '이미지 처리 프리셋 수정' : '이미지 처리 프리셋 생성'}
+      action={
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -275,8 +273,8 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
             {isSaving ? <Spinner label="저장 중..." /> : '저장'}
           </button>
         </div>
-      </div>
-
+      }
+    >
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {/* Meta */}

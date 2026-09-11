@@ -392,11 +392,9 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
     'rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-blue-500 focus:outline-none';
 
   return (
-    <PageContainer contentClassName="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {mode === 'edit' ? '썸네일 템플릿 수정' : '썸네일 템플릿 생성'}
-        </h1>
+    <PageContainer
+      title={mode === 'edit' ? '썸네일 템플릿 수정' : '썸네일 템플릿 생성'}
+      action={
         <div className="flex gap-2">
           <button
             type="button"
@@ -414,8 +412,8 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
             {isSaving ? <Spinner label="저장 중..." /> : '저장'}
           </button>
         </div>
-      </div>
-
+      }
+    >
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {/* Template meta */}

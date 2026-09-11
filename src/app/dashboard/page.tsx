@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
+import { PageContainer } from '@/presentation/components/PageContainer';
 
 export default function DashboardPage() {
   const resetNavigation = useNavigationStore((state) => state.resetNavigation);
@@ -12,8 +13,8 @@ export default function DashboardPage() {
   }, [resetNavigation]);
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold">Welcome to OCLYX</h1>
-    </div>
+    <PageContainer title="Welcome to OCLYX">
+      <></>
+    </PageContainer>
   );
 }

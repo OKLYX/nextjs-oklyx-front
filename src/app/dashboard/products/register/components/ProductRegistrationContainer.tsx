@@ -104,7 +104,7 @@ export function ProductRegistrationContainer() {
   }, [error]);
 
   return (
-    <PageContainer contentClassName="space-y-6">
+    <PageContainer title="상품등록" width="full">
       {error && (
         <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-700">{error}</p>

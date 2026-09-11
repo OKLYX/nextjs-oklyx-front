@@ -110,8 +110,6 @@ export function UserRegistrationForm({
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl flex flex-col min-h-[calc(100vh-7rem)] space-y-8">
-      <h1 className="text-3xl font-bold">회원등록</h1>
-
       {error && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 text-red-700 rounded-lg">
           {error}

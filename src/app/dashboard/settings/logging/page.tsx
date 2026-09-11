@@ -101,11 +101,7 @@ export default function LoggingSettingsPage() {
   const [selectedTarget, setSelectedTarget] = useState('');
 
   return (
-    <PageContainer contentClassName="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">로그 설정</h1>
-      </div>
-
+    <PageContainer title="로그 설정" width="md">
       <div className="bg-white rounded-lg shadow p-6">
         {isError ? (
           <p className="text-sm text-red-600">대상 목록을 불러오지 못했습니다.</p>

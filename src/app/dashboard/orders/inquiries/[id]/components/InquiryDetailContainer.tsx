@@ -230,7 +230,7 @@ export function InquiryDetailContainer({ inquiryId }: InquiryDetailContainerProp
   };
 
   return (
-    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+    <PageContainer width="xl">
       <div>
         <button
           type="button"

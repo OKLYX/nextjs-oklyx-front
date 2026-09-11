@@ -69,9 +69,9 @@ export function ProcessingPresetList() {
   }
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">이미지 처리 프리셋</h1>
+    <PageContainer
+      title="이미지 처리 프리셋"
+      action={
         <button
           type="button"
           onClick={() => router.push(ROUTES.PROCESSING_PRESET_NEW)}
@@ -79,8 +79,8 @@ export function ProcessingPresetList() {
         >
           + 새 프리셋
         </button>
-      </div>
-
+      }
+    >
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {isLoading ? (

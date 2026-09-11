@@ -31,8 +31,7 @@ export function ProductDetailView({ product, onDelete, imageUseCase }: ProductDe
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">상품 상세</h1>
+      <div className="flex items-center justify-end">
         <div className="flex gap-2">
           <button
             onClick={() => router.push(ROUTES.PRODUCT_EDIT(product.id))}
