@@ -106,7 +106,7 @@ export function FixedCostContainer() {
 
   if (!isAdmin) {
     return (
-      <PageContainer width="md">
+      <PageContainer>
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
           관리자만 접근할 수 있습니다.
         </p>
@@ -115,7 +115,7 @@ export function FixedCostContainer() {
   }
 
   return (
-    <PageContainer title="채널 고정비" width="md">
+    <PageContainer title="채널 고정비">
       <div className="space-y-1 text-sm text-gray-600">
         <p>여기서 금액·임계를 고치면 이 항목을 쓰는 모든 채널에 반영됩니다.</p>
         <p>그 달 상품 매출(배송비 제외)이 임계 이상인 달에만 부과됩니다.</p>

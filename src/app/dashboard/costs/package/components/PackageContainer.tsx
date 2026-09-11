@@ -120,7 +120,7 @@ export function PackageContainer() {
   };
 
   return (
-    <PageContainer title="상자비" width="sm">
+    <PageContainer title="상자비">
         <PackageSearchCard
           searchPackage={searchPackage}
           onSearchChange={setSearchPackage}

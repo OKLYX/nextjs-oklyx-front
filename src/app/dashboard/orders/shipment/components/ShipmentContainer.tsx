@@ -363,7 +363,6 @@ export function ShipmentContainer() {
 
   return (
     <PageContainer
-      width="xl"
       title="출고관리"
       action={
         <p className="text-sm text-gray-500 whitespace-nowrap">

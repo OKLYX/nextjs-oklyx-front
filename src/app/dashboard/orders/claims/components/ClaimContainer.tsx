@@ -186,7 +186,7 @@ export function ClaimContainer() {
       : `해당 기간에 ${typeLabel} 내역이 없습니다.`;
 
   return (
-    <PageContainer width="xl" title="반품/교환">
+    <PageContainer title="반품/교환">
       <ClaimTypeTabs value={claimType} onChange={handleTypeChange} disabled={isLoading} />
 
       <ClaimSearchCard

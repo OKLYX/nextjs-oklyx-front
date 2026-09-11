@@ -102,7 +102,7 @@ export default function LoggingSettingsPage() {
   const [selectedTarget, setSelectedTarget] = useState('');
 
   return (
-    <PageContainer title="로그 설정" width="md">
+    <PageContainer title="로그 설정">
       <Card>
         {isError ? (
           <p className="text-sm text-red-600">대상 목록을 불러오지 못했습니다.</p>

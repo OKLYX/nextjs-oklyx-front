@@ -206,7 +206,7 @@ export function ProductListingContainer() {
   };
 
   return (
-    <PageContainer width="xl" title="판매상품 조회">
+    <PageContainer title="판매상품 조회">
       <ProductListingSearchCard
           searchPlatform={searchPlatform}
           onSearchChange={setSearchPlatform}
