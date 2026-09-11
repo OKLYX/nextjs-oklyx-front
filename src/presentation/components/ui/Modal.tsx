@@ -241,12 +241,19 @@ export function Modal({
             </div>
 
             {/* 본문 — 넘치는 만큼만 여기서 스크롤된다 */}
-            {/* 푸터가 없으면 본문이 패널 바닥에 붙으므로 아래 여백을 본문이 가진다. */}
-            <div
-              className={`modal-scroll-body flex min-h-0 flex-1 flex-col px-6 ${footer ? '' : 'pb-6'}`}
-              style={{ '--modal-scroll-pad': '1.5rem' } as CSSProperties}
-            >
-              {children}
+            {/* 본문 = 여백을 가진 바깥 상자 + 그 안에서 스크롤하는 띠, 두 겹이다.
+                ⚠️ 한 겹으로 합치지 말 것 — `.modal-scroll-body` 는 **바깥 상자가 좌우 패딩을
+                가진다**는 전제로 짜여 있다(스크롤바를 그 오른쪽 패딩 안에 주차시켜 콘텐츠 열이
+                흔들리지 않게 한다). 같은 요소에 패딩을 같이 걸면 오른쪽 패딩이 상쇄돼
+                콘텐츠가 오른쪽으로 밀린다.
+                푸터가 없으면 본문이 패널 바닥에 붙으므로 아래 여백도 이 바깥 상자가 가진다. */}
+            <div className={`flex min-h-0 flex-1 flex-col px-6 ${footer ? '' : 'pb-6'}`}>
+              <div
+                className="modal-scroll-body flex min-h-0 flex-1 flex-col"
+                style={{ '--modal-scroll-pad': '1.5rem' } as CSSProperties}
+              >
+                {children}
+              </div>
             </div>
 
             {footer && (
