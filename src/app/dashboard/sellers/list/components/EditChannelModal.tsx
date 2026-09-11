@@ -92,19 +92,6 @@ export function EditChannelModal({
     return new MarketplaceAccountUseCase(repository);
   }, []);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isLoading, onClose]);
-
   if (!isOpen || !channel) {
     return null;
   }

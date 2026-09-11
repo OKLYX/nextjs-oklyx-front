@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { CommissionRateForm } from './CommissionRateForm';
 import type { CommissionRate } from '@/domain/entities/CommissionRateEntity';
 import type { UpdateCommissionRateFormData } from '@/application/schemas/CommissionRateSchema';
@@ -25,19 +24,6 @@ export function EditCommissionRateModal({
   isLoading,
   isDeletingRate,
 }: EditCommissionRateModalProps) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isLoading, onClose]);
-
   if (!isOpen) {
     return null;
   }

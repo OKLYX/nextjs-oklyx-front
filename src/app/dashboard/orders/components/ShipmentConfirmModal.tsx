@@ -1,6 +1,6 @@
 'use client';
 
-import { CSSProperties, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import axios from 'axios';
 import { Upload } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
@@ -219,10 +219,7 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
       <div className="flex flex-1 min-h-0 flex-col">
         {result == null ? (
           /* Only band that scrolls. */
-          <div
-            className="flex-1 min-h-0 modal-scroll-body"
-            style={{ '--modal-scroll-pad': '1.5rem' } as CSSProperties}
-          >
+          <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
                 택배사가 운송장번호를 채운 결과 xlsx를 업로드하세요. 서버가 주문번호로 매칭해 쿠팡에 송장을 등록합니다.
@@ -298,10 +295,7 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
             </div>
 
             {/* Only band that scrolls — no inner vertical scroller (list-table-scroll stays: it is horizontal). */}
-            <div
-              className="flex-1 min-h-0 modal-scroll-body"
-              style={{ '--modal-scroll-pad': '1.5rem' } as CSSProperties}
-            >
+            <div className="flex-1 min-h-0 overflow-y-auto">
               {selected === null &&
                 (result.unmatched.length === 0 &&
                 result.failed.length === 0 &&

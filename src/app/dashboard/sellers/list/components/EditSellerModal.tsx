@@ -51,19 +51,6 @@ export function EditSellerModal({
     fetchSeller();
   }, [isOpen, sellerId, sellerUseCase]);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isLoading, onClose]);
-
   const handleSubmit = async (data: CreateSellerRequest) => {
     try {
       setIsLoading(true);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Modal } from '@/presentation/components/ui/Modal';
 
@@ -106,15 +106,6 @@ export function ChannelPreviewModal({
   data: ChannelPreviewData | null;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    if (!data) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [data, onClose]);
-
   if (!data) return null;
 
   return (

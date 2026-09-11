@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { CarrierRateForm } from './CarrierRateForm';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
@@ -37,19 +36,6 @@ export function EditCarrierRateModal({
   onCloseDeleteConfirm,
   deleteError,
 }: EditCarrierRateModalProps) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading && !isDeletingCarrier) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-      return () => window.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen, isLoading, isDeletingCarrier, onClose]);
-
   if (!isOpen) {
     return null;
   }

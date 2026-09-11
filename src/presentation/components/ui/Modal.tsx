@@ -163,23 +163,50 @@ export function Modal({
   const z = nested ? 'z-[60]' : 'z-50';
   const overlay = variant === 'alert' ? 'bg-black/70' : 'bg-black/50';
 
-  /** 패널 ref 콜백 — 붙는 순간의 값을 기준값으로 잡는다. */
+  /**
+   * 패널 ref 콜백 — 붙는 순간의 값을 기준값으로 잡고, 값 변경 감지를 **네이티브 리스너**로 건다.
+   *
+   * ⚠️ React 합성 이벤트(`onInputCapture`)를 쓰지 말 것 — 중간 컴포넌트가 전파를 멈추거나
+   * 값을 프로그램으로 넣는 경로에서 조용히 누락된다(2026-09-12 실측). 캡처 단계 네이티브
+   * 리스너는 패널 안에서 일어나는 모든 값 변경을 놓치지 않는다.
+   */
   const attachPanel = useCallback((node: HTMLDivElement | null) => {
     panelRef.current = node;
     touchedRef.current = false;
     baselineRef.current = snapshotInputs(node);
-  }, []);
+    if (!node) return;
 
-  /** 손대기 전에는 기준값을 따라 올린다(프리필 흡수). */
-  const refreshBaseline = () => {
-    if (!touchedRef.current) baselineRef.current = snapshotInputs(panelRef.current);
-  };
+    // 값이 바뀌기 **직전**(keydown → input, pointerdown → change)에 기준값을 확정한다.
+    // 아직 손대지 않았을 때만 갱신하므로, 열린 뒤 비동기로 채워지는 값도 여기까지 흡수된다.
+    const captureBaseline = () => {
+      if (!touchedRef.current) baselineRef.current = snapshotInputs(node);
+    };
+    // 실제로 값이 바뀐 순간에만 "손댔다" 로 기록한다.
+    const markTouched = () => {
+      touchedRef.current = true;
+    };
+
+    node.addEventListener('keydown', captureBaseline, true);
+    node.addEventListener('pointerdown', captureBaseline, true);
+    node.addEventListener('input', markTouched, true);
+    node.addEventListener('change', markTouched, true);
+
+    return () => {
+      node.removeEventListener('keydown', captureBaseline, true);
+      node.removeEventListener('pointerdown', captureBaseline, true);
+      node.removeEventListener('input', markTouched, true);
+      node.removeEventListener('change', markTouched, true);
+    };
+  }, []);
 
   // 닫기 경로는 ✕ · ESC · 바깥 클릭 셋뿐이고, 전부 이 함수를 지난다.
   const requestClose = () => {
     if (disableClose) return;
     // 호출부가 `isDirty` 를 명시하면 그것이 이긴다(값이 DOM 컨트롤에 없는 팝업용).
-    const dirty = isDirty || snapshotInputs(panelRef.current) !== baselineRef.current;
+    // ⚠️ 값을 한 번도 바꾸지 않았으면 비교 자체를 하지 않는다 — 비동기로 채워진 값을
+    //    "사용자가 입력한 것" 으로 오판해 빈 팝업에서 확인창이 뜨던 버그(2026-09-12).
+    const dirty =
+      isDirty || (touchedRef.current && snapshotInputs(panelRef.current) !== baselineRef.current);
     if (dirty) {
       setConfirmingClose(true);
       return;
@@ -204,13 +231,6 @@ export function Modal({
           <Dialog.Overlay className={`fixed inset-0 ${overlay} ${z}`} />
           <Dialog.Content
             ref={attachPanel}
-            onPointerDownCapture={() => {
-              touchedRef.current = true;
-            }}
-            onKeyDownCapture={() => {
-              touchedRef.current = true;
-            }}
-            onFocusCapture={refreshBaseline}
             aria-describedby={undefined}
             style={panelStyle(variant, fullHeight)}
             className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${z} flex flex-col rounded-lg bg-white shadow-lg`}
