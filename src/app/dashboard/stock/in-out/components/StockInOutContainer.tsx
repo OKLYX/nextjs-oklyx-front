@@ -144,7 +144,7 @@ export function StockInOutContainer() {
   };
 
   return (
-    <PageContainer>
+    <PageContainer title="입고 조정">
       <div className="bg-white rounded-lg shadow">
         {/* ⚠️ key remount 로 프리필을 적용한다 — effect 안의 동기 setState 는 lint 가 막는다. */}
         <StockInOutForm
