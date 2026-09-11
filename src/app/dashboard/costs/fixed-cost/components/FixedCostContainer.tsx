@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageContainer } from '@/presentation/components/PageContainer';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
@@ -86,7 +86,7 @@ export function FixedCostContainer() {
     }
   };
 
-  // PopupDialogModal 에는 disabled prop 이 없다 → 재진입 가드는 호출부가 진다.
+  // ConfirmDialog 에 isLoading 을 넘기지 않는다 → 재진입 가드는 호출부가 진다.
   const handleDelete = async () => {
     if (isDeleting || !deleteTarget) return;
     setIsDeleting(true);
@@ -164,7 +164,7 @@ export function FixedCostContainer() {
         />
       )}
 
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={deleteTarget !== null}
         title="고정비 항목 삭제"
         message={`"${deleteTarget?.name ?? ''}"을(를) 삭제하시겠습니까?`}
