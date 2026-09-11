@@ -109,7 +109,7 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
 
   if (isLoading) {
     return (
-      <PageContainer width="full">
+      <PageContainer>
         <div className="flex items-center justify-center min-h-96">
           <p className="text-gray-600">Loading...</p>
         </div>
@@ -119,7 +119,7 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
 
   if (error) {
     return (
-      <PageContainer width="full">
+      <PageContainer>
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-700">{error}</p>
         </div>
@@ -129,7 +129,7 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
 
   if (!product) {
     return (
-      <PageContainer width="full">
+      <PageContainer>
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-700">Product not found</p>
         </div>
@@ -139,7 +139,7 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
 
   if (isEditMode) {
     return (
-      <PageContainer title="상품 수정" width="full">
+      <PageContainer title="상품 수정">
         <ProductEditForm
           product={product}
           onSave={handleSave}
@@ -152,7 +152,7 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
   }
 
   return (
-    <PageContainer title="상품 상세" width="full">
+    <PageContainer title="상품 상세">
       <ProductDetailView
         product={product}
         onDelete={handleDelete}

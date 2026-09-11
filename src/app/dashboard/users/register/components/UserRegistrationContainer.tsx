@@ -55,7 +55,7 @@ export function UserRegistrationContainer() {
   };
 
   return (
-    <PageContainer title="회원등록" width="full">
+    <PageContainer title="회원등록">
       <UserRegistrationForm
         onSubmit={handleSubmit}
         onCheckEmail={handleCheckEmail}

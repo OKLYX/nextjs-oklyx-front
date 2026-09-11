@@ -230,7 +230,7 @@ export function InquiryDetailContainer({ inquiryId }: InquiryDetailContainerProp
   };
 
   return (
-    <PageContainer width="xl">
+    <PageContainer>
       <div>
         <button
           type="button"
