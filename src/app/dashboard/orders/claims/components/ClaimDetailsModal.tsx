@@ -70,7 +70,7 @@ export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetails
   const collect = invoiceText(claim.collectCarrierCode, claim.collectInvoiceNo);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg w-full mx-4 max-w-3xl max-h-[85vh] flex flex-col p-8">
         <div className="shrink-0 flex items-center justify-between mb-6">
           <h3 className="text-2xl font-semibold text-gray-900">{typeLabel} 상세</h3>

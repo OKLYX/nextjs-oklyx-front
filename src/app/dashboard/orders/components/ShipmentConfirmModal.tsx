@@ -180,7 +180,7 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
     .join(' · ');
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50">
       {/* Upload screen sizes to its content; the result screen is pinned to h-[85vh] so switching
           buckets never resizes the modal (PLAN 2609_12 D6). Either way the close button stays put. */}
       <div
