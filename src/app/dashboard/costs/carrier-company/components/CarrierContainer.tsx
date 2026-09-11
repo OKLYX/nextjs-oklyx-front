@@ -109,7 +109,6 @@ export function CarrierContainer() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">택배사 관리</h1>
-          <p className="text-gray-600">택배사 마스터를 관리합니다.</p>
         </div>
         <button
           onClick={() => setIsCreateOpen(true)}

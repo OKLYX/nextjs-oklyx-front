@@ -180,10 +180,6 @@ export function ChannelSalesContainer() {
     <PageContainer>
       <div className="space-y-1">
         <h1 className="text-2xl font-bold text-gray-900">매출</h1>
-        <p className="text-sm text-gray-500">
-          채널 하나의 매출을 들여다보는 화면입니다. 그 기간에 무엇이 얼마나 팔렸는지와, 어느 주문에서
-          나온 매출인지를 보여줍니다.
-        </p>
       </div>
 
       <SalesTabs />

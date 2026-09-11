@@ -165,7 +165,6 @@ export function CommissionRateContainer() {
     <PageContainer contentClassName="max-w-2xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">수수료</h1>
-        <p className="text-gray-600">수수료 정보를 조회하고 관리합니다.</p>
       </div>
 
       <CommissionRateSearchCard
