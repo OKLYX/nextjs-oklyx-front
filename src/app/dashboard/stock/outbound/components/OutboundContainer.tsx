@@ -125,7 +125,7 @@ export function OutboundContainer() {
   };
 
   return (
-    <PageContainer>
+    <PageContainer title="출고확인">
       <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">판매자</label>

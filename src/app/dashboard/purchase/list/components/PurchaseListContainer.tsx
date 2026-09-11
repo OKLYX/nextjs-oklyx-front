@@ -183,7 +183,7 @@ export function PurchaseListContainer() {
   };
 
   return (
-    <PageContainer>
+    <PageContainer title="구매목록">
       <PurchaseTabs activeTab={activeTab} onChange={handleTabChange} />
 
         {activeTab === 'list' && (
