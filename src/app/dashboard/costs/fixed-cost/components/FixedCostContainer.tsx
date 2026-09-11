@@ -118,7 +118,6 @@ export function FixedCostContainer() {
     <PageContainer contentClassName="max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">채널 고정비</h1>
-        <p className="text-gray-600">플랫폼이 채널에 매달 청구하는 정액 비용을 관리합니다.</p>
       </div>
 
       <div className="space-y-1 text-sm text-gray-600">
