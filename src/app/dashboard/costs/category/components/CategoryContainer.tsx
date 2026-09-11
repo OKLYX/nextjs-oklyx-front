@@ -274,7 +274,6 @@ export function CategoryContainer() {
     <PageContainer contentClassName="max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">표준 카테고리</h1>
-        <p className="text-gray-600">표준 카테고리를 관리하고 몰별 마켓 코드에 매핑합니다.</p>
       </div>
 
       {error && (

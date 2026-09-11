@@ -399,9 +399,6 @@ export function PayoutListContainer() {
     <PageContainer>
       <div className="space-y-1">
         <h1 className="text-2xl font-bold text-gray-900">정산 내역</h1>
-        <p className="text-sm text-gray-500">
-          쿠팡이 통보한 지급 묶음입니다. 같은 기간에 주정산과 추가정산이 함께 오는 것이 정상입니다.
-        </p>
       </div>
 
       <SyncBar

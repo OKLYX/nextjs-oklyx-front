@@ -128,7 +128,6 @@ export function ProductProfitContainer() {
     <PageContainer>
       <div className="space-y-1">
         <h1 className="text-2xl font-bold text-gray-900">매출</h1>
-        <p className="text-sm text-gray-500">판매일 기준 집계입니다.</p>
       </div>
 
       <SalesTabs />
