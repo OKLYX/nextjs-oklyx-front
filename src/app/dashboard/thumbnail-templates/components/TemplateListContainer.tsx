@@ -79,8 +79,8 @@ export function TemplateListContainer() {
       ) : (
         <div className="rounded-lg bg-white shadow list-table-scroll">
           <table className="text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-600">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-left text-gray-600">
                 <th className="px-4 py-3">ID</th>
                 <th className="px-4 py-3">이름</th>
                 <th className="px-4 py-3">기본</th>

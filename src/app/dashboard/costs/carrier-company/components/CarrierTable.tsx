@@ -3,6 +3,7 @@
 import { Fragment, useState } from 'react';
 import type { Carrier } from '@/domain/entities/CarrierEntity';
 import { CarrierPlatformCodes } from './CarrierPlatformCodes';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface CarrierTableProps {
   carriers: Carrier[];
@@ -22,43 +23,12 @@ export function CarrierTable({
   // Single expansion: only one carrier's platform codes are shown at a time.
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow list-table-scroll">
-        <table className="w-full">
-          <thead className="bg-gray-100 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">택배사명</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">활성</th>
-              <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...Array(5)].map((_, i) => (
-              <tr key={i} className="border-b border-gray-200">
-                {[...Array(3)].map((_, j) => (
-                  <td key={j} className="px-6 py-3">
-                    <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  if (carriers.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-        등록된 택배사가 없습니다.
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white rounded-lg shadow list-table-scroll">
+    <TableCard
+      isLoading={isLoading}
+      isEmpty={carriers.length === 0}
+      emptyMessage="등록된 택배사가 없습니다."
+    >
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-200">
           <tr>
@@ -128,6 +98,6 @@ export function CarrierTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableCard>
   );
 }

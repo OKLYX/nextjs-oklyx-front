@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
+import { Card } from '@/presentation/components/ui/Card';
 
 /**
  * 반품/교환 조회 조건 카드. `OrderSearchCard` 에서 동기화 관련 props 와 채널 select 를 뺀 형태다
@@ -36,7 +37,7 @@ export function ClaimSearchCard({
   resultCount,
 }: ClaimSearchCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold text-gray-900">반품/교환</h2>
       </div>
@@ -111,6 +112,6 @@ export function ClaimSearchCard({
           </button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

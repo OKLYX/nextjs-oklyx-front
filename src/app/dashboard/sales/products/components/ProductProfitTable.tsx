@@ -2,6 +2,8 @@
 
 import type { ProductProfit } from '@/domain/entities/SalesSummary';
 import { PROFIT_PENDING_HINT, formatMoney, formatProfit } from '@/domain/entities/SalesSummary';
+import { Card } from '@/presentation/components/ui/Card';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 /** 정렬 가능한 축. 문자열 축(상품명)은 정렬하지 않는다 — 이 표의 질문은 "얼마 남나"다. */
 export type ProductProfitSortKey = 'netQty' | 'grossSales' | 'estNetProfit';
@@ -40,7 +42,7 @@ export function ProductProfitTable({
 }: ProductProfitTableProps) {
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-3">
+      <Card className="space-y-3">
         <p className="text-sm text-red-600">{error}</p>
         <button
           type="button"
@@ -49,27 +51,19 @@ export function ProductProfitTable({
         >
           다시 시도
         </button>
-      </div>
-    );
-  }
-
-  if (loading && rows.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6 space-y-2">
-        {[0, 1, 2].map((row) => (
-          <div key={row} className="h-8 bg-gray-100 rounded animate-pulse" />
-        ))}
-      </div>
+      </Card>
     );
   }
 
   const sortMark = (key: ProductProfitSortKey) =>
     sortKey === key ? (sortDir === 'desc' ? ' ▼' : ' ▲') : '';
 
-  const columnCount = showChannel ? 7 : 6;
-
   return (
-    <div className="bg-white rounded-lg shadow list-table-scroll">
+    <TableCard
+      isLoading={loading && rows.length === 0}
+      isEmpty={rows.length === 0}
+      emptyMessage="해당 기간에 판매된 주문이 없습니다."
+    >
       {loading && rows.length > 0 && (
         <div className="px-6 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
           조회 중...
@@ -95,7 +89,9 @@ export function ProductProfitTable({
               매출액{sortMark('grossSales')}
             </th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">할인</th>
-            <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">수수료(추정)</th>
+            <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+              수수료(추정)
+            </th>
             <th
               onClick={() => onSort('estNetProfit')}
               className="px-6 py-3 text-right text-sm font-semibold text-gray-900 cursor-pointer select-none"
@@ -105,56 +101,46 @@ export function ProductProfitTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={columnCount} className="px-6 py-8 text-center text-gray-500">
-                해당 기간에 판매된 주문이 없습니다.
+          {rows.map((row) => (
+            <tr
+              key={`${row.masterProductId ?? 'uncategorized'}:${row.accountId ?? 'all'}`}
+              className={row.uncategorized ? 'bg-gray-50 text-gray-500' : ''}
+            >
+              <td
+                className="px-6 py-3 text-sm"
+                title={row.uncategorized ? UNCATEGORIZED_HINT : undefined}
+              >
+                {row.masterProductName}
+              </td>
+              {showChannel && (
+                <td className="px-6 py-3 text-sm text-gray-700">
+                  {row.accountAlias?.trim()
+                    ? row.accountAlias
+                    : row.accountId != null
+                      ? `채널 #${row.accountId}`
+                      : '-'}
+                </td>
+              )}
+              <td className="px-6 py-3 text-sm text-right">{row.netQty.toLocaleString('ko-KR')}</td>
+              <td className="px-6 py-3 text-sm text-right font-semibold">
+                {formatMoney(row.grossSales)}
+              </td>
+              <td className="px-6 py-3 text-sm text-right text-gray-500">
+                {formatMoney(row.discount)}
+              </td>
+              <td className="px-6 py-3 text-sm text-right text-gray-500">
+                {formatMoney(row.estFee)}
+              </td>
+              <td
+                className="px-6 py-3 text-sm text-right"
+                title={row.costBasisReady ? undefined : PROFIT_PENDING_HINT}
+              >
+                {formatProfit(row)}
               </td>
             </tr>
-          ) : (
-            rows.map((row) => (
-              <tr
-                key={`${row.masterProductId ?? 'uncategorized'}:${row.accountId ?? 'all'}`}
-                className={row.uncategorized ? 'bg-gray-50 text-gray-500' : ''}
-              >
-                <td
-                  className="px-6 py-3 text-sm"
-                  title={row.uncategorized ? UNCATEGORIZED_HINT : undefined}
-                >
-                  {row.masterProductName}
-                </td>
-                {showChannel && (
-                  <td className="px-6 py-3 text-sm text-gray-700">
-                    {row.accountAlias?.trim()
-                      ? row.accountAlias
-                      : row.accountId != null
-                        ? `채널 #${row.accountId}`
-                        : '-'}
-                  </td>
-                )}
-                <td className="px-6 py-3 text-sm text-right">
-                  {row.netQty.toLocaleString('ko-KR')}
-                </td>
-                <td className="px-6 py-3 text-sm text-right font-semibold">
-                  {formatMoney(row.grossSales)}
-                </td>
-                <td className="px-6 py-3 text-sm text-right text-gray-500">
-                  {formatMoney(row.discount)}
-                </td>
-                <td className="px-6 py-3 text-sm text-right text-gray-500">
-                  {formatMoney(row.estFee)}
-                </td>
-                <td
-                  className="px-6 py-3 text-sm text-right"
-                  title={row.costBasisReady ? undefined : PROFIT_PENDING_HINT}
-                >
-                  {formatProfit(row)}
-                </td>
-              </tr>
-            ))
-          )}
+          ))}
         </tbody>
       </table>
-    </div>
+    </TableCard>
   );
 }

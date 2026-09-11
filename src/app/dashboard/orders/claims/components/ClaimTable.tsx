@@ -2,6 +2,7 @@
 
 import { CLAIM_STATUS_LABEL, faultTypeText } from '@/domain/entities/ClaimEntity';
 import type { Claim, ClaimType } from '@/domain/entities/ClaimEntity';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface ClaimTableProps {
   // Only 교환 has a 재발송송장 column
@@ -62,121 +63,74 @@ export function ClaimTable({
   onPageChange,
   emptyMessage,
 }: ClaimTableProps) {
-  // Header list and body cells must be derived from the same source, or the skeleton and the
-  // 교환 rows end up one column off.
+  // Header list and body cells must be derived from the same source, or the 교환 rows
+  // end up one column off.
   const headers = HEADERS_BY_TYPE[claimType];
-
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="list-table-scroll">
-          <table className="w-full">
-            <thead className="bg-gray-100 border-b border-gray-200">
-              <tr>
-                {headers.map((col) => (
-                  <th key={col.label} className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[...Array(5)].map((_, i) => (
-                <tr key={i} className="border-b border-gray-200">
-                  {[...Array(headers.length)].map((_, j) => (
-                    <td key={j} className="px-6 py-3">
-                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-        {error}
-      </div>
-    );
-  }
-
-  if (!hasSearched) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-        조회 결과가 여기에 표시됩니다.
-      </div>
-    );
-  }
-
-  if (claims.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-        {emptyMessage}
-      </div>
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="list-table-scroll">
-        <table className="w-full">
-          <thead className="bg-gray-100 border-b border-gray-200">
-            <tr>
-              {headers.map((col) => (
-                <th
-                  key={col.label}
-                  onClick={col.sortable ? onToggleSort : undefined}
-                  className={`px-6 py-3 text-sm font-semibold text-gray-900 ${
-                    col.align === 'right' ? 'text-right' : 'text-left'
-                  } ${col.sortable ? 'cursor-pointer select-none hover:bg-gray-200 transition-colors' : ''}`}
-                >
-                  {col.label}
-                  {col.sortable && <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {claims.map((claim) => (
-              <tr
-                key={claim.id}
-                onClick={() => onRowClick(claim)}
-                className="hover:bg-gray-50 transition-colors cursor-pointer"
+    <TableCard
+      isLoading={isLoading}
+      isEmpty={!hasSearched || claims.length === 0}
+      emptyMessage={hasSearched ? emptyMessage : '조회 결과가 여기에 표시됩니다.'}
+    >
+      <table className="w-full">
+        <thead className="bg-gray-100 border-b border-gray-200">
+          <tr>
+            {headers.map((col) => (
+              <th
+                key={col.label}
+                onClick={col.sortable ? onToggleSort : undefined}
+                className={`px-6 py-3 text-sm font-semibold text-gray-900 ${
+                  col.align === 'right' ? 'text-right' : 'text-left'
+                } ${col.sortable ? 'cursor-pointer select-none hover:bg-gray-200 transition-colors' : ''}`}
               >
-                <td className="px-6 py-3 text-sm text-gray-700">{formatDate(claim.receivedAt)}</td>
-                <td className="px-6 py-3 text-sm text-gray-700">
-                  {claim.externalOrderId}
-                  {!claim.linked && (
-                    <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
-                      주문 미연결
-                    </span>
-                  )}
-                </td>
-                <td className="px-6 py-3 text-sm text-gray-700">{claim.itemName ?? '-'}</td>
-                <td className="px-6 py-3 text-sm text-right text-gray-700">{claim.quantity}</td>
-                <td className="px-6 py-3 text-sm text-gray-700">
-                  {claim.reasonText ?? claim.reasonCode ?? '-'}
-                </td>
-                <td className="px-6 py-3 text-sm text-gray-700">{faultTypeText(claim.faultType)}</td>
-                <td className="px-6 py-3 text-sm text-gray-700">
-                  <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
-                    {CLAIM_STATUS_LABEL[claim.status]}
-                  </span>
-                </td>
-                <td className="px-6 py-3 text-sm text-gray-700">{claim.collectInvoiceNo ?? '-'}</td>
-                {claimType === 'EXCHANGE' && (
-                  <td className="px-6 py-3 text-sm text-gray-700">{claim.reshipInvoiceNo ?? '-'}</td>
-                )}
-              </tr>
+                {col.label}
+                {col.sortable && <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              </th>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {claims.map((claim) => (
+            <tr
+              key={claim.id}
+              onClick={() => onRowClick(claim)}
+              className="hover:bg-gray-50 transition-colors cursor-pointer"
+            >
+              <td className="px-6 py-3 text-sm text-gray-700">{formatDate(claim.receivedAt)}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                {claim.externalOrderId}
+                {!claim.linked && (
+                  <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
+                    주문 미연결
+                  </span>
+                )}
+              </td>
+              <td className="px-6 py-3 text-sm text-gray-700">{claim.itemName ?? '-'}</td>
+              <td className="px-6 py-3 text-sm text-right text-gray-700">{claim.quantity}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                {claim.reasonText ?? claim.reasonCode ?? '-'}
+              </td>
+              <td className="px-6 py-3 text-sm text-gray-700">{faultTypeText(claim.faultType)}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+                  {CLAIM_STATUS_LABEL[claim.status]}
+                </span>
+              </td>
+              <td className="px-6 py-3 text-sm text-gray-700">{claim.collectInvoiceNo ?? '-'}</td>
+              {claimType === 'EXCHANGE' && (
+                <td className="px-6 py-3 text-sm text-gray-700">{claim.reshipInvoiceNo ?? '-'}</td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {totalPages > 1 && (
         <div className="px-6 py-4 flex items-center justify-center gap-4 border-t border-gray-200">
@@ -199,6 +153,6 @@ export function ClaimTable({
           </button>
         </div>
       )}
-    </div>
+    </TableCard>
   );
 }

@@ -174,7 +174,7 @@ export function CreateMasterFromListingModal({
 
             <div className="my-3 min-h-0 flex-1 overflow-x-auto overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-100">
+                <thead className="bg-gray-100 border-b border-gray-200">
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold text-gray-800">옵션</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-800">쿠팡 옵션명</th>

@@ -6,7 +6,7 @@ import { INQUIRY_STATUS_LABEL } from '@/domain/entities/InquiryEntity';
 import type { Inquiry, InquiryStatus } from '@/domain/entities/InquiryEntity';
 import { channelOptionLabel } from '@/app/dashboard/orders/components/OrderSearchCard';
 import { Pagination } from '@/presentation/components/Pagination';
-import { Spinner } from '@/presentation/components/Spinner';
+import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface InquiryTableProps {
   inquiries: Inquiry[];
@@ -68,14 +68,6 @@ export function InquiryTable({
 }: InquiryTableProps) {
   const router = useRouter();
 
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 flex justify-center text-gray-500">
-        <Spinner size={24} label="조회 중..." />
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 flex items-center justify-between gap-4">
@@ -91,87 +83,76 @@ export function InquiryTable({
     );
   }
 
-  if (!hasSearched) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-        조회 조건을 선택하고 [조회]를 눌러 주세요.
-      </div>
-    );
-  }
-
-  if (inquiries.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">{emptyMessage}</div>
-    );
-  }
-
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="list-table-scroll">
-        <table className="w-full">
-          <thead className="bg-gray-100 border-b border-gray-200">
-            <tr>
-              {HEADERS.map((col) => (
-                <th
-                  key={col.label}
-                  onClick={col.sortable ? onToggleSort : undefined}
-                  className={`px-6 py-3 text-left text-sm font-semibold text-gray-900 ${
-                    col.sortable
-                      ? 'cursor-pointer select-none hover:bg-gray-200 transition-colors'
-                      : ''
-                  }`}
-                >
-                  {col.label}
-                  {col.sortable && <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {inquiries.map((inquiry) => (
-              <tr
-                key={inquiry.id}
-                // 상세는 모달이 아니라 페이지다(D16) — 좌우 2단에 답변 작성까지 들어가고,
-                // 작성 중 바깥 클릭으로 닫히면 쓴 글이 날아간다.
-                onClick={() => router.push(`${ROUTES.ORDERS_INQUIRIES}/${inquiry.id}`)}
-                className="hover:bg-gray-50 transition-colors cursor-pointer"
+    <TableCard
+      isLoading={isLoading}
+      loadingMessage="조회 중..."
+      isEmpty={!hasSearched || inquiries.length === 0}
+      emptyMessage={hasSearched ? emptyMessage : '조회 조건을 선택하고 [조회]를 눌러 주세요.'}
+    >
+      <table className="w-full">
+        <thead className="bg-gray-100 border-b border-gray-200">
+          <tr>
+            {HEADERS.map((col) => (
+              <th
+                key={col.label}
+                onClick={col.sortable ? onToggleSort : undefined}
+                className={`px-6 py-3 text-left text-sm font-semibold text-gray-900 ${
+                  col.sortable
+                    ? 'cursor-pointer select-none hover:bg-gray-200 transition-colors'
+                    : ''
+                }`}
               >
-                <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
-                  {formatDate(inquiry.inquiredAt)}
-                </td>
-                <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
-                  {channelOptionLabel(inquiry.marketplaceAccountId, inquiry.accountAlias)}
-                </td>
-                <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
-                  {/* 모르는 코드도 공백으로 두지 않는다 — 원문을 그대로 보여준다. */}
-                  {typeLabelMap[inquiry.inquiryType] ?? inquiry.inquiryType}
-                </td>
-                <td className="px-6 py-3 text-sm text-gray-700">
-                  {inquiry.itemName ?? '-'}
-                  {!inquiry.linked && (
-                    <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">
-                      주문 미연결
-                    </span>
-                  )}
-                </td>
-                <td className="px-6 py-3 text-sm text-gray-700 max-w-xs truncate">
-                  {inquiry.content}
-                </td>
-                <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded-full ${STATUS_BADGE[inquiry.status]}`}
-                  >
-                    {INQUIRY_STATUS_LABEL[inquiry.status]}
-                  </span>
-                </td>
-                <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
-                  {formatDate(inquiry.answeredAt)}
-                </td>
-              </tr>
+                {col.label}
+                {col.sortable && <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              </th>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {inquiries.map((inquiry) => (
+            <tr
+              key={inquiry.id}
+              // 상세는 모달이 아니라 페이지다(D16) — 좌우 2단에 답변 작성까지 들어가고,
+              // 작성 중 바깥 클릭으로 닫히면 쓴 글이 날아간다.
+              onClick={() => router.push(`${ROUTES.ORDERS_INQUIRIES}/${inquiry.id}`)}
+              className="hover:bg-gray-50 transition-colors cursor-pointer"
+            >
+              <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
+                {formatDate(inquiry.inquiredAt)}
+              </td>
+              <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
+                {channelOptionLabel(inquiry.marketplaceAccountId, inquiry.accountAlias)}
+              </td>
+              <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
+                {/* 모르는 코드도 공백으로 두지 않는다 — 원문을 그대로 보여준다. */}
+                {typeLabelMap[inquiry.inquiryType] ?? inquiry.inquiryType}
+              </td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                {inquiry.itemName ?? '-'}
+                {!inquiry.linked && (
+                  <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">
+                    주문 미연결
+                  </span>
+                )}
+              </td>
+              <td className="px-6 py-3 text-sm text-gray-700 max-w-xs truncate">
+                {inquiry.content}
+              </td>
+              <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
+                <span
+                  className={`px-2 py-0.5 text-xs rounded-full ${STATUS_BADGE[inquiry.status]}`}
+                >
+                  {INQUIRY_STATUS_LABEL[inquiry.status]}
+                </span>
+              </td>
+              <td className="px-6 py-3 text-sm text-gray-700 whitespace-nowrap">
+                {formatDate(inquiry.answeredAt)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {totalPages > 1 && (
         <div className="px-6 py-4 border-t border-gray-200">
@@ -182,6 +163,6 @@ export function InquiryTable({
           />
         </div>
       )}
-    </div>
+    </TableCard>
   );
 }

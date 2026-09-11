@@ -5,6 +5,7 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { ChannelOption } from '../../components/OrderSearchCard';
 import { OrderSearchInput } from '../../components/OrderSearchInput';
+import { Card } from '@/presentation/components/ui/Card';
 
 /**
  * 출고관리 화면의 필터·액션 카드.
@@ -71,7 +72,7 @@ export function ShipmentFilterCard({
   onSearchTermChange,
 }: ShipmentFilterCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card>
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">출고관리</h2>
@@ -171,6 +172,6 @@ export function ShipmentFilterCard({
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

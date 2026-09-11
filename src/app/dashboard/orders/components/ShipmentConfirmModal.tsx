@@ -50,8 +50,8 @@ function ResultTable({
   return (
     <div className={`border border-gray-200 rounded-lg ${wide ? 'list-table-scroll' : 'overflow-x-auto'}`}>
       <table className="w-full">
-        <thead>
-          <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
+        <thead className="bg-gray-100 border-b border-gray-200">
+          <tr className="text-left text-xs font-medium text-gray-500">
             {headers.map((h) => (
               <th key={h} className="px-4 py-2">
                 {h}

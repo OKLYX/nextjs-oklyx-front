@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/presentation/components/ui/Card';
+
 interface UserSearchFormProps {
   nameSearch: string;
   emailSearch: string;
@@ -24,7 +26,7 @@ export function UserSearchForm({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card>
       <h2 className="text-2xl font-bold text-gray-900 mb-6">회원 검색</h2>
 
       <div className="space-y-4">
@@ -72,6 +74,6 @@ export function UserSearchForm({
           </button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

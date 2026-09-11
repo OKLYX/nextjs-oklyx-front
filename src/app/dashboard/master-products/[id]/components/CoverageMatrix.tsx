@@ -1037,8 +1037,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           </p>
         ) : (
           <table>
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-sm text-gray-600">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-left text-sm text-gray-600">
                 <th className="px-4 py-3">
                   {isAdmin && unregisteredRows.length > 0 ? (
                     <label className="flex items-center gap-1 text-xs font-normal">

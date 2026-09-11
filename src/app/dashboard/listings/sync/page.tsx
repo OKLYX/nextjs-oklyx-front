@@ -7,6 +7,7 @@ import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegist
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import type { PendingSyncResponse } from '@/domain/entities/ListingRegistrationEntity';
 import { PendingSyncTable } from './components/PendingSyncTable';
+import { Card } from '@/presentation/components/ui/Card';
 
 interface Banner {
   text: string;
@@ -105,7 +106,7 @@ export default function ListingsSyncPage() {
   return (
     <PageContainer title="마켓 반영/승인">
       {/* Section 1: approval sweep */}
-      <section className="rounded-lg bg-white p-4 shadow">
+      <Card>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div>
             <h2 className="text-base font-semibold text-gray-900">미완료 승인 확인</h2>
@@ -127,10 +128,10 @@ export default function ListingsSyncPage() {
             {sweepBanner.text}
           </p>
         )}
-      </section>
+      </Card>
 
       {/* Section 2: pending market-sync */}
-      <section className="rounded-lg bg-white p-4 shadow">
+      <Card>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-gray-900">마켓 반영 대기</h2>
           <button
@@ -159,7 +160,7 @@ export default function ListingsSyncPage() {
             <PendingSyncTable rows={rows} selected={selected} onToggle={toggle} />
           )}
         </div>
-      </section>
+      </Card>
     </PageContainer>
   );
 }
