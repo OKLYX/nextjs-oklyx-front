@@ -24,7 +24,12 @@ export interface PayoutSummary {
   revenueRecognitionMonth: string | null;
   recognitionFrom: string | null;
   recognitionTo: string | null;
+  /** 지급(예정)일. 🔴 실제 입금 시점 판정은 이 날짜 + `status` 로 한다. */
   settlementDate: string | null;
+  /**
+   * 🔴 <b>지급내역 API 는 이 필드를 주지 않는다</b>(2026-09-11 문서 확인) — 지급 묶음에서는 항상 null 이다.
+   * 날짜를 보여줄 때 이것부터 읽으면 영영 빈칸이 된다. `settlementDate` 를 쓸 것.
+   */
   finalSettlementDate: string | null;
   totalSale: number | null;
   serviceFee: number | null;

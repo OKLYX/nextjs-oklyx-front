@@ -109,9 +109,11 @@ export function ChannelPayoutList({ payouts, isLoading, error, onOpen }: Channel
                   <span className="text-gray-900 tabular-nums">
                     {formatMoney(payout.finalAmount)}원
                   </span>
+                  {/* 🔴 날짜는 `settlementDate` 다 — `finalSettlementDate` 는 지급내역 API 가 주지 않아
+                      항상 비어 있다(2026-09-11 문서 확인). 그걸 쓰면 날짜가 영영 안 보인다. */}
                   <span className="text-gray-500">
                     지급 {payoutStatusLabel(payout.status)}
-                    {payout.finalSettlementDate ? ` ${payout.finalSettlementDate.slice(5)}` : ''}
+                    {payout.settlementDate ? ` ${payout.settlementDate.slice(5)}` : ''}
                   </span>
                   <span className={recon.className}>{recon.text}</span>
                   <button
