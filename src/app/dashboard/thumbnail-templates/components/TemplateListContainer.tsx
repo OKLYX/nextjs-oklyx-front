@@ -8,6 +8,7 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
 import type { ThumbnailTemplate } from '@/domain/entities/ThumbnailEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 export function TemplateListContainer() {
   const router = useRouter();
@@ -57,13 +58,12 @@ export function TemplateListContainer() {
     <PageContainer
       title="썸네일 템플릿"
       action={
-        <button
+        <Button
           type="button"
           onClick={() => router.push(ROUTES.THUMBNAIL_TEMPLATE_NEW)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           + 템플릿 생성
-        </button>
+        </Button>
       }
     >
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}

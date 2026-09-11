@@ -55,6 +55,7 @@ import {
   noticesToSubmit,
   submitNoticeGroup,
 } from '../[id]/components/categoryMetaValidation';
+import { Input } from '@/presentation/components/ui/Input';
 
 // Per-platform create-mode meta: user values + the loaded schema (for the submit gate).
 type MetaEntry = { attributes: CategoryAttribute[]; notices: CategoryNotice[] } & CategoryMetaCreateValue;
@@ -730,8 +731,8 @@ export function MasterProductFormModal({
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">마스터 이름 *</label>
-            <input
-              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+            <Input
+              size="sm"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -1029,8 +1030,8 @@ export function MasterProductFormModal({
                 {fields.map((f) => (
                   <div key={f.key}>
                     <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
-                    <input
-                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                    <Input
+                      size="sm"
                       value={fieldValues[f.key] ?? ''}
                       placeholder={
                         (BUILTIN_FIELD_KEYS as readonly string[]).includes(f.key)

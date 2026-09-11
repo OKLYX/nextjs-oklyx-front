@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
 import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 반품/교환 조회 조건 카드. `OrderSearchCard` 에서 동기화 관련 props 와 채널 select 를 뺀 형태다
@@ -103,13 +104,12 @@ export function ClaimSearchCard({
               <p className="text-sm text-gray-600">{resultCount}개의 결과</p>
             )}
           </div>
-          <button
+          <Button
             onClick={onSearch}
             disabled={isLoading}
-            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
             {isLoading ? '조회 중...' : '조회'}
-          </button>
+          </Button>
         </div>
       </div>
     </Card>

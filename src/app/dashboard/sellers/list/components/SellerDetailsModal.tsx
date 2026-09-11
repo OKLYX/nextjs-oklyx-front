@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface SellerDetailsModalProps {
   isOpen: boolean;
@@ -160,13 +161,14 @@ export function SellerDetailsModal({
             </button>
           )}
           {seller && onDeleteClick && (
-            <button
+            <Button
               onClick={() => onDeleteClick(seller.id)}
               disabled={isLoading}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors text-sm font-medium"
+              variant="danger"
+              className="flex-1"
             >
               삭제
-            </button>
+            </Button>
           )}
         </div>
       </div>

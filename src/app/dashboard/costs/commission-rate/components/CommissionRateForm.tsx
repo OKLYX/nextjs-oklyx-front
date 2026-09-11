@@ -13,6 +13,7 @@ import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
 import type { Category } from '@/domain/entities/CategoryEntity';
 import type { CommissionRate } from '@/domain/entities/CommissionRateEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface CommissionRateFormProps {
   initialData?: CommissionRate;
@@ -240,14 +241,14 @@ export function CommissionRateForm({
           {isSubmitting || isLoading ? submitLoadingLabel : submitButtonLabel}
         </button>
         {isEditMode && onOpenDeleteConfirm && (
-          <button
+          <Button
             type="button"
             onClick={onOpenDeleteConfirm}
             disabled={isSubmitting || isLoading || isDeletingRate}
-            className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors font-medium"
+            variant="danger"
           >
             {isDeletingRate ? '삭제 중...' : '삭제'}
-          </button>
+          </Button>
         )}
       </div>
     </form>

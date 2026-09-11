@@ -5,6 +5,7 @@ import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
 import { OrderSearchInput } from './OrderSearchInput';
 import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 채널(계정) 셀렉트 옵션. 출고관리 필터 카드도 같은 shape 을 쓴다.
@@ -168,13 +169,12 @@ export function OrderSearchCard({
             >
               {isSyncing ? '동기화 중...' : '동기화'}
             </button>
-            <button
+            <Button
               onClick={onSearch}
               disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
             >
               {isLoading ? '조회 중...' : '조회'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

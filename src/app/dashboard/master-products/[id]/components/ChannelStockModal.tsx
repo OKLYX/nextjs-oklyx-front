@@ -6,6 +6,7 @@ import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegist
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { ListingOptionSummary } from '@/domain/entities/ListingRegistrationEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface ChannelStockModalProps {
   listingId: number;
@@ -206,14 +207,15 @@ export function ChannelStockModal({
           >
             취소
           </button>
-          <button
+          <Button
             type="button"
             onClick={handleSave}
             disabled={isLoading || isSaving || invalid || dirty.length === 0}
-            className="flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            size="sm"
+            className="flex items-center gap-1"
           >
             {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

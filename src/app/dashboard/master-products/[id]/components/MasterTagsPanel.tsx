@@ -6,6 +6,7 @@ import { TagChipsInput } from '@/presentation/components/TagChipsInput';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface MasterTagsPanelProps {
   master: MasterProductResponse; // initial values come from the parent (no getById here)
@@ -104,14 +105,14 @@ export function MasterTagsPanel({ master, useCase, onSaved }: MasterTagsPanelPro
 
         {isEditing ? (
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
+              className="inline-flex items-center gap-2"
             >
               {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-            </button>
+            </Button>
             <button
               type="button"
               onClick={() => {

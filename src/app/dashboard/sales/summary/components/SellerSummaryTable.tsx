@@ -13,6 +13,7 @@ import {
 import { SellerChannelRows } from './SellerChannelRows';
 import { Card } from '@/presentation/components/ui/Card';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface SellerSummaryTableProps {
   rows: SellerSales[];
@@ -71,13 +72,12 @@ export function SellerSummaryTable({
     return (
       <Card className="space-y-3">
         <p className="text-sm text-red-600">{error}</p>
-        <button
+        <Button
           type="button"
           onClick={onRetry}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           다시 시도
-        </button>
+        </Button>
       </Card>
     );
   }

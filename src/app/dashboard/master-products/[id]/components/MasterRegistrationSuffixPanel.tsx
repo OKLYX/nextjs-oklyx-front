@@ -6,6 +6,7 @@ import { OptionCheckSuffixControl } from '@/presentation/components/OptionCheckS
 import type { OptionCheckSuffixConfig } from '@/domain/entities/OptionCheckSuffix';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface MasterRegistrationSuffixPanelProps {
   masterId: number;
@@ -105,14 +106,14 @@ export function MasterRegistrationSuffixPanel({
             <p className="text-sm text-green-700">추가 문구를 저장했습니다.</p>
           )}
 
-          <button
+          <Button
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
+            className="inline-flex items-center gap-2"
           >
             {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-          </button>
+          </Button>
         </div>
       )}
     </Card>

@@ -6,6 +6,8 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import { Button } from '@/presentation/components/ui/Button';
+import { Input } from '@/presentation/components/ui/Input';
 
 interface MasterBasicInfoPanelProps {
   master: MasterProductResponse; // initial values come from the parent (no getById here)
@@ -82,8 +84,8 @@ export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicIn
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">마스터 이름 *</label>
           {isEditing ? (
-            <input
-              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+            <Input
+              size="sm"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -139,14 +141,14 @@ export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicIn
 
         {isEditing ? (
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={handleSave}
               disabled={isSaving || name.trim() === ''}
-              className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
+              className="inline-flex items-center gap-2"
             >
               {isSaving ? <Spinner label="저장 중..." /> : '저장'}
-            </button>
+            </Button>
             <button
               type="button"
               onClick={cancelEdit}

@@ -28,6 +28,7 @@ import type { MasterProductResponse } from '@/domain/entities/MasterProductEntit
 import { parseQuery, toApiParams, toSearchParams, type MasterListQuery } from '../masterListQuery';
 import { MasterProductToolbar } from './MasterProductToolbar';
 import { MasterProductFormModal } from './MasterProductFormModal';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 판매상품 마스터 목록(서버 페이징·정렬·검색) + **생성** 모달 진입점 (83B / 111).
@@ -172,13 +173,12 @@ export function MasterProductList() {
       action={
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">총 {totalElements}개</span>
-          <button
+          <Button
             type="button"
             onClick={openCreate}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             마스터 추가
-          </button>
+          </Button>
         </div>
       }
     >

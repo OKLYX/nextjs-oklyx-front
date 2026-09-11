@@ -10,6 +10,7 @@ import {
   payoutStatusLabel,
   settlementTypeLabel,
 } from '@/domain/entities/Settlement';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 지급 묶음 목록 표 (FEATURE_2609_30 / 05 Step 2).
@@ -70,13 +71,12 @@ export function PayoutTable({ rows, loading, error, onOpen, onRetry }: PayoutTab
     return (
       <Card className="space-y-3">
         <p className="text-sm text-red-600">{error}</p>
-        <button
+        <Button
           type="button"
           onClick={onRetry}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           다시 시도
-        </button>
+        </Button>
       </Card>
     );
   }

@@ -9,6 +9,7 @@ import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { ProcessingPresetUseCase } from '@/application/usecases/ProcessingPresetUseCase';
 import { ProcessingPresetRepositoryImpl } from '@/infrastructure/repositories/ProcessingPresetRepositoryImpl';
 import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity';
+import { Button } from '@/presentation/components/ui/Button';
 
 export function ProcessingPresetList() {
   const router = useRouter();
@@ -72,13 +73,12 @@ export function ProcessingPresetList() {
     <PageContainer
       title="이미지 처리 프리셋"
       action={
-        <button
+        <Button
           type="button"
           onClick={() => router.push(ROUTES.PROCESSING_PRESET_NEW)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           + 새 프리셋
-        </button>
+        </Button>
       }
     >
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}

@@ -5,6 +5,7 @@ import type { SaleMonthSettlement } from '@/domain/entities/Settlement';
 import { formatMoney, monthLabel } from '@/domain/entities/Settlement';
 import { Card } from '@/presentation/components/ui/Card';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 판매월 기준 정산 표 — "그 달 판매가 언제 얼마로 정산됐나" (FEATURE_2609_34).
@@ -48,13 +49,12 @@ export function SaleMonthTable({ rows, loading, error, onRetry }: SaleMonthTable
     return (
       <Card className="space-y-3">
         <p className="text-sm text-red-600">{error}</p>
-        <button
+        <Button
           type="button"
           onClick={onRetry}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           다시 시도
-        </button>
+        </Button>
       </Card>
     );
   }

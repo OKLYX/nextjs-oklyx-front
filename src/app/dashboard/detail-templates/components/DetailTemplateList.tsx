@@ -12,6 +12,7 @@ import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroup
 import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import type { DetailTemplateResponse } from '@/domain/entities/DetailTemplateEntity';
 import { DetailImageGroupModal } from './DetailImageGroupModal';
+import { Button } from '@/presentation/components/ui/Button';
 
 export function DetailTemplateList() {
   const router = useRouter();
@@ -87,13 +88,12 @@ export function DetailTemplateList() {
           >
             이미지 그룹 관리
           </button>
-          <button
+          <Button
             type="button"
             onClick={() => router.push(ROUTES.DETAIL_TEMPLATE_NEW)}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             + 새 템플릿
-          </button>
+          </Button>
         </div>
       }
     >

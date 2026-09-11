@@ -7,6 +7,7 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { addressHead } from '@/infrastructure/utils/address';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { ShippingLabelExportRow } from '@/application/dto/ShippingLabelDTOs';
+import { Button } from '@/presentation/components/ui/Button';
 
 /**
  * 송장 접수시트 미리보기·택배수량 편집 모달 (Shipping Label V2)
@@ -215,13 +216,12 @@ export function ShippingLabelPreviewModal({
           >
             닫기
           </button>
-          <button
+          <Button
             onClick={handleExport}
             disabled={isPreviewing || isExporting || isEmpty || !!previewError}
-            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
             {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface ProductListingSearchCardProps {
   searchPlatform: string;
@@ -61,13 +62,12 @@ export function ProductListingSearchCard({
               <p className="text-sm text-gray-600">{resultCount}개의 결과</p>
             )}
           </div>
-          <button
+          <Button
             onClick={onSearch}
             disabled={isLoading}
-            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
             {isLoading ? '검색 중...' : '검색'}
-          </button>
+          </Button>
         </div>
       </div>
     </Card>
