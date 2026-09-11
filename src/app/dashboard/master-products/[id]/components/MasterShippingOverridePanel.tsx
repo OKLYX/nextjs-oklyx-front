@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { ShippingOverrideFields } from '@/presentation/components/ShippingOverrideFields';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import {
@@ -279,7 +279,7 @@ export function MasterShippingOverridePanel({
         </div>
       )}
 
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={confirmApply}
         title="선택한 채널에 강제 적용"
         message={

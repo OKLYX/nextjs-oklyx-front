@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { TagChipsInput } from '@/presentation/components/TagChipsInput';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { getImageUrl } from '@/infrastructure/utils/imageUrl';
 import { ShippingOverrideFields } from '@/presentation/components/ShippingOverrideFields';
 import {
@@ -1253,7 +1253,7 @@ export function MasterProductFormModal({
         </div>
       )}
 
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={confirmDialog != null}
         title="옵션 삭제 확인"
         message={confirmDialog?.message ?? ''}
@@ -1265,6 +1265,7 @@ export function MasterProductFormModal({
           setConfirmDialog(null);
         }}
         onCancel={() => setConfirmDialog(null)}
+        nested
       />
     </div>
   );

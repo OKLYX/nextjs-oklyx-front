@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
@@ -168,7 +168,7 @@ export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicIn
         )}
       </div>
 
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={confirmOff}
         title="마스터 비활성화"
         message="비활성화하면 목록에서 숨겨집니다. 계속하시겠습니까?"

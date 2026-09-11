@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ShippingOverrideFields } from '@/presentation/components/ShippingOverrideFields';
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import {
   configToOverride,
@@ -133,7 +133,7 @@ export function ChannelShippingOverrideModal({
   // (ShippingOverrideKeys.filterListing), so the channel is back to its just-created state and
   // follows 마스터 ?? 계정 again. Same post-save flow as handleSave (parent patches the cell in place).
   const handleReset = async () => {
-    if (isResetting) return; // PopupDialogModal has no disabled prop — block re-entry here.
+    if (isResetting) return; // `isLoading` is not passed to ConfirmDialog — block re-entry here.
     try {
       setIsResetting(true);
       setError('');
@@ -224,7 +224,7 @@ export function ChannelShippingOverrideModal({
         </div>
       </div>
 
-      <PopupDialogModal
+      <ConfirmDialog
         isOpen={isConfirmOpen}
         title="채널 배송 설정 초기화"
         message={
@@ -246,6 +246,7 @@ export function ChannelShippingOverrideModal({
         onConfirm={handleReset}
         onCancel={() => !isResetting && setIsConfirmOpen(false)}
         isDangerous
+        nested
       />
     </>
   );

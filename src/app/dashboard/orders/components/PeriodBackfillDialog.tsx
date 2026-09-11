@@ -1,6 +1,6 @@
 'use client';
 
-import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 
 /**
  * 빈 달을 조회했을 때 "쿠팡에서 불러올까요?"를 묻는 확인 다이얼로그 (FEATURE_2609_10, PLAN D2)
@@ -8,7 +8,7 @@ import { PopupDialogModal } from '@/presentation/components/PopupDialogModal';
  * **용도**: 월 옵션으로 조회한 결과가 0건일 때 1회 노출. 승낙하면 그 달을 계정 단위로 백필한다.
  * **파일**: src/app/dashboard/orders/components/PeriodBackfillDialog.tsx
  *
- * ⚠️ 확인 UI 는 공통 `PopupDialogModal` 을 재사용한다(프로젝트 규칙: 확인 모달 신규 작성 금지).
+ * ⚠️ 확인 UI 는 공통 `ConfirmDialog` 을 재사용한다(프로젝트 규칙: 확인 모달 신규 작성 금지).
  *    이 컴포넌트는 문구·버튼 라벨을 이 기능에 고정하는 얇은 래퍼일 뿐이다.
  * ⚠️ 두 번째 보조 문구(취소 내역 고지)는 PLAN D4 의 고지다 — 지우지 말 것.
  * ⚠️ `최근 2주` 에서는 절대 열리지 않는다(호출부 `isMonthPeriod` 가드, PLAN D1).
@@ -32,7 +32,7 @@ export function PeriodBackfillDialog({
   onCancel,
 }: PeriodBackfillDialogProps) {
   return (
-    <PopupDialogModal
+    <ConfirmDialog
       isOpen={open}
       title={`${periodLabel} 주문 데이터가 없습니다`}
       message={
