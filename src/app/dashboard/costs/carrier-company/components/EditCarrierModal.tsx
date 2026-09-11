@@ -39,7 +39,7 @@ export function EditCarrierModal({
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { name: '', isActive: true },
@@ -73,6 +73,7 @@ export function EditCarrierModal({
       onClose={handleClose}
       title="택배사 수정"
       disableClose={isSubmitting}
+      isDirty={isDirty}
       footer={
         <>
           <Button variant="secondary" onClick={handleClose} disabled={isSubmitting}>
