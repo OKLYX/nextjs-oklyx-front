@@ -1,0 +1,27 @@
+# PR 게이트 — 팝업을 손으로 짜지 못하게 막는다.
+#
+# ⚠️ 전체 lint 가 아니다. 이 저장소에는 기존 lint error 9건이 있어서 전체를 게이트로 걸면
+#    무관한 PR 까지 막힌다. 팝업 규칙(eslint.config.mjs 의 no-restricted-syntax) 위반만 본다.
+#    기존 부채 정리 후에는 `npm run lint` 로 올리면 된다.
+
+name: PR check — UI rules
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  ui-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: 팝업 규칙 검사
+        run: npm run lint:ui
