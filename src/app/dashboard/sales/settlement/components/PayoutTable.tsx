@@ -103,7 +103,7 @@ export function PayoutTable({ rows, loading, error, onOpen, onRetry }: PayoutTab
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">채널</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">유형</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-              인식기간
+              판매기간
               <span className="block text-[11px] font-normal text-gray-500">매출인식일 축</span>
             </th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">지급일</th>

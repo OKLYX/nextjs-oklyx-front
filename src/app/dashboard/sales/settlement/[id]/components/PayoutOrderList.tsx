@@ -59,7 +59,7 @@ export function PayoutOrderList({
         {!loading && !error && lines.length > 0 && (
           <span className="text-xs text-gray-500">
             {query ? `${visible.length.toLocaleString('ko-KR')} / ` : ''}
-            {lines.length.toLocaleString('ko-KR')}건 · 인식일 기준
+            {lines.length.toLocaleString('ko-KR')}건 · 판매일 기준
           </span>
         )}
 
