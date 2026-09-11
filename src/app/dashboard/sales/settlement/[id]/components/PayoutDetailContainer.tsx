@@ -342,7 +342,7 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
             {channelLabel(payout)} · {settlementTypeLabel(payout.settlementType)}
           </h1>
           <p className="text-sm text-gray-500">
-            인식기간 {formatDateRange(payout.recognitionFrom, payout.recognitionTo)} · 지급일{' '}
+            판매기간 {formatDateRange(payout.recognitionFrom, payout.recognitionTo)} · 지급일{' '}
             {payout.finalSettlementDate ?? payout.settlementDate ?? '—'} (
             {payoutStatusLabel(payout.status)}) · 지급액 {formatMoney(payout.finalAmount)}
           </p>
