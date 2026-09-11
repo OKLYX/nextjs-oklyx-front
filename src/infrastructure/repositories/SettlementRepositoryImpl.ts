@@ -8,6 +8,8 @@ import type {
   PayoutSummary,
   PayoutSyncResult,
   RecognitionPayoutQuery,
+  SaleMonthQuery,
+  SaleMonthSettlement,
   ReconLineQuery,
   ReconLineView,
   ReconReport,
@@ -38,6 +40,13 @@ export class SettlementRepositoryImpl implements SettlementRepository {
     if (query.accountId != null) params.accountId = query.accountId;
     const response = await axiosInstance.get('/api/admin/settlement/payouts/by-recognition', {
       params,
+    });
+    return response.data.data;
+  }
+
+  async getSaleMonthSettlements(query: SaleMonthQuery): Promise<SaleMonthSettlement[]> {
+    const response = await axiosInstance.get('/api/admin/settlement/by-sale-month', {
+      params: { accountId: query.accountId, from: query.from, to: query.to },
     });
     return response.data.data;
   }

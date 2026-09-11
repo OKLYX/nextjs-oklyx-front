@@ -196,6 +196,33 @@ export interface PayoutQuery {
 }
 
 /**
+ * 판매월 × 지급일 한 줄 — "그 달 판매가 언제 얼마로 정산됐나". `GET /api/admin/settlement/by-sale-month`
+ *
+ * 🔴 정산 건 목록과 <b>축이 반대</b>다. 저쪽은 정산에서 판매를 내려다보고, 이쪽은 판매에서 정산 시점을
+ * 올려다본다 — 한 달 판매가 여러 번에 나눠 정산되면 이 목록에서만 그 갈라짐이 보인다.
+ *
+ * ⚠️ 아직 어느 정산에도 붙지 않은 판매는 정산 시점이 없어 여기 나오지 않는다.
+ */
+export interface SaleMonthSettlement {
+  /** `yyyy-MM`. */
+  saleMonth: string;
+  settlementDate: string | null;
+  /** 지급 완료 여부. 같은 달이라도 일부만 지급됐을 수 있다. */
+  paid: boolean;
+  orders: number;
+  saleAmount: number;
+  /** 🔴 환불 건은 음수로 반영돼 있다. */
+  settlementAmount: number;
+}
+
+/** 판매월 기준 조회 파라미터. 🔴 채널·기간 모두 필수(서버 400). */
+export interface SaleMonthQuery {
+  accountId: number;
+  from: string;
+  to: string;
+}
+
+/**
  * <b>매출인식월</b> 축 조회 파라미터 (FEATURE_2609_34). 매출 화면이 "이 기간 매출에 대한 정산"을 뽑을 때 쓴다.
  *
  * 🔴 {@link PayoutQuery} 와 축이 다르다 — 저쪽 `from`/`to` 는 <b>지급일</b>, 이쪽은 <b>판매일</b>이고

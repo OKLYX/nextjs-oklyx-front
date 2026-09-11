@@ -5,6 +5,8 @@ import type {
   PayoutSummary,
   PayoutSyncResult,
   RecognitionPayoutQuery,
+  SaleMonthQuery,
+  SaleMonthSettlement,
   ReconLineQuery,
   ReconLineView,
   ReconReport,
@@ -23,6 +25,11 @@ export class SettlementUseCase {
   /** 매출인식월 축 — 매출 화면 전용(FEATURE_2609_34). 지급일 축인 `getPayouts` 와 섞지 말 것. */
   async getPayoutsByRecognition(query: RecognitionPayoutQuery): Promise<PayoutSummary[]> {
     return this.repository.getPayoutsByRecognition(query);
+  }
+
+  /** 판매월 기준 정산 — 정산 건 목록과 축이 반대다(판매 → 정산). */
+  async getSaleMonthSettlements(query: SaleMonthQuery): Promise<SaleMonthSettlement[]> {
+    return this.repository.getSaleMonthSettlements(query);
   }
 
   async getPayout(payoutId: number): Promise<PayoutDetail> {
