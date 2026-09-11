@@ -212,9 +212,8 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
       isOpen={isOpen}
       onClose={handleClose}
       title="발송처리 (운송장 업로드)"
-      size="xl"
       fullHeight={result != null}
-      closeOnOverlayClick={!isUploading}
+      disableClose={isUploading}
       footer={footer}
     >
       <div className="flex flex-1 min-h-0 flex-col">
