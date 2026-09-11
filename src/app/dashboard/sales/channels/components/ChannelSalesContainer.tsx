@@ -177,11 +177,7 @@ export function ChannelSalesContainer() {
   const invalidRange = Boolean(from && to && from > to);
 
   return (
-    <PageContainer>
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-gray-900">매출</h1>
-      </div>
-
+    <PageContainer title="매출">
       <SalesTabs />
 
       <PeriodFilter from={from} to={to} isLoading={isLoading} onChange={handlePeriodChange}>

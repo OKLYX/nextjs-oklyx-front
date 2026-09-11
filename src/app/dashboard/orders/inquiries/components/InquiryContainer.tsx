@@ -241,7 +241,7 @@ export function InquiryContainer() {
       : '조회 결과가 없습니다.';
 
   return (
-    <PageContainer contentClassName="max-w-7xl mx-auto space-y-6">
+    <PageContainer width="xl">
       {/* 유형이 1개뿐이면 탭 줄을 그리지 않는다 — 고를 것이 없는 탭은 자리만 차지한다. */}
       {typeOptions.length > 1 && (
         <InquiryTypeTabs

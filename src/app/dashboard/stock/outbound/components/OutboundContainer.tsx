@@ -123,7 +123,7 @@ export function OutboundContainer() {
   };
 
   return (
-    <PageContainer contentClassName="max-w-6xl mx-auto flex flex-col gap-4">
+    <PageContainer>
       <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">판매자</label>

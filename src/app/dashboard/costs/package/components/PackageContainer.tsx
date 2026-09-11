@@ -120,11 +120,7 @@ export function PackageContainer() {
   };
 
   return (
-    <PageContainer contentClassName="max-w-2xl space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">상자비</h1>
-        </div>
-
+    <PageContainer title="상자비" width="sm">
         <PackageSearchCard
           searchPackage={searchPackage}
           onSearchChange={setSearchPackage}

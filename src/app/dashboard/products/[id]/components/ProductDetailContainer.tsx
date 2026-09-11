@@ -13,6 +13,7 @@ import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
+import { PageContainer } from '@/presentation/components/PageContainer';
 import { ProductDetailView } from './ProductDetailView';
 import { ProductEditForm } from './ProductEditForm';
 
@@ -108,45 +109,55 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-96">
-        <p className="text-gray-600">Loading...</p>
-      </div>
+      <PageContainer width="full">
+        <div className="flex items-center justify-center min-h-96">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </PageContainer>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-700">{error}</p>
-      </div>
+      <PageContainer width="full">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700">{error}</p>
+        </div>
+      </PageContainer>
     );
   }
 
   if (!product) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-700">Product not found</p>
-      </div>
+      <PageContainer width="full">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700">Product not found</p>
+        </div>
+      </PageContainer>
     );
   }
 
   if (isEditMode) {
     return (
-      <ProductEditForm
-        product={product}
-        onSave={handleSave}
-        onCancel={handleCancel}
-        onCheckBarcode={handleCheckBarcode}
-        imageUseCase={imageUseCase}
-      />
+      <PageContainer title="상품 수정" width="full">
+        <ProductEditForm
+          product={product}
+          onSave={handleSave}
+          onCancel={handleCancel}
+          onCheckBarcode={handleCheckBarcode}
+          imageUseCase={imageUseCase}
+        />
+      </PageContainer>
     );
   }
 
   return (
-    <ProductDetailView
-      product={product}
-      onDelete={handleDelete}
-      imageUseCase={imageUseCase}
-    />
+    <PageContainer title="상품 상세" width="full">
+      <ProductDetailView
+        product={product}
+        onDelete={handleDelete}
+        imageUseCase={imageUseCase}
+      />
+    </PageContainer>
   );
 }

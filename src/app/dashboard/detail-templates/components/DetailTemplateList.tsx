@@ -76,9 +76,9 @@ export function DetailTemplateList() {
   }
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">상세 템플릿</h1>
+    <PageContainer
+      title="상세 템플릿"
+      action={
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -95,8 +95,8 @@ export function DetailTemplateList() {
             + 새 템플릿
           </button>
         </div>
-      </div>
-
+      }
+    >
       {groupModalOpen && (
         <DetailImageGroupModal useCase={groupUseCase} onClose={() => setGroupModalOpen(false)} />
       )}

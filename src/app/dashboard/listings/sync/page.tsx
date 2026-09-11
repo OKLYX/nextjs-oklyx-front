@@ -103,9 +103,7 @@ export default function ListingsSyncPage() {
     tone === 'green' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700';
 
   return (
-    <PageContainer>
-      <h1 className="text-xl font-semibold text-gray-900">마켓 반영/승인</h1>
-
+    <PageContainer title="마켓 반영/승인">
       {/* Section 1: approval sweep */}
       <section className="rounded-lg bg-white p-4 shadow">
         <div className="mb-2 flex items-center justify-between gap-2">

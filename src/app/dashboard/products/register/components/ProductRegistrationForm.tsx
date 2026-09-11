@@ -151,8 +151,6 @@ export function ProductRegistrationForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
-      <h1 className="text-3xl font-bold">상품등록</h1>
-
       {/* Required Fields */}
       <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
         <legend className="text-lg font-semibold text-gray-900 px-2">필수 항목</legend>

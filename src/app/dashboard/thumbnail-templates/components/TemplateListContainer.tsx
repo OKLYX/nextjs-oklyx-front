@@ -54,9 +54,9 @@ export function TemplateListContainer() {
   };
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">썸네일 템플릿</h1>
+    <PageContainer
+      title="썸네일 템플릿"
+      action={
         <button
           type="button"
           onClick={() => router.push(ROUTES.THUMBNAIL_TEMPLATE_NEW)}
@@ -64,8 +64,8 @@ export function TemplateListContainer() {
         >
           + 템플릿 생성
         </button>
-      </div>
-
+      }
+    >
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {isLoading ? (
