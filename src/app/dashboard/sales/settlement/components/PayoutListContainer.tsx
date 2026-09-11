@@ -11,7 +11,11 @@ import { SettlementRepositoryImpl } from '@/infrastructure/repositories/Settleme
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import type { Seller } from '@/domain/entities/SellerEntity';
-import type { PayoutSummary, SettlementSyncTarget } from '@/domain/entities/Settlement';
+import type {
+  PayoutSummary,
+  SaleMonthSettlement,
+  SettlementSyncTarget,
+} from '@/domain/entities/Settlement';
 import {
   channelLabel,
   formatDateTime,
@@ -22,6 +26,7 @@ import {
 import { PayoutFilter, type PayoutFilterValue } from './PayoutFilter';
 import { SyncBar } from './SyncBar';
 import { PayoutTable } from './PayoutTable';
+import { SaleMonthTable } from './SaleMonthTable';
 import { SettlementBackfillDialog } from './SettlementBackfillDialog';
 
 /**
@@ -65,6 +70,15 @@ export function PayoutListContainer() {
   );
 
   const [filter, setFilter] = useState<PayoutFilterValue>(initialFilter);
+
+  /**
+   * 🔴 두 축을 <b>화면에서 갈라 본다</b>(FEATURE_2609_34). `payout` = 정산 건에서 판매를 내려다보기,
+   * `saleMonth` = 판매에서 정산 시점을 올려다보기. 한 표에 섞으면 어느 축의 숫자인지 매번 되물어야 한다.
+   */
+  const [viewMode, setViewMode] = useState<'payout' | 'saleMonth'>('payout');
+  const [saleMonths, setSaleMonths] = useState<SaleMonthSettlement[]>([]);
+  const [saleMonthsLoading, setSaleMonthsLoading] = useState(false);
+  const [saleMonthsError, setSaleMonthsError] = useState('');
   const [rows, setRows] = useState<PayoutSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -146,6 +160,37 @@ export function PayoutListContainer() {
         /* 드롭다운이 '전체' 만 남는다 — 조회 자체는 동작한다 */
       });
   }, [sellerUseCase]);
+
+  // 판매월 축은 채널·기간이 모두 있어야 부를 수 있다(서버가 400 을 준다).
+  const saleMonthQuery =
+    viewMode === 'saleMonth' && filter.accountId !== '' && filter.from && filter.to
+      ? { accountId: Number(filter.accountId), from: filter.from, to: filter.to }
+      : null;
+
+  const loadSaleMonths = useCallback(async () => {
+    if (saleMonthQuery == null) {
+      setSaleMonths([]);
+      return;
+    }
+    setSaleMonthsLoading(true);
+    setSaleMonthsError('');
+    try {
+      setSaleMonths(await settlementUseCase.getSaleMonthSettlements(saleMonthQuery));
+    } catch (e) {
+      setSaleMonthsError(extractErrorMessage(e, '판매월 정산 조회에 실패했습니다.'));
+      setSaleMonths([]);
+    } finally {
+      setSaleMonthsLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settlementUseCase, viewMode, filter.accountId, filter.from, filter.to]);
+
+  useEffect(() => {
+    // 이펙트 본문에서 곧바로 setState 를 부르면 프로젝트 lint 가 막는다 — effect 는 호출만 한다.
+    void (async () => {
+      await loadSaleMonths();
+    })();
+  }, [loadSaleMonths, reloadTick]);
 
   const handleFilterChange = useCallback((next: PayoutFilterValue) => {
     setFilter((prev) => {
@@ -385,6 +430,32 @@ export function PayoutListContainer() {
         }}
       />
 
+      {/* 🔴 축 전환은 필터 <b>위</b>다 — 아래 표가 무엇을 뜻하는지 먼저 정해야 필터가 읽힌다. */}
+      <div className="flex items-center gap-2">
+        {([
+          { key: 'payout', label: '정산 기준' },
+          { key: 'saleMonth', label: '판매월 기준' },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setViewMode(tab.key)}
+            className={`px-3 py-2 text-sm rounded-lg border ${
+              viewMode === tab.key
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+        <span className="text-xs text-gray-500">
+          {viewMode === 'payout'
+            ? '정산 건에서 어떤 판매였는지 내려다봅니다.'
+            : '판매에서 언제 정산됐는지 올려다봅니다.'}
+        </span>
+      </div>
+
       <PayoutFilter
         value={filter}
         sellers={sellers}
@@ -414,13 +485,27 @@ export function PayoutListContainer() {
         </div>
       )}
 
-      <PayoutTable
-        rows={visibleRows}
-        loading={isLoading}
-        error={error}
-        onOpen={(payoutId) => router.push(ROUTES.SETTLEMENT_PAYOUT_DETAIL(payoutId))}
-        onRetry={() => setReloadTick((tick) => tick + 1)}
-      />
+      {viewMode === 'payout' ? (
+        <PayoutTable
+          rows={visibleRows}
+          loading={isLoading}
+          error={error}
+          onOpen={(payoutId) => router.push(ROUTES.SETTLEMENT_PAYOUT_DETAIL(payoutId))}
+          onRetry={() => setReloadTick((tick) => tick + 1)}
+        />
+      ) : saleMonthQuery == null ? (
+        // 🔴 조건을 말해 준다 — 빈 표만 보이면 "정산이 없다"로 읽힌다.
+        <div className="bg-white rounded-lg shadow px-6 py-8 text-center text-sm text-gray-500">
+          판매월 기준으로 보려면 채널과 기간을 모두 골라 주세요.
+        </div>
+      ) : (
+        <SaleMonthTable
+          rows={saleMonths}
+          loading={saleMonthsLoading}
+          error={saleMonthsError}
+          onRetry={() => setReloadTick((tick) => tick + 1)}
+        />
+      )}
     </PageContainer>
   );
 }
