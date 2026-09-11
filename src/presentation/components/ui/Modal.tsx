@@ -28,10 +28,18 @@
  * **닫기 — 기본은 ✕ 와 ESC 뿐이다.**
  * - 바깥 음영 클릭은 **기본 비활성**. 필요하면 `closeOnOverlayClick` 로 켠다. 실수로 날리는
  *   사고의 1번 원인이라 opt-in 이다.
- * - `isDirty` 를 넘기면 **닫기 경로 전부**(✕ · ESC · 바깥 클릭)가 확인 다이얼로그를 거친다.
- *   ⚠️ 한 경로만 막으면 나머지로 그대로 날아간다 — 세 경로를 따로 다루지 말 것.
- * - ⚠️ `Modal` 은 children 이 무엇인지 모르므로 **입력 여부를 스스로 알 수 없다.** 호출부가
- *   `isDirty` 를 계산해 넘긴다 (예: `name.trim() !== '' || items.length > 0`).
+ * - **작성 중이면 자동으로 되묻는다 — 팝업마다 배선하지 않는다.** 패널 안 `input`/`select`/
+ *   `textarea` 값을 열었을 때와 닫을 때 비교해서, 다르면 확인 다이얼로그를 띄운다.
+ *   ⚠️ 변경 플래그(`setHasUpdate(true)`)가 아니라 **값 비교**인 이유: 플래그는 사용자가 입력을
+ *   되돌려도 계속 켜져 있어 "바뀐 게 없는데 묻는" 상태가 된다. 값 비교는 원위치로 돌아오면
+ *   저절로 다시 조용해진다.
+ *   ⚠️ 비교는 타이핑할 때가 아니라 **닫으려 할 때 한 번**이라 리렌더 비용이 없다.
+ *   ⚠️ 수정 팝업은 열린 뒤 비동기로 값이 채워지므로, **사용자가 처음 손대기 전까지는 기준값을
+ *   계속 따라 올린다**(프리필을 입력으로 오판하지 않게).
+ * - 값이 DOM 컨트롤에 없는 팝업(이미지 선택, 칩 목록 등)은 `isDirty` 로 직접 알려준다.
+ *   넘기면 자동 판정보다 우선한다.
+ * - 확인은 **닫기 경로 전부**(✕ · ESC · 바깥 클릭)에 걸린다. 한 경로만 막으면 나머지로 그대로
+ *   날아간다 — 세 경로를 따로 다루지 말 것.
  *
  * **배경**
  * - 일반 팝업 = 음영(`bg-black/50`), 알림(`variant="alert"`) = 더 짙은 음영(`bg-black/70`).
@@ -46,8 +54,8 @@
  *   <ProductForm />
  * </Modal>
  *
- * // 입력이 있으면 닫기 전에 확인
- * <Modal isOpen={isOpen} onClose={close} title="채널 추가" isDirty={name !== ''}>…</Modal>
+ * // 값이 DOM 컨트롤에 없는 팝업만 직접 알려준다 (그 외엔 자동)
+ * <Modal isOpen={isOpen} onClose={close} title="이미지 선택" isDirty={picked.length > 0}>…</Modal>
  *
  * // 다른 모달 위에 뜨는 팝업
  * <Modal isOpen={isOpen} onClose={close} title="이미지 선택" nested>…</Modal>
@@ -64,7 +72,7 @@
  * ❌ 호출부에서 Radix(`Dialog.Root` 등)를 직접 import 하지 않는다.
  */
 
-import { CSSProperties, ReactNode, useState } from 'react';
+import { CSSProperties, ReactNode, useCallback, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 
@@ -83,7 +91,10 @@ export interface ModalProps {
   variant?: ModalVariant;
   /** 바깥 음영 클릭으로 닫히는지. **기본 `false`** — 실수로 닫혀 입력이 날아가는 걸 막는다 */
   closeOnOverlayClick?: boolean;
-  /** 작성 중인 입력이 있는지. `true` 면 모든 닫기 경로가 확인 다이얼로그를 거친다 */
+  /**
+   * 작성 중인 입력이 있는지 **직접** 알려준다. 기본은 자동 판정(패널 안 입력값 비교)이므로
+   * 보통 넘길 필요가 없다. 값이 DOM 컨트롤에 없는 팝업(이미지 선택·칩 목록 등)에만 쓴다.
+   */
   isDirty?: boolean;
   /** ESC 로도 닫히지 않게 한다. API 호출 중처럼 **중단되면 안 되는** 구간에만 쓴다 */
   disableClose?: boolean;
@@ -92,6 +103,30 @@ export interface ModalProps {
   /** 내용에 따라 높이가 출렁이면 안 되는 팝업이면 `true` → 패널을 최대 높이로 고정 */
   fullHeight?: boolean;
   children: ReactNode;
+}
+
+/**
+ * 패널 안 입력 컨트롤의 현재 값을 한 문자열로 직렬화한다.
+ *
+ * 닫기 확인 여부를 "열었을 때와 지금이 다른가" 로 판정하기 위한 것이다. 변경 플래그를 켜는
+ * 방식(`setHasUpdate(true)`)으로는 **되돌렸을 때 다시 false 가 되지 않는다** — 그래서 플래그가
+ * 아니라 값 비교를 쓴다. 타이핑할 때마다가 아니라 **닫으려 할 때 한 번만** 계산하므로
+ * 리렌더 비용이 없다.
+ */
+function snapshotInputs(root: HTMLElement | null): string {
+  if (!root) return '';
+  const parts: string[] = [];
+  root.querySelectorAll('input, select, textarea').forEach((el, i) => {
+    if (el instanceof HTMLInputElement) {
+      // 파일 입력은 값 비교가 불가능하므로 "파일이 붙었는가" 로만 본다.
+      if (el.type === 'file') parts.push(`${i}:file:${el.files?.length ?? 0}`);
+      else if (el.type === 'checkbox' || el.type === 'radio') parts.push(`${i}:${el.checked}`);
+      else parts.push(`${i}:${el.value}`);
+    } else if (el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) {
+      parts.push(`${i}:${el.value}`);
+    }
+  });
+  return parts.join('\u0001');
 }
 
 /** 네 변 공통 마진 · 폭 2종은 globals.css 의 변수 한 곳이 소유한다. */
@@ -119,13 +154,33 @@ export function Modal({
   children,
 }: ModalProps) {
   const [confirmingClose, setConfirmingClose] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const baselineRef = useRef('');
+  // 사용자가 아직 한 번도 손대지 않았으면 기준값을 계속 갱신한다 — 수정 팝업은 열린 뒤
+  // 비동기로 값이 채워지므로, 마운트 시점만 기준으로 삼으면 프리필을 "입력"으로 오판한다.
+  const touchedRef = useRef(false);
+
   const z = nested ? 'z-[60]' : 'z-50';
   const overlay = variant === 'alert' ? 'bg-black/70' : 'bg-black/50';
+
+  /** 패널 ref 콜백 — 붙는 순간의 값을 기준값으로 잡는다. */
+  const attachPanel = useCallback((node: HTMLDivElement | null) => {
+    panelRef.current = node;
+    touchedRef.current = false;
+    baselineRef.current = snapshotInputs(node);
+  }, []);
+
+  /** 손대기 전에는 기준값을 따라 올린다(프리필 흡수). */
+  const refreshBaseline = () => {
+    if (!touchedRef.current) baselineRef.current = snapshotInputs(panelRef.current);
+  };
 
   // 닫기 경로는 ✕ · ESC · 바깥 클릭 셋뿐이고, 전부 이 함수를 지난다.
   const requestClose = () => {
     if (disableClose) return;
-    if (isDirty) {
+    // 호출부가 `isDirty` 를 명시하면 그것이 이긴다(값이 DOM 컨트롤에 없는 팝업용).
+    const dirty = isDirty || snapshotInputs(panelRef.current) !== baselineRef.current;
+    if (dirty) {
       setConfirmingClose(true);
       return;
     }
@@ -148,6 +203,14 @@ export function Modal({
         <Dialog.Portal>
           <Dialog.Overlay className={`fixed inset-0 ${overlay} ${z}`} />
           <Dialog.Content
+            ref={attachPanel}
+            onPointerDownCapture={() => {
+              touchedRef.current = true;
+            }}
+            onKeyDownCapture={() => {
+              touchedRef.current = true;
+            }}
+            onFocusCapture={refreshBaseline}
             aria-describedby={undefined}
             style={panelStyle(variant, fullHeight)}
             className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${z} flex flex-col rounded-lg bg-white shadow-lg`}

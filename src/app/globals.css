@@ -213,8 +213,8 @@ body {
      가로 = 전 팝업 공통 한 값. 확인/경고(alert)만 좁다. 호출부가 고르는 knob 은 없다.
      마진 = 팝업 네 변 공통. PageContainer 의 `p-4 md:p-6` 과 같은 축이라 팝업이 화면 여백 안에
      앉고, 화면보다 커지지 않는다(넘치면 본문만 스크롤). */
-  --modal-content-w: 40rem;
-  --modal-alert-w: 26rem;
+  --modal-content-w: 56rem;
+  --modal-alert-w: 30rem;
   --modal-margin: 1rem;
 }
 @media (min-width: 768px) {
