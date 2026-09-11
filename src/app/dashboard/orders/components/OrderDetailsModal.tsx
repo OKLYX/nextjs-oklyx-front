@@ -414,7 +414,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50">
       {/* Fixed geometry from the first paint — expanding the sheet must not resize the modal (D1). */}
       <div className="bg-white rounded-lg shadow-lg w-full mx-4 max-w-4xl h-[90vh] flex flex-col p-8">
         <h3 className="shrink-0 text-2xl font-semibold text-gray-900 mb-6">주문 상세</h3>
