@@ -2,7 +2,11 @@
 
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { InquiryListParams, InquiryRepository } from '@/domain/repositories/InquiryRepository';
-import type { Inquiry, PlatformInquiryTypes } from '@/domain/entities/InquiryEntity';
+import type {
+  Inquiry,
+  InquirySyncResult,
+  PlatformInquiryTypes,
+} from '@/domain/entities/InquiryEntity';
 
 export class InquiryRepositoryImpl implements InquiryRepository {
   /**
@@ -32,6 +36,15 @@ export class InquiryRepositoryImpl implements InquiryRepository {
 
   async getTypes(): Promise<PlatformInquiryTypes[]> {
     const response = await axiosInstance.get('/api/inquiries/types');
+    return response.data.data;
+  }
+
+  /**
+   * 문의만 다시 가져오기 — 채널 1개분. 주문 동기화(`/api/orders/sync`)와 같은 자리의 경로이며,
+   * 여러 채널을 도는 것은 화면(진행 모달)이 한다.
+   */
+  async syncInquiries(accountId: number): Promise<InquirySyncResult> {
+    const response = await axiosInstance.post('/api/inquiries/sync', null, { params: { accountId } });
     return response.data.data;
   }
 

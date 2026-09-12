@@ -126,3 +126,16 @@ export const INQUIRY_STATUS_LABEL: Record<InquiryStatus, string> = {
  * ⚠️ Because of that the chip counts can sum to **less** than the 전체 chip. That gap is intended.
  */
 export const INQUIRY_STATUS_FILTERS: InquiryStatus[] = ['UNANSWERED', 'ANSWERED', 'CLOSED'];
+
+/**
+ * 문의만 다시 가져오기 결과 (POST /api/inquiries/sync). 채널 1개분이다.
+ *
+ * `fetched` 는 이번에 가져와 저장한 건수로, 이미 있던 문의를 다시 읽은 것도 포함한다
+ * (같은 건을 다시 저장해도 덮어쓰기라 화면에는 중복이 생기지 않는다).
+ */
+export interface InquirySyncResult {
+  accountId: number;
+  fetched: number;
+  staleClosed: number;
+  syncedAt: string;
+}

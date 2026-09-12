@@ -7,6 +7,9 @@ import { OrderRepositoryImpl } from '@/infrastructure/repositories/OrderReposito
 import { OrderUseCase } from '@/application/usecases/OrderUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
+import { useOrderSync } from '@/presentation/hooks/useOrderSync';
+import { SyncProgressModal } from '@/app/dashboard/orders/components/SyncProgressModal';
+import type { SyncTarget } from '@/application/dto/OrderDTOs';
 import { INQUIRY_STATUS_FILTERS } from '@/domain/entities/InquiryEntity';
 import type { Inquiry, InquiryStatus, InquiryTypeOption } from '@/domain/entities/InquiryEntity';
 import { RECENT_PERIOD, buildPeriodOptions, toPeriodRange } from '@/domain/entities/OrderPeriod';
@@ -41,6 +44,8 @@ export function InquiryContainer() {
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [selectedSellerId, setSelectedSellerId] = useState<number | ''>('');
   const [channelOptions, setChannelOptions] = useState<ChannelOption[]>([]);
+  // 동기화 대상 원본 — 채널 셀렉트 옵션과 같은 조회 결과를 그대로 보관한다(추가 조회 없음).
+  const [syncTargets, setSyncTargets] = useState<SyncTarget[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
   const [typeOptions, setTypeOptions] = useState<InquiryTypeOption[]>([]);
   // The tab is a server axis: switching it refetches.
@@ -123,11 +128,13 @@ export function InquiryContainer() {
           syncable: true,
         }));
         setChannelOptions(options);
+        setSyncTargets(targets);
         setSelectedAccountId((prev) =>
           prev !== '' && !options.some((option) => option.accountId === prev) ? '' : prev
         );
       } catch {
         setChannelOptions([]);
+        setSyncTargets([]);
       }
     };
     void loadChannels();
@@ -156,6 +163,48 @@ export function InquiryContainer() {
       });
     })();
   }, [inquiryUseCase, fetchInquiries]);
+
+  /**
+   * 동기화가 끝난 뒤 목록 재조회 — 마지막으로 **조회에 반영된** 조건 그대로다.
+   * 그 사이 사용자가 만진 pending 값을 쓰면 다른 조회가 되어 화면이 말없이 바뀐다.
+   */
+  const refetchAfterSync = useCallback(async () => {
+    const query = appliedQueryRef.current;
+    if (query) await fetchInquiries(query);
+  }, [fetchInquiries]);
+
+  // 채널 루프·진행 모달·취소·채널별 실패 격리는 주문내역과 같은 훅을 쓴다(복사 금지).
+  // 부르는 엔드포인트만 다르므로 표준 동기화(runSync)가 아니라 범용 러너(runChannels)를 빌린다.
+  const {
+    isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen,
+    runChannels, failedTargets, cancelSync, closeSyncModal, stopSyncing,
+  } = useOrderSync({ onAfterSync: refetchAfterSync });
+
+  const runInquirySync = useCallback(async (targets: SyncTarget[]) => {
+    if (targets.length === 0) {
+      setError('가져올 채널이 없습니다.');
+      return;
+    }
+    setError('');
+    await runChannels(targets, async (target) => {
+      await inquiryUseCase.syncInquiries(target.accountId);
+    });
+    // 루프 직후 스피너를 푼다(주문 백필과 같은 자세) — 목록 재조회는 이어서 돈다.
+    stopSyncing();
+    await refetchAfterSync();
+  }, [runChannels, stopSyncing, refetchAfterSync, inquiryUseCase]);
+
+  // 채널을 고르면 그 채널만, '전체 채널' 이면 전부 가져온다(조회 조건과 같은 축).
+  const handleSync = () => {
+    const targets = selectedAccountId === ''
+      ? syncTargets
+      : syncTargets.filter((target) => target.accountId === selectedAccountId);
+    void runInquirySync(targets);
+  };
+
+  const handleRetryFailed = () => {
+    void runInquirySync(failedTargets);
+  };
 
   // The status chips are a client-side filter — clicking one never hits the server.
   const visible = useMemo(
@@ -265,7 +314,10 @@ export function InquiryContainer() {
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
         onSearch={handleSearch}
+        onSync={handleSync}
         isLoading={isLoading}
+        isSyncing={isSyncing}
+        syncDisabledReason={syncTargets.length === 0 ? '가져올 채널이 없습니다' : undefined}
         resultCount={visible.length}
       />
 
@@ -290,6 +342,17 @@ export function InquiryContainer() {
         totalPages={totalPages}
         onPageChange={setCurrentPage}
         emptyMessage={emptyMessage}
+      />
+
+      <SyncProgressModal
+        open={syncModalOpen}
+        channels={syncChannels}
+        doneCount={syncCursor}
+        isRunning={isSyncing}
+        canceled={syncCanceled}
+        onCancel={cancelSync}
+        onRetryFailed={handleRetryFailed}
+        onClose={closeSyncModal}
       />
     </PageContainer>
   );
