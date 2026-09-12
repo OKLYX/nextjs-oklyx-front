@@ -9,6 +9,21 @@ import type { CreatePackageRequest } from '@/application/dto/CreatePackageReques
 const packageInputSchema = z.object({
   type: z.string().min(1, '패키지 타입을 입력하세요').max(50, '50자 이내'),
   cost: z.number().min(0, '비용은 0 이상이어야 합니다'),
+  widthCm: z
+    .number()
+    .min(0.1, '0.1cm 이상 입력하세요')
+    .max(999.9, '999.9cm 이하로 입력하세요')
+    .refine((v) => Number(v.toFixed(1)) === v, '소수점 첫째 자리까지 입력하세요'),
+  lengthCm: z
+    .number()
+    .min(0.1, '0.1cm 이상 입력하세요')
+    .max(999.9, '999.9cm 이하로 입력하세요')
+    .refine((v) => Number(v.toFixed(1)) === v, '소수점 첫째 자리까지 입력하세요'),
+  heightCm: z
+    .number()
+    .min(0.1, '0.1cm 이상 입력하세요')
+    .max(999.9, '999.9cm 이하로 입력하세요')
+    .refine((v) => Number(v.toFixed(1)) === v, '소수점 첫째 자리까지 입력하세요'),
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD 형식'),
   isDefault: z.boolean(),
 });
@@ -40,6 +55,9 @@ export function PackageInputForm({
     defaultValues: {
       type: '',
       cost: 0,
+      widthCm: 0,
+      lengthCm: 0,
+      heightCm: 0,
       effectiveDate: '',
       isDefault: false,
     },
@@ -52,6 +70,9 @@ export function PackageInputForm({
       const createData: CreatePackageRequest = {
         type: data.type,
         cost: data.cost,
+        widthCm: data.widthCm,
+        lengthCm: data.lengthCm,
+        heightCm: data.heightCm,
         effectiveDate: data.effectiveDate,
         isDefault: data.isDefault,
       };
@@ -103,6 +124,84 @@ export function PackageInputForm({
         {errors.type && (
           <p className="mt-1 text-xs text-red-600">{errors.type.message}</p>
         )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            가로 (cm)
+          </label>
+          <Controller
+            name="widthCm"
+            control={control}
+            render={({ field }) => (
+              <input
+                {...field}
+                value={field.value === 0 ? '' : field.value}
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="999.9"
+                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                disabled={isSubmitting || isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              />
+            )}
+          />
+          {errors.widthCm && (
+            <p className="mt-1 text-xs text-red-600">{errors.widthCm.message}</p>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            세로 (cm)
+          </label>
+          <Controller
+            name="lengthCm"
+            control={control}
+            render={({ field }) => (
+              <input
+                {...field}
+                value={field.value === 0 ? '' : field.value}
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="999.9"
+                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                disabled={isSubmitting || isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              />
+            )}
+          />
+          {errors.lengthCm && (
+            <p className="mt-1 text-xs text-red-600">{errors.lengthCm.message}</p>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            높이 (cm)
+          </label>
+          <Controller
+            name="heightCm"
+            control={control}
+            render={({ field }) => (
+              <input
+                {...field}
+                value={field.value === 0 ? '' : field.value}
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="999.9"
+                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                disabled={isSubmitting || isLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              />
+            )}
+          />
+          {errors.heightCm && (
+            <p className="mt-1 text-xs text-red-600">{errors.heightCm.message}</p>
+          )}
+        </div>
       </div>
 
       <div>
