@@ -1,6 +1,7 @@
 import type { InquiryListParams, InquiryRepository } from '@/domain/repositories/InquiryRepository';
 import type {
   Inquiry,
+  InquirySyncResult,
   InquiryTypeOption,
   PlatformInquiryTypes,
 } from '@/domain/entities/InquiryEntity';
@@ -22,6 +23,11 @@ export class InquiryUseCase {
 
   async getTypes(): Promise<PlatformInquiryTypes[]> {
     return this.repository.getTypes();
+  }
+
+  /** 채널 1개의 문의를 다시 가져온다. 채널 루프·진행 표시는 화면이 소유한다. */
+  async syncInquiries(accountId: number): Promise<InquirySyncResult> {
+    return this.repository.syncInquiries(accountId);
   }
 
   /** 답변 전송 (D17). 성공하면 갱신된 문의로 화면을 통째 교체한다 — 로컬에서 스레드를 조립하지 않는다. */
