@@ -111,8 +111,18 @@ export function ProcessingPresetList() {
                   onClick={() => router.push(ROUTES.PROCESSING_PRESET_EDIT(p.id))}
                 >
                   <td className="px-4 py-3 text-gray-900">{p.id}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
-                  <td className="px-4 py-3 text-gray-700">{p.operations?.length ?? 0}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    <span className="align-middle">{p.name}</span>
+                    {p.operations?.some((o) => o.type === 'colorAdjust') && (
+                      <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs font-normal text-blue-700 align-middle">
+                        색보정
+                      </span>
+                    )}
+                  </td>
+                  {/* 컬럼 헤더가 "오버레이 수" 이므로 colorAdjust op 는 세지 않는다. */}
+                  <td className="px-4 py-3 text-gray-700">
+                    {p.operations?.filter((o) => o.type === 'overlay').length ?? 0}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`rounded px-2 py-0.5 text-xs ${
