@@ -2,6 +2,7 @@
 
 import type { Package } from '@/domain/entities/PackageEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { formatPackageSize, sizeIsUnset } from './packageSize';
 
 interface PackageTableProps {
   packages: Package[];
@@ -51,6 +52,7 @@ export function PackageTable({
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">패키지 타입</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">사이즈</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">비용</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">유효일</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">기본값</th>
@@ -74,6 +76,11 @@ export function PackageTable({
                 }`}
               >
                 <td className="px-6 py-3 text-sm text-gray-900">{pkg.type || '-'}</td>
+                <td
+                  className={`px-6 py-3 text-sm ${sizeIsUnset(pkg) ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  {formatPackageSize(pkg)}
+                </td>
                 <td className="px-6 py-3 text-sm text-gray-900">{formatCost(pkg.cost)}</td>
                 <td className="px-6 py-3 text-sm text-gray-900">{formatDate(pkg.effectiveDate)}</td>
                 <td className="px-6 py-3 text-sm">
