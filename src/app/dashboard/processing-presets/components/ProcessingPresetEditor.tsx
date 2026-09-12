@@ -77,14 +77,75 @@ function overlayStyle(op: OverlayOp): CSSProperties {
 
 // Bundled sample backgrounds, painted straight onto the preview canvas (no image
 // element → no canvas taint → getImageData stays available for the real color pass).
-// Three tones so the user can gauge overlay contrast against light / dark / colorful
-// bases, which is where a watermark most often becomes hard to read.
+// 그라디언트 3종 = 오버레이 대비 가늠용(밝음/어두움/유색). 4번째 "화면 조정" 은
+// 색보정 전용 테스트 차트 — 그라디언트만으로는 슬라이더 4개가 각각 무엇을 바꾸는지
+// 구분되지 않기 때문이다.
 const PREVIEW_SIZE = 400;
 
-const SAMPLE_GRADIENTS: { label: string; stops: [number, string][] }[] = [
-  { label: '밝은 배경', stops: [[0, '#f8fafc'], [1, '#cbd5e1']] },
-  { label: '어두운 배경', stops: [[0, '#334155'], [1, '#0f172a']] },
-  { label: '컬러 배경', stops: [[0, '#ef4444'], [0.5, '#f59e0b'], [1, '#3b82f6']] },
+// 채도·색온도가 읽힐 1차/2차색 바(방송 컬러바 순서: 휘도 내림차순).
+const CHART_BARS = ['#ffffff', '#ffff00', '#00ffff', '#00ff00', '#ff00ff', '#ff0000', '#0000ff'];
+// 색온도·채도가 가장 눈에 잘 띄는 기억색(피부·하늘·잎·중성회색 18%).
+const CHART_PATCHES = ['#e0ac69', '#4a90d9', '#4a7c3f', '#7f7f7f'];
+const CHART_STEPS = 11; // 계단 그레이스케일 칸 수(밝기·대비의 클리핑이 칸 병합으로 보인다)
+
+function paintGradient(ctx: CanvasRenderingContext2D, stops: [number, string][]) {
+  const grad = ctx.createLinearGradient(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+  for (const [offset, color] of stops) grad.addColorStop(offset, color);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+}
+
+// 반올림 틈이 남지 않도록 마지막 칸은 캔버스 끝까지 채운다.
+function bandX(index: number, count: number): { x: number; w: number } {
+  const unit = PREVIEW_SIZE / count;
+  const x = Math.round(index * unit);
+  const end = index === count - 1 ? PREVIEW_SIZE : Math.round((index + 1) * unit);
+  return { x, w: end - x };
+}
+
+// 화면 조정 차트. 위에서부터 컬러바 / 계단 그레이스케일 / 연속 램프 / 기억색 패치.
+// 슬라이더별로 반응하는 대역이 다르다: 밝기·대비=계단/램프, 채도=컬러바, 색온도=패치.
+function paintTestChart(ctx: CanvasRenderingContext2D) {
+  const barsH = Math.round(PREVIEW_SIZE * 0.38);
+  const stepsH = Math.round(PREVIEW_SIZE * 0.16);
+  const rampH = Math.round(PREVIEW_SIZE * 0.1);
+  const patchY = barsH + stepsH + rampH;
+
+  // 1) 컬러바 — 채도를 내리면 위에서부터 회색으로 무너진다.
+  CHART_BARS.forEach((color, i) => {
+    const { x, w } = bandX(i, CHART_BARS.length);
+    ctx.fillStyle = color;
+    ctx.fillRect(x, 0, w, barsH);
+  });
+
+  // 2) 계단 그레이스케일 — 밝기/대비가 양 끝 칸을 언제 맞붙이는지(클리핑) 보여준다.
+  for (let i = 0; i < CHART_STEPS; i += 1) {
+    const v = Math.round((i / (CHART_STEPS - 1)) * 255);
+    const { x, w } = bandX(i, CHART_STEPS);
+    ctx.fillStyle = `rgb(${v}, ${v}, ${v})`;
+    ctx.fillRect(x, barsH, w, stepsH);
+  }
+
+  // 3) 연속 램프 — 계단이 가리는 중간 톤의 이동을 매끄럽게 보여준다.
+  const ramp = ctx.createLinearGradient(0, 0, PREVIEW_SIZE, 0);
+  ramp.addColorStop(0, '#000000');
+  ramp.addColorStop(1, '#ffffff');
+  ctx.fillStyle = ramp;
+  ctx.fillRect(0, barsH + stepsH, PREVIEW_SIZE, rampH);
+
+  // 4) 기억색 패치 — 색온도를 올리면 피부가 붉고 하늘이 탁해지는 게 바로 보인다.
+  CHART_PATCHES.forEach((color, i) => {
+    const { x, w } = bandX(i, CHART_PATCHES.length);
+    ctx.fillStyle = color;
+    ctx.fillRect(x, patchY, w, PREVIEW_SIZE - patchY);
+  });
+}
+
+const SAMPLE_BACKGROUNDS: { label: string; paint: (ctx: CanvasRenderingContext2D) => void }[] = [
+  { label: '밝은 배경', paint: (ctx) => paintGradient(ctx, [[0, '#f8fafc'], [1, '#cbd5e1']]) },
+  { label: '어두운 배경', paint: (ctx) => paintGradient(ctx, [[0, '#334155'], [1, '#0f172a']]) },
+  { label: '컬러 배경', paint: (ctx) => paintGradient(ctx, [[0, '#ef4444'], [0.5, '#f59e0b'], [1, '#3b82f6']]) },
+  { label: '화면 조정', paint: paintTestChart },
 ];
 
 // 색보정 슬라이더 4종. 라벨/힌트는 화면 문구, key 는 ColorAdjust 필드.
@@ -192,15 +253,12 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
     };
   }, [isAdmin, assetUseCase, mergeAssetNames]);
 
-  // 미리보기 = 실연산. 샘플 그라디언트를 매번 다시 칠한 뒤 보정한다(보정 위에 보정을
+  // 미리보기 = 실연산. 샘플 배경을 매번 다시 칠한 뒤 보정한다(보정 위에 보정을
   // 누적하면 슬라이더를 되돌려도 색이 돌아오지 않는다). 백엔드와 같은 공식(colorLut.ts).
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
-    const grad = ctx.createLinearGradient(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
-    for (const [offset, color] of SAMPLE_GRADIENTS[sampleIdx].stops) grad.addColorStop(offset, color);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+    SAMPLE_BACKGROUNDS[sampleIdx].paint(ctx);
     if (isNeutral(adjust)) return;
     const img = ctx.getImageData(0, 0, PREVIEW_SIZE, PREVIEW_SIZE);
     applyColorAdjust(img.data, adjust);
@@ -503,7 +561,7 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-gray-700">미리보기</h2>
             <div className="flex gap-1">
-              {SAMPLE_GRADIENTS.map((s, i) => (
+              {SAMPLE_BACKGROUNDS.map((s, i) => (
                 <button
                   key={s.label}
                   type="button"
