@@ -6,7 +6,7 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { ClaimUseCase } from '@/application/usecases/ClaimUseCase';
 import { ClaimRepositoryImpl } from '@/infrastructure/repositories/ClaimRepositoryImpl';
-import { deliveryCompaniesFor } from '@/presentation/components/ShippingOverrideFields';
+import { useCarrierOptions } from '@/presentation/hooks/useCarrierOptions';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ClaimRejectForm } from './ClaimRejectForm';
 import type {
@@ -106,15 +106,16 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
   );
 
   /**
-   * 택배사 목록 = 배송 설정과 **같은 프론트 상수**(`COUPANG_DELIVERY_COMPANIES`, 쿠팡 문서의 정적
-   * 코드표에서 큐레이션한 주요 국내 택배사). 조회 API 를 부르지 않는다(사용자 결정 2026-09-05).
+   * 택배사 목록은 `useCarrierOptions` 하나에서 온다 — 배송 설정 화면과 같은 백엔드 카탈로그다
+   * (PLAN 2609_37 D7·D8). 화면용 상수를 만들지 말 것: 두 화면이 다른 택배사를 보여주게 된다.
    *
-   * ⚠️ 사본을 만들지 말 것 — 이 화면과 배송 설정이 다른 택배사를 보여주게 된다.
-   * ⚠️ 알려진 한계: 이 목록에 없는 택배사(백엔드 화이트리스트는 198개)는 고를 수 없다. 값 자체는
-   * 서버가 `CoupangCourierCodes` 로 검증하므로 틀린 코드가 마켓까지 가지는 않는다.
-   * TODO: 프론트 큐레이션 표와 백엔드 전량 표를 한 원천으로 합치는 것은 후속 리팩터링.
+   * ⚠️ 비-ADMIN 에게는 조회하지 않는다(아래 `isAdmin` 가드로 패널 자체가 안 그려지는데, 훅은 그
+   * 가드보다 위에서 돌기 때문이다) — ADMIN 전용 엔드포인트에 403 을 받으러 가지 않는다.
+   * ⚠️ 목록이 비면(조회 실패·미지원 플랫폼) 지금의 직접 입력 안내가 그대로 안전망이다.
    */
-  const carriers = useMemo(() => deliveryCompaniesFor(claim.platform), [claim.platform]);
+  const { carriers, loading: carriersLoading } = useCarrierOptions(
+    isAdmin ? claim.platform : undefined
+  );
 
   if (!isAdmin) return null;
   // 처리할 것이 없는 행이 대부분이라 빈 문구조차 잡음이 된다 — 패널 자체를 그리지 않는다.
@@ -268,10 +269,11 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
                   disabled={isSending}
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100"
                 >
-                  <option value="">택배사 선택</option>
+                  <option value="">{carriersLoading ? '택배사를 불러오는 중…' : '택배사 선택'}</option>
+                  {/* 라벨은 `이름 (코드)`(D14) · 순서는 서버 정렬 그대로(D4) */}
                   {carriers.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.name}
+                    <option key={c.deliveryCompanyCode} value={c.deliveryCompanyCode}>
+                      {c.carrierName} ({c.deliveryCompanyCode})
                     </option>
                   ))}
                 </select>
@@ -291,7 +293,7 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
 
             {/* 지원하지 않는 플랫폼(=목록 없음). 서버가 그런 claim 에 INVOICE 액션을 주지 않으므로
                 현재는 도달하지 않지만, 빈 드롭다운으로 막다른 길을 만들지 않기 위한 안내다. */}
-            {openAction.requires === 'INVOICE' && carriers.length === 0 && (
+            {openAction.requires === 'INVOICE' && !carriersLoading && carriers.length === 0 && (
               <p className="mt-2 text-sm text-gray-500">
                 이 플랫폼의 택배사 목록이 없어 송장을 등록할 수 없습니다.
               </p>
