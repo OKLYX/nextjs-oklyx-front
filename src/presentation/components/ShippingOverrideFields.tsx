@@ -6,6 +6,7 @@ import type {
   ReturnCenter,
   ShippingOverride,
 } from '@/domain/entities/ShippingEntity';
+import { useCarrierOptions } from '@/presentation/hooks/useCarrierOptions';
 import { OutboundPlacePickerModal } from './OutboundPlacePickerModal';
 import { ReturnCenterPickerModal } from './ReturnCenterPickerModal';
 
@@ -36,48 +37,7 @@ const EXTRA_INFO_PRESETS = [
 ];
 const CUSTOM_MESSAGE = '__custom__';
 
-/**
- * 쿠팡 택배사 코드(deliveryCompanyCode)는 조회 API 가 없는 정적 표(공식 문서, ~150개).
- * 사용자는 코드를 모르므로 이름으로 고르게 하고 코드를 대신 저장/전송한다.
- * 출처: https://developers.coupang.com/hc/en-us/articles/360034156033-Courier-Code
- *
- * ⚠️ 클레임 회수송장 등록(`ClaimActionPanel`)도 이 목록을 **공유**한다 — 사본을 만들면 두 화면이
- * 다른 택배사를 보여주게 된다. 백엔드에도 같은 성격의 표(`CoupangCourierCodes`, 198개)가 있고
- * 그쪽이 전송 전 화이트리스트 검증을 하므로, 여기 목록은 그 부분집합이어야 한다.
- * TODO: 두 표(프론트 큐레이션 16 / 백엔드 전량 198)를 한 원천으로 합치는 것은 후속 리팩터링
- * (사용자 결정 2026-09-05 — 지금은 프론트 상수 공유로 간다).
- */
-export const COUPANG_DELIVERY_COMPANIES: { code: string; name: string }[] = [
-  { code: 'CJGLS', name: 'CJ대한통운' },
-  { code: 'HANJIN', name: '한진택배' },
-  // ⚠️ 롯데는 코드가 2개다 — 공식 표에 `HYUNDAI`·`LOTTEGLOBAL` 이 **둘 다** "Lotte Global Logistics"
-  // 로 등재돼 있다(`HYUNDAI` 는 현대택배 시절 코드가 그대로 남은 것). 계정마다 매칭되는 쪽이 달라
-  // 하나만 넣으면 "내 택배사가 목록에 없다"가 된다(실계정 확인 2026-08-30: WING 매칭은 `HYUNDAI`).
-  // 이름에 코드를 병기해 사용자가 자기 계정 값을 고르게 한다. 기존 저장값(LOTTEGLOBAL)도 계속
-  // 인식돼야 하므로 **둘 다 유지**할 것 — 목록에 없는 코드는 "직접 입력" 으로 떨어진다.
-  { code: 'HYUNDAI', name: '롯데택배 (HYUNDAI)' },
-  { code: 'LOTTEGLOBAL', name: '롯데택배 (LOTTEGLOBAL)' },
-  { code: 'KGB', name: '로젠택배' },
-  { code: 'EPOST', name: '우체국택배' },
-  { code: 'KDEXP', name: '경동택배' },
-  { code: 'ILYANG', name: '일양로지스' },
-  { code: 'CHUNIL', name: '천일택배' },
-  { code: 'DAESIN', name: '대신택배' },
-  { code: 'CVS', name: '편의점택배(CVSnet)' },
-  { code: 'SLX', name: 'SLX택배' },
-  { code: 'HONAM', name: '우리택배(호남)' },
-  { code: 'CSLOGIS', name: 'SC로지스' },
-  { code: 'AJOU', name: '아주택배' },
-  { code: 'HILOGIS', name: '하이로지스' },
-  { code: 'EMS', name: '우체국 EMS' },
-];
-
 const MANUAL_CARRIER = '__manual__';
-
-/** Curated per-platform carrier list; empty = free-text fallback (other platforms). */
-export function deliveryCompaniesFor(platform: string): { code: string; name: string }[] {
-  return platform === 'COUPANG' ? COUPANG_DELIVERY_COMPANIES : [];
-}
 
 export type ShippingOverrideLevel = 'account' | 'master' | 'listing';
 
@@ -89,7 +49,7 @@ interface ShippingOverrideFieldsProps {
    * (출고지/반품지 숨김 — 계정별 센터라 마스터 override 불가). listing = 채널 override.
    */
   level: ShippingOverrideLevel;
-  /** COUPANG 택배사 큐레이션 분기용. 없으면 자유입력. */
+  /** 택배사 카탈로그 조회 키(`useCarrierOptions`). 없으면 조회하지 않고 자유입력으로 내려간다. */
   platform?: string;
   disabled?: boolean;
   /** 출고지 피커 옵션 (level ≠ master 에서 부모가 조회해 주입). */
@@ -144,7 +104,14 @@ export function ShippingOverrideFields({
 }: ShippingOverrideFieldsProps) {
   const isCommon = scope === 'common';
   const showPlaces = level !== 'master' && !isCommon;
-  const companies = deliveryCompaniesFor(platform ?? '');
+  // 택배사 목록은 백엔드 카탈로그 하나에서 온다(PLAN 2609_37 D7·D8). 출고지·반품지처럼 부모 주입으로
+  // 하지 않는 이유 = 호출부 4곳이 전부 같은 목록을 같은 `platform` 으로 원하기 때문이다 —
+  // 주입으로 하면 같은 조회가 4벌 복사된다.
+  const {
+    carriers: companies,
+    loading: carriersLoading,
+    failed: carriersFailed,
+  } = useCarrierOptions(platform);
 
   // UI-only state (not value): manual carrier code entry, custom message entry, picker open.
   const [manualCarrier, setManualCarrier] = useState(false);
@@ -183,8 +150,13 @@ export function ShippingOverrideFields({
   // the user sees what applies when a field is left blank. account level has no inheritance.
   const labelOf = (opts: { value: string; label: string }[], v: string | null) =>
     v == null ? undefined : opts.find((o) => o.value === v)?.label ?? v;
-  const carrierName = (code: string | null | undefined) =>
-    code == null ? undefined : companies.find((c) => c.code === code)?.name ?? code;
+  // 라벨 표기는 드롭다운 옵션과 같은 `이름 (코드)` 다(PLAN 2609_37 D14) — 롯데처럼 한 택배사가
+  // 코드 2개로 등재된 경우 사용자가 자기 계정에 맞는 쪽을 고를 근거가 화면에 있어야 한다.
+  const carrierName = (code: string | null | undefined) => {
+    if (code == null) return undefined;
+    const found = companies.find((c) => c.deliveryCompanyCode === code);
+    return found ? `${found.carrierName} (${found.deliveryCompanyCode})` : code;
+  };
   const numStr = (n: number | null | undefined) => (n == null ? undefined : String(n));
   const ynLabel = (v: string | null | undefined) =>
     v === 'Y' ? '가능' : v === 'N' ? '불가' : undefined;
@@ -267,8 +239,8 @@ export function ShippingOverrideFields({
   const messageSelectValue = showCustomInput ? CUSTOM_MESSAGE : isPreset ? currentMessage : '';
   const showExtraInfo = EXTRA_INFO_METHODS.has(value.deliveryMethod ?? '');
 
-  // Delivery-company select: a stored code not in the curated list opens manual entry.
-  const codeInList = companies.some((c) => c.code === value.deliveryCompanyCode);
+  // Delivery-company select: a stored code not in the catalog opens manual entry.
+  const codeInList = companies.some((c) => c.deliveryCompanyCode === value.deliveryCompanyCode);
   const showManualCarrier =
     manualCarrier || (companies.length > 0 && !!value.deliveryCompanyCode && !codeInList);
 
@@ -374,7 +346,13 @@ export function ShippingOverrideFields({
             )}
             <div>
               <label className={labelClass}>택배사</label>
-              {companies.length > 0 ? (
+              {/* 🔴 로딩 분기가 먼저 와야 한다 — 목록이 비동기라 이것이 없으면 모달을 열 때마다
+                  "직접 입력" 박스가 한 번 번쩍였다가 select 로 바뀐다(출고지 placesLoading 과 같은 결). */}
+              {carriersLoading ? (
+                <select disabled className={inputClass}>
+                  <option>택배사를 불러오는 중…</option>
+                </select>
+              ) : companies.length > 0 ? (
                 <>
                   <select
                     value={showManualCarrier ? MANUAL_CARRIER : value.deliveryCompanyCode ?? ''}
@@ -390,9 +368,10 @@ export function ShippingOverrideFields({
                     className={inputClass}
                   >
                     <option value="">{inheritOptionOf(carrierName(inherited?.deliveryCompanyCode))}</option>
+                    {/* 순서는 서버 정렬 그대로 쓴다(D4) — 등록 택배사가 앞에 오도록 이미 정렬돼 온다. */}
                     {companies.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.name}
+                      <option key={c.deliveryCompanyCode} value={c.deliveryCompanyCode}>
+                        {c.carrierName} ({c.deliveryCompanyCode})
                       </option>
                     ))}
                     <option value={MANUAL_CARRIER}>직접 입력…</option>
@@ -409,14 +388,22 @@ export function ShippingOverrideFields({
                   )}
                 </>
               ) : (
-                <input
-                  type="text"
-                  value={value.deliveryCompanyCode ?? ''}
-                  onChange={(e) => setField('deliveryCompanyCode', e.target.value || null)}
-                  placeholder={inherited?.deliveryCompanyCode ?? '택배사 코드를 직접 입력하세요'}
-                  disabled={disabled}
-                  className={inputClass}
-                />
+                <>
+                  <input
+                    type="text"
+                    value={value.deliveryCompanyCode ?? ''}
+                    onChange={(e) => setField('deliveryCompanyCode', e.target.value || null)}
+                    placeholder={inherited?.deliveryCompanyCode ?? '택배사 코드를 직접 입력하세요'}
+                    disabled={disabled}
+                    className={inputClass}
+                  />
+                  {/* 빈 목록에는 "미지원 플랫폼(정상)" 과 "조회 실패" 가 섞인다 — 실패일 때만 이유를 알린다. */}
+                  {carriersFailed && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      택배사 목록을 불러오지 못했습니다. 코드를 직접 입력하세요
+                    </p>
+                  )}
+                </>
               )}
             </div>
             <div>
