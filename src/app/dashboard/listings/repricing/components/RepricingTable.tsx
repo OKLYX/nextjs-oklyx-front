@@ -1,6 +1,13 @@
 'use client';
 
 import type { RepricingRow } from '@/domain/entities/RepricingEntity';
+import {
+  basePriceText,
+  isEdited,
+  parsePrice,
+  previewMargin,
+  sanitizePriceInput,
+} from './priceDraft';
 
 /** 원 단위 금액. null = 계산 불가 → '—' */
 export const formatWon = (value: number | null | undefined) =>
@@ -16,24 +23,34 @@ interface RepricingTableProps {
   selected: number[];
   onToggle: (optionId: number) => void;
   onToggleAll: (optionIds: number[], checked: boolean) => void;
+  /** optionId → 입력칸의 현재 문자열. 없으면 공식값을 그대로 보여준다 */
+  drafts: Record<number, string>;
+  onDraftChange: (optionId: number, value: string) => void;
+  /** 이 그룹의 목표 마진율(0~1). 예상 마진율이 이 값 미만이면 경고색 */
+  targetMarginRate: number | null;
   /** 실행 중이면 선택을 잠근다 */
   disabled?: boolean;
 }
 
 /**
- * 판매가 재계산 대상 옵션 표(FEATURE_2609_39 / PLAN D21·D23·D25).
+ * 판매가 재계산 대상 옵션 표(FEATURE_2609_39 / PLAN D21·D23·D25 + FEATURE_2609_42 D2·D4·D9).
  * File: src/app/dashboard/listings/repricing/components/RepricingTable.tsx
  *
  * 🔴 선택 단위는 **옵션 행**이지만 [재계산]은 상품(셀) 단위로 나간다 — 그 접기는 부모가 한다.
  * 🔴 「새 마진」열은 두지 않는다: 새 판매가는 목표 마진율로 역산한 값이라 모든 행이 같은 숫자다
- *    (목표 마진율은 카드 머리에 한 번 적는다).
+ *    (목표 마진율은 카드 머리에 한 번 적는다). 단, **사람이 값을 고친 행만** 그 자리에서 예상 마진을 센다.
  * 🔴 「비용 내역」은 **지금 값의 분해**다. 「전 → 후」로 쓰지 않는다 — 서버는 과거 비용을 모른다.
+ * 🔴 「새 판매가」 입력값은 저장해도 `price_source` 를 바꾸지 않아 **다음 재계산 때 공식값으로 되돌아간다**(2609_42 D2).
+ * 🔴 직접 지정가·계산 불가 행은 입력칸을 **열지 않는다**(D4) — 서버가 `skipped` 로 되돌려 보내므로 눌러도 아무 일이 없다.
  */
 export function RepricingTable({
   rows,
   selected,
   onToggle,
   onToggleAll,
+  drafts,
+  onDraftChange,
+  targetMarginRate,
   disabled = false,
 }: RepricingTableProps) {
   if (rows.length === 0) {
@@ -54,6 +71,88 @@ export function RepricingTable({
     ];
     if (row.feeAmount != null) parts.push(`수수료 ${Math.round(row.feeAmount).toLocaleString('ko-KR')}`);
     return parts.join(' + ');
+  };
+
+  /** 입력칸을 여는 행인지. 직접 지정가·계산 불가는 저장 대상이 아니다(D4). */
+  const priceCell = (row: RepricingRow) => {
+    if (row.excluded === 'MANUAL') {
+      return (
+        <div className="text-right">
+          <span>{formatWon(row.newPrice)}</span>
+          <p className="mt-0.5 text-[11px] text-gray-500">
+            직접 지정가입니다. 옵션 편집에서 바꾸세요
+          </p>
+        </div>
+      );
+    }
+    if (row.excluded === 'UNCALCULABLE') {
+      return (
+        <div className="text-right">
+          <span>{formatWon(row.newPrice)}</span>
+          <p className="mt-0.5 text-[11px] text-gray-500">{row.excludedReason ?? '계산할 수 없습니다'}</p>
+        </div>
+      );
+    }
+
+    const draft = drafts[row.optionId] ?? basePriceText(row);
+    const edited = isEdited(row, drafts[row.optionId]);
+    const parsed = parsePrice(draft);
+    const invalid = edited && parsed == null;
+
+    return (
+      <div className="flex flex-col items-end gap-0.5">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => onDraftChange(row.optionId, sanitizePriceInput(e.target.value))}
+          aria-label={`${row.listingName} ${row.optionName} 새 판매가`}
+          className={`w-28 rounded border px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100 ${
+            invalid
+              ? 'border-red-500 bg-red-50'
+              : edited
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300'
+          }`}
+        />
+        {invalid ? (
+          <span className="text-[11px] text-red-600">0보다 큰 금액을 입력하세요</span>
+        ) : (
+          <span className="text-[11px] text-gray-400">다음 재계산 때 공식값으로 되돌아갑니다</span>
+        )}
+      </div>
+    );
+  };
+
+  /** 값을 고친 행에만 예상 마진을 덧붙인다. 필요한 값이 하나라도 없으면 아예 내지 않는다(D9). */
+  const marginCell = (row: RepricingRow) => {
+    const current =
+      row.marginAmount == null
+        ? '—'
+        : `${formatWon(row.marginAmount)} (${formatPercent(row.marginRate)})`;
+
+    const draft = drafts[row.optionId];
+    if (row.excluded != null || !isEdited(row, draft)) return current;
+    const price = parsePrice(draft as string);
+    const preview = price == null ? null : previewMargin(row, price);
+    if (preview == null) return current;
+
+    const tone =
+      preview.rate < 0
+        ? 'text-red-700 font-semibold'
+        : targetMarginRate != null && preview.rate < targetMarginRate
+          ? 'text-amber-700'
+          : 'text-blue-700';
+
+    return (
+      <div className="text-right">
+        <span>{current}</span>
+        <p className={`mt-0.5 text-[11px] ${tone}`}>
+          예상 {formatWon(preview.amount)} ({formatPercent(preview.rate)})
+        </p>
+      </div>
+    );
   };
 
   return (
@@ -120,12 +219,8 @@ export function RepricingTable({
                 )}
               </td>
               <td className="px-4 py-3 text-right">{formatWon(row.judgedPrice)}</td>
-              <td className="px-4 py-3 text-right">
-                {row.marginAmount == null
-                  ? '—'
-                  : `${formatWon(row.marginAmount)} (${formatPercent(row.marginRate)})`}
-              </td>
-              <td className="px-4 py-3 text-right">{formatWon(row.newPrice)}</td>
+              <td className="px-4 py-3 text-right">{marginCell(row)}</td>
+              <td className="px-4 py-3 text-right">{priceCell(row)}</td>
               <td className="px-4 py-3">{costDetail(row)}</td>
               <td className="px-4 py-3">
                 {row.pendingPush ? (

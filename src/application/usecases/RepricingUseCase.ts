@@ -1,5 +1,7 @@
 import type { RepricingRepository } from '@/domain/repositories/RepricingRepository';
 import type {
+  PriceOverrideItem,
+  PriceOverrideResult,
   RecalculateResult,
   RepricePushResult,
   RepricingCandidatesParams,
@@ -19,5 +21,9 @@ export class RepricingUseCase {
 
   push(optionIds: number[]): Promise<RepricePushResult> {
     return this.repository.push(optionIds);
+  }
+
+  override(items: PriceOverrideItem[]): Promise<PriceOverrideResult> {
+    return this.repository.override(items);
   }
 }
