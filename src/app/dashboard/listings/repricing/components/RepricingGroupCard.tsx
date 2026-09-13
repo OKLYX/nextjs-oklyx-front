@@ -163,7 +163,10 @@ export function RepricingGroupCard({
         <p className={`rounded px-3 py-2 text-sm ${bannerClass(banner.tone)}`}>{banner.text}</p>
       )}
 
-      <div className="list-table-scroll">
+      {/* 🔴 `list-table-scroll` 을 쓰지 않는다(2609_44 / PLAN D5) — 그 클래스의 최소폭 736px + nowrap 이
+          표를 카드 밖으로 밀어내던 원인이다. 표가 스스로 카드 폭에 맞추고, 여기 `overflow-x-auto` 는
+          만약을 대비한 안전망일 뿐이다. */}
+      <div className="overflow-x-auto">
         <RepricingTable
           rows={rows}
           selected={selected}
