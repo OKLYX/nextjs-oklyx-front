@@ -1,6 +1,15 @@
 'use client';
 
 import { Card } from '@/presentation/components/ui/Card';
+import { BOX_KIND_LABEL } from '@/domain/entities/PackageEntity';
+import type { BoxKind } from '@/domain/entities/PackageEntity';
+
+/** 유형 칩 — `null` = 전체. 클릭은 **로컬 필터**라 요청을 만들지 않는다 */
+const KIND_CHIPS: { kind: BoxKind | null; label: string }[] = [
+  { kind: null, label: '전체' },
+  { kind: 'PURCHASED', label: BOX_KIND_LABEL.PURCHASED },
+  { kind: 'RECYCLED', label: BOX_KIND_LABEL.RECYCLED },
+];
 
 interface PackageSearchCardProps {
   searchPackage: string;
@@ -9,6 +18,9 @@ interface PackageSearchCardProps {
   isLoading: boolean;
   resultCount: number;
   onAddClick: () => void;
+  /** null = 전체 유형 */
+  kindFilter: BoxKind | null;
+  onKindFilterChange: (kind: BoxKind | null) => void;
 }
 
 export function PackageSearchCard({
@@ -18,6 +30,8 @@ export function PackageSearchCard({
   isLoading,
   resultCount,
   onAddClick,
+  kindFilter,
+  onKindFilterChange,
 }: PackageSearchCardProps) {
   return (
     <Card>
@@ -49,6 +63,25 @@ export function PackageSearchCard({
         >
           상자비 추가
         </button>
+      </div>
+      <div className="flex flex-wrap gap-2 mb-4">
+        {KIND_CHIPS.map((chip) => {
+          const isActive = kindFilter === chip.kind;
+          return (
+            <button
+              key={chip.kind ?? 'ALL'}
+              type="button"
+              onClick={() => onKindFilterChange(chip.kind)}
+              className={`px-4 py-2 text-sm font-medium rounded-full border transition-colors ${
+                isActive
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              {chip.label}
+            </button>
+          );
+        })}
       </div>
       <p className="text-sm text-gray-600" role="status" aria-live="polite">
         검색 결과: {resultCount}건

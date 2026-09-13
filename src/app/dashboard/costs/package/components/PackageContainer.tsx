@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { PageContainer } from '@/presentation/components/PageContainer';
-import type { Package } from '@/domain/entities/PackageEntity';
+import type { BoxKind, Package } from '@/domain/entities/PackageEntity';
+import { boxKindOf } from '@/domain/entities/PackageEntity';
 import type { CreatePackageRequest } from '@/application/dto/CreatePackageRequest';
 import type { UpdatePackageRequest } from '@/application/dto/UpdatePackageRequest';
 import { PackageUseCase } from '@/application/usecases/PackageUseCase';
@@ -14,6 +15,9 @@ import { PackageDetailsModal } from './PackageDetailsModal';
 
 export function PackageContainer() {
   const [searchPackage, setSearchPackage] = useState('');
+  // 🔴 상자 관리 목록만 유형을 넘기지 않는다 = 전 유형(PLAN 2609_40 D21). 칩은 받아온 뒤 거르는
+  // 로컬 필터라 유형을 바꿔도 다시 조회하지 않는다.
+  const [kindFilter, setKindFilter] = useState<BoxKind | null>(null);
   const [packages, setPackages] = useState<Package[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -52,8 +56,10 @@ export function PackageContainer() {
     }
   };
 
-  const filteredPackages = packages.filter((pkg) =>
-    pkg.type.toLowerCase().includes(searchPackage.toLowerCase())
+  const filteredPackages = packages.filter(
+    (pkg) =>
+      pkg.type.toLowerCase().includes(searchPackage.toLowerCase()) &&
+      (kindFilter === null || boxKindOf(pkg) === kindFilter)
   );
 
   const handleAddClick = () => {
@@ -85,11 +91,16 @@ export function PackageContainer() {
     setSelectedPackageId(undefined);
   };
 
-  const handleUpdatePackage = async (data: UpdatePackageRequest) => {
+  const handleUpdatePackage = async (data: UpdatePackageRequest, imageFile: File | null) => {
     if (!selectedPackage) return;
 
     setIsSubmittingDetails(true);
     try {
+      // 사진 업로드는 전용 엔드포인트다. 수정 요청에는 이미지 필드가 없으므로 순서는 상관없지만,
+      // 먼저 올려야 목록 새로고침 한 번으로 사진과 값이 함께 보인다.
+      if (imageFile) {
+        await packageUseCase.uploadPackageImage(selectedPackage.id, imageFile);
+      }
       await packageUseCase.updatePackage(selectedPackage.id, data);
       handleCloseDetailsModal();
       await handleSearch();
@@ -128,6 +139,8 @@ export function PackageContainer() {
           isLoading={isLoading}
           resultCount={filteredPackages.length}
           onAddClick={handleAddClick}
+          kindFilter={kindFilter}
+          onKindFilterChange={setKindFilter}
         />
 
         <PackageTable

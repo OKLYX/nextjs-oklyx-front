@@ -220,7 +220,9 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
         // 참조 데이터 로드
         const [carrierRateRes, packagesRes, productsRes, commissionRes, categoryRes, sellersRes] = await Promise.all([
           axiosInstance.get('/api/admin/carrier-rate'),
-          axiosInstance.get('/api/admin/package'),
+          // 🔴 판매가 계산용 상자 후보 = 구매 상자만(PLAN 2609_40 D21). 재활용 상자는 비용 0 이라
+          // 후보에 섞이면 원가 0 으로 판매가가 계산된다.
+          axiosInstance.get('/api/admin/package', { params: { boxKind: 'PURCHASED' } }),
           axiosInstance.get('/api/products'),
           axiosInstance.get('/api/admin/commission-rate'),
           axiosInstance.get('/api/admin/category'),
