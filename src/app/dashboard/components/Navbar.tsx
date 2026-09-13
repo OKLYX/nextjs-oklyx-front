@@ -131,6 +131,8 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       items: [
         { href: ROUTES.STOCK_IN_OUT, label: '입고·조정' },
         { href: ROUTES.STOCK_OUTBOUND, label: '출고 확인' },
+        // 포장 콘솔은 `/api/admin/packing` 전용이다 — 일반 사용자에게 보이면 열자마자 403 이 된다.
+        { href: ROUTES.STOCK_PACKING, label: '포장 작업', adminOnly: true },
         { href: ROUTES.STOCK_SEARCH, label: '재고 조회' },
       ],
     },
