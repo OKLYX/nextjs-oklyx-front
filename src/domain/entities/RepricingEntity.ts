@@ -114,3 +114,28 @@ export interface RepricePushResult {
   /** stopped 일 때의 재시도 가능 시각(ISO-8601). 쿨다운은 약 10분이라 「잠시 후」로 쓰지 않는다 */
   retryAfter: string | null;
 }
+
+/**
+ * 🔴 판매가 상한 — 서버 `PriceOverrideRequest.Item.price` 의 `@Digits(integer = 8, fraction = 2)` 와 같은 값이다
+ * (`product_listing_option.selling_price` = DECIMAL(10,2)). 컬럼이 못 담는 값을 왕복시키지 않으려고 화면에서 먼저 막는다.
+ */
+export const PRICE_OVERRIDE_MAX = 99_999_999.99;
+
+/** 판매가 직접 입력 1건(FEATURE_2609_42 / PLAN D3 — 단위는 옵션 1건이다). */
+export interface PriceOverrideItem {
+  optionId: number;
+  price: number;
+}
+
+/**
+ * 판매가 직접 입력 결과.
+ *
+ * 🔴 마켓 호출 0회다(D1) — `push` 결과의 `stopped`·`retryAfter` 가 여기 없는 이유이고,
+ * 저장만으로는 실판매가가 바뀌지 않는다는 뜻이다.
+ * 🔴 저장된 옵션은 `price_source` 가 그대로 AUTO 다(D2) — 다음 재계산이 공식값으로 덮는 것이 정상 동작이다.
+ */
+export interface PriceOverrideResult {
+  applied: number;
+  skipped: RepriceSkippedOption[];
+  failed: RepriceFailedOption[];
+}

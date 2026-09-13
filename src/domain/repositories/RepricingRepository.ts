@@ -1,4 +1,6 @@
 import type {
+  PriceOverrideItem,
+  PriceOverrideResult,
   RecalculateResult,
   RepricePushResult,
   RepricingCandidatesParams,
@@ -14,4 +16,7 @@ export interface RepricingRepository {
 
   /** ② 마켓 반영 — 옵션 단위. 🔴 실제 판매 가격이 바뀐다. */
   push(optionIds: number[]): Promise<RepricePushResult>;
+
+  /** 판매가 직접 입력 — 옵션 단위. 로컬 판매가만 바꾼다(마켓 호출 0회, 2609_42 D1). */
+  override(items: PriceOverrideItem[]): Promise<PriceOverrideResult>;
 }

@@ -3,8 +3,13 @@
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
 import { Spinner } from '@/presentation/components/Spinner';
-import type { RepricingGroup, RepricingRow } from '@/domain/entities/RepricingEntity';
+import type {
+  PriceOverrideItem,
+  RepricingGroup,
+  RepricingRow,
+} from '@/domain/entities/RepricingEntity';
 import { RepricingTable, formatPercent } from './RepricingTable';
+import { collectDrafts } from './priceDraft';
 
 /** 그룹 실행 배너. green = 전부 성공, amber = 부분 실패/중단, red = 요청 자체 실패 */
 export interface RepricingBanner {
@@ -13,7 +18,7 @@ export interface RepricingBanner {
 }
 
 /** 실행 중인 동작. null = 대기 */
-export type RepricingAction = 'RECALC' | 'PUSH';
+export type RepricingAction = 'RECALC' | 'PUSH' | 'OVERRIDE';
 
 interface RepricingGroupCardProps {
   group: RepricingGroup;
@@ -23,9 +28,15 @@ interface RepricingGroupCardProps {
   selected: number[];
   onToggle: (optionId: number) => void;
   onToggleAll: (optionIds: number[], checked: boolean) => void;
-  /** listingIds = 중복 제거한 셀 목록, optionIds = 고른 옵션 그대로 */
-  onRecalculate: (listingIds: number[], optionIds: number[]) => void;
+  /** optionId → 입력칸 문자열(전 그룹 공통, 부모가 보유) */
+  drafts: Record<number, string>;
+  onDraftChange: (optionId: number, value: string) => void;
+  /** listingIds = 중복 제거한 셀 목록, optionIds = 고른 옵션 그대로.
+   *  editedCount = 이 그룹에서 손댄 행 수 — 재계산이 그 입력값을 덮는다는 것을 확인창이 말해야 한다 */
+  onRecalculate: (listingIds: number[], optionIds: number[], editedCount: number) => void;
   onPush: (optionIds: number[]) => void;
+  /** 입력값 저장 — 선택과 무관하게 **손댄 행 전부**가 대상이다(D3, 단위는 옵션 1건) */
+  onOverride: (items: PriceOverrideItem[]) => void;
   /** 이 그룹에서 실행 중인 동작. 다른 그룹은 계속 쓸 수 있다 */
   busy: RepricingAction | null;
   banner: RepricingBanner | null;
@@ -52,8 +63,11 @@ export function RepricingGroupCard({
   selected,
   onToggle,
   onToggleAll,
+  drafts,
+  onDraftChange,
   onRecalculate,
   onPush,
+  onOverride,
   busy,
   banner,
 }: RepricingGroupCardProps) {
@@ -61,6 +75,10 @@ export function RepricingGroupCard({
   const selectedOptionIds = selectedRows.map((r) => r.optionId);
   const selectedListingIds = Array.from(new Set(selectedRows.map((r) => r.listingId)));
   const hasSelection = selectedOptionIds.length > 0;
+
+  // 🔴 입력값 저장은 체크박스와 무관하다 — 손댄 칸이 곧 대상이다.
+  const { items: draftItems, invalidCount } = collectDrafts(rows, drafts);
+  const editedCount = draftItems.length + invalidCount;
 
   return (
     <Card className="space-y-3">
@@ -81,6 +99,7 @@ export function RepricingGroupCard({
           <span className="text-xs text-gray-500">
             선택 상품 {selectedListingIds.length.toLocaleString('ko-KR')} · 옵션{' '}
             {selectedOptionIds.length.toLocaleString('ko-KR')}
+            {editedCount > 0 && ` · 수정 ${editedCount.toLocaleString('ko-KR')}`}
           </span>
           <div className="flex gap-2">
             <Button
@@ -88,10 +107,24 @@ export function RepricingGroupCard({
               size="sm"
               variant="secondary"
               disabled={busy != null || !hasSelection}
-              onClick={() => onRecalculate(selectedListingIds, selectedOptionIds)}
+              onClick={() => onRecalculate(selectedListingIds, selectedOptionIds, editedCount)}
               className="flex items-center gap-1"
             >
               {busy === 'RECALC' ? <Spinner label="재계산 중..." /> : '선택 재계산'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={busy != null || draftItems.length === 0 || invalidCount > 0}
+              onClick={() => onOverride(draftItems)}
+              className="flex items-center gap-1"
+            >
+              {busy === 'OVERRIDE' ? (
+                <Spinner label="저장 중..." />
+              ) : (
+                `입력값 저장${draftItems.length > 0 ? ` ${draftItems.length}건` : ''}`
+              )}
             </Button>
             <Button
               type="button"
@@ -116,9 +149,25 @@ export function RepricingGroupCard({
           selected={selected}
           onToggle={onToggle}
           onToggleAll={onToggleAll}
+          drafts={drafts}
+          onDraftChange={onDraftChange}
+          targetMarginRate={group.targetMarginRate}
           disabled={busy != null}
         />
       </div>
+
+      {invalidCount > 0 && (
+        <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+          입력한 판매가 {invalidCount.toLocaleString('ko-KR')}건이 저장할 수 없는 값입니다. 고치면 저장할 수
+          있습니다.
+        </p>
+      )}
+
+      <p className="text-xs text-gray-500">
+        「새 판매가」를 직접 고치면 그 옆의 <span className="font-medium">예상 마진은 추정치</span>입니다 —
+        확정 값은 [입력값 저장] 후 목록을 다시 불러온 숫자입니다. 저장해도{' '}
+        <span className="font-medium">마켓에는 반영되지 않고</span>, 다음 재계산 때 공식값으로 되돌아갑니다.
+      </p>
 
       <p className="text-xs text-gray-500">
         이 마진은 <span className="font-medium">지금 팔면</span> 기준(현재 원가·택배비·박스비)입니다.

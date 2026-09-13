@@ -3,6 +3,8 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { RepricingRepository } from '@/domain/repositories/RepricingRepository';
 import type {
+  PriceOverrideItem,
+  PriceOverrideResult,
   RecalculateResult,
   RepricePushResult,
   RepricingCandidatesParams,
@@ -30,6 +32,11 @@ export class RepricingRepositoryImpl implements RepricingRepository {
 
   async push(optionIds: number[]): Promise<RepricePushResult> {
     const response = await axiosInstance.post(`${base}/push`, { optionIds });
+    return response.data.data;
+  }
+
+  async override(items: PriceOverrideItem[]): Promise<PriceOverrideResult> {
+    const response = await axiosInstance.post(`${base}/override`, { items });
     return response.data.data;
   }
 }
