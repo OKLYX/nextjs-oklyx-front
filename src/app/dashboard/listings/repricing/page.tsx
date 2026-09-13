@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
 import { Card } from '@/presentation/components/ui/Card';
@@ -15,10 +15,10 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import {
   REPRICE_PUSH_CHUNK_SIZE,
-  type PriceOverrideItem,
   type RepriceFailedOption,
   type RepriceSkippedOption,
   type RepricingCandidatesResponse,
+  type RepricingRow,
   type RepricingScope,
 } from '@/domain/entities/RepricingEntity';
 import {
@@ -26,6 +26,13 @@ import {
   type RepricingAction,
   type RepricingBanner,
 } from './components/RepricingGroupCard';
+import { formatWon } from './components/RepricingTable';
+import {
+  mergeKeptGroups,
+  mergeKeptRows,
+  type RecentAction,
+  type RecentActionMap,
+} from './components/rowActions';
 
 const groupKeyOf = (sellerId: number, platform: string) => `${sellerId}::${platform}`;
 
@@ -38,16 +45,16 @@ const formatRetryAfter = (iso: string | null) => {
 };
 
 interface PendingConfirm {
-  action: RepricingAction;
+  action: Exclude<RepricingAction, 'OVERRIDE'>;
   groupKey: string;
   groupLabel: string;
   platform: string;
   listingIds: number[];
   optionIds: number[];
-  /** OVERRIDE 일 때 저장할 입력값. 다른 동작에서는 빈 배열 */
-  items: PriceOverrideItem[];
-  /** RECALC 일 때 그 그룹에서 덮어써질 입력값 수 */
-  editedCount: number;
+  /** RECALC 일 때 그 그룹에서 덮어써질 미저장 입력값 수 */
+  unsavedCount: number;
+  /** 행 단위 실행이면 그 행 이름. 묶음 실행이면 null */
+  rowLabel: string | null;
 }
 
 /**
@@ -57,12 +64,13 @@ interface PendingConfirm {
  * 🔴 `dashboard/listings/sync` 와 **다른 화면**이다(PLAN 2609_39 D12): 저쪽은 콘텐츠 재전송(재심사),
  *    여기는 가격 전송이다. 두 기능을 한 표에 합치지 않는다.
  * 🔴 [마켓 반영]은 승인 없이 **실제 판매가를 즉시 바꾼다** — 확인 모달 없이 전송하지 않는다(D7).
+ * 🔴 실행 단위가 둘이다(2609_43 D3·D8): 기본은 **행 하나**([저장]·[마켓 반영]), 묶음 버튼은 선택한 여러 건.
+ *    행 단위도 **같은 엔드포인트를 1건짜리 요청으로** 부른다 — 서버에 새 경로를 만들지 않는다.
+ * 🔴 저장하지 않은 입력값이 있으면 그 행의 마켓 반영을 막는다(D6). 옛 값이 조용히 나가는 사고를 막는 장치다.
+ * 🔴 처리한 행은 응답에서 빠져도 화면이 기억해 그 자리에 남긴다(D7 — {@link RecentActionMap}).
+ *    비우는 시점은 [새로고침]과 필터 변경 **둘뿐**이고, 시간으로 자동 삭제하지 않는다.
  * 🔴 [마켓 반영]은 한 번에 {@link REPRICE_PUSH_CHUNK_SIZE} 건씩 나눠 순차 호출한다(D26 — 서버 상한 200 의
  *    실제 소요가 미측정이라 504 구간이다). 숫자는 그 상수 한 곳에서만 고친다.
- * 🔴 실행 버튼은 셋이고 마켓에 나가는 것은 [마켓 반영] **하나뿐**이다(FEATURE_2609_42 D1):
- *    [재계산] = 공식으로 다시 계산(상품 단위) · [입력값 저장] = 사람이 친 값을 로컬에 저장(옵션 단위) ·
- *    [마켓 반영] = 저장된 값을 전송(실판매가가 즉시 바뀐다).
- * 🔴 [재계산]과 [입력값 저장]은 **같은 칸을 덮어쓴다** — 입력값이 있는 상태로 재계산하면 그 값은 공식값으로 대체된다.
  * 자동 폴링 없음 — 모든 갱신은 수동 트리거(sync 콘솔과 같은 자세).
  */
 export default function ListingsRepricingPage() {
@@ -79,11 +87,40 @@ export default function ListingsRepricingPage() {
   const [error, setError] = useState('');
 
   const [selected, setSelected] = useState<number[]>([]);
-  /** optionId → 「새 판매가」 입력칸 문자열. 화면에만 있는 값이고 [입력값 저장] 으로만 서버에 간다(2609_42 D1) */
+  /** 편집 중인 optionId = 저장하지 않은 입력값이 있는 행(2609_43 D5·D6) */
+  const [editing, setEditing] = useState<number[]>([]);
+  /** optionId → 「새 판매가」 입력칸 문자열. 화면에만 있는 값이고 행 [저장] 으로만 서버에 간다 */
   const [drafts, setDrafts] = useState<Record<number, string>>({});
-  const [busy, setBusy] = useState<{ groupKey: string; action: RepricingAction } | null>(null);
+  const [busy, setBusy] = useState<{
+    groupKey: string;
+    action: RepricingAction;
+    optionId: number | null;
+  } | null>(null);
   const [banners, setBanners] = useState<Record<string, RepricingBanner>>({});
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
+
+  /**
+   * 「방금 처리한 행」. 🔴 실행 직후 목록을 다시 부를 때 **읽는 쪽이 최신 값이어야** 해서 ref 가 원본이고
+   * state 는 그리기용 사본이다(setState 는 다음 렌더까지 반영되지 않는다).
+   */
+  const recentRef = useRef<RecentActionMap>({});
+  const [recent, setRecent] = useState<RecentActionMap>({});
+  /** 직전 목록. 응답에서 빠진 「처리한 행」을 그 자리에 남기려면 이전 순서를 알아야 한다(D7) */
+  const rowsRef = useRef<RepricingRow[]>([]);
+  const groupsRef = useRef<RepricingCandidatesResponse['groups']>([]);
+
+  const putRecent = useCallback((entries: [number, RecentAction][]) => {
+    const next = { ...recentRef.current };
+    for (const [optionId, action] of entries) next[optionId] = action;
+    recentRef.current = next;
+    setRecent(next);
+  }, []);
+
+  /** 처리 표시를 비운다 — [새로고침]과 필터 변경에서만 부른다(D7). */
+  const clearRecent = useCallback(() => {
+    recentRef.current = {};
+    setRecent({});
+  }, []);
 
   const load = useCallback(
     async (params: { sellerId: number | ''; platform: string; scope: RepricingScope }) => {
@@ -95,12 +132,18 @@ export default function ListingsRepricingPage() {
           platform: params.platform || undefined,
           scope: params.scope,
         });
-        setData(res);
-        setSelected((prev) => prev.filter((id) => res.rows.some((r) => r.optionId === id)));
+        // 🔴 응답에서 빠진 행이라도 방금 처리한 행이면 그 자리에 남긴다(D7).
+        const rows = mergeKeptRows(rowsRef.current, res.rows, recentRef.current);
+        const groups = mergeKeptGroups(groupsRef.current, res.groups, rows);
+        rowsRef.current = rows;
+        groupsRef.current = groups;
+        setData({ groups, rows });
+        setSelected((prev) => prev.filter((id) => rows.some((r) => r.optionId === id)));
+        setEditing((prev) => prev.filter((id) => rows.some((r) => r.optionId === id)));
         // 사라진 행의 입력값은 버린다. 남은 행의 입력값은 유지 — 조회만으로 사람이 친 숫자를 지우지 않는다.
         setDrafts((prev) =>
           Object.fromEntries(
-            Object.entries(prev).filter(([id]) => res.rows.some((r) => r.optionId === Number(id))),
+            Object.entries(prev).filter(([id]) => rows.some((r) => r.optionId === Number(id))),
           ),
         );
       } catch (e) {
@@ -134,10 +177,17 @@ export default function ListingsRepricingPage() {
     })();
   }, [load]);
 
+  /** 실행 직후의 재조회 — 처리 표시는 그대로 둔다(D7). */
   const reload = useCallback(
     () => load({ sellerId: formSellerId, platform: formPlatform, scope: formScope }),
     [load, formSellerId, formPlatform, formScope],
   );
+
+  /** [새로고침] — 처리 표시를 비우고 다시 부른다(D7). */
+  const refresh = useCallback(() => {
+    clearRecent();
+    return reload();
+  }, [clearRecent, reload]);
 
   const toggle = (optionId: number) => {
     setSelected((prev) =>
@@ -156,12 +206,22 @@ export default function ListingsRepricingPage() {
   const changeDraft = (optionId: number, value: string) =>
     setDrafts((prev) => ({ ...prev, [optionId]: value }));
 
-  const dropDrafts = (optionIds: number[]) =>
+  const dropDraft = (optionId: number) =>
     setDrafts((prev) => {
       const next = { ...prev };
-      for (const id of optionIds) delete next[id];
+      delete next[optionId];
       return next;
     });
+
+  const startEdit = (optionId: number, initial: string) => {
+    setDrafts((prev) => ({ ...prev, [optionId]: prev[optionId] ?? initial }));
+    setEditing((prev) => (prev.includes(optionId) ? prev : [...prev, optionId]));
+  };
+
+  const closeEdit = (optionId: number) => {
+    setEditing((prev) => prev.filter((id) => id !== optionId));
+    dropDraft(optionId);
+  };
 
   const setBanner = (groupKey: string, banner: RepricingBanner) =>
     setBanners((prev) => ({ ...prev, [groupKey]: banner }));
@@ -174,7 +234,7 @@ export default function ListingsRepricingPage() {
     });
 
   const runRecalculate = async (target: PendingConfirm) => {
-    setBusy({ groupKey: target.groupKey, action: 'RECALC' });
+    setBusy({ groupKey: target.groupKey, action: 'RECALC', optionId: null });
     clearBanner(target.groupKey);
     try {
       const res = await useCase.recalculate(target.listingIds);
@@ -188,10 +248,10 @@ export default function ListingsRepricingPage() {
         text: `재계산 상품 ${res.cellCount}건 · 판매가가 바뀐 옵션 ${res.optionChanged}건${failedText} — 마켓에는 아직 반영되지 않았습니다.`,
         tone: res.failed.length > 0 ? 'amber' : 'green',
       });
-      // 재계산은 그 셀의 AUTO 옵션을 전부 공식값으로 덮는다 — 그 셀에 남아 있던 입력값도 같이 버린다.
-      dropDrafts(
-        data.rows.filter((r) => target.listingIds.includes(r.listingId)).map((r) => r.optionId),
-      );
+      // 재계산은 그 셀의 AUTO 옵션을 전부 공식값으로 덮는다 — 그 셀에서 편집 중이던 입력값도 같이 버린다.
+      for (const row of rowsRef.current) {
+        if (target.listingIds.includes(row.listingId)) closeEdit(row.optionId);
+      }
       setSelected([]);
       await reload();
     } catch (e) {
@@ -204,8 +264,30 @@ export default function ListingsRepricingPage() {
     }
   };
 
+  /** 반영에 성공한 옵션 = 보낸 것 − 건너뜀 − 실패. 마지막으로 알던 로컬 판매가를 그대로 기록한다(D7). */
+  const markPushed = (
+    attemptedIds: number[],
+    skipped: RepriceSkippedOption[],
+    failed: RepriceFailedOption[],
+  ) => {
+    const problem = new Set([...skipped.map((x) => x.optionId), ...failed.map((x) => x.optionId)]);
+    const at = Date.now();
+    const entries: [number, RecentAction][] = [];
+    for (const optionId of attemptedIds) {
+      if (problem.has(optionId)) continue;
+      const row = rowsRef.current.find((r) => r.optionId === optionId);
+      const price = row?.sellingPrice ?? row?.newPrice ?? recentRef.current[optionId]?.price ?? null;
+      entries.push([optionId, { kind: 'PUSHED', price, at }]);
+    }
+    if (entries.length > 0) putRecent(entries);
+  };
+
   const runPush = async (target: PendingConfirm) => {
-    setBusy({ groupKey: target.groupKey, action: 'PUSH' });
+    setBusy({
+      groupKey: target.groupKey,
+      action: 'PUSH',
+      optionId: target.rowLabel != null ? target.optionIds[0] : null,
+    });
     clearBanner(target.groupKey);
 
     // 🔴 서버 상한(200)이 아니라 화면이 정한 묶음 단위로 나눠 순차 전송한다(D26).
@@ -215,6 +297,7 @@ export default function ListingsRepricingPage() {
     }
 
     let pushed = 0;
+    const attempted: number[] = [];
     const skipped: RepriceSkippedOption[] = [];
     const failed: RepriceFailedOption[] = [];
     let stopped = false;
@@ -229,6 +312,7 @@ export default function ListingsRepricingPage() {
           });
         }
         const res = await useCase.push(chunks[i]);
+        attempted.push(...chunks[i]);
         pushed += res.pushed;
         skipped.push(...res.skipped);
         failed.push(...res.failed);
@@ -239,17 +323,23 @@ export default function ListingsRepricingPage() {
         }
       }
 
+      markPushed(attempted, skipped, failed);
+
       const summary = `반영 ${pushed}건 · 건너뜀 ${skipped.length}건 · 실패 ${failed.length}건`;
       const stoppedText = stopped
         ? ` — 쿠팡 호출 제한으로 중단되었습니다. ${formatRetryAfter(retryAfter)} 이후 남은 건을 다시 반영하세요.`
         : '';
+      const skippedText =
+        skipped.length > 0
+          ? ` (${skipped.map((s) => `${s.optionName}: ${s.reason}`).join(' / ')})`
+          : '';
       const failedText =
         failed.length > 0
           ? ` (${failed.map((f) => `${f.optionName}: ${f.message}`).join(' / ')})`
           : '';
       setBanner(target.groupKey, {
-        text: `${summary}${failedText}${stoppedText}`,
-        tone: stopped || failed.length > 0 ? 'amber' : 'green',
+        text: `${summary}${skippedText}${failedText}${stoppedText}`,
+        tone: stopped || failed.length > 0 || skipped.length > 0 ? 'amber' : 'green',
       });
       setSelected([]);
       await reload();
@@ -264,63 +354,29 @@ export default function ListingsRepricingPage() {
   };
 
   /**
-   * 입력값 저장 — 🔴 마켓 호출 0회다. 저장만으로는 실판매가가 그대로여서 그 행은 「미반영」이 켜진다(D10).
-   * 상한은 [마켓 반영]과 같은 축이라 같은 묶음 단위로 나눠 보낸다(D7).
+   * 행 [저장] — 🔴 마켓 호출 0회다. 저장만으로는 실판매가가 그대로여서 그 행은 「미반영」이 켜진다(2609_42 D10).
+   * 1건짜리 `override` 요청이고, 확인창 없이 바로 나간다(2609_43 D5·D8).
    */
-  const runOverride = async (target: PendingConfirm) => {
-    setBusy({ groupKey: target.groupKey, action: 'OVERRIDE' });
-    clearBanner(target.groupKey);
-
-    const chunks: PriceOverrideItem[][] = [];
-    for (let i = 0; i < target.items.length; i += REPRICE_PUSH_CHUNK_SIZE) {
-      chunks.push(target.items.slice(i, i + REPRICE_PUSH_CHUNK_SIZE));
-    }
-
-    let applied = 0;
-    const skipped: RepriceSkippedOption[] = [];
-    const failed: RepriceFailedOption[] = [];
-
+  const runOverrideRow = async (row: RepricingRow, price: number) => {
+    const groupKey = groupKeyOf(row.sellerId, row.platform);
+    setBusy({ groupKey, action: 'OVERRIDE', optionId: row.optionId });
+    clearBanner(groupKey);
     try {
-      for (let i = 0; i < chunks.length; i += 1) {
-        if (chunks.length > 1) {
-          setBanner(target.groupKey, {
-            text: `${i + 1}/${chunks.length} 묶음 저장 중... (저장 ${applied}건)`,
-            tone: 'amber',
-          });
-        }
-        const res = await useCase.override(chunks[i]);
-        applied += res.applied;
-        skipped.push(...res.skipped);
-        failed.push(...res.failed);
+      const res = await useCase.override([{ optionId: row.optionId, price }]);
+      if (res.applied > 0) {
+        putRecent([[row.optionId, { kind: 'SAVED', price, at: Date.now() }]]);
+        closeEdit(row.optionId);
+        setBanner(groupKey, {
+          text: `${row.optionName} 판매가를 ${formatWon(price)}으로 저장했습니다 — 마켓에는 아직 반영되지 않았습니다. 그 행의 [마켓 반영]을 눌러야 실제 판매가가 바뀝니다.`,
+          tone: 'green',
+        });
+      } else {
+        const reason = res.skipped[0]?.reason ?? res.failed[0]?.message ?? '저장되지 않았습니다.';
+        setBanner(groupKey, { text: `${row.optionName}: ${reason}`, tone: 'amber' });
       }
-
-      const problemIds = new Set([
-        ...skipped.map((x) => x.optionId),
-        ...failed.map((x) => x.optionId),
-      ]);
-      // 저장된 칸만 비운다 — 건너뛴·실패한 칸은 사람이 고쳐 다시 누를 수 있게 입력값을 남긴다.
-      dropDrafts(target.items.map((x) => x.optionId).filter((id) => !problemIds.has(id)));
-
-      const detail = [
-        skipped.length > 0
-          ? ` · 건너뜀 ${skipped.length}건 (${skipped
-              .map((x) => `${x.optionName}: ${x.reason}`)
-              .join(' / ')})`
-          : '',
-        failed.length > 0
-          ? ` · 실패 ${failed.length}건 (${failed
-              .map((x) => `${x.optionName}: ${x.message}`)
-              .join(' / ')})`
-          : '',
-      ].join('');
-
-      setBanner(target.groupKey, {
-        text: `판매가 저장 ${applied}건${detail} — 마켓에는 아직 반영되지 않았습니다. 해당 행의 「미반영」을 확인하고 [선택 마켓 반영]을 눌러야 실제 판매가가 바뀝니다.`,
-        tone: skipped.length > 0 || failed.length > 0 ? 'amber' : 'green',
-      });
       await reload();
     } catch (e) {
-      setBanner(target.groupKey, {
+      setBanner(groupKey, {
         text: extractErrorMessage(e, '판매가 저장에 실패했습니다.'),
         tone: 'red',
       });
@@ -329,13 +385,31 @@ export default function ListingsRepricingPage() {
     }
   };
 
+  /** 행 [마켓 반영] — 확인창을 거쳐 1건짜리 `push` 로 나간다(D3·D8). */
+  const askPushRow = (row: RepricingRow) =>
+    setConfirm({
+      action: 'PUSH',
+      groupKey: groupKeyOf(row.sellerId, row.platform),
+      groupLabel: `${row.listingName} · ${row.optionName}`,
+      platform: row.platform,
+      listingIds: [],
+      optionIds: [row.optionId],
+      unsavedCount: 0,
+      rowLabel: `${row.listingName} · ${row.optionName}`,
+    });
+
   const handleConfirm = async () => {
     if (!confirm) return;
     const target = confirm;
     setConfirm(null);
     if (target.action === 'RECALC') await runRecalculate(target);
-    else if (target.action === 'OVERRIDE') await runOverride(target);
     else await runPush(target);
+  };
+
+  const changeFilter = (apply: () => void) => {
+    // 필터가 바뀌면 지금 보이는 처리 표시는 다른 범위의 이야기가 된다 — 비운다(D7).
+    clearRecent();
+    apply();
   };
 
   return (
@@ -347,7 +421,9 @@ export default function ListingsRepricingPage() {
             <select
               className="rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
               value={formSellerId}
-              onChange={(e) => setFormSellerId(e.target.value ? Number(e.target.value) : '')}
+              onChange={(e) =>
+                changeFilter(() => setFormSellerId(e.target.value ? Number(e.target.value) : ''))
+              }
             >
               <option value="">전체 판매자</option>
               {sellers.map((s) => (
@@ -362,7 +438,7 @@ export default function ListingsRepricingPage() {
             <select
               className="rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
               value={formPlatform}
-              onChange={(e) => setFormPlatform(e.target.value)}
+              onChange={(e) => changeFilter(() => setFormPlatform(e.target.value))}
             >
               <option value="">전체 채널</option>
               {PLATFORMS.map((p) => (
@@ -378,7 +454,7 @@ export default function ListingsRepricingPage() {
                 type="radio"
                 name="scope"
                 checked={formScope === 'BELOW'}
-                onChange={() => setFormScope('BELOW')}
+                onChange={() => changeFilter(() => setFormScope('BELOW'))}
               />
               대응 필요만
             </label>
@@ -387,13 +463,13 @@ export default function ListingsRepricingPage() {
                 type="radio"
                 name="scope"
                 checked={formScope === 'ALL'}
-                onChange={() => setFormScope('ALL')}
+                onChange={() => changeFilter(() => setFormScope('ALL'))}
               />
               전체
             </label>
           </div>
-          <Button type="button" onClick={() => void reload()} disabled={isLoading || busy != null}>
-            조회
+          <Button type="button" onClick={() => void refresh()} disabled={isLoading || busy != null}>
+            새로고침
           </Button>
         </div>
       </Card>
@@ -424,11 +500,18 @@ export default function ListingsRepricingPage() {
               selected={selected}
               onToggle={toggle}
               onToggleAll={toggleAll}
+              editing={editing}
               drafts={drafts}
               onDraftChange={changeDraft}
+              onEditStart={startEdit}
+              onEditCancel={closeEdit}
+              onSaveRow={(row, price) => void runOverrideRow(row, price)}
+              onPushRow={askPushRow}
+              recent={recent}
               busy={busy?.groupKey === key ? busy.action : null}
+              busyOptionId={busy?.groupKey === key ? busy.optionId : null}
               banner={banners[key] ?? null}
-              onRecalculate={(listingIds, optionIds, editedCount) =>
+              onRecalculate={(listingIds, optionIds, unsavedCount) =>
                 setConfirm({
                   action: 'RECALC',
                   groupKey: key,
@@ -436,8 +519,8 @@ export default function ListingsRepricingPage() {
                   platform: group.platform,
                   listingIds,
                   optionIds,
-                  items: [],
-                  editedCount,
+                  unsavedCount,
+                  rowLabel: null,
                 })
               }
               onPush={(optionIds) =>
@@ -448,20 +531,8 @@ export default function ListingsRepricingPage() {
                   platform: group.platform,
                   listingIds: [],
                   optionIds,
-                  items: [],
-                  editedCount: 0,
-                })
-              }
-              onOverride={(items) =>
-                setConfirm({
-                  action: 'OVERRIDE',
-                  groupKey: key,
-                  groupLabel: `${group.sellerName} · ${group.platform}`,
-                  platform: group.platform,
-                  listingIds: [],
-                  optionIds: items.map((x) => x.optionId),
-                  items,
-                  editedCount: items.length,
+                  unsavedCount: 0,
+                  rowLabel: null,
                 })
               }
             />
@@ -471,47 +542,26 @@ export default function ListingsRepricingPage() {
 
       <ConfirmDialog
         isOpen={confirm != null}
-        title={
-          confirm?.action === 'PUSH'
-            ? '마켓 반영'
-            : confirm?.action === 'OVERRIDE'
-              ? '입력값 저장'
-              : '판매가 재계산'
-        }
+        title={confirm?.action === 'PUSH' ? '마켓 반영' : '판매가 재계산'}
         isDangerous={confirm?.action === 'PUSH'}
-        confirmText={
-          confirm?.action === 'PUSH'
-            ? '마켓 반영'
-            : confirm?.action === 'OVERRIDE'
-              ? '저장'
-              : '재계산'
-        }
+        confirmText={confirm?.action === 'PUSH' ? '마켓 반영' : '재계산'}
         message={
-          confirm?.action === 'OVERRIDE' ? (
+          confirm?.action === 'PUSH' ? (
             <>
               <span className="mb-2 block text-base text-gray-500">{confirm.groupLabel}</span>
-              직접 입력한 <span className="font-semibold">{confirm.items.length}개 옵션</span>의 판매가를
-              저장합니다.
-              <span className="mt-2 block">
-                <span className="font-semibold">마켓에는 아직 반영되지 않습니다.</span> 저장 후 [선택 마켓
-                반영]을 눌러야 실제 판매가가 바뀝니다.
-              </span>
-              <span className="mt-2 block">
-                <span className="font-semibold">다음 재계산 때 공식으로 계산된 값으로 되돌아갑니다.</span>{' '}
-                계속 유지하려면 옵션 편집에서 직접 지정가로 넣으세요.
-              </span>
-              {confirm.items.length > REPRICE_PUSH_CHUNK_SIZE && (
-                <span className="mt-2 block text-base text-gray-500">
-                  {REPRICE_PUSH_CHUNK_SIZE}건씩 나눠 순차 저장합니다.
-                </span>
+              {confirm.rowLabel != null ? (
+                <>
+                  이 옵션의 판매가가{' '}
+                  <span className="font-semibold">{confirm.platform}에 즉시 반영</span>됩니다.
+                  되돌리려면 다시 계산해서 반영해야 합니다.
+                </>
+              ) : (
+                <>
+                  선택한 {confirm.optionIds.length}개 옵션의 판매가가{' '}
+                  <span className="font-semibold">{confirm.platform}에 즉시 반영</span>됩니다.
+                  되돌리려면 다시 계산해서 반영해야 합니다.
+                </>
               )}
-            </>
-          ) : confirm?.action === 'PUSH' ? (
-            <>
-              <span className="mb-2 block text-base text-gray-500">{confirm.groupLabel}</span>
-              선택한 {confirm.optionIds.length}개 옵션의 판매가가{' '}
-              <span className="font-semibold">{confirm.platform}에 즉시 반영</span>됩니다. 되돌리려면
-              다시 계산해서 반영해야 합니다.
               {confirm.optionIds.length > REPRICE_PUSH_CHUNK_SIZE && (
                 <span className="mt-2 block text-base text-gray-500">
                   {REPRICE_PUSH_CHUNK_SIZE}건씩 나눠 순차 전송합니다.
@@ -527,9 +577,12 @@ export default function ListingsRepricingPage() {
                 같은 상품의 선택하지 않은 옵션도 함께 다시 계산됩니다.
               </span>{' '}
               마켓에는 아직 반영되지 않습니다.
-              {(confirm?.editedCount ?? 0) > 0 && (
+              <span className="mt-2 block">
+                직접 지정가 옵션은 <span className="font-semibold">재계산에서 빠집니다.</span>
+              </span>
+              {(confirm?.unsavedCount ?? 0) > 0 && (
                 <span className="mt-2 block font-semibold text-red-600">
-                  직접 입력한 {confirm?.editedCount}건의 값이 공식값으로 대체됩니다.
+                  저장하지 않은 입력값 {confirm?.unsavedCount}건이 공식값으로 대체됩니다.
                 </span>
               )}
             </>
