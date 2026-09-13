@@ -55,6 +55,13 @@ export interface RepricingRow {
   marginRate: number | null;
   /** 지금 공식으로 다시 계산한 판매가. 계산 불가면 null */
   newPrice: number | null;
+  /**
+   * 마진이 0이 되는 판매가. 이 값 아래로 팔면 손해다. 계산 불가면 null (2609_44 / PLAN D1·D3).
+   *
+   * 🔴 서버가 계산해 내려준다 — 화면이 역산하지 않는다. 화면에는 수수료 **금액**만 있고 비율이 없어
+   * 역산하면 반올림이 섞여 값이 어긋난다.
+   */
+  breakEvenPrice: number | null;
   marketPrice: number | null;
   sellingPrice: number | null;
   /** marketPrice != null && marketPrice != sellingPrice (D25) */
