@@ -28,6 +28,8 @@ export const ROUTES = {
     `/dashboard/master-products/${masterId}/detail/${listingId}` as const,
   MARGIN_POLICIES: '/dashboard/margin-policies' as const,
   LISTINGS_SYNC: '/dashboard/listings/sync' as const,
+  // 🔴 LISTINGS_SYNC(콘텐츠 재전송·재심사) 와 다른 화면이다 — 이쪽은 가격 전송(FEATURE_2609_39 / PLAN D12).
+  LISTINGS_REPRICING: '/dashboard/listings/repricing' as const,
   SELLERS_LIST: '/dashboard/sellers/list' as const,
   SELLERS_MANAGE: '/dashboard/sellers/manage' as const,
   ORDERS_RETRIEVE: '/dashboard/orders' as const,
