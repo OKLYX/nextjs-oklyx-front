@@ -392,7 +392,9 @@ export function MasterProductCreateForm({
         const [prod, rates, boxes] = await Promise.all([
           productsUseCase.getProducts({ page: 0, size: 1000 }),
           carrierRateUseCase.getCarrierRates(),
-          packageUseCase.getPackages(),
+          // 🔴 판매가 계산용 상자 후보 = 구매 상자만(PLAN 2609_40 D21). 재활용 상자는 비용 0 이라
+          // 기본 상자로 뽑히면 원가 0 으로 판매가가 계산된다.
+          packageUseCase.getPackages('PURCHASED'),
         ]);
         if (!alive) return;
         setProducts(prod.content);
