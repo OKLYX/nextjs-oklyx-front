@@ -43,6 +43,9 @@ export function MarginPolicyTable() {
   const [formPct, setFormPct] = useState('');
   // 표시 할인율은 0~0.5 decimal 로 그대로 입력 (originalPrice 역산은 백엔드).
   const [formDiscount, setFormDiscount] = useState('');
+  // 최소 마진 기준 (FEATURE_2609_39 / PLAN D4). 빈 문자열 = 미사용 → 저장 시 null.
+  const [formMinAmount, setFormMinAmount] = useState('');
+  const [formMinPct, setFormMinPct] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -82,6 +85,8 @@ export function MarginPolicyTable() {
     setFormPlatform('');
     setFormPct('');
     setFormDiscount('');
+    setFormMinAmount('');
+    setFormMinPct('');
     setFormError('');
     setShowForm(true);
   };
@@ -92,6 +97,8 @@ export function MarginPolicyTable() {
     setFormPlatform(p.platform);
     setFormPct(String(toPercent(p.marginRate)));
     setFormDiscount(p.displayDiscountRate != null ? String(p.displayDiscountRate) : '');
+    setFormMinAmount(p.minMarginAmount != null ? String(p.minMarginAmount) : '');
+    setFormMinPct(p.minMarginRate != null ? String(toPercent(p.minMarginRate)) : '');
     setFormError('');
     setShowForm(true);
   };
@@ -125,11 +132,33 @@ export function MarginPolicyTable() {
       }
       discount = d;
     }
+    // 빈칸 = 그 조건 미사용 → null 을 명시 전송해야 기존 값이 지워진다(undefined 는 백엔드가 무시하지 않고
+    // 그대로 null 로 쓰지만, 의도를 코드에 남긴다).
+    let minAmount: number | null = null;
+    if (formMinAmount !== '') {
+      const a = Number(formMinAmount);
+      if (Number.isNaN(a) || a < 0) {
+        setFormError('최소 마진액은 0 이상의 숫자여야 합니다.');
+        return;
+      }
+      minAmount = a;
+    }
+    let minRate: number | null = null;
+    if (formMinPct !== '') {
+      const r = Number(formMinPct);
+      if (Number.isNaN(r) || r < 0 || r > 100) {
+        setFormError('최소 마진율은 0~100 사이의 숫자여야 합니다.');
+        return;
+      }
+      minRate = toRate(r);
+    }
     const payload = {
       sellerId: formSellerId,
       platform: formPlatform,
       marginRate: toRate(pct),
       displayDiscountRate: discount,
+      minMarginAmount: minAmount,
+      minMarginRate: minRate,
     };
     setIsSubmitting(true);
     try {
@@ -223,7 +252,7 @@ export function MarginPolicyTable() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">마진율 (%)</label>
+              <label className="mb-1 block text-xs font-medium text-gray-600">목표 마진율 (%)</label>
               <Input
                 type="number"
                 min={0}
@@ -251,6 +280,41 @@ export function MarginPolicyTable() {
           <p className="mt-2 text-xs text-gray-500">
             originalPrice를 이 할인율로 역산해 표시가로 노출합니다. 실판매가·마진은 변하지 않습니다.
           </p>
+
+          {/* 최소 마진 기준 (FEATURE_2609_39 / PLAN D4) — 목표 마진율과 축이 다르므로 한 묶음으로 분리해 둔다. */}
+          <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3">
+            <h3 className="mb-2 text-xs font-semibold text-gray-700">최소 마진 기준</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">최소 마진액 (원)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={100}
+                  placeholder="비우면 사용 안 함"
+                  size="sm"
+                  value={formMinAmount}
+                  onChange={(e) => setFormMinAmount(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">최소 마진율 (%)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  placeholder="비우면 사용 안 함"
+                  size="sm"
+                  value={formMinPct}
+                  onChange={(e) => setFormMinPct(e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              둘 중 하나라도 밑돌면 대응 필요로 표시됩니다. 비워두면 이 판매자·채널은 경고하지 않습니다.
+            </p>
+          </div>
           <div className="mt-4 flex gap-2">
             <button
               type="button"
@@ -285,15 +349,17 @@ export function MarginPolicyTable() {
               <tr className="text-left text-sm text-gray-600">
                 <th className="px-4 py-3">판매자</th>
                 <th className="px-4 py-3">플랫폼</th>
-                <th className="px-4 py-3">마진율</th>
+                <th className="px-4 py-3">목표 마진율</th>
                 <th className="px-4 py-3">표시 할인율</th>
+                <th className="px-4 py-3">최소 마진액</th>
+                <th className="px-4 py-3">최소 마진율</th>
                 <th className="px-4 py-3">액션</th>
               </tr>
             </thead>
             <tbody>
               {policies.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500">
                     등록된 마진 프리셋이 없습니다.
                   </td>
                 </tr>
@@ -307,6 +373,14 @@ export function MarginPolicyTable() {
                       {p.displayDiscountRate != null && p.displayDiscountRate > 0
                         ? p.displayDiscountRate
                         : '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {p.minMarginAmount != null
+                        ? `${p.minMarginAmount.toLocaleString('ko-KR')}원`
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {p.minMarginRate != null ? `${toPercent(p.minMarginRate)}%` : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
