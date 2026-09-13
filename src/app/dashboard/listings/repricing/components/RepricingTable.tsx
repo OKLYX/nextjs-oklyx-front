@@ -14,6 +14,14 @@ export const formatWon = (value: number | null | undefined) =>
 export const formatPercent = (rate: number | null | undefined) =>
   rate == null ? '—' : `${(Math.round(rate * 1000) / 10).toLocaleString('ko-KR')}%`;
 
+/** 「손익분기가」 열 머리 설명(2609_44 / PLAN 용어). 이 한 문장이 열 이름의 뜻을 다 담는다. */
+const BREAK_EVEN_HINT =
+  '마진이 0이 되는 판매가입니다. 원가·택배비·박스비와 채널 수수료(부가세 포함)를 낸 뒤 남는 것이 없는 지점으로, 이 값 아래로 팔면 손해입니다.';
+
+/** 지금 가격이 손익분기가 아래인가 = 마진이 음수라는 뜻(2609_44 Step 4). 둘 중 하나라도 없으면 판정하지 않는다. */
+const isBelowBreakEven = (row: RepricingRow) =>
+  row.breakEvenPrice != null && row.judgedPrice != null && row.judgedPrice < row.breakEvenPrice;
+
 interface RepricingTableProps {
   rows: RepricingRow[];
   /** 선택된 optionId 목록(전 그룹 공통, 부모가 보유) */
@@ -53,6 +61,12 @@ interface RepricingTableProps {
  * 🔴 직접 지정가(`MANUAL`) 행도 입력·반영이 된다(2609_43 D1, 2609_39 D6·2609_42 D4 번복).
  *    배지는 「재계산 제외」다 — 「실행 불가」가 아니다(D2).
  * 🔴 「비용 내역」은 **지금 값의 분해**다. 「전 → 후」로 쓰지 않는다 — 서버는 과거 비용을 모른다.
+ *
+ * 🔴 표는 **가로로 넘치지 않는다**(2609_44 / PLAN D5): 열 폭 합이 100% 인 `table-fixed` + colgroup 이고,
+ *    상품·옵션을 한 열에 2줄로, 반영 상태와 [마켓 반영]을 한 열에 2줄로 합쳐 「손익분기가」 자리를 만들었다.
+ *    ⚠️ 이 표에 `list-table-scroll`(최소폭 736px + nowrap)을 다시 씌우지 말 것 — 그게 가로 스크롤의 원인이었다.
+ * 🔴 「손익분기가」는 **서버가 준 `breakEvenPrice` 를 그대로** 보여준다(PLAN D1). 화면에는 수수료 금액만 있고
+ *    비율이 없어 역산하면 값이 어긋난다.
  */
 export function RepricingTable({
   rows,
@@ -82,15 +96,31 @@ export function RepricingTable({
   const allSelected =
     selectableIds.length > 0 && selectableIds.every((id) => selected.includes(id));
 
+  /**
+   * 「비용 내역」 칸 — 항목마다 한 줄, 금액은 오른쪽 정렬로 자릿수를 맞춘다(2609_44 / PLAN D4).
+   *
+   * 🔴 금액이 없는 항목도 줄을 **빼지 않고** `—` 로 둔다 — 줄 수가 행마다 달라지면 표가 들쭉날쭉해진다.
+   */
   const costDetail = (row: RepricingRow) => {
-    if (row.costSum == null) return '—';
-    const parts = [
-      `원가 ${Math.round(row.costSum).toLocaleString('ko-KR')}`,
-      `택배 ${Math.round(row.delivery ?? 0).toLocaleString('ko-KR')}`,
-      `박스 ${Math.round(row.box ?? 0).toLocaleString('ko-KR')}`,
+    if (row.costSum == null) return <span className="text-xs text-gray-500">—</span>;
+    const items: { label: string; value: number | null }[] = [
+      { label: '원가', value: row.costSum },
+      { label: '택배', value: row.delivery },
+      { label: '박스', value: row.box },
+      { label: '수수료', value: row.feeAmount },
     ];
-    if (row.feeAmount != null) parts.push(`수수료 ${Math.round(row.feeAmount).toLocaleString('ko-KR')}`);
-    return parts.join(' + ');
+    return (
+      <dl className="space-y-0.5 text-xs leading-tight">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-baseline justify-between gap-2">
+            <dt className="text-gray-500">{item.label}</dt>
+            <dd className="tabular-nums">
+              {item.value == null ? '—' : Math.round(item.value).toLocaleString('ko-KR')}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    );
   };
 
   /** 「새 판매가」 칸 — 기본 / 편집 중 / 저장 직후 세 모습(D5). */
@@ -121,7 +151,7 @@ export function RepricingTable({
             autoFocus
             onChange={(e) => onDraftChange(row.optionId, sanitizePriceInput(e.target.value))}
             aria-label={`${row.listingName} ${row.optionName} 새 판매가`}
-            className={`w-28 rounded border px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100 ${
+            className={`w-full max-w-28 rounded border px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100 ${
               parsed == null ? 'border-red-500 bg-red-50' : 'border-blue-500 bg-blue-50'
             }`}
           />
@@ -163,7 +193,7 @@ export function RepricingTable({
             disabled
             readOnly
             aria-label={`${row.listingName} ${row.optionName} 새 판매가`}
-            className="w-28 rounded border border-gray-300 bg-gray-100 px-2 py-1 text-right text-sm text-gray-900"
+            className="w-full max-w-28 rounded border border-gray-300 bg-gray-100 px-2 py-1 text-right text-sm text-gray-900"
           />
           <span className="text-[11px] text-gray-500">
             {action.kind === 'SAVED' ? '입력값 저장됨' : '마켓에 반영된 값'}
@@ -271,10 +301,23 @@ export function RepricingTable({
   };
 
   return (
-    <table>
+    // 🔴 `table-fixed` + colgroup 으로 열 폭을 카드 안에 가둔다(2609_44 / PLAN D5) — 폭 합이 100% 라
+    //    어떤 화면 폭에서도 표가 카드를 넘지 않는다. 넘치던 원인은 `list-table-scroll`(최소폭 736px +
+    //    nowrap)이었고, 그래서 이 표는 그 클래스를 쓰지 않는다.
+    <table className="w-full table-fixed text-sm">
+      <colgroup>
+        <col className="w-[4%]" />
+        <col className="w-[20%]" />
+        <col className="w-[9%]" />
+        <col className="w-[13%]" />
+        <col className="w-[10%]" />
+        <col className="w-[17%]" />
+        <col className="w-[15%]" />
+        <col className="w-[12%]" />
+      </colgroup>
       <thead className="bg-gray-100 border-b border-gray-200">
         <tr className="text-left text-sm text-gray-600">
-          <th className="px-4 py-3">
+          <th className="px-2 py-3">
             <input
               type="checkbox"
               checked={allSelected}
@@ -283,14 +326,15 @@ export function RepricingTable({
               aria-label="전체 선택"
             />
           </th>
-          <th className="px-4 py-3">상품(셀)</th>
-          <th className="px-4 py-3">옵션</th>
-          <th className="px-4 py-3 text-right">현재가</th>
-          <th className="px-4 py-3 text-right">현재 마진</th>
-          <th className="px-4 py-3 text-right">새 판매가</th>
-          <th className="px-4 py-3">비용 내역</th>
-          <th className="px-4 py-3">반영</th>
-          <th className="px-4 py-3">마켓 반영</th>
+          <th className="px-3 py-3">상품(셀) / 옵션</th>
+          <th className="px-3 py-3 text-right">현재가</th>
+          <th className="px-3 py-3 text-right">현재 마진</th>
+          <th className="px-3 py-3 text-right" title={BREAK_EVEN_HINT}>
+            손익분기가
+          </th>
+          <th className="px-3 py-3 text-right">새 판매가</th>
+          <th className="px-3 py-3">비용 내역</th>
+          <th className="px-3 py-3">반영</th>
         </tr>
       </thead>
       <tbody>
@@ -298,6 +342,8 @@ export function RepricingTable({
           const handled = recent[row.optionId] != null;
           // 방금 처리한 행은 기준을 넘겼으므로 경보색을 벗긴다(D7).
           const alert = row.below && !handled;
+          // 현재가가 손익분기가 아래면 마진이 음수다 — 이 열을 추가한 이유라 눈에 띄게 칠한다.
+          const belowBreakEven = isBelowBreakEven(row);
           return (
             <tr
               key={row.optionId}
@@ -305,7 +351,7 @@ export function RepricingTable({
                 row.excluded === 'UNCALCULABLE' ? 'text-gray-400' : 'text-gray-900'
               }`}
             >
-              <td className="px-4 py-3">
+              <td className="px-2 py-3 align-top">
                 <input
                   type="checkbox"
                   checked={selected.includes(row.optionId)}
@@ -314,34 +360,67 @@ export function RepricingTable({
                   aria-label={`${row.listingName} ${row.optionName} 선택`}
                 />
               </td>
-              <td className="px-4 py-3">{row.listingName}</td>
-              <td className="px-4 py-3">
-                <span>{row.optionName}</span>
-                {alert && (
-                  <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
-                    대응 필요
-                  </span>
+              {/* 상품·옵션을 한 열에 2줄로 합쳐 손익분기가 열 자리를 만든다(2609_44 / PLAN D5·D6). */}
+              <td className="px-3 py-3 align-top">
+                <p className="truncate font-medium" title={row.listingName}>
+                  {row.listingName}
+                </p>
+                <p className="truncate text-xs text-gray-500" title={row.optionName}>
+                  {row.optionName}
+                </p>
+                {(alert || row.excluded != null) && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {alert && (
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+                        대응 필요
+                      </span>
+                    )}
+                    {row.excluded === 'MANUAL' && (
+                      <span
+                        className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600"
+                        title="가격을 사람이 직접 정한 옵션입니다. [재계산]으로는 바뀌지 않지만, 직접 입력과 마켓 반영은 됩니다."
+                      >
+                        재계산 제외
+                      </span>
+                    )}
+                    {row.excluded === 'UNCALCULABLE' && row.excludedReason && (
+                      <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600">
+                        {row.excludedReason}
+                      </span>
+                    )}
+                  </div>
                 )}
-                {row.excluded === 'MANUAL' && (
+              </td>
+              <td
+                className={`px-3 py-3 text-right align-top ${
+                  belowBreakEven ? 'font-semibold text-red-700' : ''
+                }`}
+                title={belowBreakEven ? '손익분기가보다 낮은 가격입니다 — 지금 팔면 손해입니다.' : undefined}
+              >
+                {formatWon(row.judgedPrice)}
+              </td>
+              <td className="px-3 py-3 text-right align-top">{marginCell(row)}</td>
+              <td className="px-3 py-3 text-right align-top">
+                <span>{formatWon(row.breakEvenPrice)}</span>
+                {belowBreakEven && (
                   <span
-                    className="ml-1.5 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600"
-                    title="가격을 사람이 직접 정한 옵션입니다. [재계산]으로는 바뀌지 않지만, 직접 입력과 마켓 반영은 됩니다."
+                    className="ml-1 text-red-700"
+                    title="현재가가 이 값보다 낮습니다 — 마진이 음수입니다."
+                    aria-label="현재가가 손익분기가보다 낮습니다"
                   >
-                    재계산 제외
-                  </span>
-                )}
-                {row.excluded === 'UNCALCULABLE' && row.excludedReason && (
-                  <span className="ml-1.5 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600">
-                    {row.excludedReason}
+                    ⚠
                   </span>
                 )}
               </td>
-              <td className="px-4 py-3 text-right">{formatWon(row.judgedPrice)}</td>
-              <td className="px-4 py-3 text-right">{marginCell(row)}</td>
-              <td className="px-4 py-3 text-right">{priceCell(row)}</td>
-              <td className="px-4 py-3">{costDetail(row)}</td>
-              <td className="px-4 py-3">{statusCell(row)}</td>
-              <td className="px-4 py-3">{pushCell(row)}</td>
+              <td className="px-3 py-3 text-right align-top">{priceCell(row)}</td>
+              <td className="px-3 py-3 align-top">{costDetail(row)}</td>
+              {/* 반영 상태와 [마켓 반영]을 한 열에 2줄로 합친다(2609_44 / PLAN D5). */}
+              <td className="px-3 py-3 align-top">
+                <div className="flex flex-col items-start gap-1">
+                  {statusCell(row)}
+                  {pushCell(row)}
+                </div>
+              </td>
             </tr>
           );
         })}
