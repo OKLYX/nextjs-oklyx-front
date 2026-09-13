@@ -1,12 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { CreatePackageRequest } from '@/application/dto/CreatePackageRequest';
+import { BOX_KIND_LABEL } from '@/domain/entities/PackageEntity';
 
+/**
+ * 🔴 비용·기본값 규칙이 **유형에 따라 갈린다**(PLAN 2609_40 D20 · D21).
+ * - 구매 상자: 비용 > 0 (0 이면 서버가 400)
+ * - 재활용 상자: 비용 0 이 정상이고, **기본 상자로 지정할 수 없다**(서버 400)
+ * 필드 단위로는 쓸 수 없어 스키마 레벨 refine 으로 둔다.
+ */
 const packageInputSchema = z.object({
+  boxKind: z.enum(['PURCHASED', 'RECYCLED']),
   type: z.string().min(1, '패키지 타입을 입력하세요').max(50, '50자 이내'),
   cost: z.number().min(0, '비용은 0 이상이어야 합니다'),
   widthCm: z
@@ -26,7 +34,15 @@ const packageInputSchema = z.object({
     .refine((v) => Number(v.toFixed(1)) === v, '소수점 첫째 자리까지 입력하세요'),
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD 형식'),
   isDefault: z.boolean(),
-});
+})
+  .refine((v) => v.boxKind === 'RECYCLED' || v.cost > 0, {
+    path: ['cost'],
+    message: '구매 상자의 비용은 0보다 커야 합니다',
+  })
+  .refine((v) => !(v.boxKind === 'RECYCLED' && v.isDefault), {
+    path: ['isDefault'],
+    message: '재활용 상자는 기본 상자로 지정할 수 없습니다',
+  });
 
 type PackageInputFormData = z.infer<typeof packageInputSchema>;
 
@@ -48,11 +64,14 @@ export function PackageInputForm({
     control,
     handleSubmit,
     reset,
+    setValue,
+    trigger,
     formState: { errors, isValid },
   } = useForm<PackageInputFormData>({
     resolver: zodResolver(packageInputSchema),
     mode: 'onChange',
     defaultValues: {
+      boxKind: 'PURCHASED',
       type: '',
       cost: 0,
       widthCm: 0,
@@ -63,11 +82,16 @@ export function PackageInputForm({
     },
   });
 
+  // watch() 대신 useWatch — watch() 는 React Compiler 메모이제이션을 통째로 끈다.
+  const boxKind = useWatch({ control, name: 'boxKind' });
+  const isRecycled = boxKind === 'RECYCLED';
+
   const handleFormSubmit = async (data: PackageInputFormData) => {
     setIsSubmitting(true);
     setRequestError('');
     try {
       const createData: CreatePackageRequest = {
+        boxKind: data.boxKind,
         type: data.type,
         cost: data.cost,
         widthCm: data.widthCm,
@@ -103,6 +127,39 @@ export function PackageInputForm({
           {requestError}
         </div>
       )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          유형
+        </label>
+        <Controller
+          name="boxKind"
+          control={control}
+          render={({ field }) => (
+            <select
+              {...field}
+              disabled={isSubmitting || isLoading}
+              onChange={(e) => {
+                const next = e.target.value as PackageInputFormData['boxKind'];
+                field.onChange(next);
+                // 재활용은 비용 0 · 기본 상자 해제가 강제다(서버 400). 유형을 바꾼 즉시 따라간다.
+                if (next === 'RECYCLED') {
+                  setValue('cost', 0);
+                  setValue('isDefault', false);
+                }
+                void trigger(['cost', 'isDefault']);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+            >
+              <option value="PURCHASED">{BOX_KIND_LABEL.PURCHASED}</option>
+              <option value="RECYCLED">{BOX_KIND_LABEL.RECYCLED}</option>
+            </select>
+          )}
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          재활용 상자는 비용 0 이 정상이고 판매가 계산 목록에 뜨지 않습니다.
+        </p>
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -215,7 +272,7 @@ export function PackageInputForm({
             <input
               {...field}
               type="number"
-              disabled={isSubmitting || isLoading}
+              disabled={isSubmitting || isLoading || isRecycled}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
               placeholder="비용 입력"
               step="0.01"
@@ -252,22 +309,36 @@ export function PackageInputForm({
         )}
       </div>
 
-      <div className="flex items-center">
-        <Controller
-          name="isDefault"
-          control={control}
-          render={({ field }) => (
-            <input
-              type="checkbox"
-              checked={field.value}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-              disabled={isSubmitting || isLoading}
-              className="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            />
-          )}
-        />
-        <label className="ml-2 text-sm font-medium text-gray-700">기본값</label>
+      <div>
+        <div className="flex items-center">
+          <Controller
+            name="isDefault"
+            control={control}
+            render={({ field }) => (
+              <input
+                type="checkbox"
+                checked={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                disabled={isSubmitting || isLoading || isRecycled}
+                className="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            )}
+          />
+          <label
+            className={`ml-2 text-sm font-medium ${isRecycled ? 'text-gray-400' : 'text-gray-700'}`}
+          >
+            기본값
+          </label>
+        </div>
+        {isRecycled && (
+          <p className="mt-1 text-xs text-gray-500">
+            재활용 상자는 기본 상자로 지정할 수 없습니다.
+          </p>
+        )}
+        {errors.isDefault && (
+          <p className="mt-1 text-xs text-red-600">{errors.isDefault.message}</p>
+        )}
       </div>
 
       <div className="flex gap-3 pt-4 border-t">

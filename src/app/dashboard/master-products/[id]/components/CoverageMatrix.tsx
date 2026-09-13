@@ -367,7 +367,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       try {
         const [rates, boxes] = await Promise.all([
           carrierRateUseCase.getCarrierRates(),
-          packageUseCase.getPackages(),
+          // 🔴 판매가 계산용 상자 후보 = 구매 상자만(PLAN 2609_40 D21).
+          packageUseCase.getPackages('PURCHASED'),
         ]);
         if (!alive) return;
         setCarrierRates(rates);
