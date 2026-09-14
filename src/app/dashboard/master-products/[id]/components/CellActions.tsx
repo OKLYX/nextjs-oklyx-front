@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Spinner } from '@/presentation/components/Spinner';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { ROUTES } from '@/config/routes';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
@@ -40,9 +41,13 @@ interface CellActionsProps {
   shippingReady: boolean | null | undefined;
   shippingUseCase: ShippingUseCase; // parent-owned lookup (outbound/return)
   onShippingSaved: (updated: GeneratedProductResponse) => void;
+  // 채널 카테고리(2609_45/D13). 서버 판정 그대로 — false 면 버튼을 렌더하지 않는다(되돌리는 방향은 400).
+  usesOwnCategory: boolean;
+  channelCategoryLabel: string | null; // categoryName ?? categoryCode (둘 다 없으면 null)
+  masterCategoryName: string | null;
 }
 
-type Busy = 'register' | 'fetch' | 'regenerate' | 'update' | null;
+type Busy = 'register' | 'fetch' | 'regenerate' | 'update' | 'category-source' | null;
 
 /**
  * 등록됨/DRAFT 셀의 상태별 액션 버튼 (register / update-request / fetch-status / regenerate / 필드값 편집).
@@ -63,6 +68,9 @@ export function CellActions({
   shippingReady,
   shippingUseCase,
   onShippingSaved,
+  usesOwnCategory,
+  channelCategoryLabel,
+  masterCategoryName,
 }: CellActionsProps) {
   const router = useRouter();
   const useCase = useMemo(
@@ -80,6 +88,7 @@ export function CellActions({
   const [showStock, setShowStock] = useState(false);
   const [showPrice, setShowPrice] = useState(false);
   const [showOptionName, setShowOptionName] = useState(false);
+  const [showCategorySource, setShowCategorySource] = useState(false);
 
   const optionName = (id: number) => options.find((o) => o.id === id)?.name ?? `옵션 #${id}`;
 
@@ -118,6 +127,26 @@ export function CellActions({
     } catch (e) {
       const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
       setError(msg ?? '수정 요청에 실패했습니다.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // 채널 카테고리 → 마스터 카테고리(2609_45/D13). handleUpdateRequest 와 같은 이유로 run() 을 타지
+  // 않는다: 백엔드가 내려주는 사유(이미 마스터를 따름 / 미지원 등)를 그대로 보여줘야 한다.
+  const handleCategorySource = async () => {
+    setBusy('category-source');
+    setError('');
+    setPushedBanner('');
+    try {
+      await useCase.setCategorySource(listing.id, true);
+      setShowCategorySource(false);
+      setPushedBanner('마스터 카테고리로 변경했습니다. 다음 수정 요청 때 쿠팡에 반영됩니다.');
+      onReload();
+    } catch (e) {
+      const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
+      setShowCategorySource(false);
+      setError(msg ?? '마스터 카테고리로 변경하지 못했습니다.');
     } finally {
       setBusy(null);
     }
@@ -273,6 +302,22 @@ export function CellActions({
         >
           옵션명
         </button>
+
+        {/* 채널이 자기 카테고리를 쓰는 셀에만 노출(2609_45/D13). 마스터 → 채널 방향은 없다. */}
+        {usesOwnCategory && (
+          <button
+            type="button"
+            onClick={() => setShowCategorySource(true)}
+            disabled={busy !== null}
+            className="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          >
+            {busy === 'category-source' ? (
+              <Spinner label="변경 중..." />
+            ) : (
+              '마스터 카테고리로 변경'
+            )}
+          </button>
+        )}
       </div>
 
       {status === 'DRAFT' && shippingBlocked && (
@@ -349,6 +394,30 @@ export function CellActions({
           onClose={() => setShowPrice(false)}
         />
       )}
+
+      {/* 되돌릴 수 있는 조작이고 파괴가 아니라 isDangerous 를 쓰지 않는다(2609_45/D13). */}
+      <ConfirmDialog
+        isOpen={showCategorySource}
+        title="마스터 카테고리로 변경"
+        message={
+          <>
+            이 채널의 카테고리를 마스터 카테고리로 바꿉니다.
+            <br />
+            <b>
+              {channelCategoryLabel ?? '채널 카테고리'} → {masterCategoryName ?? '마스터 카테고리'}
+            </b>
+            <p>
+              지금 쿠팡에 반영되지는 않습니다. 다음 [수정 요청] 때 함께 전송되며, 그때 쿠팡에서
+              카테고리가 변경되고 재심사에 들어갑니다. 이 카테고리에 맞춰 넣어둔 필수 속성·고시 값은
+              지워집니다.
+            </p>
+          </>
+        }
+        confirmText="변경"
+        onConfirm={handleCategorySource}
+        onCancel={() => setShowCategorySource(false)}
+        isLoading={busy === 'category-source'}
+      />
 
       {showOptionName && (
         <ChannelOptionNameModal

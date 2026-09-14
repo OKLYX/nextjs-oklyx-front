@@ -99,6 +99,10 @@ const SHIPPING_BLOCK_REASON =
  */
 const MARKET_OPTION_LOCK_REASON = '마켓에 등록된 옵션은 뺄 수 없습니다.';
 
+/** 채널 카테고리 배지 툴팁(2609_45/D8) — 마스터와 다른 것이 정상이라는 설명이다. */
+const OWN_CATEGORY_HINT =
+  '이 채널은 마켓에 올라가 있는 자기 카테고리를 사용합니다. 수수료·필수 항목도 이 카테고리 기준입니다.';
+
 /**
  * 채널 반영 요약 줄(90). 배너와 확인 모달이 **같은 문구**를 쓰도록 여기서 한 번만 만든다 —
  * 두 곳에 복붙하지 말 것. 0 인 항목은 생략한다.
@@ -1155,6 +1159,21 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       >
                         {badge}
                       </span>
+                      {/* 2609_45/D8: 이 채널이 마켓에 올라가 있는 자기 카테고리를 쓰고 있다는 사실 표시.
+                          ⚠️ 오류가 아니라 정상 상태이므로 경고색(빨강)을 쓰지 않는다. 판정은 서버가 내린
+                          usesOwnCategory 하나뿐 — 코드 유무·이름 비교로 다시 판단하지 말 것(D10-1). */}
+                      {row.cell?.usesOwnCategory && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1" title={OWN_CATEGORY_HINT}>
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+                            채널 카테고리
+                          </span>
+                          {(row.cell.categoryName ?? row.cell.categoryCode) && (
+                            <span className="text-[10px] text-gray-600">
+                              {row.cell.categoryName ?? row.cell.categoryCode}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {(() => {
@@ -1299,6 +1318,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           onShippingSaved={(updated) =>
                             handleShippingSaved(row.cell!.productListingId, updated)
                           }
+                          usesOwnCategory={row.cell.usesOwnCategory === true}
+                          channelCategoryLabel={row.cell.categoryName ?? row.cell.categoryCode ?? null}
+                          masterCategoryName={matrix.masterCategoryName ?? null}
                         />
                       )}
                     </td>
