@@ -167,8 +167,8 @@ export function ProductEditForm({
               <Input
                 id="price"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0.00"
                 {...register('price')}
               />
@@ -218,8 +218,8 @@ export function ProductEditForm({
               <Input
                 id="packageHeight"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
                 {...register('packageHeight')}
               />
@@ -232,8 +232,8 @@ export function ProductEditForm({
               <Input
                 id="packageLength"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
                 {...register('packageLength')}
               />
@@ -248,8 +248,8 @@ export function ProductEditForm({
               <Input
                 id="packageWidth"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
                 {...register('packageWidth')}
               />
@@ -262,8 +262,8 @@ export function ProductEditForm({
               <Input
                 id="netContent"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
                 {...register('netContent')}
               />
