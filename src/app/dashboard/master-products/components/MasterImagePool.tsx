@@ -44,7 +44,9 @@ const PRODUCT_OFFSET = 1_000_000_000;
  *
  * **모드**:
  *   - 수정(`masterId != null`): 매핑/참조가 즉시 서버 반영.
- *   - 생성(`masterId == null`): 서버 호출 없이 버퍼만. 제품 참조는 마스터가 없어 불가 → [제품 이미지] 탭 숨김.
+ *   - 생성(`masterId == null`): 서버 호출 없이 버퍼만(제품 사진은 참조 토큰으로 버퍼에 담고 저장 때 반영).
+ *     ⚠️ [제품 이미지] 탭은 **생성 모드에서도 뜬다** — 조건은 `productImageUseCase` 와 `sourceProducts`
+ *     둘 다 주어졌는가 하나뿐이다(`canUseProducts`). 하나만 빠져도 사진 목록이 통째로 사라진다.
  */
 export type ImageField = { key: string; label: string };
 
