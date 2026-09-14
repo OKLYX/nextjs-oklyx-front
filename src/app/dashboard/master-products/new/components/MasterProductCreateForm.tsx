@@ -31,7 +31,6 @@ import type { Product } from '@/domain/entities/Product';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { Package } from '@/domain/entities/PackageEntity';
 import { BUILTIN_FIELD_KEYS, type TemplateField } from '@/domain/entities/ThumbnailEntity';
-import { SOURCE_ZONE } from '@/domain/entities/DetailTemplateEntity';
 import { CategoryTreeColumns } from '@/presentation/components/CategoryTreeColumns';
 import { ROUTES } from '@/config/routes';
 import { MasterOptionEditor } from '../../components/MasterOptionEditor';
@@ -42,6 +41,7 @@ import {
   type MasterImageBuffer,
 } from '../../components/MasterImagePool';
 import { deriveMasterImageFields } from '../../components/masterImageFields';
+import { commitMasterImageBuffer } from '../../components/masterImageCommit';
 import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
 import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import { MetaPlatformTabs } from '../../[id]/components/MetaPlatformTabs';
@@ -685,45 +685,10 @@ export function MasterProductCreateForm({
         }
       }
       if (tags.length > 0) await useCase.updateTags(created.id, { tags });
-      // Buffer: upload pool files sequentially (index → real id) then apply mappings.
-      // Sequential await preserves pool sortOrder (backend = upload order); Promise.all
-      // would race it. The master already exists → a failure surfaces a distinct banner.
+      // 버퍼 → 마스터 반영(업로드 순서·매핑 규칙은 공용 헬퍼가 소유).
+      // The master already exists → a failure surfaces a distinct banner.
       try {
-        const idByIndex: number[] = [];
-        for (const file of imageBuffer.files) {
-          const uploaded = await detailUseCase.uploadPoolImage(created.id, file);
-          idByIndex.push(uploaded.id);
-        }
-        // Import product-image references (create pool entries) → map productImageId to pool id.
-        const poolIdByProductId = new Map<number, number>();
-        const productIds = [
-          ...new Set(Object.values(imageBuffer.productAssignments ?? {}).flat()),
-        ];
-        if (productIds.length > 0) {
-          const refs = await detailUseCase.importProductImages(created.id, productIds);
-          for (const r of refs) {
-            if (r.productImageId != null) poolIdByProductId.set(r.productImageId, r.id);
-          }
-        }
-        // Apply each field = uploaded file pool ids + imported product pool ids.
-        const fieldKeys = new Set([
-          ...Object.keys(imageBuffer.assignments),
-          ...Object.keys(imageBuffer.productAssignments ?? {}),
-        ]);
-        for (const fieldKey of fieldKeys) {
-          const fileIds = (imageBuffer.assignments[fieldKey] ?? [])
-            .map((i) => idByIndex[i])
-            .filter((v): v is number => v != null);
-          const productPoolIds = (imageBuffer.productAssignments?.[fieldKey] ?? [])
-            .map((id) => poolIdByProductId.get(id))
-            .filter((v): v is number => v != null);
-          const ids = [...fileIds, ...productPoolIds];
-          if (fieldKey === SOURCE_ZONE) {
-            await detailUseCase.setSourceImage(created.id, ids[0] ?? null);
-          } else {
-            await detailUseCase.setZoneImages(created.id, fieldKey, ids);
-          }
-        }
+        await commitMasterImageBuffer(detailUseCase, created.id, imageBuffer);
       } catch {
         onCreatedWithWarning(created.id, '마스터·옵션은 생성되었습니다. 이미지 일부 업로드/매핑에 실패했습니다.');
         setIsSubmitting(false);
