@@ -24,6 +24,10 @@ import type {
   ImportPreviewRequest,
   ImportPreviewResponse,
   ImportRequest,
+  MasterFromChannelPreviewRequest,
+  MasterFromChannelPreview,
+  MasterFromChannelRequest,
+  MasterFromChannelResult,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -97,4 +101,8 @@ export interface ListingRegistrationRepository {
   importPreview(masterId: number, body: ImportPreviewRequest): Promise<ImportPreviewResponse>;
   /** 2609_22: 가져오기 커밋 — 성공 시 새 셀 id 를 담은 ChannelAddResponse. */
   importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse>;
+  /** 2609_45: 마켓 상품으로 마스터 만들기 미리보기 — 쓰기 없음(masterId 가 아직 없다). */
+  masterFromChannelPreview(body: MasterFromChannelPreviewRequest): Promise<MasterFromChannelPreview>;
+  /** 2609_45: 마스터 + 옵션 + 채널 셀 생성 커밋. */
+  createMasterFromChannel(body: MasterFromChannelRequest): Promise<MasterFromChannelResult>;
 }

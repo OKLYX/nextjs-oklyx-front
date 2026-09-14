@@ -28,6 +28,10 @@ import type {
   ImportPreviewRequest,
   ImportPreviewResponse,
   ImportRequest,
+  MasterFromChannelPreviewRequest,
+  MasterFromChannelPreview,
+  MasterFromChannelRequest,
+  MasterFromChannelResult,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -241,6 +245,18 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse> {
     const response = await axiosInstance.post(`${masterBase}/${masterId}/listings/import`, body);
+    return response.data.data;
+  }
+
+  async masterFromChannelPreview(
+    body: MasterFromChannelPreviewRequest,
+  ): Promise<MasterFromChannelPreview> {
+    const response = await axiosInstance.post(`${masterBase}/from-channel/preview`, body);
+    return response.data.data;
+  }
+
+  async createMasterFromChannel(body: MasterFromChannelRequest): Promise<MasterFromChannelResult> {
+    const response = await axiosInstance.post(`${masterBase}/from-channel`, body);
     return response.data.data;
   }
 }
