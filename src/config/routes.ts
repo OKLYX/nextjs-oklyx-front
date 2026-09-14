@@ -24,6 +24,8 @@ export const ROUTES = {
   SALES_PRODUCTS_RETRIEVE_EDIT: (id: number | string) => `/dashboard/sales-products/retrieve/${id}/edit` as const,
   MASTER_PRODUCTS: '/dashboard/master-products' as const,
   MASTER_PRODUCT_NEW: '/dashboard/master-products/new' as const,
+  // 2609_45/D17: 경로는 플랫폼 중립. 쿠팡은 메뉴 라벨·화면 문구에만 남는다.
+  MASTER_PRODUCT_NEW_FROM_CHANNEL: '/dashboard/master-products/new-from-channel' as const,
   MASTER_PRODUCT_DETAIL: (id: number | string) => `/dashboard/master-products/${id}` as const,
   MASTER_PRODUCT_DETAIL_EDIT: (masterId: number | string, listingId: number | string) =>
     `/dashboard/master-products/${masterId}/detail/${listingId}` as const,
