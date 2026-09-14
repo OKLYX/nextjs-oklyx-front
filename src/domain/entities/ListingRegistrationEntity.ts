@@ -357,6 +357,10 @@ export interface MasterFromChannelRequest extends MasterFromChannelPreviewReques
   categoryId: number;
   componentProductIds: number[];
   options: MasterFromChannelOptionSpec[];
+  /** 2609_47/D6: 마스터 기본 택배. 화면이 필수로 막고 서버는 optional 로 받는다. */
+  defaultDeliveryId?: number;
+  /** 2609_47/D6: 마스터 기본 상자. `defaultDeliveryId` 와 같은 규칙. */
+  defaultPackageId?: number;
 }
 
 export interface MasterFromChannelOptionSpec {
@@ -370,4 +374,9 @@ export interface MasterFromChannelResult {
   productListingId: number;
   optionCount: number;
   status: string;
+  /**
+   * 2609_47/D4: 서버가 생성 직후 돌린 자동생성(썸네일·상세)의 성공 여부. 실패해도 마스터·셀은
+   * 남는다(D2) — 화면은 이 값으로 **사진을 붙인 뒤 재생성할지**만 판단한다.
+   */
+  assetsGenerated?: boolean;
 }

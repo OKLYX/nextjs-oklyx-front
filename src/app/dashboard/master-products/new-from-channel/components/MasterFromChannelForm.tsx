@@ -19,8 +19,36 @@ import { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
 import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRepositoryImpl';
+import { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
+import { CarrierRateRepositoryImpl } from '@/infrastructure/repositories/CarrierRateRepositoryImpl';
+import { PackageUseCase } from '@/application/usecases/PackageUseCase';
+import { PackageRepositoryImpl } from '@/infrastructure/repositories/PackageRepositoryImpl';
+import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
+import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
+import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
+import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
+import { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
+import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
+import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
+import { ShippingOverrideFields } from '@/presentation/components/ShippingOverrideFields';
+import {
+  EMPTY_SHIPPING_OVERRIDE,
+  overrideToMap,
+  type ShippingOverride,
+} from '@/domain/entities/ShippingEntity';
+import {
+  MasterImagePool,
+  type ImageField,
+  type ImageFieldFilter,
+  type MasterImageBuffer,
+} from '../../components/MasterImagePool';
+import { deriveMasterImageFields } from '../../components/masterImageFields';
+import { commitMasterImageBuffer } from '../../components/masterImageCommit';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { Product } from '@/domain/entities/Product';
+import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
+import type { Package } from '@/domain/entities/PackageEntity';
 import type {
   MasterFromChannelOption,
   MasterFromChannelPreview,
@@ -56,10 +84,14 @@ const PLATFORMS: PlatformOption[] = [
   { value: 'COUPANG', label: '쿠팡', idLabel: '쿠팡 상품 ID', idNumeric: true },
 ];
 
-// D5(얕은 생성)의 사용자 대면 설명. 이미지·상세가 비어 있는 이유와 다음 행동을 알려주지 않으면
-// 사용자가 [마켓 반영]을 눌러 실물 상품을 덮을 수 있다.
-const SUCCESS_NOTICE =
-  '마스터와 채널이 만들어졌습니다. 이미지·상세는 이 화면에서 채운 뒤 [재생성]하세요.';
+// 2609_47/D1: 이제 이 경로도 자동생성(썸네일·상세)을 끝낸 상태로 만들어진다 — 기존 가져오기로
+// 만든 셀과 같다. 뒤에 붙는 저장(②~④)이 실패했을 때만 무엇이 비었는지 알려준다.
+const SUCCESS_NOTICE = '마스터와 채널이 만들어졌습니다.';
+const IMAGE_FAIL_NOTICE = '마스터·옵션은 만들어졌습니다. 이미지 반영에 실패했습니다.';
+const SHIPPING_FAIL_NOTICE =
+  '마스터는 만들어졌습니다. 배송 설정 저장에 실패했습니다(상세에서 재지정).';
+const ASSETS_FAIL_NOTICE =
+  '마스터는 만들어졌습니다. 썸네일·상세 생성에 실패했습니다(상세에서 [재생성]).';
 
 const PRODUCT_SEARCH_LIMIT = 50;
 
@@ -100,6 +132,28 @@ export function MasterFromChannelForm() {
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
   const productsUseCase = useMemo(() => new GetProductsUseCase(new ProductRepositoryImpl()), []);
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
+  const carrierRateUseCase = useMemo(
+    () => new CarrierRateUseCase(new CarrierRateRepositoryImpl()),
+    [],
+  );
+  const packageUseCase = useMemo(() => new PackageUseCase(new PackageRepositoryImpl()), []);
+  const detailUseCase = useMemo(
+    () => new DetailContentUseCase(new DetailContentRepositoryImpl()),
+    [],
+  );
+  const groupUseCase = useMemo(
+    () => new DetailImageGroupUseCase(new DetailImageGroupRepositoryImpl()),
+    [],
+  );
+  const productImageUseCase = useMemo(
+    () => new ProductImageUseCase(new ProductImageRepositoryImpl()),
+    [],
+  );
+  // ⚠️ 배송 설정(③)은 **마스터용** updateShippingOverride 다(셀용은 ListingRegistrationUseCase).
+  const masterUseCase = useMemo(
+    () => new MasterProductUseCase(new MasterProductRepositoryImpl()),
+    [],
+  );
 
   // ① 판매자 · 플랫폼
   const [sellers, setSellers] = useState<Seller[]>([]);
@@ -118,6 +172,24 @@ export function MasterFromChannelForm() {
   // optionKey → (productId → 입력 문자열)
   const [quantities, setQuantities] = useState<Record<string, Record<number, string>>>({});
   const [metaOpen, setMetaOpen] = useState(false);
+
+  // 이미지: 칸(대표사진 + 상세 zone) 도출 + 생성 버퍼. 마스터가 아직 없어 버퍼로 들고 있다가
+  // 만들어진 뒤 반영한다(D7 ②).
+  const [imageFields, setImageFields] = useState<ImageField[]>([]);
+  const [imageFieldFilters, setImageFieldFilters] = useState<ImageFieldFilter[]>([]);
+  // 기본 템플릿이 요구하는 zone 만 필수(대표사진·비기본 템플릿 zone 은 선택).
+  const [requiredZoneKeys, setRequiredZoneKeys] = useState<string[]>([]);
+  const [imageBuffer, setImageBuffer] = useState<MasterImageBuffer>({ files: [], assignments: {} });
+
+  // 기본 택배비·상자비(판매가 계산의 원가) — 생성 시 필수. 초기값은 후보 로드 IIFE 에서 프리셀렉트.
+  const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [defaultDeliveryId, setDefaultDeliveryId] = useState<number | ''>('');
+  const [defaultPackageId, setDefaultPackageId] = useState<number | ''>('');
+
+  // 전 채널 공통 배송 설정. 비우면 판매채널의 기본값을 그대로 쓴다.
+  const [shippingOverride, setShippingOverride] =
+    useState<ShippingOverride>(EMPTY_SHIPPING_OVERRIDE);
 
   // 구성상품 후보
   const [products, setProducts] = useState<Product[]>([]);
@@ -140,21 +212,46 @@ export function MasterFromChannelForm() {
     let alive = true;
     (async () => {
       try {
-        const [sellerList, prod] = await Promise.all([
+        const [sellerList, prod, rates, boxes] = await Promise.all([
           sellerUseCase.getAll(),
           productsUseCase.getProducts({ page: 0, size: 1000 }),
+          carrierRateUseCase.getCarrierRates(),
+          // 🔴 판매가 계산용 상자 후보 = 구매 상자만. 재활용 상자는 비용 0 이라 기본 상자로 뽑히면
+          //    원가 0 으로 판매가가 계산된다(생성 폼과 같은 규칙).
+          packageUseCase.getPackages('PURCHASED'),
         ]);
         if (!alive) return;
         setSellers(sellerList);
         setProducts(prod.content);
+        setCarrierRates(rates);
+        setPackages(boxes);
+        // 기본값 프리셀렉트. 없으면 미선택으로 두고 사용자가 고르게 한다(임의로 첫 항목 금지).
+        // ⚠️ 별도 useEffect + setState 는 react-hooks/set-state-in-effect 위반이라 이 IIFE 안에서.
+        setDefaultDeliveryId(rates.find((r) => r.isDefault)?.id ?? '');
+        setDefaultPackageId(boxes.find((b) => b.isDefault)?.id ?? '');
       } catch {
-        if (alive) setError('판매자·구성상품 후보를 불러오지 못했습니다.');
+        if (alive) setError('판매자·구성상품·택배/상자 후보를 불러오지 못했습니다.');
       }
     })();
     return () => {
       alive = false;
     };
-  }, [sellerUseCase, productsUseCase]);
+  }, [sellerUseCase, productsUseCase, carrierRateUseCase, packageUseCase]);
+
+  // 이미지 칸 = 대표사진 + 상세 이미지 그룹 카탈로그. 도출 규칙은 생성 폼과 공유하는 헬퍼가 소유한다.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const derived = await deriveMasterImageFields(detailUseCase, groupUseCase);
+      if (!alive) return;
+      setImageFields(derived.fields);
+      setImageFieldFilters(derived.fieldFilters);
+      setRequiredZoneKeys(derived.requiredZoneKeys);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [detailUseCase, groupUseCase]);
 
   const filteredProducts = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
@@ -174,6 +271,12 @@ export function MasterFromChannelForm() {
         .map((id) => products.find((p) => p.id === id))
         .filter((p): p is Product => p != null),
     [selectedIds, products],
+  );
+
+  // 이미지 풀의 [제품 이미지] 탭 소스. ⚠️ `productImageUseCase` 와 이 배열이 **둘 다** 있어야 탭이 뜬다.
+  const sourceProducts = useMemo(
+    () => selectedProducts.map((p) => ({ id: p.id, name: p.productName })),
+    [selectedProducts],
   );
 
   /** 상품 ID 를 고쳐 다시 조회하면 이전 결과와 이름·수량 입력을 함께 버린다(옵션 집합이 달라지면
@@ -259,22 +362,54 @@ export function MasterFromChannelForm() {
             ? '구성상품을 1개 이상 선택하세요.'
             : quantityInvalid
               ? '모든 옵션의 구성상품 수량을 입력하세요'
-              : null;
+              : defaultDeliveryId === '' || defaultPackageId === ''
+                ? '기본 택배비와 기본 상자비를 선택하세요.'
+                : null;
 
+  /** 만들어진 마스터 상세로 이동. 뒤이은 저장이 실패했으면 그 사유를 배너로 넘긴다. */
+  const goToMaster = (masterProductId: number, notice: string) =>
+    router.push(
+      `${ROUTES.MASTER_PRODUCT_DETAIL(masterProductId)}?notice=${encodeURIComponent(notice)}`,
+    );
+
+  /**
+   * 저장 순서(2609_47/D7) = ① 만들기 → ② 사진 반영 → ③ 배송 설정 → ④ 자동생성 다시 → ⑤ 이동.
+   *
+   * ⚠️ **④가 핵심이다.** 서버는 ①에서 자동생성을 한 번 시도하지만 그때는 아직 사진이 없다(사진은
+   * 마스터가 생긴 뒤에야 저장된다). ④를 빠뜨리면 썸네일·상세가 빈 채로 남는다.
+   *
+   * ⚠️ ①의 서버측 자동생성을 "중복이니 빼자"고 하지 말 것 — 화면을 거치지 않는 직접 호출과
+   * ②~④ 도중 사용자가 나가버린 경우를 그것이 덮는다. 렌더가 두 번 도는 비용은 수용한다.
+   *
+   * ②·③·④ 실패는 생성을 되돌리지 않는다 — 각각 다른 안내로 상세 화면에 넘긴다.
+   */
   const handleCreate = async () => {
     if (preview == null || sellerId === '' || categoryId === '' || blockReason != null || creating) {
       return;
     }
+    // 기본 템플릿이 요구하는 상세 칸은 사진이 1장 이상 있어야 한다(버튼은 살아 있고 여기서 막는다).
+    // 파일 업로드분 + 제품 사진 참조분을 합산한다.
+    for (const zoneKey of requiredZoneKeys) {
+      const fileCount = imageBuffer.assignments[zoneKey]?.length ?? 0;
+      const productCount = imageBuffer.productAssignments?.[zoneKey]?.length ?? 0;
+      if (fileCount + productCount < 1) {
+        setError(`상세 이미지(${zoneKey})를 1장 이상 매핑하세요.`);
+        return;
+      }
+    }
     setCreating(true);
     setError('');
+    let created: { masterProductId: number; productListingId: number; assetsGenerated?: boolean };
     try {
-      const res = await listingUseCase.createMasterFromChannel({
+      created = await listingUseCase.createMasterFromChannel({
         sellerId,
         platform,
         platformProductId: productId.trim(),
         masterName: masterName.trim(),
         categoryId,
         componentProductIds: selectedIds,
+        defaultDeliveryId: defaultDeliveryId === '' ? undefined : Number(defaultDeliveryId),
+        defaultPackageId: defaultPackageId === '' ? undefined : Number(defaultPackageId),
         options: preview.options.map((o) => {
           const row = quantities[optionKey(o)] ?? {};
           return {
@@ -288,9 +423,6 @@ export function MasterFromChannelForm() {
           };
         }),
       });
-      router.push(
-        `${ROUTES.MASTER_PRODUCT_DETAIL(res.masterProductId)}?notice=${encodeURIComponent(SUCCESS_NOTICE)}`,
-      );
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
       // 400 은 전부 사람이 읽을 문구로 온다 → 가공하지 않고 그대로 보여준다.
@@ -299,9 +431,48 @@ export function MasterFromChannelForm() {
           ? '이 판매자에는 이미 같은 채널이 있습니다.'
           : extractErrorMessage(e, '마스터를 만들지 못했습니다.'),
       );
-    } finally {
       setCreating(false);
+      return;
     }
+
+    // ② 사진 반영 — 여기부터는 마스터가 이미 존재한다. 실패해도 되돌리지 않는다.
+    const mappedImages =
+      imageBuffer.files.length > 0 ||
+      Object.values(imageBuffer.assignments).some((v) => v.length > 0) ||
+      Object.values(imageBuffer.productAssignments ?? {}).some((v) => v.length > 0);
+    try {
+      await commitMasterImageBuffer(detailUseCase, created.masterProductId, imageBuffer);
+    } catch {
+      goToMaster(created.masterProductId, IMAGE_FAIL_NOTICE);
+      return;
+    }
+
+    // ③ 배송 설정(전 채널 공통) — 비어 있으면 호출하지 않는다.
+    const shippingMap = overrideToMap(shippingOverride);
+    if (Object.keys(shippingMap).length > 0) {
+      try {
+        await masterUseCase.updateShippingOverride(created.masterProductId, {
+          override: shippingMap,
+        });
+      } catch {
+        goToMaster(created.masterProductId, SHIPPING_FAIL_NOTICE);
+        return;
+      }
+    }
+
+    // ④ 사진이 붙은 뒤 자동생성을 다시 돌린다. 반영한 사진이 하나도 없고 ①이 이미 성공했다면
+    //    바뀐 게 없으므로 건너뛴다(그때는 ①의 결과가 곧 최신이다).
+    if (!mappedImages && created.assetsGenerated === true) {
+      goToMaster(created.masterProductId, SUCCESS_NOTICE);
+      return;
+    }
+    try {
+      await listingUseCase.regenerate(created.productListingId);
+    } catch {
+      goToMaster(created.masterProductId, ASSETS_FAIL_NOTICE);
+      return;
+    }
+    goToMaster(created.masterProductId, SUCCESS_NOTICE);
   };
 
   const renderThumb = (p: Product) => {
@@ -567,6 +738,20 @@ export function MasterFromChannelForm() {
             </ul>
           </Card>
 
+          {/* ⑥-1 이미지 — 구성상품을 고르면 그 물품 사진이 왼쪽 [제품 이미지] 탭에 뜬다 */}
+          <Card title="이미지 (대표사진 + 상세페이지)">
+            <MasterImagePool
+              masterId={null}
+              detailUseCase={detailUseCase}
+              fields={imageFields}
+              fieldFilters={imageFieldFilters}
+              buffer={imageBuffer}
+              onBufferChange={setImageBuffer}
+              productImageUseCase={productImageUseCase}
+              sourceProducts={sourceProducts}
+            />
+          </Card>
+
           {/* ⑦ 옵션 × 구성상품 수량 */}
           <Card title="옵션별 구성 수량" className="space-y-2">
             {selectedIds.length === 0 ? (
@@ -624,6 +809,77 @@ export function MasterFromChannelForm() {
             <p className="text-[11px] text-gray-500">
               수량은 1 이상의 정수입니다. 옵션명·판매가·재고는 쿠팡 값을 그대로 사용합니다.
             </p>
+          </Card>
+
+          {/* ⑦-1 기본 택배비 · 상자비 (판매가 계산의 원가) */}
+          <Card title="기본 택배비 · 상자비" className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  className="mb-1 block text-xs font-medium text-gray-600"
+                  htmlFor="from-channel-delivery"
+                >
+                  기본 택배비 *
+                </label>
+                <select
+                  id="from-channel-delivery"
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                  value={defaultDeliveryId}
+                  disabled={busy}
+                  onChange={(e) =>
+                    setDefaultDeliveryId(e.target.value ? Number(e.target.value) : '')
+                  }
+                >
+                  {carrierRates.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.carrier} {r.type} · {formatWon(r.cost)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  className="mb-1 block text-xs font-medium text-gray-600"
+                  htmlFor="from-channel-package"
+                >
+                  기본 상자비 *
+                </label>
+                <select
+                  id="from-channel-package"
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                  value={defaultPackageId}
+                  disabled={busy}
+                  onChange={(e) => setDefaultPackageId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  {packages.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.type} · {formatWon(p.cost)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="text-[11px] text-gray-500">
+              옵션에서 개별 지정하지 않으면 이 값이 모든 옵션 판매가 계산에 쓰입니다. 판매가는 쿠팡
+              값을 그대로 쓰므로 이 원가로 덮이지 않습니다.
+            </p>
+          </Card>
+
+          {/* ⑦-2 배송 설정 (전 채널 공통) */}
+          <Card title="배송 설정 (전 채널 공통)" className="space-y-2">
+            <p className="text-[11px] text-gray-500">
+              비우면 판매채널의 기본 배송 설정을 그대로 씁니다. 채워두면 이 마스터의 모든 채널에
+              적용되고, 채널마다 다르게 하려면 나중에 [채널 배송 설정]에서 바꿉니다. 출고지·반품지는
+              판매채널마다 달라야 해서 여기서 지정하지 않습니다.
+            </p>
+            <ShippingOverrideFields
+              level="master"
+              scope="common"
+              value={shippingOverride}
+              onChange={setShippingOverride}
+              platform={platform}
+              disabled={busy}
+            />
           </Card>
 
           {/* ⑧ 속성·고시 미리보기(접힘) */}
