@@ -310,3 +310,64 @@ export interface ApplyOptionNamesResponse {
   updatedOptions: number;
   warnings: string[];
 }
+
+// ── 마켓 상품으로 마스터 만들기 (2609_45) ────────────────────────────────────
+// 마켓 상품 id 하나로 마스터 + 옵션 + 채널 셀을 한 번에 만든다. 위의 가져오기(2609_22)와
+// 출발점이 다르다 — 저쪽은 "기존 마스터에 채널을 붙인다", 이쪽은 "마스터가 그 상품에서 태어난다".
+// 🔴 이름·경로는 플랫폼 중립(D17). 쿠팡은 메뉴 라벨·화면 문구에만 남는다.
+
+export interface MasterFromChannelPreviewRequest {
+  sellerId: number;
+  platform: string;
+  platformProductId: string;
+}
+
+/** 마켓 옵션 하나의 현재 모습(미리보기). 가격·재고는 표시 전용 — 커밋 때 서버가 재조회해 확정한다. */
+export interface MasterFromChannelOption {
+  itemName: string;
+  platformOptionId: string | null;
+  sellerProductItemId: string | null;
+  salePrice: number;
+  stockQuantity: number | null;
+  /** D4-1: 이 옵션 고유 속성(= commonAttributes 와 값이 다른 항목만). 마스터 옵션에 저장된다. */
+  attributes: Record<string, string>;
+}
+
+/** 미리보기 결과(쓰기 0회). 응답을 캐시하지 않는다 — 가격·재고는 변한다. */
+export interface MasterFromChannelPreview {
+  productName: string | null;
+  suggestedMasterName: string | null;
+  status: string;
+  categoryCode: string | null;
+  suggestedCategoryId: number | null;
+  suggestedCategoryName: string | null;
+  /** false = 역조회 실패 → 화면이 표준 카테고리 선택을 필수로 만든다(D2). */
+  categoryResolved: boolean;
+  options: MasterFromChannelOption[];
+  /** D4-1: 전 옵션이 같은 키·값으로 갖는 속성 = 마스터로 가는 몫. */
+  commonAttributes: Record<string, string>;
+  /** D4-2: 고시는 품목군 단위라 옵션에 따라 갈리지 않는다(마스터에만). */
+  notices: Record<string, string>;
+  noticeGroup: string | null;
+}
+
+/** 커밋 요청 = 마켓에 없는 정보만(D3). 가격·재고·옵션 id·옵션명·상태·태그는 보내지 않는다. */
+export interface MasterFromChannelRequest extends MasterFromChannelPreviewRequest {
+  masterName: string;
+  categoryId: number;
+  componentProductIds: number[];
+  options: MasterFromChannelOptionSpec[];
+}
+
+export interface MasterFromChannelOptionSpec {
+  platformOptionId: string | null; // 미승인 옵션은 null → 서버가 itemName 으로 매칭
+  itemName: string;
+  components: { productId: number; quantity: number }[];
+}
+
+export interface MasterFromChannelResult {
+  masterProductId: number;
+  productListingId: number;
+  optionCount: number;
+  status: string;
+}

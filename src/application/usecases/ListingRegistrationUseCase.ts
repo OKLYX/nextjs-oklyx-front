@@ -25,6 +25,10 @@ import type {
   ImportPreviewRequest,
   ImportPreviewResponse,
   ImportRequest,
+  MasterFromChannelPreviewRequest,
+  MasterFromChannelPreview,
+  MasterFromChannelRequest,
+  MasterFromChannelResult,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -179,5 +183,15 @@ export class ListingRegistrationUseCase {
 
   importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse> {
     return this.repository.importListing(masterId, body);
+  }
+
+  masterFromChannelPreview(
+    body: MasterFromChannelPreviewRequest,
+  ): Promise<MasterFromChannelPreview> {
+    return this.repository.masterFromChannelPreview(body);
+  }
+
+  createMasterFromChannel(body: MasterFromChannelRequest): Promise<MasterFromChannelResult> {
+    return this.repository.createMasterFromChannel(body);
   }
 }
