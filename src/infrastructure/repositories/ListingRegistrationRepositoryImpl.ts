@@ -248,6 +248,10 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     return response.data.data;
   }
 
+  async setCategorySource(listingId: number, useMasterCategory: boolean): Promise<void> {
+    await axiosInstance.patch(`${listingBase}/${listingId}/category-source`, { useMasterCategory });
+  }
+
   async masterFromChannelPreview(
     body: MasterFromChannelPreviewRequest,
   ): Promise<MasterFromChannelPreview> {

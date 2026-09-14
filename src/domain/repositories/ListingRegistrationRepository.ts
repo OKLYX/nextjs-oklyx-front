@@ -101,6 +101,11 @@ export interface ListingRegistrationRepository {
   importPreview(masterId: number, body: ImportPreviewRequest): Promise<ImportPreviewResponse>;
   /** 2609_22: 가져오기 커밋 — 성공 시 새 셀 id 를 담은 ChannelAddResponse. */
   importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse>;
+  /**
+   * 2609_45/D13: 이 셀이 마스터 카테고리를 따르게 한다. 마켓에는 지금 아무것도 보내지 않는다
+   * (실제 반영은 다음 [수정 요청]). `useMasterCategory=false` 는 백엔드가 400 으로 막는다.
+   */
+  setCategorySource(listingId: number, useMasterCategory: boolean): Promise<void>;
   /** 2609_45: 마켓 상품으로 마스터 만들기 미리보기 — 쓰기 없음(masterId 가 아직 없다). */
   masterFromChannelPreview(body: MasterFromChannelPreviewRequest): Promise<MasterFromChannelPreview>;
   /** 2609_45: 마스터 + 옵션 + 채널 셀 생성 커밋. */

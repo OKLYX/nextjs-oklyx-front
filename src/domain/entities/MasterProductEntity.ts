@@ -193,6 +193,13 @@ export interface MatrixCell {
   // 종전엔 이 값이 없어서 프론트가 `platformProductId` 유무로 DRAFT/SUBMITTED 를 **추정**했고,
   // 그래서 승인완료·반려된 셀이 계속 "승인 대기중"으로 보였다.
   status?: ListingStatus;
+  // 이 셀이 **실제로** 쓰는 마켓 카테고리 코드/이름(2609_45/D9). 해석 불가면 null.
+  categoryCode?: string | null;
+  categoryName?: string | null;
+  // true = 채널 자기 카테고리, false = 마스터 카테고리.
+  // ⚠️ 프론트가 `categoryCode` 유무나 이름 비교로 다시 판정하지 말 것(2609_45/D10-1) — 가져오기는
+  // 카테고리가 같아도 코드를 저장하므로 기존 셀 전부에 배지가 뜬다. 판정은 서버 값 하나뿐이다.
+  usesOwnCategory?: boolean;
 }
 
 export interface MatrixRow {
@@ -209,6 +216,9 @@ export interface ListingMatrixResponse {
   masterId: number;
   masterName: string;
   rows: MatrixRow[];
+  // 마스터 표준 카테고리를 플랫폼 코드로 해석한 이름(2609_45/D13). 셀마다 같은 값이라 최상위에 온다.
+  // [마스터 카테고리로 변경] 안내의 "A → B" 중 B 쪽. 해석 불가/미배포면 null·없음.
+  masterCategoryName?: string | null;
 }
 
 // ── List query (110/111) ─────────────────────────────────────────────────────
