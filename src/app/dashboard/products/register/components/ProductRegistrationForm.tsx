@@ -247,8 +247,8 @@ export function ProductRegistrationForm({
               <Input
                 id="price"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0.00"
                 disabled={isLoading}
                 {...register('price')}
@@ -302,8 +302,8 @@ export function ProductRegistrationForm({
               <Input
                 id="packageHeight"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
                 disabled={isLoading}
                 {...register('packageHeight')}
@@ -318,8 +318,8 @@ export function ProductRegistrationForm({
               <Input
                 id="packageLength"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
                 disabled={isLoading}
                 {...register('packageLength')}
@@ -336,8 +336,8 @@ export function ProductRegistrationForm({
               <Input
                 id="packageWidth"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
                 disabled={isLoading}
                 {...register('packageWidth')}
@@ -352,8 +352,8 @@ export function ProductRegistrationForm({
               <Input
                 id="netContent"
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
                 disabled={isLoading}
                 {...register('netContent')}
