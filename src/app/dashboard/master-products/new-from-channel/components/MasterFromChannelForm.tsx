@@ -36,8 +36,25 @@ const STATUS_LABEL: Record<string, string> = {
   SUSPENDED: '판매 중지',
 };
 
-// 오늘 지원하는 마켓은 쿠팡 하나다(D17: 플랫폼이 늘면 여기 한 줄만 는다).
-const PLATFORMS: { value: string; label: string }[] = [{ value: 'COUPANG', label: '쿠팡' }];
+/**
+ * 오늘 지원하는 플랫폼은 쿠팡 하나다(D17: 플랫폼이 늘면 여기 한 줄만 는다).
+ *
+ * 조회에 필요한 입력은 **플랫폼마다 다르다** — 그 이름과 입력 방식을 여기서 함께 선언하고
+ * 화면은 선택된 플랫폼의 값을 그대로 쓴다(네이버는 숫자가 아닌 `채널상품번호` 를 쓴다).
+ * ⚠️ 화면 JSX 에 플랫폼 이름을 직접 쓰지 말 것 — 플랫폼이 늘 때 고칠 자리가 흩어진다.
+ */
+type PlatformOption = {
+  value: string;
+  label: string;
+  /** 상품 식별자 입력칸의 라벨 */
+  idLabel: string;
+  /** 식별자가 숫자만인지(모바일 키패드 힌트) */
+  idNumeric: boolean;
+};
+
+const PLATFORMS: PlatformOption[] = [
+  { value: 'COUPANG', label: '쿠팡', idLabel: '쿠팡 상품 ID', idNumeric: true },
+];
 
 // D5(얕은 생성)의 사용자 대면 설명. 이미지·상세가 비어 있는 이유와 다음 행동을 알려주지 않으면
 // 사용자가 [마켓 반영]을 눌러 실물 상품을 덮을 수 있다.
@@ -84,12 +101,12 @@ export function MasterFromChannelForm() {
   const productsUseCase = useMemo(() => new GetProductsUseCase(new ProductRepositoryImpl()), []);
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
 
-  // ① 판매자 · 마켓
+  // ① 판매자 · 플랫폼
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [sellerId, setSellerId] = useState<number | ''>('');
   const [platform, setPlatform] = useState(PLATFORMS[0].value);
 
-  // ② 마켓 상품 ID
+  // ② 플랫폼 상품 식별자(이름·입력 방식은 선택된 플랫폼이 정한다)
   const [productId, setProductId] = useState('');
 
   // ③~⑧ 조회 결과와 입력
@@ -303,12 +320,26 @@ export function MasterFromChannelForm() {
     );
   };
 
+  /** 선택된 플랫폼의 입력 정의. 화면 문구·입력 방식이 전부 여기서 나온다. */
+  const platformMeta = useMemo(
+    () => PLATFORMS.find((p) => p.value === platform) ?? PLATFORMS[0],
+    [platform],
+  );
+
+  /** 플랫폼을 바꾸면 식별자의 뜻이 달라지므로 입력과 이전 조회 결과를 함께 버린다. */
+  const handlePlatformChange = (next: string) => {
+    setPlatform(next);
+    setProductId('');
+    setPreview(null);
+    setError('');
+  };
+
   const busy = looking || creating;
 
   return (
-    <PageContainer title="쿠팡 상품으로 마스터 추가">
+    <PageContainer title="플랫폼 상품으로 마스터 추가">
       <Card className="space-y-4">
-        {/* ① 판매자 · 마켓 */}
+        {/* ① 판매자 · 플랫폼 */}
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label
@@ -337,14 +368,14 @@ export function MasterFromChannelForm() {
               className="mb-1 block text-xs font-medium text-gray-600"
               htmlFor="from-channel-platform"
             >
-              마켓
+              플랫폼
             </label>
             <select
               id="from-channel-platform"
               className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
               value={platform}
               disabled={busy || PLATFORMS.length === 1}
-              onChange={(e) => setPlatform(e.target.value)}
+              onChange={(e) => handlePlatformChange(e.target.value)}
             >
               {PLATFORMS.map((p) => (
                 <option key={p.value} value={p.value}>
@@ -355,14 +386,14 @@ export function MasterFromChannelForm() {
           </div>
         </div>
 
-        {/* ② 쿠팡 상품 ID */}
+        {/* ② 플랫폼 상품 식별자 — 라벨·입력 방식은 선택된 플랫폼이 정한다 */}
         <div className="flex items-end gap-2">
           <div className="w-64">
             <Input
               id="from-channel-product-id"
-              label="쿠팡 상품 ID"
+              label={platformMeta.idLabel}
               size="sm"
-              inputMode="numeric"
+              inputMode={platformMeta.idNumeric ? 'numeric' : 'text'}
               disabled={busy}
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
@@ -389,7 +420,8 @@ export function MasterFromChannelForm() {
 
         {preview == null && (
           <p className="text-[11px] text-gray-500">
-            판매자와 쿠팡 상품 ID 를 넣고 [조회]하면 옵션·가격·재고를 쿠팡에서 가져옵니다.
+            판매자와 {platformMeta.idLabel} 를 넣고 [조회]하면 옵션·가격·재고를{' '}
+            {platformMeta.label}에서 가져옵니다.
           </p>
         )}
       </Card>
