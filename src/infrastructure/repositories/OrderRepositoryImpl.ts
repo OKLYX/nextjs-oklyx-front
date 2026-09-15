@@ -6,7 +6,7 @@ import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
   CancelReasonOption, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult, OrderMonth,
-  OrderSyncResponse, OrderSyncResult, OrderSyncScope, SyncTarget,
+  OrderSyncResponse, OrderSyncResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export class OrderRepositoryImpl implements OrderRepository {
@@ -28,9 +28,9 @@ export class OrderRepositoryImpl implements OrderRepository {
     return response.data.data;
   }
 
-  // scope omitted -> not sent, so the server applies its default (FULL, 전 상태).
+  // 조회 범위는 서버 기본값(QUICK)이다 — 화면은 preset 을 실어 보내지 않는다(FEATURE_2609_49).
   async syncOrders(
-    params?: { sellerId?: number; accountId?: number; scope?: OrderSyncScope },
+    params?: { sellerId?: number; accountId?: number },
   ): Promise<OrderSyncResponse> {
     const response = await axiosInstance.post('/api/orders/sync', null, { params });
     return response.data.data;

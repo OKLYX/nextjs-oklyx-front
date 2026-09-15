@@ -11,6 +11,7 @@ import { useAuthStore } from '@/infrastructure/stores/authStore';
 import type { OrderItem, OrderSearchField } from '@/domain/entities/OrderEntity';
 import { SHIPMENT_STATUSES, matchesOrderSearch } from '@/domain/entities/OrderEntity';
 import type { OrderAcknowledgeResult, SyncTarget } from '@/application/dto/OrderDTOs';
+import { formatRelativeTime } from '@/domain/entities/DateTimeFormat';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
@@ -23,7 +24,7 @@ import { ShippingLabelPreviewModal } from '../../components/ShippingLabelPreview
 import { SyncProgressModal } from '../../components/SyncProgressModal';
 import { channelOptionLabel } from '../../components/OrderSearchCard';
 import type { ChannelOption } from '../../components/OrderSearchCard';
-import { ShipmentFilterCard, formatSyncedAt } from './ShipmentFilterCard';
+import { ShipmentFilterCard } from './ShipmentFilterCard';
 import { AcknowledgeBar } from './AcknowledgeBar';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
@@ -153,13 +154,24 @@ export function ShipmentContainer() {
     ));
   }
 
-  // 출고관리는 "아직 안 보낸 주문"만 다룬다 → 결제완료·상품준비중만 조회(쿠팡 왕복 6회 → 2회).
-  // 배송지시 이후 상태는 주문내역 동기화(전 상태)가 따라잡는다.
+  // 조회 범위는 서버가 정한다(기본 QUICK) — 화면은 범위를 실어 보내지 않는다(FEATURE_2609_49).
   const {
     runSync, applyChannelErrors, failedTargets,
-    isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen, lastSyncedAt,
+    isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen,
     cancelSync, closeSyncModal,
-  } = useOrderSync({ onAfterSync: load, onSyncSettled: handleSyncSettled, scope: 'ACTIVE' });
+  } = useOrderSync({ onAfterSync: load, onSyncSettled: handleSyncSettled });
+
+  // 백그라운드 동기화(FEATURE_2609_49)가 돌기 때문에 "내가 마지막으로 누른 시각"은 더 이상 최신 상태를
+  // 뜻하지 않는다. 서버가 채널별로 낙인한 시각 중 가장 최근을 쓴다(정산 화면과 같은 방식).
+  // 값이 모두 오프셋 없는 같은 형식이라 사전순 = 시간순이다.
+  const lastSyncedAt = useMemo(
+    () => syncTargets
+      .map((t) => t.lastOrderSyncAt)
+      .filter((v): v is string => Boolean(v))
+      .sort()
+      .at(-1) ?? null,
+    [syncTargets]
+  );
 
   // 최초 진입 로드(주문내역과 같은 형태). 이후 재조회는 [조회]·동기화·모달 성공이 담당한다.
   // ⚠️ `load()` 를 직접 부르면 lint(set-state-in-effect) 에 걸린다 — 인라인 async 함수로 감싼다.
@@ -367,7 +379,7 @@ export function ShipmentContainer() {
       action={
         <p className="text-sm text-gray-500 whitespace-nowrap">
           마지막 동기화:{' '}
-          <span className="font-medium text-gray-700">{formatSyncedAt(lastSyncedAt)}</span>
+          <span className="font-medium text-gray-700">{formatRelativeTime(lastSyncedAt)}</span>
         </p>
       }
     >
