@@ -292,13 +292,15 @@ export function StockInOutForm({ sellers, prefill, onRecorded }: StockInOutFormP
 
         {reason === 'OPENING' && (
           <div>
-            <label className="block text-xs text-gray-500 mb-1">단가</label>
+            {/* 단가는 선택이다 — 비우면 서버가 상품 등록가를 스냅샷으로 넣는다. */}
+            <label className="block text-xs text-gray-500 mb-1">단가 (선택)</label>
             <input
               {...form.register('unitPrice')}
               type="number"
               step="0.01"
               className="w-28 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+            <p className="mt-1 text-xs text-gray-400">미입력 시 상품 등록가가 적용됩니다</p>
           </div>
         )}
 
