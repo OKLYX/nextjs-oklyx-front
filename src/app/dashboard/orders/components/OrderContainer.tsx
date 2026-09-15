@@ -133,7 +133,9 @@ export function OrderContainer() {
 
   // 동기화 루프가 끝난 뒤의 목록 재조회. 화면마다 다르므로 훅에 넘긴다.
   // 훅보다 먼저 선언한다(useCallback 은 TDZ).
-  const refetchAfterSync = useCallback(async () => {
+  // 조회한 행을 돌려준다(실패하면 null) — 상세 모달의 최신화가 "같은 id 의 새 행" 을 집어야 하기
+  // 때문이다(PLAN 2609_50 D13). 기존 호출부는 반환값을 무시하므로 영향이 없다(`loadSyncTargets` 와 같은 모양).
+  const refetchAfterSync = useCallback(async (): Promise<OrderItem[] | null> => {
     // The per-call `orders` payload is scoped by the sellerId parameter, so it is not reused —
     // the list is refetched once after the loop instead.
     try {
@@ -145,10 +147,15 @@ export function OrderContainer() {
       setAppliedPeriod(selectedPeriod);
       setHasSearched(true);
       setCurrentPage(0);
+      return result;
     } catch {
       setError('주문 목록을 불러오지 못했습니다.');
+      return null;
     }
   }, [orderUseCase, selectedSellerId, selectedPeriod]);
+
+  // 훅은 목록을 모른다 — 조회 결과를 삼키고 void 로 맞춰 준다(훅의 콜백 시그니처를 바꾸지 않는다).
+  const refetchAfterSyncVoid = useCallback(async () => { await refetchAfterSync(); }, [refetchAfterSync]);
 
   // 함수 선언문이라 호이스팅된다 — 훅이 돌려주는 applyChannelErrors 를 호출 시점(렌더 이후)에 읽는다.
   async function handleSyncSettled() {
@@ -165,7 +172,7 @@ export function OrderContainer() {
     runChannels, runSync, applyChannelErrors, failedTargets,
     isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen, syncResult,
     cancelSync, closeSyncModal, stopSyncing, clearSyncResult,
-  } = useOrderSync({ onAfterSync: refetchAfterSync, onSyncSettled: handleSyncSettled });
+  } = useOrderSync({ onAfterSync: refetchAfterSyncVoid, onSyncSettled: handleSyncSettled });
 
   // 백그라운드 동기화(FEATURE_2609_49)가 돌기 때문에 "내가 마지막으로 누른 시각"은 더 이상 최신 상태를
   // 뜻하지 않는다. 서버가 채널별로 낙인한 시각 중 가장 최근을 쓴다(정산 화면과 같은 방식).
@@ -555,6 +562,12 @@ export function OrderContainer() {
             setSelectedOrder(null);
             // Re-run the current search so the write-back'd 배송지시 row shows up without a full reload.
             if (didSucceed) void handleSearch();
+          }}
+          onRefreshed={async () => {
+            // 목록을 다시 불러와 같은 주문의 새 행으로 교체한다 — 모달은 닫지 않는다(PLAN 2609_50 D13).
+            // 재조회가 실패하면(null) 모달을 그대로 둔다: 갱신은 이미 끝났고 배너가 결과를 말해 준다.
+            const rows = await refetchAfterSync();
+            if (rows) setSelectedOrder(rows.find((o) => o.id === selectedOrder?.id) ?? null);
           }}
           isAdmin={isAdmin}
           useCase={shippingLabelUseCase}

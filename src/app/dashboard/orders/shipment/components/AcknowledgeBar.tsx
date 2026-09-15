@@ -4,7 +4,7 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { Button } from '@/presentation/components/ui/Button';
 
 /**
- * 출고관리 표 상단 선택 액션 바 — 선택 건수 · [발주처리] · 페이지 크기 · 결과 메시지.
+ * 출고관리 표 상단 선택 액션 바 — 선택 건수 · [선택 최신화] · [발주처리] · 페이지 크기 · 결과 메시지.
  *
  * ⚠️ `ShipmentFilterCard` 에 넣지 않는다 — 그 카드는 "조회 조건 + 서버가 sellerId 로 처리하는 액션"의
  * 자리다. 발주처리는 선택에 종속되고 페이지 크기는 표에 종속이라 표 바로 위가 맞다.
@@ -20,6 +20,9 @@ interface AcknowledgeBarProps {
   onAcknowledge: () => void;
   isSubmitting: boolean;
   canAcknowledge: boolean;      // = isAdmin
+  /** 선택한 주문을 마켓에서 다시 읽어 상태를 맞춘다(PLAN 2609_50). */
+  onRefresh: () => void;
+  isRefreshing: boolean;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   message: { text: string; detail: string[] } | null;
@@ -30,6 +33,8 @@ export function AcknowledgeBar({
   onAcknowledge,
   isSubmitting,
   canAcknowledge,
+  onRefresh,
+  isRefreshing,
   pageSize,
   onPageSizeChange,
   message,
@@ -44,6 +49,16 @@ export function AcknowledgeBar({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* 최신화는 마켓에 쓰지 않는 읽기라 ADMIN 게이트를 걸지 않는다(PLAN 2609_50 D17).
+              상한(주문 50건)도 서버가 판정하므로 여기서 건수로 막지 않는다(D3). */}
+          <Button
+            variant="secondary"
+            onClick={onRefresh}
+            disabled={selectedCount === 0 || isRefreshing}
+          >
+            {isRefreshing ? <Spinner label={`${selectedCount}건 확인 중...`} /> : `선택 최신화 (${selectedCount}건)`}
+          </Button>
+
           {canAcknowledge && (
             <Button
               onClick={onAcknowledge}

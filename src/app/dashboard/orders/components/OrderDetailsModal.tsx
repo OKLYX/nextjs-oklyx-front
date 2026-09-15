@@ -12,6 +12,7 @@ import type {
   CancelReasonOption,
   OrderAcknowledgeResult,
   OrderCancelResult,
+  OrderRefreshResult,
 } from '@/application/dto/OrderDTOs';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type {
@@ -48,6 +49,11 @@ interface OrderDetailsModalProps {
   useCase: ShippingLabelUseCase;
   /** 발주처리(결제완료→상품준비중) 전용. 주문내역·출고관리 두 호출부가 모두 넘긴다. */
   orderUseCase: OrderUseCase;
+  /**
+   * 최신화가 끝났다 → 부모가 목록을 다시 불러오고 이 모달의 `order` prop 을 새 행으로 교체한다
+   * (PLAN 2609_50 D13). 모달은 닫지 않는다 — 사용자는 상태가 바뀌었는지 보려고 누른다.
+   */
+  onRefreshed?: () => Promise<void> | void;
 }
 
 const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
@@ -90,7 +96,7 @@ function formatDate(value: string | null): string {
   return date.toLocaleString('ko-KR');
 }
 
-export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase }: OrderDetailsModalProps) {
+export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase, onRefreshed }: OrderDetailsModalProps) {
   // Hooks must precede the `order == null` guard — a conditional hook breaks the Rules of Hooks.
   const [rows, setRows] = useState<ShippingLabelExportRow[]>([]);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -121,6 +127,9 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const [ackResult, setAckResult] = useState<OrderAcknowledgeResult | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
   const [ackError, setAckError] = useState('');
+  // 최신화(쿠팡에서 이 주문을 다시 읽어 상태를 맞춘다, PLAN 2609_50). 읽기라 탭 밖에 둔다(D12).
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshBanner, setRefreshBanner] = useState('');
   // 발송 전 주문 취소(PLAN 2609_25). 사유 목록은 서버가 소유한다(D4) — 코드→라벨 상수를 만들지 않는다.
   const [cancelReasons, setCancelReasons] = useState<CancelReasonOption[]>([]);
   // 목록을 못 불러온 것과 "아직 안 골랐다"는 다르다 — 실패는 별도 플래그로 안내 문구를 가른다.
@@ -330,6 +339,38 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   };
 
   /**
+   * 이 주문 1건을 쿠팡에서 다시 읽어 로컬 상태를 맞춘다(PLAN 2609_50).
+   *
+   * 일괄 최신화와 **같은 엔드포인트**를 쓴다(D14, 길이 1) — 판정을 두 곳에 두지 않는다.
+   * ⚠️ 성공해도 모달을 닫지 않는다(D13). `onClose(true)` 는 발송처리 성공 규약이라 여기서 부르지 않는다.
+   */
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      setRefreshBanner('');
+      const result: OrderRefreshResult = await orderUseCase.refreshOrders([order.id]);
+      if (result.failed.length > 0) {
+        // 사유는 서버 원문 그대로 — 사용자가 고칠 수 있는 정보가 여기 담긴다.
+        setRefreshBanner(result.failed[0].reason);
+      } else if (result.unsupported.length > 0) {
+        setRefreshBanner('이 채널은 최신화를 지원하지 않습니다.');
+      } else if (result.empty.length > 0) {
+        setRefreshBanner('마켓에 남은 배송건이 없습니다(전량 취소로 보입니다).');
+      } else if (result.refreshed > 0) {
+        setRefreshBanner('최신 상태로 갱신했습니다.');
+      } else {
+        // 갱신 0건은 실패가 아니다 — 이미 최신이면 0이 정상이다.
+        setRefreshBanner('이미 최신입니다.');
+      }
+      await onRefreshed?.();
+    } catch (err) {
+      setRefreshBanner(extractErrorMessage(err, '최신화에 실패했습니다. 다시 시도해주세요.'));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  /**
    * 발송 전 주문 취소 — 이 라인을 고른 수량만큼 취소한다(PLAN 2609_25 D6).
    * - 보내는 것은 라인 id + 수량뿐이다. 박스 분할·상태 판정·수량 상한은 서버가 한다(D1·D2·D3).
    * - 되돌릴 수 없고 판매자 점수가 하락하므로 확인 다이얼로그가 마지막 방어선이다(D13).
@@ -417,6 +458,28 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   // 기하 고정(D1) — 시트를 펼쳐도 모달 크기가 변하지 않는다. `fullHeight` 가 그 역할을 승계한다.
   return (
     <Modal isOpen onClose={handleClose} title="주문 상세" fullHeight>
+
+        {/* 쿠팡에서 이 주문을 다시 읽어 상태를 맞춘다 — 읽기라서 탭(쓰기 작업) 밖에 둔다(PLAN 2609_50 D12).
+            쿠팡 주문에만 보인다(D17) — isAdmin 은 걸지 않는다(읽기다).
+            스크롤 밴드 앞에 둬야 길게 내려도 버튼이 남는다. 공용 Modal 의 title 은 string 이라 제목줄에
+            버튼을 끼울 수 없고, 앱 전체가 쓰는 공용 컴포넌트를 고치지 않는다. */}
+        {isCoupang && (
+          <div className="flex items-center justify-between gap-2 pb-3 border-b border-gray-200">
+            <span className="text-xs text-gray-500">주문번호 {order.externalOrderId}</span>
+            <button
+              type="button"
+              onClick={() => void handleRefresh()}
+              disabled={isRefreshing}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRefreshing ? <Spinner label="확인 중..." /> : '최신화'}
+            </button>
+          </div>
+        )}
+
+        {refreshBanner && (
+          <p className="pt-2 text-sm text-gray-800">{refreshBanner}</p>
+        )}
 
         {/* Only this middle band scrolls — the table keeps no scroller of its own (D2). */}
         <div className="flex-1 min-h-0 overflow-y-auto">
