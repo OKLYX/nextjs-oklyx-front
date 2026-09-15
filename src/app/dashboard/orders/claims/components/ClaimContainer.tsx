@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { ClaimRepositoryImpl } from '@/infrastructure/repositories/ClaimRepositoryImpl';
 import { ClaimUseCase } from '@/application/usecases/ClaimUseCase';
@@ -15,6 +16,7 @@ import type { Claim, ClaimStatus, ClaimType } from '@/domain/entities/ClaimEntit
 import { RECENT_PERIOD, buildPeriodOptions, toPeriodRange } from '@/domain/entities/OrderPeriod';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
+import { ROUTES } from '@/config/routes';
 import { ClaimSearchCard } from './ClaimSearchCard';
 import { ClaimTypeTabs } from './ClaimTypeTabs';
 import { ClaimStatusFilter } from './ClaimStatusFilter';
@@ -29,6 +31,13 @@ const PAGE_SIZE = 20;
 const DEFAULT_STATUS: ClaimStatus = 'RECEIVED';
 
 export function ClaimContainer() {
+  const router = useRouter();
+  // 알림(종)에서 들어온 클레임 딥링크(PLAN 2609_51 D9). 클레임은 전용 상세 페이지가 없어(모달)
+  // 쿼리 파라미터로 모달을 연다.
+  const searchParams = useSearchParams();
+  const deepLinkClaimId = searchParams.get('claimId');
+  const deepLinkType = searchParams.get('type');
+
   const claimUseCase = useMemo(() => new ClaimUseCase(new ClaimRepositoryImpl()), []);
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
 
@@ -48,7 +57,12 @@ export function ClaimContainer() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
   // The tab is a server axis: switching it refetches.
-  const [claimType, setClaimType] = useState<ClaimType>('RETURN');
+  // 🔴 딥링크 타입은 탭에도 반영한다 — 조회만 바꾸면 탭 라벨은 `반품` 인데 내용은 교환이 된다.
+  //    파라미터가 없으면 기본값은 그대로 `'RETURN'`.
+  const initialClaimType: ClaimType = deepLinkType === 'EXCHANGE' ? 'EXCHANGE' : 'RETURN';
+  const [claimType, setClaimType] = useState<ClaimType>(initialClaimType);
+  // 최초 조회에만 쓰는 값 — URL 이 정리돼도(모달 닫기) 재조회가 돌지 않게 ref 로 고정한다.
+  const initialClaimTypeRef = useRef<ClaimType>(initialClaimType);
 
   // null = do not label months with data — claims have no "months with data" API.
   const periodOptions = useMemo(() => buildPeriodOptions(null), []);
@@ -99,9 +113,31 @@ export function ClaimContainer() {
   // synchronous setState in an effect body.
   useEffect(() => {
     void (async () => {
-      await fetchClaims('RETURN', '', RECENT_PERIOD, '');
+      await fetchClaims(initialClaimTypeRef.current, '', RECENT_PERIOD, '');
     })();
   }, [fetchClaims]);
+
+  // 알림에서 들어온 경우(D9): 목록 필터와 무관하게 그 건의 모달을 바로 연다.
+  // 🔴 목록에서 찾지 말 것 — 기본 필터(접수 + 최근 2주) 밖의 건이면 영영 못 찾는다.
+  useEffect(() => {
+    if (!deepLinkClaimId) return;
+    void (async () => {
+      try {
+        setSelectedClaim(await claimUseCase.getClaim(Number(deepLinkClaimId)));
+      } catch {
+        // 없는 건(이미 종결·삭제)이면 그냥 목록만 보여준다 — 모달 대신 화면이 비는 게 낫다.
+      }
+    })();
+  }, [deepLinkClaimId, claimUseCase]);
+
+  /**
+   * 모달을 닫으면 URL 도 정리한다 — 딥링크 파라미터를 남기면 새로고침마다 모달이 다시 열리고,
+   * 다른 건을 보다 F5 하면 엉뚱한 건이 뜬다.
+   */
+  const handleCloseModal = useCallback(() => {
+    setSelectedClaim(null);
+    if (deepLinkClaimId) router.replace(ROUTES.ORDERS_CLAIMS);
+  }, [deepLinkClaimId, router]);
 
   // The status chips are a client-side filter — clicking one never hits the server.
   // The keyword is the opposite: it goes with the [조회] request.
@@ -228,7 +264,7 @@ export function ClaimContainer() {
 
       <ClaimDetailsModal
         claim={selectedClaim}
-        onClose={() => setSelectedClaim(null)}
+        onClose={handleCloseModal}
         onActionDone={handleActionDone}
       />
     </PageContainer>

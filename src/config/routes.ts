@@ -39,6 +39,8 @@ export const ROUTES = {
   ORDERS_SHIPMENT: '/dashboard/orders/shipment' as const,
   ORDERS_CLAIMS: '/dashboard/orders/claims' as const,
   ORDERS_INQUIRIES: '/dashboard/orders/inquiries' as const,
+  // 🔴 사이드바 메뉴가 아니다(FEATURE_2609_51 / D13) — 진입은 상단 종 말풍선 하단 [전체 보기] 하나뿐이다.
+  ALERTS: '/dashboard/alerts' as const,
   PURCHASE_LIST: '/dashboard/purchase/list' as const,
   SETTINGS_LOGGING: '/dashboard/settings/logging' as const,
   THUMBNAIL_TEMPLATES: '/dashboard/thumbnail-templates' as const,
