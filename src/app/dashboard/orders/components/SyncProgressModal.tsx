@@ -4,10 +4,15 @@ import { Spinner } from '@/presentation/components/Spinner';
 import type { SyncTarget } from '@/application/dto/OrderDTOs';
 import { Modal } from '@/presentation/components/ui/Modal';
 
-/** 채널(계정) 1개의 동기화 진행 상태. 순서 = 서버가 준 동기화 대상 순서. */
+/**
+ * 채널(계정) 1개의 동기화 진행 상태. 순서 = 서버가 준 동기화 대상 순서.
+ *
+ * `skipped` = 같은 채널이 이미 동기화 중이라 서버가 건너뛴 회차(FEATURE_2609_48 / D5).
+ * 실패가 아니므로 재시도 목록에도, 실패 집계에도 들어가지 않는다.
+ */
 export type ChannelProgress = {
   target: SyncTarget;
-  state: 'pending' | 'running' | 'success' | 'failed';
+  state: 'pending' | 'running' | 'success' | 'skipped' | 'failed';
   error?: string;
 };
 
@@ -50,6 +55,8 @@ function channelLabel(target: SyncTarget): string {
 const STATE_ICON: Record<Exclude<ChannelProgress['state'], 'running'>, string> = {
   pending: '·',
   success: '✓',
+  // Skipped is neither success nor failure - a dash keeps it visually neutral.
+  skipped: '–',
   failed: '✕',
 };
 
@@ -57,6 +64,8 @@ const STATE_CLASS: Record<ChannelProgress['state'], string> = {
   pending: 'text-gray-400',
   running: 'text-blue-600',
   success: 'text-green-600',
+  // Gray = "nothing happened here". Never red - skipping is not an error.
+  skipped: 'text-gray-500',
   failed: 'text-red-600',
 };
 
@@ -76,11 +85,15 @@ export function SyncProgressModal({
   const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0;
   const successCount = channels.filter((c) => c.state === 'success').length;
   const failedCount = channels.filter((c) => c.state === 'failed').length;
+  const skippedCount = channels.filter((c) => c.state === 'skipped').length;
   const running = channels.find((c) => c.state === 'running');
 
+  // Without this the counts would not add up to the channel total when a channel was skipped.
+  // Hidden at 0 so the usual heading stays short.
+  const skippedPart = skippedCount > 0 ? ` · 건너뜀 ${skippedCount}` : '';
   const heading = isRunning
     ? `동기화 중… (${doneCount}/${total})`
-    : `동기화 완료 · 성공 ${successCount} / 실패 ${failedCount}${canceled ? ' · 중단됨' : ''}`;
+    : `동기화 완료 · 성공 ${successCount} / 실패 ${failedCount}${skippedPart}${canceled ? ' · 중단됨' : ''}`;
 
   return (
     <Modal

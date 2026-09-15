@@ -3,11 +3,14 @@ import type { FailedBox, SkippedOrder } from './ShippingLabelDTOs';
 
 /** 동기화 1회의 집계 결과. 기간 백필(`POST /api/orders/sync/period`)은 목록 없이 이것만 돌려준다(PLAN D8). */
 export interface OrderSyncResult {
-  syncedAt: string;
+  /** 실제로 조회한 시각. 전 채널을 건너뛴 회차는 조회를 안 했으므로 null 이다(FEATURE_2609_48 / D9). */
+  syncedAt: string | null;
   newOrders: number;
   updatedOrders: number;
   /** 기간 백필에서는 항상 0 — 취소 보정을 돌리지 않는다(PLAN D4). */
   canceledUpdated: number;
+  /** 이미 같은 채널이 동기화 중이라 건너뛴 채널 수. 실패가 아니다(FEATURE_2609_48 / D5). */
+  skippedAccounts: number;
 }
 
 export interface OrderSyncResponse extends OrderSyncResult {

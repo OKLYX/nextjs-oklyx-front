@@ -157,8 +157,13 @@ export function PurchaseListContainer() {
       const result = await purchaseListUseCase.extract();
       setPurchaseList(result);
       loadImages(result.items);
+      // This screen calls every channel at once, so only the totals come back - no per-channel row.
+      // Appended only when something was skipped (2609_48 D5).
+      const skippedPart = sync.skippedAccounts > 0
+        ? ` · ${sync.skippedAccounts}채널은 이미 동기화 중이라 건너뜀`
+        : '';
       setSyncMessage(
-        `주문내역 동기화 완료 — 신규 ${sync.newOrders}건, 수정 ${sync.updatedOrders}건, 취소 ${sync.canceledUpdated}건`
+        `주문내역 동기화 완료 — 신규 ${sync.newOrders}건, 수정 ${sync.updatedOrders}건, 취소 ${sync.canceledUpdated}건${skippedPart}`
       );
     } catch {
       setError('주문내역 동기화에 실패했습니다. 다시 시도해주세요.');

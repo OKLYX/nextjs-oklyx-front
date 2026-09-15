@@ -78,10 +78,13 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
    *
    * ⚠️ `isSyncing` 을 **켜기만** 하고 끄지 않는다 — 끄는 시점이 흐름마다 다르기 때문이다
    * (표준 동기화 = 목록 재조회·localStorage 이후, 백필 = 루프 직후). 호출부가 `stopSyncing` 으로 끈다.
+   * ⚠️ 채널 상태 판정은 호출부가 한다 — `callOne` 이 돌려준 상태를 그대로 찍는다. 반환이 없으면
+   * `'success'`(현행). 건너뜀(FEATURE_2609_48 / D5) 판정을 이 러너 안에 넣지 말 것 — 공용 러너이고
+   * 호출자마다 부르는 엔드포인트가 다르다.
    */
   const runChannels = useCallback(async (
     targets: SyncTarget[],
-    callOne: (target: SyncTarget) => Promise<void>,
+    callOne: (target: SyncTarget) => Promise<ChannelProgress['state'] | void>,
   ) => {
     cancelRef.current = false;
     setSyncCanceled(false);
@@ -97,8 +100,8 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
       }
       setSyncChannels((prev) => markState(prev, i, 'running'));
       try {
-        await callOne(targets[i]);
-        setSyncChannels((prev) => markState(prev, i, 'success'));
+        const state = await callOne(targets[i]);
+        setSyncChannels((prev) => markState(prev, i, state ?? 'success'));
       } catch (e) {
         setSyncChannels((prev) => markState(prev, i, 'failed', extractMessage(e)));
       }
@@ -119,12 +122,15 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
     let newOrders = 0;
     let updatedOrders = 0;
     let canceledUpdated = 0;
+    let skippedAccounts = 0;
 
     await runChannels(targets, async (target) => {
       const result = await orderUseCase.syncOrders({ accountId: target.accountId, scope });
       newOrders += result.newOrders;
       updatedOrders += result.updatedOrders;
       canceledUpdated += result.canceledUpdated;
+      skippedAccounts += result.skippedAccounts;
+      return result.skippedAccounts > 0 ? 'skipped' : 'success';
     });
 
     // The per-call `orders` payload is scoped by the sellerId parameter, so it is not reused here —
@@ -134,7 +140,7 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
     const syncedAt = new Date().toISOString();
     setLastSyncedAt(syncedAt);
     localStorage.setItem(LAST_SYNCED_AT_KEY, syncedAt);
-    setSyncResult({ syncedAt, newOrders, updatedOrders, canceledUpdated, orders: [] });
+    setSyncResult({ syncedAt, newOrders, updatedOrders, canceledUpdated, skippedAccounts, orders: [] });
     setIsSyncing(false);
 
     // The reason still comes from the server (2609_02 D18), but from the channel status the sync
