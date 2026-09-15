@@ -7,6 +7,7 @@ import { Navbar } from './components/Navbar';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { useIsMobile } from '@/presentation/hooks/useIsMobile';
+import { useAlertSummaryPolling } from '@/presentation/hooks/useAlertSummaryPolling';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 import { AuthRepositoryImpl } from '@/infrastructure/repositories/AuthRepositoryImpl';
 import { ROUTES } from '@/config/routes';
@@ -33,6 +34,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
+  // 🔴 알림 숫자 폴링의 유일한 호출부(2609_51 Step 2). 사이드바 배지·상단 종·알림 센터가 모두
+  // `alertStore` 를 읽으므로, 여기 한 번만 돌면 화면 수와 무관하게 호출량이 고정된다.
+  useAlertSummaryPolling();
   const isSidebarOpen = useNavigationStore((state) => state.isSidebarOpen);
   const setSidebarOpen = useNavigationStore((state) => state.setSidebarOpen);
   const toggleSidebar = useNavigationStore((state) => state.toggleSidebar);

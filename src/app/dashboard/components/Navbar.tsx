@@ -19,7 +19,7 @@ import {
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { ROUTES } from '@/config/routes';
-import { useAlertSummary } from '@/presentation/hooks/useAlertSummary';
+import { useAlertStore } from '@/infrastructure/stores/alertStore';
 import { NavbarHeader } from './NavbarHeader';
 import { NavBadge } from './NavBadge';
 
@@ -30,7 +30,7 @@ interface MenuGroup {
   toggle: () => void;
   /** `adminOnly` 는 그룹뿐 아니라 항목에도 붙는다 — 공개 그룹 안에 ADMIN 전용 화면이 하나 있을 때
       새 그룹을 만들지 않기 위해서다(예: 비용관리 > 채널 고정비 = `/api/admin/fixed-costs`). */
-  items: { href: string; label: string; adminOnly?: boolean; badge?: number }[];
+  items: { href: string; label: string; adminOnly?: boolean; badge?: number; title?: string }[];
   /** Hidden from non-ADMIN users. Kept inline so the display order below is the
       real order — an ADMIN-only group can sit between two public ones. */
   adminOnly?: boolean;
@@ -60,8 +60,9 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const isDesignTemplatesOpen = useNavigationStore((state) => state.isDesignTemplatesMenuOpen);
   const isSettlementOpen = useNavigationStore((state) => state.isSettlementMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
-  // 처리 대기 건수의 단일 창구(FEATURE_2609_49) — 화면이 자기 목록을 세지 않는다.
-  const alerts = useAlertSummary();
+  // 처리 대기 건수의 단일 창구(FEATURE_2609_49 · 2609_51 Step 2) — 화면이 자기 목록을 세지 않는다.
+  // 🔴 폴링은 `dashboard/layout.tsx` 가 한 번만 돈다. 여기서는 store 를 읽기만 한다.
+  const alerts = useAlertStore((state) => state.summary);
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
   const toggleCostsMenu = useNavigationStore((state) => state.toggleCostsMenu);
@@ -105,7 +106,8 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       open: isOrdersOpen,
       toggle: toggleOrdersMenu,
       items: [
-        { href: ROUTES.ORDERS_SHIPMENT, label: '출고관리' },
+        // 결제완료 상품(라인) 수. 알림의 새 주문 건수(주문 단위·최근 14일)와 다른 숫자다(2609_51 D7·D8).
+        { href: ROUTES.ORDERS_SHIPMENT, label: '출고관리', badge: alerts?.paidLines, title: '결제완료 상품 수' },
         { href: ROUTES.ORDERS_RETRIEVE, label: '주문내역' },
         { href: ROUTES.ORDERS_CLAIMS, label: '반품/교환', badge: alerts?.openClaims },
         { href: ROUTES.ORDERS_INQUIRIES, label: '고객문의', badge: alerts?.unansweredInquiries },
@@ -261,6 +263,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
                     <li key={item.href}>
                       <Link
                         href={item.href}
+                        title={item.title}
                         className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700 whitespace-nowrap"
                       >
                         {item.label}
