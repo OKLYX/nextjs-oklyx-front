@@ -10,7 +10,7 @@ import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCas
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import type { OrderItem, OrderSearchField } from '@/domain/entities/OrderEntity';
 import { SHIPMENT_STATUSES, matchesOrderSearch } from '@/domain/entities/OrderEntity';
-import type { OrderAcknowledgeResult, SyncTarget } from '@/application/dto/OrderDTOs';
+import type { OrderAcknowledgeResult, OrderRefreshResult, SyncTarget } from '@/application/dto/OrderDTOs';
 import { formatRelativeTime } from '@/domain/entities/DateTimeFormat';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -44,6 +44,21 @@ function buildMessage(result: OrderAcknowledgeResult): { text: string; detail: s
   if (result.skipped.length > 0) text += ` / 제외 ${result.skipped.length}건(결제완료 아님)`;
   if (result.unsupported.length > 0) text += ` / 처리불가 ${result.unsupported.length}건`;
   const detail = [...new Set(result.failed.map((box) => `${box.resultCode}: ${box.message}`))].slice(0, 3);
+  return { text, detail };
+}
+
+/**
+ * 최신화 결과 → 인라인 메시지(PLAN 2609_50). 분류 이름이 달라 `buildMessage` 와 합치지 않는다.
+ *
+ * ⚠️ "성공" 이 아니라 "갱신" 이다 — `refreshed` 가 0이어도 실패가 아니다(이미 최신이면 0이 정상).
+ * 실패 사유는 서버 원문 그대로, 중복 제거 후 최대 3종만.
+ */
+function buildRefreshMessage(result: OrderRefreshResult): { text: string; detail: string[] } {
+  let text = `최신화 완료 — ${result.refreshed}건 갱신`;
+  if (result.empty.length > 0) text += ` / 주문 없음 ${result.empty.length}건`;
+  if (result.failed.length > 0) text += ` / 실패 ${result.failed.length}건`;
+  if (result.unsupported.length > 0) text += ` / 처리불가 ${result.unsupported.length}건`;
+  const detail = [...new Set(result.failed.map((o) => `${o.externalOrderId}: ${o.reason}`))].slice(0, 3);
   return { text, detail };
 }
 
@@ -93,6 +108,8 @@ export function ShipmentContainer() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [ackMessage, setAckMessage] = useState<{ text: string; detail: string[] } | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
+  // 발주처리와 별도 state 다 — 하나로 묶으면 최신화 중에 발주처리 버튼까지 '처리 중' 으로 보인다.
+  const [isRefreshing, setIsRefreshing] = useState(false);
   // 자동 소멸 타이머. 연속 전송 시 이전 타이머가 새 메시지를 지우지 않게 ref 로 붙잡는다.
   const ackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -126,7 +143,9 @@ export function ShipmentContainer() {
 
   // 기간 파라미터를 보내지 않는다(D8) — 서버 기본 창(14일)이 곧 출고 대상 범위다.
   // useOrderSync 보다 먼저 선언한다(useCallback 은 TDZ — 아래에 두면 참조 불가).
-  const load = useCallback(async () => {
+  // 조회한 행을 돌려준다(실패하면 null) — 상세 모달의 최신화가 "같은 id 의 새 행" 을 집어야 하기
+  // 때문이다(PLAN 2609_50 D13). 기존 호출부는 반환값을 무시하므로 영향이 없다(`loadSyncTargets` 와 같은 모양).
+  const load = useCallback(async (): Promise<OrderItem[] | null> => {
     try {
       setIsLoading(true);
       setError('');
@@ -135,13 +154,18 @@ export function ShipmentContainer() {
       setHasSearched(true);
       setCurrentPage(0);
       await loadSyncTargets(selectedSellerId);
+      return result;
     } catch {
       setError('출고 대상 조회에 실패했습니다. 다시 시도해주세요.');
       setOrders([]);
+      return null;
     } finally {
       setIsLoading(false);
     }
   }, [orderUseCase, selectedSellerId, loadSyncTargets]);
+
+  // 훅은 목록을 모른다 — 조회 결과를 삼키고 void 로 맞춰 준다(훅의 콜백 시그니처를 바꾸지 않는다).
+  const loadVoid = useCallback(async () => { await load(); }, [load]);
 
   // 함수 선언문이라 호이스팅된다 — 훅이 돌려주는 applyChannelErrors 를 호출 시점(렌더 이후)에 읽는다.
   async function handleSyncSettled() {
@@ -159,7 +183,7 @@ export function ShipmentContainer() {
     runSync, applyChannelErrors, failedTargets,
     isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen,
     cancelSync, closeSyncModal,
-  } = useOrderSync({ onAfterSync: load, onSyncSettled: handleSyncSettled });
+  } = useOrderSync({ onAfterSync: loadVoid, onSyncSettled: handleSyncSettled });
 
   // 백그라운드 동기화(FEATURE_2609_49)가 돌기 때문에 "내가 마지막으로 누른 시각"은 더 이상 최신 상태를
   // 뜻하지 않는다. 서버가 채널별로 낙인한 시각 중 가장 최근을 쓴다(정산 화면과 같은 방식).
@@ -309,6 +333,37 @@ export function ShipmentContainer() {
     }
   };
 
+  /**
+   * 선택한 주문을 쿠팡에서 다시 읽어 상태를 맞춘다(PLAN 2609_50).
+   *
+   * - confirm 이 없다(D15) — 마켓에 쓰지 않는 읽기라 되돌릴 것이 없다.
+   * - 50건 상한은 서버가 판정한다(D3). 여기서 미리 막지 않고 서버 400 메시지를 그대로 보여준다.
+   * - 메시지 자리는 발주처리와 공유한다(`ackMessage`) — 결과 줄을 둘로 늘리지 않는다.
+   */
+  const handleRefresh = async () => {
+    const ids = [...selectedIds];
+    if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
+    try {
+      setIsRefreshing(true);
+      const result = await orderUseCase.refreshOrders(ids);
+      setAckMessage(buildRefreshMessage(result));
+      setSelectedIds(new Set());
+      await load();
+      // 성공만 있을 때만 자동 소멸 — 실패·처리불가가 섞이면 사용자가 읽을 때까지 남긴다.
+      if (result.failed.length === 0 && result.unsupported.length === 0) {
+        ackTimerRef.current = setTimeout(() => setAckMessage(null), ACK_MESSAGE_TTL);
+      }
+    } catch (err) {
+      // 서버 message 를 살린다(상한 초과 400 이 여기로 온다). 선택은 유지 — 줄여서 다시 누르면 된다.
+      setAckMessage({
+        text: extractErrorMessage(err, '최신화에 실패했습니다. 다시 시도해주세요.'),
+        detail: [],
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handleSync = async () => {
     setError('');
     clearSelection();
@@ -418,6 +473,8 @@ export function ShipmentContainer() {
         selectedCount={selectedIds.size}
         onAcknowledge={() => void handleAcknowledge()}
         isSubmitting={isAcknowledging}
+        onRefresh={() => void handleRefresh()}
+        isRefreshing={isRefreshing}
         canAcknowledge={isAdmin}
         pageSize={pageSize}
         onPageSizeChange={(n) => { setPageSize(n); setCurrentPage(0); }}
@@ -456,6 +513,12 @@ export function ShipmentContainer() {
         onClose={(didSucceed) => {
           setSelectedOrder(null);
           if (didSucceed) void load();
+        }}
+        onRefreshed={async () => {
+          // 목록을 다시 불러와 같은 주문의 새 행으로 교체한다 — 모달은 닫지 않는다(PLAN 2609_50 D13).
+          // 목록에서 사라졌으면 `?? null` 이 모달을 닫고, 재조회가 실패하면(null) 그대로 둔다.
+          const rows = await load();
+          if (rows) setSelectedOrder(rows.find((o) => o.id === selectedOrder?.id) ?? null);
         }}
         isAdmin={isAdmin}
         useCase={shippingLabelUseCase}

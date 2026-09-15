@@ -57,6 +57,25 @@ export interface OrderAcknowledgeResult {
 }
 
 /**
+ * 주문 최신화 결과 (POST /api/orders/refresh).
+ *
+ * 모든 목록이 <b>주문번호 단위</b>다(PLAN 2609_50 D6) — 보낸 것은 라인 id 지만 조회·보고 단위는 주문이다.
+ * `refreshed` 가 0 이어도 실패가 아니다: 이미 최신이면 0 이 정상이다.
+ */
+export interface OrderRefreshResult {
+  /** dedupe 후 실제로 조회를 시도한 주문 수. */
+  requestedOrders: number;
+  /** 박스를 1건 이상 반영한 주문 수. */
+  refreshed: number;
+  /** 쿠팡이 0박스를 돌려준 주문번호 — 전량 취소로 추정(실패 아님). */
+  empty: string[];
+  /** 조회·파싱 실패 주문. 사유는 원문 그대로 보여준다. */
+  failed: { externalOrderId: string; reason: string }[];
+  /** 비-쿠팡이라 조회할 수 없는 주문번호. */
+  unsupported: string[];
+}
+
+/**
  * 취소 사유 1행 (GET /api/admin/orders/cancel-reasons).
  *
  * ⚠️ 사유 목록의 유일한 소유자는 서버다(PLAN 2609_25 D4) — 코드→라벨 상수를 프론트에 만들지 말 것.
