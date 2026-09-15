@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { OrderRepositoryImpl } from '@/infrastructure/repositories/OrderRepositoryImpl';
 import { OrderUseCase } from '@/application/usecases/OrderUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
@@ -116,6 +117,28 @@ export function ShipmentContainer() {
   useEffect(() => () => {
     if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
   }, []);
+
+  // 알림(종)에서 들어온 새 주문 딥링크(PLAN 2609_51 D9). 검색 로직은 새로 만들지 않는다 —
+  // 이미 있는 칩 검색(`searchField='orderNo'` + `matchesOrderSearch`)의 값을 URL 로 채울 뿐이다.
+  const searchParams = useSearchParams();
+  const deepLinkOrderNo = searchParams.get('orderNo');
+
+  // 🔴 `useState(초기값 = 파라미터)` 로 끝내면 안 된다 — 이미 출고관리 화면에 있는 상태에서 종을 열어
+  // 다른 주문을 누르면 URL 만 바뀌고 컴포넌트는 다시 마운트되지 않아 검색어가 그대로다. 효과로 맞춘다.
+  useEffect(() => {
+    if (!deepLinkOrderNo) return;
+    // ⚠️ setState 를 효과 본문에서 바로 부르면 lint(set-state-in-effect) 에 걸린다 — 화면의 다른
+    // 효과들과 같은 방식으로 함수에 감싼다.
+    const applyDeepLink = () => {
+      setSearchField('orderNo');
+      setSearchTerm(deepLinkOrderNo);
+      // 🔴 채널 선택도 푼다 — `visible` 은 selectedAccountId 로도 거르므로, 다른 채널이 골라진 채
+      // 들어오면 검색어를 맞춰도 그 주문이 안 보인다.
+      setSelectedAccountId('');
+      // 🔴 서버 조회 조건은 건드리지 않는다 — 새 주문 알림은 14일 안의 건이라 이미 받아온 목록에 있다(D8).
+    };
+    applyDeepLink();
+  }, [deepLinkOrderNo]);
 
   useEffect(() => {
     const loadSellers = async () => {

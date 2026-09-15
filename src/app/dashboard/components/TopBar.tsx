@@ -8,6 +8,7 @@ import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { useThemeStore } from '@/infrastructure/stores/themeStore';
 import { AuthRepositoryImpl } from '@/infrastructure/repositories/AuthRepositoryImpl';
 import { ROUTES } from '@/config/routes';
+import { AlertBell } from './AlertBell';
 
 export function TopBar() {
   const router = useRouter();
@@ -43,6 +44,9 @@ export function TopBar() {
   return (
     <header className="flex items-center justify-end px-6 py-3 bg-white">
       <div className="flex items-center gap-3">
+        {/* 알림 종 (FEATURE_2609_51) — 숫자는 AlertBell 이 alertStore 에서 직접 읽는다.
+            🔴 TopBar 에 알림 prop 을 추가하지 않는다. */}
+        <AlertBell />
         {/* Theme switch — toggles Light/Dark mode (persisted via themeStore) */}
         <button
           type="button"
