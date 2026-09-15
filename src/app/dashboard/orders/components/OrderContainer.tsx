@@ -328,9 +328,12 @@ export function OrderContainer() {
     setError('');
 
     let newOrders = 0;
+    let skipped = 0;
     await runChannels(targets, async (target) => {
       const result = await orderUseCase.syncPeriod(target.accountId, range);
       newOrders += result.newOrders;                      // PLAN D9
+      skipped += result.skippedAccounts;                  // 2609_48 D6
+      return result.skippedAccounts > 0 ? 'skipped' : 'success';
     });
     // 백필은 루프 직후 스피너를 푼다(표준 동기화는 재조회까지 끝낸 뒤 — 현행 유지).
     stopSyncing();
@@ -340,7 +343,10 @@ export function OrderContainer() {
       const refreshed = await orderUseCase.getOrders(selectedSellerId || undefined, range);
       setOrders(refreshed);
       setCurrentPage(0);
-      if (refreshed.length === 0 && newOrders === 0) {
+      if (skipped > 0) {
+        // A skipped channel was never queried, so "there are none" would be a lie (2609_48 D6).
+        setError('이미 동기화 중이라 일부 채널을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      } else if (refreshed.length === 0 && newOrders === 0) {
         setError('쿠팡에도 해당 기간 주문이 없습니다.');      // PLAN D11
       }
     } catch {
@@ -473,6 +479,8 @@ export function OrderContainer() {
         {syncResult && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
             동기화 완료 — 신규 {syncResult.newOrders}건, 수정 {syncResult.updatedOrders}건, 취소 {syncResult.canceledUpdated}건
+            {/* Only when something was skipped - "건너뜀 0" would just lengthen the usual line (2609_48 D5). */}
+            {syncResult.skippedAccounts > 0 && ` · ${syncResult.skippedAccounts}채널은 이미 동기화 중이라 건너뜀`}
           </div>
         )}
 
