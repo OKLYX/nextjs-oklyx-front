@@ -48,13 +48,13 @@ function buildMessage(result: OrderAcknowledgeResult): { text: string; detail: s
 }
 
 /**
- * 최신화 결과 → 인라인 메시지(PLAN 2609_50). 분류 이름이 달라 `buildMessage` 와 합치지 않는다.
+ * 주문 상태 갱신 결과 → 인라인 메시지(PLAN 2609_50). 분류 이름이 달라 `buildMessage` 와 합치지 않는다.
  *
  * ⚠️ "성공" 이 아니라 "갱신" 이다 — `refreshed` 가 0이어도 실패가 아니다(이미 최신이면 0이 정상).
  * 실패 사유는 서버 원문 그대로, 중복 제거 후 최대 3종만.
  */
 function buildRefreshMessage(result: OrderRefreshResult): { text: string; detail: string[] } {
-  let text = `최신화 완료 — ${result.refreshed}건 갱신`;
+  let text = `주문 상태 갱신 완료 — ${result.refreshed}건 갱신`;
   if (result.empty.length > 0) text += ` / 주문 없음 ${result.empty.length}건`;
   if (result.failed.length > 0) text += ` / 실패 ${result.failed.length}건`;
   if (result.unsupported.length > 0) text += ` / 처리불가 ${result.unsupported.length}건`;
@@ -108,7 +108,7 @@ export function ShipmentContainer() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [ackMessage, setAckMessage] = useState<{ text: string; detail: string[] } | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
-  // 발주처리와 별도 state 다 — 하나로 묶으면 최신화 중에 발주처리 버튼까지 '처리 중' 으로 보인다.
+  // 발주처리와 별도 state 다 — 하나로 묶으면 상태 갱신 중에 발주처리 버튼까지 '처리 중' 으로 보인다.
   const [isRefreshing, setIsRefreshing] = useState(false);
   // 자동 소멸 타이머. 연속 전송 시 이전 타이머가 새 메시지를 지우지 않게 ref 로 붙잡는다.
   const ackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -143,7 +143,7 @@ export function ShipmentContainer() {
 
   // 기간 파라미터를 보내지 않는다(D8) — 서버 기본 창(14일)이 곧 출고 대상 범위다.
   // useOrderSync 보다 먼저 선언한다(useCallback 은 TDZ — 아래에 두면 참조 불가).
-  // 조회한 행을 돌려준다(실패하면 null) — 상세 모달의 최신화가 "같은 id 의 새 행" 을 집어야 하기
+  // 조회한 행을 돌려준다(실패하면 null) — 상세 모달의 상태 갱신이 "같은 id 의 새 행" 을 집어야 하기
   // 때문이다(PLAN 2609_50 D13). 기존 호출부는 반환값을 무시하므로 영향이 없다(`loadSyncTargets` 와 같은 모양).
   const load = useCallback(async (): Promise<OrderItem[] | null> => {
     try {
@@ -277,8 +277,33 @@ export function ShipmentContainer() {
   );
 
   // 결제완료 + 쿠팡 + 박스 id 있음 = 발주처리 대상(PLAN 2609_17 D2·D10). 판정은 여기 한 곳에서만 한다.
-  const isSelectable = useCallback((o: OrderItem) =>
+  const isAcknowledgeTarget = useCallback((o: OrderItem) =>
     o.status === 'PAID' && o.platform === 'COUPANG' && Boolean(o.externalBoxId), []);
+
+  /**
+   * 체크박스를 그릴지 = **쿠팡 주문이면 상태 무관**.
+   *
+   * 🔴 발주처리 화이트리스트(`isAcknowledgeTarget`)를 체크박스 판정으로 쓰면 안 된다 — 그러면
+   * 상품준비중으로 고착된 주문에 체크박스가 없어서 [주문 상태 갱신] 이 영구 비활성이 된다.
+   * 고착 건을 푸는 것이 2609_50 의 존재 이유이므로 판정을 액션별로 나눈다.
+   *
+   * 발주처리는 좁은 쪽이 맞다(되돌릴 수 없는 쓰기) — 서버가 결제완료 아닌 라인을 `skipped` 로
+   * 걸러 결과에 적어 주므로(`OrderAcknowledgeServiceImpl` 의 `STATUS_PAID` 검사) 섞여 들어가도
+   * 마켓에 쓰이지 않는다.
+   */
+  const isSelectable = useCallback((o: OrderItem) => o.platform === 'COUPANG', []);
+
+  /**
+   * 선택한 것 중 실제로 발주처리되는 라인 id.
+   *
+   * 체크박스가 상태 무관으로 넓어졌으므로 발주처리는 **여기서 다시 좁힌다** — 넓어진 선택을 그대로
+   * 보내면 상품준비중 주문이 발주처리 요청에 섞여 서버 `skipped` 로 되돌아오는 왕복이 생긴다.
+   * 현재 페이지가 아니라 조회 결과 전체(`orders`)에서 찾는다 — 선택은 페이지를 넘겨도 유지되기 때문.
+   */
+  const ackTargetIds = useMemo(
+    () => orders.filter((o) => selectedIds.has(o.id) && isAcknowledgeTarget(o)).map((o) => o.id),
+    [orders, selectedIds, isAcknowledgeTarget]
+  );
 
   // 전체 선택은 현재 페이지 기준으로만 계산한다(D7) — 선택 자체는 id 라 페이지를 넘겨도 유지된다.
   const selectablePaged = useMemo(() => paged.filter(isSelectable), [paged, isSelectable]);
@@ -308,7 +333,9 @@ export function ShipmentContainer() {
   };
 
   const handleAcknowledge = async () => {
-    const ids = [...selectedIds];
+    // 선택 전체가 아니라 발주처리 대상만 보낸다 — 체크박스를 넓히기 전과 같은 요청이 된다.
+    const ids = ackTargetIds;
+    if (ids.length === 0) return;
     // 되돌릴 수 없다 — 브라우저 confirm 으로 마지막 방어선을 둔다.
     if (!window.confirm(`${ids.length}건을 발주처리합니다. 되돌릴 수 없습니다. 계속할까요?`)) return;
     if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
@@ -356,7 +383,7 @@ export function ShipmentContainer() {
     } catch (err) {
       // 서버 message 를 살린다(상한 초과 400 이 여기로 온다). 선택은 유지 — 줄여서 다시 누르면 된다.
       setAckMessage({
-        text: extractErrorMessage(err, '최신화에 실패했습니다. 다시 시도해주세요.'),
+        text: extractErrorMessage(err, '주문 상태 갱신에 실패했습니다. 다시 시도해주세요.'),
         detail: [],
       });
     } finally {
@@ -471,6 +498,7 @@ export function ShipmentContainer() {
       {/* 바는 showEmpty 분기 밖에 둔다 — 결과 0건이어도 페이지 크기 select 는 남아야 한다. */}
       <AcknowledgeBar
         selectedCount={selectedIds.size}
+        acknowledgeableCount={ackTargetIds.length}
         onAcknowledge={() => void handleAcknowledge()}
         isSubmitting={isAcknowledging}
         onRefresh={() => void handleRefresh()}
