@@ -6,7 +6,7 @@ import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
   CancelReasonOption, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult, OrderMonth,
-  OrderSyncResponse, OrderSyncResult, SyncTarget,
+  OrderRefreshResult, OrderSyncResponse, OrderSyncResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export class OrderRepositoryImpl implements OrderRepository {
@@ -55,6 +55,13 @@ export class OrderRepositoryImpl implements OrderRepository {
   // 라인 id 만 보낸다 — 박스 dedupe·상태 필터는 서버가 한다(PLAN 2609_17 D1·D2).
   async acknowledgeOrders(orderItemIds: number[]): Promise<OrderAcknowledgeResult> {
     const response = await axiosInstance.post('/api/admin/orders/acknowledge', { orderItemIds });
+    return response.data.data;
+  }
+
+  // 라인 id 를 보내고, 서버가 주문번호로 dedupe 한다(PLAN 2609_50 D1). 상한(주문 50건)도 서버 판정이다(D3).
+  // ⚠️ 경로가 `/api/admin/orders` 가 아니다 — 마켓에 쓰지 않는 읽기라 인증만 요구한다(D2).
+  async refreshOrders(orderItemIds: number[]): Promise<OrderRefreshResult> {
+    const response = await axiosInstance.post('/api/orders/refresh', { orderItemIds });
     return response.data.data;
   }
 
