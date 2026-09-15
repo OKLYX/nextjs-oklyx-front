@@ -15,11 +15,12 @@ import {
   RECENT_PERIOD, buildPeriodOptions, isMonthPeriod, toPeriodRange,
 } from '@/domain/entities/OrderPeriod';
 import type { SyncTarget } from '@/application/dto/OrderDTOs';
+import { formatRelativeTime } from '@/domain/entities/DateTimeFormat';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { useOrderSync } from '@/presentation/hooks/useOrderSync';
 import { OrderSearchCard } from './OrderSearchCard';
-import { channelOptionLabel, formatSyncedAt } from './OrderSearchCard';
+import { channelOptionLabel } from './OrderSearchCard';
 import type { ChannelOption } from './OrderSearchCard';
 import { OrderStatusFilter } from './OrderStatusFilter';
 import { OrderTable } from './OrderTable';
@@ -112,7 +113,7 @@ export function OrderContainer() {
   }, [orderUseCase]);
 
   // On first entry: load all sellers' orders without requiring a search click.
-  // (The persisted last sync time is restored by useOrderSync.)
+  // (The banner's last sync time comes from the fetched syncTargets.)
   useEffect(() => {
     const loadInitialOrders = async () => {
       try {
@@ -162,9 +163,21 @@ export function OrderContainer() {
 
   const {
     runChannels, runSync, applyChannelErrors, failedTargets,
-    isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen, syncResult, lastSyncedAt,
+    isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen, syncResult,
     cancelSync, closeSyncModal, stopSyncing, clearSyncResult,
   } = useOrderSync({ onAfterSync: refetchAfterSync, onSyncSettled: handleSyncSettled });
+
+  // 백그라운드 동기화(FEATURE_2609_49)가 돌기 때문에 "내가 마지막으로 누른 시각"은 더 이상 최신 상태를
+  // 뜻하지 않는다. 서버가 채널별로 낙인한 시각 중 가장 최근을 쓴다(정산 화면과 같은 방식).
+  // 값이 모두 오프셋 없는 같은 형식이라 사전순 = 시간순이다.
+  const lastSyncedAt = useMemo(
+    () => syncTargets
+      .map((t) => t.lastOrderSyncAt)
+      .filter((v): v is string => Boolean(v))
+      .sort()
+      .at(-1) ?? null,
+    [syncTargets]
+  );
 
   // 채널 옵션 = 동기화 대상 ∪ 조회된 목록의 계정(PLAN 2609_15 D7-a).
   // ⚠️ 대상(활성 계정)만으로 채우면 비활성 채널의 과거 주문이 필터에서 영영 사라진다.
@@ -449,7 +462,7 @@ export function OrderContainer() {
       action={
         <p className="text-sm text-gray-500 whitespace-nowrap">
           마지막 동기화:{' '}
-          <span className="font-medium text-gray-700">{formatSyncedAt(lastSyncedAt)}</span>
+          <span className="font-medium text-gray-700">{formatRelativeTime(lastSyncedAt)}</span>
         </p>
       }
     >

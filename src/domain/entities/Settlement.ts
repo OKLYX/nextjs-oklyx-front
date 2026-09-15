@@ -332,19 +332,6 @@ export const formatDateRange = (from: string | null, to: string | null): string 
   return from == null && to == null ? '—' : `${short(from)} ~ ${short(to)}`;
 };
 
-/** `2026-09-15T10:20:30` → `3시간 전`. 이력이 없으면 `없음`. */
-export const formatRelativeTime = (value: string | null): string => {
-  if (!value) return '없음';
-  const target = new Date(value).getTime();
-  if (Number.isNaN(target)) return '없음';
-  const minutes = Math.floor((Date.now() - target) / 60000);
-  if (minutes < 1) return '방금 전';
-  if (minutes < 60) return `${minutes}분 전`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
-  return `${Math.floor(hours / 24)}일 전`;
-};
-
 /** `2026-09-15T10:20:30` → `09-15 10:20`. 갱신 가능 시각 안내에 쓴다. */
 export const formatDateTime = (value: string | null): string => {
   if (!value) return '—';

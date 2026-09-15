@@ -43,13 +43,6 @@ interface ShipmentFilterCardProps {
   onSearchTermChange: (value: string) => void;
 }
 
-export function formatSyncedAt(value: string | null): string {
-  if (!value) return '동기화 기록 없음';
-  const date = new Date(value);
-  if (isNaN(date.getTime())) return '동기화 기록 없음';
-  return date.toLocaleString('ko-KR');
-}
-
 export function ShipmentFilterCard({
   sellers,
   selectedSellerId,

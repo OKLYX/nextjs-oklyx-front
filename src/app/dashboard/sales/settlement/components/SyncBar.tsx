@@ -2,7 +2,7 @@
 
 import { History, RefreshCw } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
-import { formatRelativeTime } from '@/domain/entities/Settlement';
+import { formatRelativeTime } from '@/domain/entities/DateTimeFormat';
 
 /**
  * 정산 갱신 바 (FEATURE_2609_30 / 05 Step 4 · PLAN D11).
