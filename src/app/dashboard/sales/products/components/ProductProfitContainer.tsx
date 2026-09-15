@@ -6,8 +6,16 @@ import { SalesStatsUseCase } from '@/application/usecases/SalesStatsUseCase';
 import { SalesStatsRepositoryImpl } from '@/infrastructure/repositories/SalesStatsRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
+import { PackingSavingsUseCase } from '@/application/usecases/PackingSavingsUseCase';
+import { PackingSavingsRepositoryImpl } from '@/infrastructure/repositories/PackingSavingsRepositoryImpl';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { ProductProfit } from '@/domain/entities/SalesSummary';
+import type { OptionSaving } from '@/domain/entities/PackingSavingsEntity';
+import {
+  SAVINGS_BASIS_NOTICE,
+  SAVINGS_CHANNEL_NOTICE,
+  groupSavingsByMaster,
+} from '@/domain/entities/PackingSavingsEntity';
 import { SalesTabs } from '../../components/SalesTabs';
 import { PeriodFilter, currentMonthRange } from '../../components/PeriodFilter';
 import { CrossChannelToggle } from './CrossChannelToggle';
@@ -21,6 +29,10 @@ import type { ProductProfitSortKey } from './ProductProfitTable';
  * 바뀌면 재조회한다(행 수가 실제로 달라진다).
  *
  * 🔴 `미분류` 행은 정렬과 무관하게 항상 맨 아래다 — 순이익 순으로 위에 끼어들면 상품으로 오해한다.
+ *
+ * 🔴 <b>포장 절약(FEATURE_2609_41)은 별도 조회다</b> — 기준일이 포장 완료일이라 이 화면의 손익(주문일)과
+ * 기간이 덮는 주문이 다르다(PLAN 2609_41 S7). 기간 입력은 같은 `PeriodFilter` 를 쓰고(S8), 조회 축은
+ * <b>판매자·기간뿐</b>이라 `crossChannel` 을 보내지 않는다(S13).
  */
 export function ProductProfitContainer() {
   const salesStatsUseCase = useMemo(
@@ -28,6 +40,10 @@ export function ProductProfitContainer() {
     []
   );
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
+  const packingSavingsUseCase = useMemo(
+    () => new PackingSavingsUseCase(new PackingSavingsRepositoryImpl()),
+    []
+  );
 
   const initialRange = useMemo(() => currentMonthRange(), []);
   const [from, setFrom] = useState(initialRange.from);
@@ -45,7 +61,13 @@ export function ProductProfitContainer() {
   const [sortKey, setSortKey] = useState<ProductProfitSortKey>('estNetProfit');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
+  // 포장 절약 — 옵션 단위로 오므로 표시 직전에 마스터로 접는다(S16).
+  const [optionSavings, setOptionSavings] = useState<OptionSaving[]>([]);
+  const [expandedSavingsMasterId, setExpandedSavingsMasterId] = useState<number | null>(null);
+
   const requestIdRef = useRef(0);
+  // 절약은 매출과 다른 API 라 요청 순서를 따로 센다.
+  const savingsRequestIdRef = useRef(0);
 
   useEffect(() => {
     sellerUseCase
@@ -79,6 +101,25 @@ export function ProductProfitContainer() {
     }
   }, [salesStatsUseCase, from, to, sellerId, crossChannel]);
 
+  // 🔴 `crossChannel` 을 보내지 않는다(S13) — 포장은 창고 행위라 채널 축이 없다.
+  //    조회 실패해도 손익 표는 그대로 뜬다(절약 열만 `—`).
+  const loadSavings = useCallback(async () => {
+    if (!from || !to || from > to) return;
+    const requestId = ++savingsRequestIdRef.current;
+    try {
+      const result = await packingSavingsUseCase.getOptions({
+        from,
+        to,
+        sellerId: sellerId ? Number(sellerId) : undefined,
+      });
+      if (requestId !== savingsRequestIdRef.current) return;
+      setOptionSavings(result);
+    } catch {
+      if (requestId !== savingsRequestIdRef.current) return;
+      setOptionSavings([]);
+    }
+  }, [packingSavingsUseCase, from, to, sellerId]);
+
   // `reloadTick` 은 [다시 시도] 전용 — 조건이 그대로면 이펙트가 안 돌기 때문에 카운터로 강제한다.
   useEffect(() => {
     void (async () => {
@@ -86,9 +127,21 @@ export function ProductProfitContainer() {
     })();
   }, [load, reloadTick]);
 
+  useEffect(() => {
+    void (async () => {
+      await loadSavings();
+    })();
+  }, [loadSavings, reloadTick]);
+
   const handlePeriodChange = useCallback((nextFrom: string, nextTo: string) => {
     setFrom(nextFrom);
     setTo(nextTo);
+    // 펼쳐둔 옵션 행은 이전 기간의 값이다 — 접어서 기간이 섞이지 않게 한다.
+    setExpandedSavingsMasterId(null);
+  }, []);
+
+  const handleToggleSavings = useCallback((masterProductId: number) => {
+    setExpandedSavingsMasterId((prev) => (prev === masterProductId ? null : masterProductId));
   }, []);
 
   // ⚠️ set-state updater 안에서 다른 set-state 를 부르지 않는다 — StrictMode 가 updater 를 두 번
@@ -122,6 +175,10 @@ export function ProductProfitContainer() {
     });
   }, [rows, sortKey, sortDir, costBasisReady]);
 
+  const savingsByMaster = useMemo(() => groupSavingsByMaster(optionSavings), [optionSavings]);
+  // 🔴 채널별 보기에서는 절약을 내지 않는다(S13) — 같은 절약이 채널마다 반복돼 합계가 부풀어 보인다.
+  const hasSavings = !crossChannel ? false : savingsByMaster.size > 0;
+
   const invalidRange = Boolean(from && to && from > to);
 
   return (
@@ -149,7 +206,10 @@ export function ProductProfitContainer() {
         <CrossChannelToggle
           crossChannel={crossChannel}
           disabled={isLoading}
-          onChange={setCrossChannel}
+          onChange={(next) => {
+            setCrossChannel(next);
+            setExpandedSavingsMasterId(null);
+          }}
         />
       </PeriodFilter>
 
@@ -165,9 +225,19 @@ export function ProductProfitContainer() {
         </div>
       )}
 
+      {/* 🔴 기준일이 다르다는 사실과, 채널별 보기에서 절약을 내지 않는 이유를 표 위에 한 줄로 밝힌다. */}
+      {!crossChannel ? (
+        <p className="text-sm text-gray-500">{SAVINGS_CHANNEL_NOTICE}</p>
+      ) : (
+        hasSavings && <p className="text-sm text-gray-500">포장 절약은 {SAVINGS_BASIS_NOTICE}</p>
+      )}
+
       <ProductProfitTable
         rows={sortedRows}
         showChannel={!crossChannel}
+        savingsByMaster={savingsByMaster}
+        expandedSavingsMasterId={expandedSavingsMasterId}
+        onToggleSavings={handleToggleSavings}
         sortKey={sortKey}
         sortDir={sortDir}
         loading={isLoading}

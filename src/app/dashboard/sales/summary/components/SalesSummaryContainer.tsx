@@ -8,11 +8,16 @@ import { SalesStatsUseCase } from '@/application/usecases/SalesStatsUseCase';
 import { SalesStatsRepositoryImpl } from '@/infrastructure/repositories/SalesStatsRepositoryImpl';
 import { SettlementUseCase } from '@/application/usecases/SettlementUseCase';
 import { SettlementRepositoryImpl } from '@/infrastructure/repositories/SettlementRepositoryImpl';
+import { PackingSavingsUseCase } from '@/application/usecases/PackingSavingsUseCase';
+import { PackingSavingsRepositoryImpl } from '@/infrastructure/repositories/PackingSavingsRepositoryImpl';
 import type { ChannelSales, SellerSales } from '@/domain/entities/SalesSummary';
 import type { PayoutSummary } from '@/domain/entities/Settlement';
+import type { BoxSaving, SavingsSummary } from '@/domain/entities/PackingSavingsEntity';
 import { SalesTabs } from '../../components/SalesTabs';
 import { PeriodFilter, currentMonthRange } from '../../components/PeriodFilter';
 import { SellerSummaryTable } from './SellerSummaryTable';
+import { PackingSavingsCard } from './PackingSavingsCard';
+import { BoxSavingsTable } from './BoxSavingsTable';
 
 /**
  * 조회 기간이 한 달보다 짧은가 (PLAN 2609_33 D4-2).
@@ -39,6 +44,10 @@ const isShorterThanMonth = (from: string, to: string): boolean => {
  *
  * ⚠️ 정산 배치·금액 확인은 이 화면이 아니다(PLAN D2) — 여기서는 그 기간 매출에 걸린 정산 건으로
  * 넘어가기만 한다.
+ *
+ * 🔴 <b>포장 절약(FEATURE_2609_41)은 이 화면 안 섹션이다</b>(PLAN 2609_41 S9) — 카드와 상자별 표를
+ * 위한 <b>탭·페이지를 새로 만들지 않는다</b>. 기간 입력은 같은 `PeriodFilter` 를 쓰되(S8) 절약의 기준일은
+ * <b>포장 완료일</b>이라 매출(주문일)과 덮는 주문이 다르다 — 그 사실은 카드가 한 줄로 밝힌다(S7).
  */
 export function SalesSummaryContainer() {
   const router = useRouter();
@@ -49,6 +58,11 @@ export function SalesSummaryContainer() {
   // 정산 건 목록은 정산 도메인이 소유한다 — 매출 API 에 목록을 얹지 않는다(축이 다르다).
   const settlementUseCase = useMemo(
     () => new SettlementUseCase(new SettlementRepositoryImpl()),
+    []
+  );
+  // 포장 절약도 별도 도메인이다 — 기준일이 매출과 다르다(포장 완료일, PLAN 2609_41 S7).
+  const packingSavingsUseCase = useMemo(
+    () => new PackingSavingsUseCase(new PackingSavingsRepositoryImpl()),
     []
   );
 
@@ -72,8 +86,16 @@ export function SalesSummaryContainer() {
   const [payoutsLoading, setPayoutsLoading] = useState(false);
   const [payoutsError, setPayoutsError] = useState('');
 
+  // 포장 절약(PLAN 2609_41 S9) — 매출과 <b>같은 기간 입력</b>을 쓰되 기준일이 달라 화면이 그 차이를 밝힌다(S7).
+  const [savings, setSavings] = useState<SavingsSummary | null>(null);
+  const [boxSavings, setBoxSavings] = useState<BoxSaving[]>([]);
+  const [savingsLoading, setSavingsLoading] = useState(false);
+  const [savingsError, setSavingsError] = useState('');
+
   // 프리셋을 빠르게 연타하면 응답이 역순으로 도착할 수 있다 — 마지막 요청의 결과만 반영한다.
   const requestIdRef = useRef(0);
+  // 절약은 매출과 다른 API 라 요청 순서를 따로 센다(한쪽이 느려도 서로의 결과를 버리지 않는다).
+  const savingsRequestIdRef = useRef(0);
 
   // ⚠️ 이펙트 본문에서 곧바로 setState 를 부르면 프로젝트 lint(`react-hooks/set-state-in-effect`)가 막는다
   // — 조회를 useCallback 으로 감싸 effect 는 호출만 한다.
@@ -95,12 +117,42 @@ export function SalesSummaryContainer() {
     }
   }, [salesStatsUseCase, from, to]);
 
+  // 절약 조회. 🔴 매출과 한 요청으로 묶지 않는다 — 절약 API 가 실패해도 매출 표는 그대로 떠야 한다.
+  const loadSavings = useCallback(async () => {
+    if (!from || !to || from > to) return;
+    const requestId = ++savingsRequestIdRef.current;
+    setSavingsLoading(true);
+    setSavingsError('');
+    try {
+      const [summary, boxes] = await Promise.all([
+        packingSavingsUseCase.getSummary({ from, to }),
+        packingSavingsUseCase.getBoxes({ from, to }),
+      ]);
+      if (requestId !== savingsRequestIdRef.current) return;
+      setSavings(summary);
+      setBoxSavings(boxes);
+    } catch {
+      if (requestId !== savingsRequestIdRef.current) return;
+      setSavingsError('포장 절약 조회에 실패했습니다.');
+      setSavings(null);
+      setBoxSavings([]);
+    } finally {
+      if (requestId === savingsRequestIdRef.current) setSavingsLoading(false);
+    }
+  }, [packingSavingsUseCase, from, to]);
+
   // `reloadTick` 은 [다시 시도] 전용 — 조건이 그대로면 이펙트가 안 돌기 때문에 카운터로 강제한다.
   useEffect(() => {
     void (async () => {
       await load();
     })();
   }, [load, reloadTick]);
+
+  useEffect(() => {
+    void (async () => {
+      await loadSavings();
+    })();
+  }, [loadSavings, reloadTick]);
 
   const handlePeriodChange = useCallback((nextFrom: string, nextTo: string) => {
     setFrom(nextFrom);
@@ -216,6 +268,18 @@ export function SalesSummaryContainer() {
         onOpenChannel={openChannel}
         onOpenPayout={openPayout}
       />
+
+      {/* 🔴 절약은 <b>새 탭·새 페이지가 아니라</b> 이 화면 안 섹션이다(PLAN 2609_41 S9) —
+          `SalesTabs` 는 탭이 곧 라우트라 탭을 더하면 그게 새 주소다. */}
+      <PackingSavingsCard summary={savings} isLoading={savingsLoading} error={savingsError} />
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-gray-900">
+          상자별 절약
+          <span className="ml-2 text-xs font-normal text-gray-500">포장한 날 기준 · 합계 높은 순</span>
+        </h2>
+        <BoxSavingsTable rows={boxSavings} isLoading={savingsLoading} error={savingsError} />
+      </section>
     </PageContainer>
   );
 }
