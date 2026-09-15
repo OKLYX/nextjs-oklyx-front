@@ -50,7 +50,7 @@ interface OrderDetailsModalProps {
   /** 발주처리(결제완료→상품준비중) 전용. 주문내역·출고관리 두 호출부가 모두 넘긴다. */
   orderUseCase: OrderUseCase;
   /**
-   * 최신화가 끝났다 → 부모가 목록을 다시 불러오고 이 모달의 `order` prop 을 새 행으로 교체한다
+   * 주문 상태 갱신이 끝났다 → 부모가 목록을 다시 불러오고 이 모달의 `order` prop 을 새 행으로 교체한다
    * (PLAN 2609_50 D13). 모달은 닫지 않는다 — 사용자는 상태가 바뀌었는지 보려고 누른다.
    */
   onRefreshed?: () => Promise<void> | void;
@@ -127,7 +127,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const [ackResult, setAckResult] = useState<OrderAcknowledgeResult | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
   const [ackError, setAckError] = useState('');
-  // 최신화(쿠팡에서 이 주문을 다시 읽어 상태를 맞춘다, PLAN 2609_50). 읽기라 탭 밖에 둔다(D12).
+  // 주문 상태 갱신(쿠팡에서 이 주문을 다시 읽어 상태를 맞춘다, PLAN 2609_50). 읽기라 탭 밖에 둔다(D12).
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshBanner, setRefreshBanner] = useState('');
   // 발송 전 주문 취소(PLAN 2609_25). 사유 목록은 서버가 소유한다(D4) — 코드→라벨 상수를 만들지 않는다.
@@ -341,7 +341,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   /**
    * 이 주문 1건을 쿠팡에서 다시 읽어 로컬 상태를 맞춘다(PLAN 2609_50).
    *
-   * 일괄 최신화와 **같은 엔드포인트**를 쓴다(D14, 길이 1) — 판정을 두 곳에 두지 않는다.
+   * 일괄 상태 갱신과 **같은 엔드포인트**를 쓴다(D14, 길이 1) — 판정을 두 곳에 두지 않는다.
    * ⚠️ 성공해도 모달을 닫지 않는다(D13). `onClose(true)` 는 발송처리 성공 규약이라 여기서 부르지 않는다.
    */
   const handleRefresh = async () => {
@@ -353,7 +353,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
         // 사유는 서버 원문 그대로 — 사용자가 고칠 수 있는 정보가 여기 담긴다.
         setRefreshBanner(result.failed[0].reason);
       } else if (result.unsupported.length > 0) {
-        setRefreshBanner('이 채널은 최신화를 지원하지 않습니다.');
+        setRefreshBanner('이 채널은 주문 상태 갱신을 지원하지 않습니다.');
       } else if (result.empty.length > 0) {
         setRefreshBanner('마켓에 남은 배송건이 없습니다(전량 취소로 보입니다).');
       } else if (result.refreshed > 0) {
@@ -364,7 +364,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
       }
       await onRefreshed?.();
     } catch (err) {
-      setRefreshBanner(extractErrorMessage(err, '최신화에 실패했습니다. 다시 시도해주세요.'));
+      setRefreshBanner(extractErrorMessage(err, '주문 상태 갱신에 실패했습니다. 다시 시도해주세요.'));
     } finally {
       setIsRefreshing(false);
     }
@@ -472,7 +472,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
               disabled={isRefreshing}
               className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isRefreshing ? <Spinner label="확인 중..." /> : '최신화'}
+              {isRefreshing ? <Spinner label="확인 중..." /> : '주문 상태 갱신'}
             </button>
           </div>
         )}
