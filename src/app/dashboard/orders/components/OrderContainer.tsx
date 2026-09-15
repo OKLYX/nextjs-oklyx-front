@@ -133,7 +133,7 @@ export function OrderContainer() {
 
   // 동기화 루프가 끝난 뒤의 목록 재조회. 화면마다 다르므로 훅에 넘긴다.
   // 훅보다 먼저 선언한다(useCallback 은 TDZ).
-  // 조회한 행을 돌려준다(실패하면 null) — 상세 모달의 최신화가 "같은 id 의 새 행" 을 집어야 하기
+  // 조회한 행을 돌려준다(실패하면 null) — 상세 모달의 상태 갱신이 "같은 id 의 새 행" 을 집어야 하기
   // 때문이다(PLAN 2609_50 D13). 기존 호출부는 반환값을 무시하므로 영향이 없다(`loadSyncTargets` 와 같은 모양).
   const refetchAfterSync = useCallback(async (): Promise<OrderItem[] | null> => {
     // The per-call `orders` payload is scoped by the sellerId parameter, so it is not reused —

@@ -57,7 +57,7 @@ export interface OrderAcknowledgeResult {
 }
 
 /**
- * 주문 최신화 결과 (POST /api/orders/refresh).
+ * 주문 상태 갱신 결과 (POST /api/orders/refresh).
  *
  * 모든 목록이 <b>주문번호 단위</b>다(PLAN 2609_50 D6) — 보낸 것은 라인 id 지만 조회·보고 단위는 주문이다.
  * `refreshed` 가 0 이어도 실패가 아니다: 이미 최신이면 0 이 정상이다.
