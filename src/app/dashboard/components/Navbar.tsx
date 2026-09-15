@@ -19,7 +19,9 @@ import {
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { ROUTES } from '@/config/routes';
+import { useAlertSummary } from '@/presentation/hooks/useAlertSummary';
 import { NavbarHeader } from './NavbarHeader';
+import { NavBadge } from './NavBadge';
 
 interface MenuGroup {
   icon: LucideIcon;
@@ -28,7 +30,7 @@ interface MenuGroup {
   toggle: () => void;
   /** `adminOnly` 는 그룹뿐 아니라 항목에도 붙는다 — 공개 그룹 안에 ADMIN 전용 화면이 하나 있을 때
       새 그룹을 만들지 않기 위해서다(예: 비용관리 > 채널 고정비 = `/api/admin/fixed-costs`). */
-  items: { href: string; label: string; adminOnly?: boolean }[];
+  items: { href: string; label: string; adminOnly?: boolean; badge?: number }[];
   /** Hidden from non-ADMIN users. Kept inline so the display order below is the
       real order — an ADMIN-only group can sit between two public ones. */
   adminOnly?: boolean;
@@ -58,6 +60,8 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const isDesignTemplatesOpen = useNavigationStore((state) => state.isDesignTemplatesMenuOpen);
   const isSettlementOpen = useNavigationStore((state) => state.isSettlementMenuOpen);
   const hasHydrated = useNavigationStore((state) => state.hasHydrated);
+  // 처리 대기 건수의 단일 창구(FEATURE_2609_49) — 화면이 자기 목록을 세지 않는다.
+  const alerts = useAlertSummary();
   const toggleProductsMenu = useNavigationStore((state) => state.toggleProductsMenu);
   const toggleStockMenu = useNavigationStore((state) => state.toggleStockMenu);
   const toggleCostsMenu = useNavigationStore((state) => state.toggleCostsMenu);
@@ -103,8 +107,8 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       items: [
         { href: ROUTES.ORDERS_SHIPMENT, label: '출고관리' },
         { href: ROUTES.ORDERS_RETRIEVE, label: '주문내역' },
-        { href: ROUTES.ORDERS_CLAIMS, label: '반품/교환' },
-        { href: ROUTES.ORDERS_INQUIRIES, label: '고객문의' },
+        { href: ROUTES.ORDERS_CLAIMS, label: '반품/교환', badge: alerts?.openClaims },
+        { href: ROUTES.ORDERS_INQUIRIES, label: '고객문의', badge: alerts?.unansweredInquiries },
       ],
     },
     {
@@ -226,6 +230,8 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       <ul className="space-y-1 py-4">
         {menuGroups.map((menu) => {
           const Icon = menu.icon;
+          // 접힌 레일(아이콘만)에서는 항목 라벨이 숨겨지므로 그룹 합계를 아이콘 위에 겹쳐 그린다.
+          const groupBadge = menu.items.reduce((sum, item) => sum + (item.badge ?? 0), 0);
           return (
             <li key={menu.label}>
               <button
@@ -236,8 +242,13 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
                     state — collapsed rail (w-16), expanded rail (w-56) and the
                     wide static sidebar (w-56) — so the icon's x-position never
                     shifts. The collapsed rail is the reference geometry. */}
-                <span className="flex shrink-0 items-center justify-center w-16">
+                <span className="relative flex shrink-0 items-center justify-center w-16">
                   <Icon className="w-6 h-6 shrink-0" />
+                  {/* Absolutely positioned so the w-16 rail width and the icon's x-position stay
+                      untouched — a sibling in normal flow would shift or clip the icon. */}
+                  <span className="absolute top-0 right-3">
+                    <NavBadge count={groupBadge} />
+                  </span>
                 </span>
                 <span className={`flex-1 whitespace-nowrap ${labelCls}`}>{menu.label}</span>
                 <span className={`pr-4 ${labelCls}`}>
@@ -253,6 +264,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
                         className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-700 whitespace-nowrap"
                       >
                         {item.label}
+                        <NavBadge count={item.badge} />
                       </Link>
                     </li>
                   ))}

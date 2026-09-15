@@ -1,13 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { OrderRepositoryImpl } from '@/infrastructure/repositories/OrderRepositoryImpl';
 import { OrderUseCase } from '@/application/usecases/OrderUseCase';
-import type { OrderSyncResponse, OrderSyncScope, SyncTarget } from '@/application/dto/OrderDTOs';
+import type { OrderSyncResponse, SyncTarget } from '@/application/dto/OrderDTOs';
 import type { ChannelProgress } from '@/app/dashboard/orders/components/SyncProgressModal';
-
-const LAST_SYNCED_AT_KEY = 'oklyx_order_last_synced_at';
 
 const markState = (
   list: ChannelProgress[], index: number, state: ChannelProgress['state'], error?: string,
@@ -25,11 +23,6 @@ export interface UseOrderSyncOptions {
    * `applyChannelErrors` 로 되돌리는 자리. 없으면 사유 보강을 건너뛴다.
    */
   onSyncSettled?: () => Promise<void> | void;
-  /**
-   * 조회할 주문 상태 범위. 생략하면 서버 기본값(FULL, 전 상태)이다.
-   * 출고관리처럼 "아직 안 보낸 주문"만 다루는 화면은 `'ACTIVE'` 를 준다.
-   */
-  scope?: OrderSyncScope;
 }
 
 /**
@@ -51,9 +44,11 @@ export interface UseOrderSyncOptions {
  * ⚠️ 두 화면이 이 훅 하나를 쓴다(PLAN 2609_15 D6). 복사하면 동기화 동작이 조용히 갈라진다.
  * ⚠️ 목록 재조회는 화면마다 다르므로 `onAfterSync` 로 넘긴다 — 훅은 목록을 모른다.
  * ⚠️ 에러 문구(`setError`)는 화면 상태다. 훅은 채널별 실패만 다루고 화면 에러는 건드리지 않는다.
+ * ⚠️ "마지막 동기화" 시각은 훅이 갖지 않는다 — 백그라운드 동기화(FEATURE_2609_49)가 돌기 때문에
+ *    "내가 마지막으로 누른 시각"은 최신 상태를 뜻하지 않는다. 화면이 `syncTargets` 의 서버 기록을 쓴다.
  * ❌ 채널 루프를 화면에 복사하지 말 것 — 다른 엔드포인트를 돌려야 하면 `runChannels` 를 빌려 쓴다.
  */
-export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSyncOptions) {
+export function useOrderSync({ onAfterSync, onSyncSettled }: UseOrderSyncOptions) {
   // 훅이 자기 호출(syncOrders)만 소유한다 — 화면의 usecase 인스턴스와 독립. 둘 다 무상태 래퍼다.
   const orderUseCase = useMemo(() => new OrderUseCase(new OrderRepositoryImpl()), []);
 
@@ -63,21 +58,15 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [syncCanceled, setSyncCanceled] = useState(false);
   const [syncResult, setSyncResult] = useState<OrderSyncResponse | null>(null);
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   // Cancel is requested through a ref so the running loop sees it without a re-render.
   const cancelRef = useRef(false);
-
-  // localStorage is read after mount only (SSR has no window).
-  useEffect(() => {
-    setLastSyncedAt(localStorage.getItem(LAST_SYNCED_AT_KEY));
-  }, []);
 
   /**
    * 범용 러너 — 진행 모달·취소·채널별 실패 격리만 한다. 호출 내용은 `callOne` 이 정한다.
    * 백필처럼 다른 엔드포인트를 쓰는 흐름은 이걸 부른다(집계는 호출부 클로저에서).
    *
    * ⚠️ `isSyncing` 을 **켜기만** 하고 끄지 않는다 — 끄는 시점이 흐름마다 다르기 때문이다
-   * (표준 동기화 = 목록 재조회·localStorage 이후, 백필 = 루프 직후). 호출부가 `stopSyncing` 으로 끈다.
+   * (표준 동기화 = 목록 재조회 이후, 백필 = 루프 직후). 호출부가 `stopSyncing` 으로 끈다.
    * ⚠️ 채널 상태 판정은 호출부가 한다 — `callOne` 이 돌려준 상태를 그대로 찍는다. 반환이 없으면
    * `'success'`(현행). 건너뜀(FEATURE_2609_48 / D5) 판정을 이 러너 안에 넣지 말 것 — 공용 러너이고
    * 호출자마다 부르는 엔드포인트가 다르다.
@@ -110,13 +99,12 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
   }, []);
 
   /**
-   * 표준 동기화 = `runChannels(syncOrders)` + 집계 + localStorage + 결과 배너 + `onAfterSync`.
+   * 표준 동기화 = `runChannels(syncOrders)` + 집계 + 결과 배너 + `onAfterSync`.
    *
-   * ⚠️ `isSyncing` 은 목록 재조회·localStorage 까지 끝낸 뒤 풀린다 — 순서를 바꾸면 스피너가
-   * 재조회 도중에 먼저 풀린다.
+   * ⚠️ `isSyncing` 은 목록 재조회까지 끝낸 뒤 풀린다 — 순서를 바꾸면 스피너가 재조회 도중에 먼저 풀린다.
    * ⚠️ accountId 만 보낸다 — sellerId 를 함께 보내면 서버의 accountId > sellerId 우선순위와
    * 충돌해 응답 범위가 흐려진다.
-   * 옵션의 `scope` 는 그대로 실려 나간다(없으면 미전송 = 서버 기본값 FULL).
+   * ⚠️ 조회 범위는 서버 기본값(QUICK)이다 — 프론트는 `preset` 을 실어 보내지 않는다(FEATURE_2609_49).
    */
   const runSync = useCallback(async (targets: SyncTarget[]) => {
     let newOrders = 0;
@@ -125,7 +113,7 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
     let skippedAccounts = 0;
 
     await runChannels(targets, async (target) => {
-      const result = await orderUseCase.syncOrders({ accountId: target.accountId, scope });
+      const result = await orderUseCase.syncOrders({ accountId: target.accountId });
       newOrders += result.newOrders;
       updatedOrders += result.updatedOrders;
       canceledUpdated += result.canceledUpdated;
@@ -138,8 +126,6 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
     await onAfterSync();
 
     const syncedAt = new Date().toISOString();
-    setLastSyncedAt(syncedAt);
-    localStorage.setItem(LAST_SYNCED_AT_KEY, syncedAt);
     setSyncResult({ syncedAt, newOrders, updatedOrders, canceledUpdated, skippedAccounts, orders: [] });
     setIsSyncing(false);
 
@@ -148,7 +134,7 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
     // RestClientException, which the backend's catch-all handler answers with the generic
     // "Internal server error" body. `lastSyncError` carries the real one ("HTTP 504 from Coupang").
     await onSyncSettled?.();
-  }, [orderUseCase, runChannels, onAfterSync, onSyncSettled, scope]);
+  }, [orderUseCase, runChannels, onAfterSync, onSyncSettled]);
 
   /**
    * 실패 채널의 사유를 서버 기록(`lastSyncError`)으로 덮어쓴다 — 대상 재조회는 화면이 하고
@@ -178,7 +164,7 @@ export function useOrderSync({ onAfterSync, onSyncSettled, scope }: UseOrderSync
   const clearSyncResult = useCallback(() => setSyncResult(null), []);
 
   return {
-    isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen, syncResult, lastSyncedAt,
+    isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen, syncResult,
     runChannels, runSync, applyChannelErrors, failedTargets,
     cancelSync, closeSyncModal, stopSyncing, clearSyncResult,
   };
