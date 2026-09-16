@@ -25,7 +25,7 @@ export interface ScanInputProps {
 
 const GUIDE: Record<ScanInputProps['mode'], string> = {
   INVOICE: '송장을 스캔하세요',
-  ITEM: '물품을 스캔하세요 · 숫자 4자리 이하 + Enter = 직전 물품 수량 수정',
+  ITEM: '물품을 스캔하세요 · 숫자 4자리 이하 + Enter = 고른 줄 수량 수정',
 };
 
 export function ScanInput({ mode, buffer, disabled, onScan, isScanning = false }: ScanInputProps) {
