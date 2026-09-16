@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
  * 같은 성격의 화면이 서로 다른 폭으로 갈라진다(실제로 비용 관리 5개 페이지가
  * sm/md 로 갈려 있었다). 폭을 바꿔야 하면 이 상수 하나만 고친다.
  */
-const CONTENT_WIDTH = 'max-w-7xl mx-auto';
+export const CONTENT_WIDTH = 'max-w-7xl mx-auto';
 
 /**
  * 대시보드 페이지의 공통 레이아웃/배경/헤더 래퍼 컴포넌트.
@@ -58,6 +58,9 @@ const CONTENT_WIDTH = 'max-w-7xl mx-auto';
  * ❌ 금지 패턴:
  * - 페이지마다 `bg-gray-50` 등 색상 하드코딩 → `bg-page` 토큰만 사용
  * - 직접 `-m-6 p-6 bg-page min-h-full` div 작성 → 이 Component 사용
+ *   (예외 1곳 = `stock/packing` 몰입 레이어. `<main>` 안에 들어가면 사이드바를 덮지 못해
+ *   `fixed inset-0` 레이어를 직접 그린다. 폭은 손으로 적지 않고 `CONTENT_WIDTH` 를 import 한다 —
+ *   그래서 이 상수가 export 다. eslint 예외와 같은 사유·같은 방식이다)
  * - 페이지에서 직접 `<h1>` 작성 → `title` props 사용
  * - 페이지에서 `max-w-*` / `space-y-*`로 본문 폭·간격 재정의 → 폭·간격은 이 컴포넌트가 소유한다
  * - 제목 아래 부제(description) 추가 → 부제는 두지 않기로 결정됨(2026-09-11 `34cee44`)

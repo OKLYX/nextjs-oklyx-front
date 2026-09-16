@@ -43,14 +43,16 @@ const eslintConfig = defineConfig([
     rules: { 'no-restricted-syntax': ['error', ...HAND_ROLLED_POPUP] },
   },
   {
-    // 예외 3곳. 늘리기 전에 정말 팝업이 아닌지 확인할 것.
+    // 예외 4곳. 늘리기 전에 정말 팝업이 아닌지 확인할 것.
     //  - ui/Modal.tsx      : 규칙이 지키려는 대상 본인
     //  - dashboard/layout.tsx : 좁은 화면 사이드바 드로어(팝업 아님)
     //  - EnvBadge.tsx      : 화면 구석 고정 배지(팝업 아님)
+    //  - stock/packing/page.tsx : 포장 작업 몰입 화면(팝업 아님 — 백드롭·닫기 경로·작성 중 확인이 없다)
     files: [
       'src/presentation/components/ui/Modal.tsx',
       'src/app/dashboard/layout.tsx',
       'src/presentation/components/EnvBadge.tsx',
+      'src/app/dashboard/stock/packing/page.tsx',
     ],
     rules: { 'no-restricted-syntax': 'off' },
   },
