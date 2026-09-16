@@ -9,6 +9,7 @@ import type { BoxCandidate } from '@/domain/entities/PackingEntity';
  * 담은 조합으로 추천된 상자 후보 (FEATURE_2609_40 / PLAN D23 · D26 · D33).
  *
  * 🔴 선택 단축키는 **F1 · F2 · F3** 이다. 숫자키를 쓰면 「숫자 + Enter = 수량 수정」과 겹친다(D33).
+ * 🔴 4번째 이상 후보와 전체 상자 목록은 ← → 로 고른다(2609_53/D6) — 키캡은 3개뿐이다.
  * 🔴 사진이 없는 상자는 공용 `BoxShape` 를 쓴다(D26) — 상자 관리 목록과 같은 그림이어야
  * 같은 상자로 보인다.
  */

@@ -1,18 +1,23 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import type { PendingParcel } from '@/domain/entities/PackingEntity';
 
 /**
- * 작업 대상 박스 목록 (FEATURE_2609_40 / PLAN D16 · D31).
+ * 작업 대상 박스 목록 (FEATURE_2609_40 / PLAN D16 · D31 · 2609_53/D6).
  *
  * 🔴 목록은 **서버가 잔량으로 이미 걸러서** 준다(D31) — 여기서 다시 거르거나 날짜로 자르지 않는다.
  * 자동 새로고침도 없다(폴링 금지) — 박스를 닫을 때 페이지가 다시 부른다.
+ * 🔴 `selectedParcelId` = ↑↓ 로 고른 줄. **DOM 포커스가 아니다**(2609_53/D5) — 선택은 state 로만
+ * 표시하고 Enter 의 주인은 언제나 페이지 하나다. 선택된 줄만 보이게 스크롤을 따라가게 한다.
  */
 export interface PendingParcelListProps {
   parcels: PendingParcel[];
   loading: boolean;
   onOpen: (invoiceNumber: string) => void;
+  /** ↑↓ 로 고른 줄. `null` = 선택 표시 없음(시작 화면 = 전역 키가 꺼져 있는 상태) */
+  selectedParcelId: number | null;
 }
 
 /** 주문 시각으로부터 지난 시간. 목록에서 오래 묵은 박스를 눈에 띄게 하려는 값이다 */
@@ -28,7 +33,18 @@ const elapsed = (orderedAt: string | null): string => {
   return `${Math.floor(hours / 24)}일`;
 };
 
-export function PendingParcelList({ parcels, loading, onOpen }: PendingParcelListProps) {
+export function PendingParcelList({
+  parcels,
+  loading,
+  onOpen,
+  selectedParcelId,
+}: PendingParcelListProps) {
+  // 목록이 길면 고른 줄이 화면 밖으로 나간다 → 그 줄만 보이게 끌어온다(포커스 이동이 아니다)
+  const selectedRowRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    selectedRowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [selectedParcelId]);
+
   return (
     <TableCard
       isLoading={loading}
@@ -48,8 +64,16 @@ export function PendingParcelList({ parcels, loading, onOpen }: PendingParcelLis
           </tr>
         </thead>
         <tbody>
-          {parcels.map((parcel) => (
-            <tr key={parcel.parcelId} className="border-b border-gray-100 hover:bg-gray-50">
+          {parcels.map((parcel) => {
+            const selected = parcel.parcelId === selectedParcelId;
+            return (
+            <tr
+              key={parcel.parcelId}
+              ref={selected ? selectedRowRef : undefined}
+              className={`border-b border-gray-100 hover:bg-gray-50 ${
+                selected ? 'bg-blue-50 ring-1 ring-inset ring-blue-400' : ''
+              }`}
+            >
               <td className="px-4 py-2">
                 <button
                   type="button"
@@ -76,7 +100,8 @@ export function PendingParcelList({ parcels, loading, onOpen }: PendingParcelLis
               </td>
               <td className="px-4 py-2 text-center text-gray-500">{elapsed(parcel.orderedAt)}</td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </TableCard>
