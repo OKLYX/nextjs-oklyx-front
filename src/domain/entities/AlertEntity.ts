@@ -35,7 +35,8 @@ export interface AlertFeedItem {
   platform: string;
   sellerName: string | null;
   itemName: string | null;
-  /** ORDER 의 상품(라인) 수 — `상품 3개` 로 그린다. 메뉴 배지와 알림 수가 왜 다른지의 답(D7). */
+  /** ORDER 의 상품(라인) 수 — `상품 3개` 로 그린다.
+   *  ⚠️ 2026-09-16 이후 메뉴 배지도 **주문 단위**(`paidOrders`)라 단위 차이는 없다. 남은 차이는 기간뿐. */
   itemCount: number | null;
   detail: string | null;
   /** 🔴 마켓이 준 **KST 벽시계**다 — `formatMarketRelativeTime` 으로만 그린다(D8). */
