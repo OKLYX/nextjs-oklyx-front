@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Check, Package as PackageIcon } from 'lucide-react';
 
 /**
- * 이 박스에 담을 것 — 사진 · 이름 · 담음/필요 **타일 그리드**
+ * 「발송 상품 목록」 — 사진 · 이름 · 담음/필요 **타일 그리드**
  * (FEATURE_2609_40 / PLAN D10 · D33, FEATURE_2609_54 / PLAN D2 · D3).
  *
  * 🔴 상태를 갖지 않는다. 값은 페이지가 소유하고 여기는 그리기만 한다.
@@ -83,9 +83,15 @@ export function PackingItemList({ items, activeRowKey, onQuantityChange }: Packi
 
             <div className="mt-2 flex items-start gap-1">
               {done && (
-                <Check size={18} className="mt-0.5 shrink-0 text-green-600" aria-label="다 담음" />
+                <Check size={22} className="mt-1 shrink-0 text-green-600" aria-label="다 담음" />
               )}
-              <span className="line-clamp-2 text-base font-semibold text-gray-900">
+              {/* 🔴 상품 이름은 작업자가 실물과 대조하는 값이라 크게 그린다(2026-09-17 사용자 지시).
+                  `line-clamp-2` 는 유지한다 — 이름 길이에 따라 타일 높이가 들쭉날쭉해지면
+                  ↑↓ 로 고른 타일을 눈으로 좇기 어려워진다. 전체 이름은 `title` 로 본다. */}
+              <span
+                className="line-clamp-2 text-xl font-bold leading-snug text-gray-900"
+                title={item.productName}
+              >
                 {item.productName}
               </span>
             </div>

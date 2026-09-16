@@ -299,15 +299,28 @@ export default function StockPackingPage() {
   );
   const packedTotal = useMemo(() => rows.reduce((sum, row) => sum + row.packedQty, 0), [rows]);
 
-  /** 상자 후보를 물을 조합 — 키는 물품 × 수량뿐이다(D22). 여러 라인의 같은 물품은 합친다 */
+  /** 이 박스에 담을 것을 다 담았는가 — 완료 배지·진행바가 같은 값을 본다 */
+  const allPacked = remainingTotal > 0 && packedTotal >= remainingTotal;
+
+  /**
+   * 상자 후보를 물을 조합 — 키는 물품 × 수량뿐이다(D22). 여러 라인의 같은 물품은 합친다.
+   *
+   * 🔴 **이 박스에 담아야 할 전량**(`remainingQty`)으로 만든다(2026-09-17 사용자 지시).
+   *    담은 수량(`packedQty`)으로 만들면 물품을 찍을 때마다 조합이 바뀌어 추천 상자가 계속
+   *    갈아치워지고, 정작 **송장을 찍은 직후에는 조합이 비어 있어 추천이 없다.** 작업자는
+   *    물품을 담기 전에 상자부터 집어야 한다.
+   * 🔴 그래서 `rows` 가 아니라 `scanResult` 를 본다 — `rows` 는 담을 때마다 새로 만들어져서
+   *    이 값이 같아도 참조가 바뀌고, 그러면 아래 조회 이펙트가 매번 다시 돈다.
+   */
   const compositionItems: BoxCandidateItem[] = useMemo(() => {
+    if (!scanResult) return [];
     const byProduct = new Map<number, number>();
-    rows.forEach((row) => {
-      if (row.packedQty <= 0) return;
-      byProduct.set(row.productId, (byProduct.get(row.productId) ?? 0) + row.packedQty);
+    scanResult.remaining.forEach((item) => {
+      if (item.remainingQty <= 0) return;
+      byProduct.set(item.productId, (byProduct.get(item.productId) ?? 0) + item.remainingQty);
     });
     return [...byProduct.entries()].map(([productId, quantity]) => ({ productId, quantity }));
-  }, [rows]);
+  }, [scanResult]);
 
   /** 완료 요청에 실을 항목 — 합포장 대비로 라인을 유지한다(D2) */
   const packedItems: PackedItemRequest[] = useMemo(
@@ -392,7 +405,10 @@ export default function StockPackingPage() {
     })();
   }, [loadPending, packageUseCase]);
 
-  /** 담은 조합이 바뀔 때마다 후보를 다시 묻는다 (D23) */
+  /**
+   * 송장을 찍으면 **한 번** 후보를 묻는다 (D23 · 2026-09-17 사용자 지시).
+   * 🔴 담는 동안에는 다시 묻지 않는다 — `compositionKey` 가 이 박스의 전량이라 바뀌지 않는다.
+   */
   useEffect(() => {
     if (!scanResult || scanResult.parcel.status !== 'PENDING') return;
     void (async () => {
@@ -1084,10 +1100,12 @@ export default function StockPackingPage() {
         )}
       </div>
 
-      {/* 🔴 스캔 입력칸은 **이 카드 안, 화면 통틀어 한 자리**다(2026-09-16 사용자 지시).
-          송장이든 물품이든 같은 칸에 찍는다 — `mode` 만 바뀐다. 다른 카드로 옮겨 적으면 상태가
-          바뀔 때 React 가 다시 마운트해서 손으로 쳐 둔 글자가 날아간다(2609_40/D9). */}
-      {scanInput}
+      {/* 🔴 여기 스캔칸은 **송장용**이다. 물품 스캔칸은 「발송 상품 목록」 카드 맨 위에 있다
+          (2026-09-17 사용자 지시) — 담는 동안 눈이 머무는 카드가 그쪽이다.
+          🔴 두 자리에 동시에 그리지 않는다. 화면에 있는 인스턴스는 언제나 하나다(2609_40/D9).
+          🔴 담는 중에도 **자리는 비워 둔다**(`min-h-14` = 스캔칸 높이). 칸이 사라지면 이 줄이
+          짧아지면서 아래 3열이 통째로 위로 올라간다 — 이 화면이 없애려던 밀림이다. */}
+      <div className="min-h-14">{!isPending && scanInput}</div>
     </Card>
   );
 
@@ -1168,7 +1186,7 @@ export default function StockPackingPage() {
       )}
 
       {compositionItems.length === 0 ? (
-        <p className="text-sm text-gray-700">물품을 담으면 상자를 추천합니다.</p>
+        <p className="text-sm text-gray-700">담을 물품이 없습니다.</p>
       ) : (
         <BoxCandidateRow
           candidates={candidates}
@@ -1278,7 +1296,26 @@ export default function StockPackingPage() {
    * 여기에 입력칸을 만들지 말 것: 포커스를 가진 입력칸은 전역 수신을 꺼 버린다(`isFormField` 가드).
    */
   const productCard = (
-    <Card title="발송 상품 목록" className="space-y-4 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
+    <Card
+      title="발송 상품 목록"
+      /* 🔴 다 담으면 배지로 알린다(2026-09-17 사용자 지시) — 타일을 하나씩 세어 보지 않아도
+         「이제 닫아도 된다」가 한눈에 보여야 한다. 상단 정보 줄의 `담음 N / 필요 N` 은 숫자라
+         읽어야 알 수 있다. 🔴 `remainingTotal > 0` 가드: 담을 게 없는 박스를 완료로 칠하지 않는다 */
+      action={
+        allPacked ? (
+          <span className="rounded bg-green-600 px-3 py-1 text-lg font-bold text-white">
+            담기 완료
+          </span>
+        ) : undefined
+      }
+      className="space-y-4 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden"
+    >
+      {/* 🔴 물품 스캔칸은 이 카드 **맨 위**다(2026-09-17 사용자 지시) — 담는 동안 눈이 머무는
+          카드가 여기라, 찍는 자리와 결과가 보이는 자리가 같아야 한다.
+          🔴 `ScanInput` 은 상태를 갖지 않는다(버퍼는 페이지 소유) — 상태가 바뀌며 이 조각이 다시
+          마운트돼도 쳐 둔 글자가 날아가지 않는다. */}
+      {scanInput}
+
       {/* 🔴 늘어나는 칸은 상품 목록 하나다 — 진행바·버튼은 카드 아래쪽에 붙어 있어야 한다 */}
       <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
         <PackingItemList
