@@ -57,6 +57,7 @@ function buildMessage(result: OrderAcknowledgeResult): { text: string; detail: s
 function buildRefreshMessage(result: OrderRefreshResult): { text: string; detail: string[] } {
   let text = `주문 상태 갱신 완료 — ${result.refreshed}건 갱신`;
   if (result.empty.length > 0) text += ` / 주문 없음 ${result.empty.length}건`;
+  if (result.cancelled.length > 0) text += ` / 마켓에서 취소·반품됨 ${result.cancelled.length}건`;
   if (result.failed.length > 0) text += ` / 실패 ${result.failed.length}건`;
   if (result.unsupported.length > 0) text += ` / 처리불가 ${result.unsupported.length}건`;
   const detail = [...new Set(result.failed.map((o) => `${o.externalOrderId}: ${o.reason}`))].slice(0, 3);

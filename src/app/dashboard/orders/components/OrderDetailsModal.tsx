@@ -354,6 +354,12 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
         setRefreshBanner(result.failed[0].reason);
       } else if (result.unsupported.length > 0) {
         setRefreshBanner('이 채널은 주문 상태 갱신을 지원하지 않습니다.');
+      } else if (result.cancelled.length > 0) {
+        // 쿠팡이 "이미 끝난 주문"이라고 답한 경우 — 서버가 로컬도 함께 정리했다.
+        const marked = result.cancelled[0];
+        setRefreshBanner(marked.cancelledLines > 0
+          ? '마켓에서 취소·반품된 주문입니다. 발송 전이라 취소로 정리했습니다.'
+          : '마켓에서 취소·반품된 주문입니다. 이미 발송한 건이라 금액은 그대로 두었습니다.');
       } else if (result.empty.length > 0) {
         setRefreshBanner('마켓에 남은 배송건이 없습니다(전량 취소로 보입니다).');
       } else if (result.refreshed > 0) {
