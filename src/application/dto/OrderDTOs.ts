@@ -69,6 +69,13 @@ export interface OrderRefreshResult {
   refreshed: number;
   /** 쿠팡이 0박스를 돌려준 주문번호 — 전량 취소로 추정(실패 아님). */
   empty: string[];
+  /**
+   * 쿠팡이 "이미 취소 또는 반품된 주문"이라고 답한 건(2026-09-16 신설).
+   *
+   * 서버가 로컬도 함께 정리한다 — 발송 전 라인만 취소로 확정(`cancelledLines`)하고,
+   * 발송 이후 라인은 매출이 잡힌 건이라 그대로 둔다(`keptLines`).
+   */
+  cancelled: { externalOrderId: string; cancelledLines: number; keptLines: number }[];
   /** 조회·파싱 실패 주문. 사유는 원문 그대로 보여준다. */
   failed: { externalOrderId: string; reason: string }[];
   /** 비-쿠팡이라 조회할 수 없는 주문번호. */
