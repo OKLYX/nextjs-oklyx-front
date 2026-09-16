@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { ScanLine } from 'lucide-react';
-import { PageContainer, CONTENT_WIDTH } from '@/presentation/components/PageContainer';
+import { PageContainer } from '@/presentation/components/PageContainer';
+import { useThemeStore } from '@/infrastructure/stores/themeStore';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
@@ -39,7 +40,7 @@ import { RightRailTabs, type RailTab } from './components/RightRailTabs';
  * `22rem | 1fr | 20rem` 3열 · 하단 유틸리티 줄이 **항상** 그려지고 **칸의 내용만** 바뀐다.
  * 자리가 상태마다 움직이면 작업자가 눈을 어디에 둘지 배울 수 없다. 그래서 레이아웃은
  * `leftColumn` · `centerColumn` · `rightRail` **열 단위 조각**으로만 만든다 — 상태별로 레이아웃을
- * 따로 들고 있으면 상태가 자리를 흔든다. `xl:grid-cols-[22rem_1fr_20rem]` 은 이 파일에 한 번만 나온다.
+ * 따로 들고 있으면 상태가 자리를 흔든다. `xl:grid-cols-[26rem_1fr_20rem]` 은 이 파일에 한 번만 나온다.
  *
  * 🔴 **상태는 이 페이지가 전부 소유한다.** 자식은 값을 받아 그리고 이벤트만 올린다 — 스캔 버퍼가
  * 두 곳에 있으면 포커스가 벗어났을 때 스캔이 허공으로 간다.
@@ -56,7 +57,8 @@ import { RightRailTabs, type RailTab } from './components/RightRailTabs';
  *
  * 🔴 **몰입 모드(2609_53/D1)**: [작업 시작] 이후엔 `fixed inset-0` 레이어가 사이드바·상단바를 덮는다.
  * 브라우저 Fullscreen API 를 쓰지 않는다 — 쓰면 브라우저가 Esc 를 먼저 가져가 Esc 한 겹 벗기기(D3)가
- * 통째로 깨진다. 폭은 `PageContainer` 의 `CONTENT_WIDTH` 하나에서 온다(D10, 손으로 적지 않는다).
+ * 통째로 깨진다. 🔴 몰입 레이어는 **디스플레이를 꽉 채운다** — 폭도 높이도 제한하지 않는다.
+ * `CONTENT_WIDTH`(`max-w-7xl`)를 다시 씌우지 말 것: 넓은 현장 PC 에서 양옆이 죽는다.
  *
  * 🔴 **방향키는 DOM 포커스를 옮기지 않는다(2609_53/D5)**. 선택은 state 로만 표시하고 Enter 의 주인은
  * 언제나 이 페이지 하나다. `element.focus()` 를 부르지 않는다.
@@ -79,10 +81,21 @@ const SCAN_ENTER_GUARD_MS = 400;
 
 type MessageTone = 'info' | 'error' | 'success';
 
-const TONE_CLASS: Record<MessageTone, string> = {
-  info: 'border-gray-300 bg-gray-50 text-gray-700',
-  error: 'border-red-300 bg-red-50 text-red-700',
-  success: 'border-green-300 bg-green-50 text-green-700',
+/**
+ * 메시지 창 **카드 면 전체**의 색. 🔴 안쪽에 작은 띠(스낵바 모양)를 만들지 않는다 —
+ * 작업자는 서서 1~2초만 보기 때문에 「색이 바뀐 면」이 「작은 띠」보다 훨씬 빨리 읽힌다.
+ * 오류는 채운 빨강이다. 연한 배경 + 빨간 글씨로는 몇 미터 떨어진 작업대에서 구분이 안 된다.
+ */
+const TONE_LABEL: Record<MessageTone, string> = {
+  info: '상태 메시지',
+  error: '오류',
+  success: '완료',
+};
+
+const TONE_PANEL_CLASS: Record<MessageTone, string> = {
+  info: 'bg-gray-100 text-gray-800',
+  error: 'bg-red-600 text-white',
+  success: 'bg-green-600 text-white',
 };
 
 /** 서버 메시지를 그대로 보여준다 — 판정은 서버가 소유한다 */
@@ -121,6 +134,14 @@ interface KeyHandlers {
   toggleVoice: () => void;
   /** F10 — 오른쪽 열 탭 전환 (작업 대상 ↔ 오늘 완료). 2609_53/D7 부분 번복 = 2609_55/D6 */
   toggleRail: () => void;
+  /**
+   * Ctrl + Alt + D — 라이트 ↔ 다크 (2026-09-16 사용자 지시).
+   *
+   * 🔴 F키를 쓰지 않는다: F1~F4·F6~F10 은 전부 임자가 있고 `F5 · F11 · F12` 는 건드리지 않기로 한
+   * 규칙(2609_53/D7)이 남아 있다. 조합키는 **스캐너가 절대 보내지 않으므로**(문자 + Enter 만 보낸다)
+   * 스캔과 충돌하지 않는다. 브라우저 기본 동작도 없는 조합이다.
+   */
+  toggleTheme: () => void;
 }
 
 /** F8 도움말 표 — 화면에 적힌 두 길(F키 · 방향키)을 한 곳에 모아 둔다 */
@@ -137,6 +158,7 @@ const SHORTCUT_HELP: [string, string][] = [
   ['F6 / F7', '이 박스 완료 / 취소'],
   ['F8 / F9', '단축키 / 안내 음성'],
   ['F10', '오른쪽 열 탭 (작업 대상 / 오늘 완료)'],
+  ['Ctrl + Alt + D', '라이트 ↔ 다크 모드'],
   ['Esc', '박스 잡은 중: 이 박스 취소 · 송장 대기: 나가기'],
 ];
 
@@ -157,6 +179,10 @@ export default function StockPackingPage() {
 
   // 🔴 브라우저는 사용자가 한 번 클릭하기 전에는 소리를 내지 않는다 → [작업 시작] 이 그 클릭이다
   const [started, setStarted] = useState(false);
+
+  /** 라이트 ↔ 다크. 몰입 레이어가 상단 바를 덮으므로 이 화면 안에 전환 창구가 따로 필요하다 */
+  const theme = useThemeStore((state) => state.theme);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
 
   const [buffer, setBuffer] = useState('');
   const bufferRef = useRef('');
@@ -191,7 +217,26 @@ export default function StockPackingPage() {
   const [unusedOpen, setUnusedOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [message, setMessage] = useState<{ tone: MessageTone; text: string } | null>(null);
+  /**
+   * 메시지 + 그 메시지의 일련번호 (2026-09-16 사용자 지시 — 바뀔 때마다 한 번 깜빡인다).
+   *
+   * 🔴 번호는 메시지 **안에** 둔다. 별도 state + 이펙트로 세면 `react-hooks/set-state-in-effect`
+   * (이 저장소 lint 규칙, error)에 걸린다.
+   * 🔴 번호가 필요한 이유 = CSS 애니메이션은 클래스를 다시 붙여도 되돌아오지 않는다. `key` 를 바꿔
+   * 엘리먼트를 갈아끼워야 처음부터 다시 돈다. 같은 문구가 연달아 떠도 번호가 올라가 깜빡인다.
+   */
+  const [message, setMessageState] = useState<{
+    tone: MessageTone;
+    text: string;
+    seq: number;
+  } | null>(null);
+  const messageSeqRef = useRef(0);
+
+  /** 🔴 기존 호출부(`setMessage({tone,text})` · `setMessage(null)`)를 그대로 두기 위한 껍데기다 */
+  const setMessage = useCallback((next: { tone: MessageTone; text: string } | null) => {
+    messageSeqRef.current += 1;
+    setMessageState(next ? { ...next, seq: messageSeqRef.current } : null);
+  }, []);
 
   // ── 음성 (D12 · D13) ───────────────────────────────────────────────────────
 
@@ -216,7 +261,7 @@ export default function StockPackingPage() {
       setMessage({ tone, text });
       if (spoken) speak(spoken);
     },
-    [speak]
+    [speak, setMessage]
   );
 
   /** F9 — 끄는 순간 **하던 말도 끊는다**. 안 끊으면 꺼진 줄 모른다 */
@@ -228,7 +273,7 @@ export default function StockPackingPage() {
       window.speechSynthesis.cancel();
     }
     setMessage({ tone: 'info', text: next ? '안내 음성 켜짐' : '안내 음성 꺼짐' });
-  }, []);
+  }, [setMessage]);
 
   // ── 파생 값 ────────────────────────────────────────────────────────────────
 
@@ -426,18 +471,22 @@ export default function StockPackingPage() {
             '담을 물품이 없습니다 — [F4] 이 박스 사용 안 함으로 닫으세요',
             '담을 물품이 없습니다'
           );
+        } else {
+          // 문제 없이 열린 경우에도 메시지 창은 비워 두지 않는다 — 스캔이 먹었다는 것을 눈으로 알려 준다.
+          // 🔴 음성은 붙이지 않는다: 정상 스캔마다 말하면 정작 오류 음성이 묻힌다.
+          notify('success', `송장을 스캔했습니다 — ${result.parcel.invoiceNumber}`);
         }
       } catch (error) {
         const notFound = axios.isAxiosError(error) && error.response?.status === 404;
         const text = notFound
-          ? '아직 발송처리 전이거나 없는 송장입니다 — 주문 동기화 후 다시 스캔해 주세요'
+          ? '유효하지 않은 송장번호입니다 — 아직 발송처리 전이거나 주문 동기화가 필요합니다'
           : serverMessage(error, '송장 조회에 실패했습니다');
-        notify('error', text, notFound ? '없는 송장입니다' : text);
+        notify('error', text, notFound ? '유효하지 않은 송장번호입니다' : text);
       } finally {
         setIsScanning(false);
       }
     },
-    [packingUseCase, notify]
+    [packingUseCase, notify, setMessage]
   );
 
   const addOne = useCallback((row: PackedRow) => {
@@ -445,7 +494,7 @@ export default function StockPackingPage() {
     setPacked((previous) => ({ ...previous, [key]: (previous[key] ?? 0) + 1 }));
     setActiveRowKey(key);
     setMessage(null);
-  }, []);
+  }, [setMessage]);
 
   const handleItemScan = useCallback(
     async (value: string) => {
@@ -509,7 +558,7 @@ export default function StockPackingPage() {
       setPacked((previous) => ({ ...previous, [activeRowKey]: quantity }));
       setMessage(null);
     },
-    [activeRowKey, rows, notify]
+    [activeRowKey, rows, notify, setMessage]
   );
 
   /** 수량칸 직접 입력 — **줄 key** 를 받는다. 같은 물품이 두 줄일 때 추측하지 않는다 (D8) */
@@ -643,7 +692,7 @@ export default function StockPackingPage() {
     resetBox(); // 잡고 있던 박스가 있으면 함께 버린다
     setStarted(false);
     setMessage(null);
-  }, [resetBox]);
+  }, [resetBox, setMessage]);
 
   // ── 방향키 이동 — 선택 표시만 옮긴다(포커스 이동 없음, D5) ──────────────────
 
@@ -680,6 +729,22 @@ export default function StockPackingPage() {
     () => setRailTab((previous) => (previous === 'PENDING' ? 'DONE' : 'PENDING')),
     []
   );
+
+  /**
+   * Ctrl + Alt + D · 하단 버튼 — 라이트 ↔ 다크. 🔴 두 길이 같은 함수를 쓴다.
+   *
+   * 색은 이 페이지가 고르지 않는다 — 전역 `themeStore` 가 `<html>` 에 `.dark` 를 붙이고 색은
+   * `globals.css` 의 `.dark` 블록 한 곳에서 나온다. 여기에 다크 색을 하드코딩하지 말 것.
+   * 바뀐 결과는 메시지 창에 남긴다: 몰입 레이어가 상단 바를 덮어 테마 버튼이 안 보이기 때문에
+   * 방금 무엇이 바뀌었는지 말해 주는 자리가 여기밖에 없다.
+   */
+  const switchTheme = useCallback(() => {
+    toggleTheme();
+    setMessage({
+      tone: 'info',
+      text: theme === 'dark' ? '라이트 모드로 바꿨습니다' : '다크 모드로 바꿨습니다',
+    });
+  }, [theme, toggleTheme, setMessage]);
 
   /** ← → — 상자 이동 = **즉시 선택**. 이미 출고·미사용 박스면 아무 것도 고르지 않는다 */
   const moveBox = useCallback(
@@ -804,6 +869,7 @@ export default function StockPackingPage() {
     help: noop,
     toggleVoice: noop,
     toggleRail: noop,
+    toggleTheme: noop,
   });
 
   // 렌더 중에 ref 를 쓰면 lint 가 막는다 → 매 렌더 뒤 이펙트에서 갱신한다(의존성 배열 없음).
@@ -832,6 +898,7 @@ export default function StockPackingPage() {
       help: () => setHelpOpen(true),
       toggleVoice,
       toggleRail: toggleRailTab,
+      toggleTheme: switchTheme,
     };
   });
 
@@ -862,6 +929,19 @@ export default function StockPackingPage() {
         // 🔴 마지막 else 는 `F숫자` 를 상자 후보로 읽는다 — F10 을 흘리면 10번째 후보를 고르려 든다
         else if (event.key === 'F10') handlers.toggleRail();
         else handlers.selectCandidate(Number(event.key.slice(1)) - 1);
+        return;
+      }
+
+      /*
+       * 🔴 Ctrl(또는 ⌘) + Alt + D = 라이트 ↔ 다크. **조합키 검사는 아래 `modifier return` 보다
+       *    먼저**여야 한다 — 그 줄이 조합키를 전부 흘려보낸다.
+       * 🔴 `event.key` 가 아니라 `event.code` 로 본다: macOS 에서 Alt + D 는 `key` 가 `'∂'` 로 온다.
+       * 🔴 입력칸에 포커스가 있어도 받는다(테마는 글자가 아니다). 전송 중(`busy`)에도 받는다 —
+       *    색만 바뀔 뿐 아무 것도 보내지 않는다.
+       */
+      if ((event.ctrlKey || event.metaKey) && event.altKey && event.code === 'KeyD') {
+        event.preventDefault();
+        handlers.toggleTheme();
         return;
       }
 
@@ -943,9 +1023,10 @@ export default function StockPackingPage() {
     <ScanInput
       mode={scanResult && isPending ? 'ITEM' : 'INVOICE'}
       buffer={buffer}
-      disabled={isSubmitting}
+      /* 🔴 닫힌 박스에서는 꺼 둔다(2609_55/D10 의 취지): 이 상태의 스캔은 거부되므로 받을 수 없는
+         입력을 받을 것처럼 보이면 안 된다. 거부 판정 자체(`handleScannedValue`)는 손대지 않는다 */
+      disabled={isSubmitting || (!!scanResult && !isPending)}
       isScanning={isScanning}
-      onScan={handleScannedValue}
     />
   );
 
@@ -959,10 +1040,11 @@ export default function StockPackingPage() {
    *    대조하는 값이라 가려지면 안 된다.
    */
   const parcelHeader = (
-    <Card>
+    <Card className="h-full space-y-4">
       <div className="flex min-h-[3.25rem] flex-wrap items-center gap-x-6 gap-y-2">
         {!parcel ? (
-          <span className="text-2xl font-bold text-gray-400">송장을 스캔하세요</span>
+          /* 송장번호가 들어올 자리 — 대기 중에는 무엇을 해야 하는지로 자리를 지킨다 */
+          <span className="text-2xl font-bold text-gray-600">송장 바코드를 스캔해 주세요</span>
         ) : (
           <>
             <span className="font-mono text-2xl font-bold tabular-nums text-gray-900">
@@ -973,13 +1055,13 @@ export default function StockPackingPage() {
             <span className="text-xl font-semibold text-gray-900">
               {scanResult?.order.receiverName ?? scanResult?.order.ordererName ?? '-'}
             </span>
-            <span className="text-sm text-gray-500">{parcel.carrierName ?? '택배사 미상'}</span>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-700">{parcel.carrierName ?? '택배사 미상'}</span>
+            <span className="text-sm text-gray-700">
               {parcel.totalParcels > 1
                 ? `${parcel.totalParcels}박스 중 ${parcel.parcelSeq ?? '-'}번째`
                 : '1박스'}
             </span>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-700">
               {scanResult?.order.sellerName ?? '-'} · 주문 {scanResult?.order.externalOrderId}
             </span>
             {scanResult?.isLastParcel && (
@@ -1001,18 +1083,63 @@ export default function StockPackingPage() {
           </>
         )}
       </div>
+
+      {/* 🔴 스캔 입력칸은 **이 카드 안, 화면 통틀어 한 자리**다(2026-09-16 사용자 지시).
+          송장이든 물품이든 같은 칸에 찍는다 — `mode` 만 바뀐다. 다른 카드로 옮겨 적으면 상태가
+          바뀔 때 React 가 다시 마운트해서 손으로 쳐 둔 글자가 날아간다(2609_40/D9). */}
+      {scanInput}
     </Card>
   );
 
+  /** 송장을 기다리는 중 = 스캔 카드를 깜빡여 눈을 끈다 (2026-09-16 사용자 지시) */
+  const awaitingInvoice = !scanResult;
+
   /**
-   * 4-0 ③ 안내문 — 🔴 **세 상태 모두 같은 자리**(상단 바 바로 아래, 열 위 전체 폭)에 둔다.
-   * 미등록 송장 · 이미 출고된 박스 · 구성 물품 전개 불가는 **송장 대기 상태에서** 뜬다.
-   * 자리가 상태마다 움직이면 작업자가 눈을 어디에 둘지 배울 수 없다.
+   * 🔴 깜빡임은 `Card` **바깥 래퍼**가 맡는다 — `Card` 의 `className` 으로 `shadow-*` 를
+   * 덮어쓰지 않기 위해서다(Card.tsx 규칙). 애니메이션은 `globals.css` 의 `.packing-scan-blink`.
    */
-  const messageBar = message && (
-    <div className={`rounded border px-4 py-3 text-sm ${TONE_CLASS[message.tone]}`}>
-      {message.text}
-    </div>
+  const scanCard = (
+    <div className={awaitingInvoice ? 'packing-scan-blink' : undefined}>{parcelHeader}</div>
+  );
+
+  /**
+   * 4-0 ③ 메시지 창 — 상단 정보 줄 **오른쪽 카드**. 오류와 상태 메시지가 여기에만 뜬다
+   * (2026-09-16 사용자 지시).
+   *
+   * 🔴 **떠 있다 사라지는 알림(스낵바)을 쓰지 않는다.** 작업자는 서 있고 눈은 1~2초만 화면에 준다 —
+   *    메시지가 사라지고 나면 방금 무엇이 잘못됐는지 확인할 방법이 없다. 자리를 고정하고 **마지막
+   *    메시지를 그대로 남긴다.**
+   * 🔴 메시지가 없어도 카드는 그린다. 높이도 고정이다(`h-[4.5rem]` + 안쪽 스크롤) — 긴 오류 문구가
+   *    줄을 늘려 아래 3열을 밀어 내리면 이 화면이 없애려던 밀림이 그대로 돌아온다.
+   */
+  const messagePanel = (
+    /*
+     * 🔴 `padded={false}` + 안쪽 `rounded-lg` — 색이 카드 **면 전체**를 덮게 하는 방법이다.
+     *    `Card` 의 `className` 으로 `bg-*` 를 덮어쓰지 않는다(Card.tsx 규칙).
+     * 🔴 `h-full` — 색이 카드 **바닥까지** 찬다. 높이는 왼쪽 스캔 카드가 정하고(같은 줄의 grid stretch)
+     *    이쪽은 거기에 맞춰 늘어난다. 🔴 `max-h-*` 를 다시 붙이지 말 것: 색칠 안 된 흰 자투리가 생긴다.
+     *    긴 문구는 줄을 늘리는 대신 이 칸 **안에서** 스크롤한다 — 아래 3열을 밀어 내리지 않는다.
+     */
+    <Card padded={false}>
+      <div
+        /* 🔴 메시지가 없을 때는 깜빡이지 않는다 — 물품을 찍을 때마다 메시지가 지워지므로
+           빈 카드까지 깜빡이면 계속 번쩍인다 */
+        key={message?.seq ?? 'empty'}
+        className={`flex h-full flex-col gap-2 overflow-y-auto rounded-lg px-6 py-4 ${
+          message ? `packing-message-flash ${TONE_PANEL_CLASS[message.tone]}` : 'bg-white'
+        }`}
+      >
+        {/* 왼쪽 위 상태 타이틀 — 왼쪽 카드의 「송장 대기 중」과 같은 자리·같은 역할 */}
+        <span className={`text-sm font-semibold ${message ? 'opacity-75' : 'text-gray-600'}`}>
+          {message ? TONE_LABEL[message.tone] : '상태 메시지'}
+        </span>
+        {message ? (
+          <span className="text-2xl font-bold leading-snug">{message.text}</span>
+        ) : (
+          <span className="text-2xl font-bold text-gray-500">메시지 없음</span>
+        )}
+      </div>
+    </Card>
   );
 
   /** 진행 바 — 담음 / 필요 (2609_54/D1) */
@@ -1027,21 +1154,21 @@ export default function StockPackingPage() {
    * 읽는 자리(`selectedBox` 등)는 이미 옵셔널을 거치고 있다. 새 `?.` 를 덧붙이며 조건을 바꾸지 않는다.
    */
   const boxCard = (
-    <Card title="이 박스에 담기" className="space-y-3">
+    <Card title="박스 추천" className="space-y-3 xl:flex xl:min-h-0 xl:flex-col xl:overflow-y-auto">
       {selectedBox ? (
         <div>
           <div className="text-4xl font-bold text-gray-900">{selectedBox.type}</div>
-          <div className="mt-1 text-sm text-gray-500">
+          <div className="mt-1 text-sm text-gray-700">
             {selectedBox.widthCm} × {selectedBox.lengthCm} × {selectedBox.heightCm} cm
           </div>
-          <div className="text-sm text-gray-500">{BOX_KIND_LABEL[boxKindOf(selectedBox)]}</div>
+          <div className="text-sm text-gray-700">{BOX_KIND_LABEL[boxKindOf(selectedBox)]}</div>
         </div>
       ) : (
-        <div className="text-xl text-gray-500">상자를 고르세요</div>
+        <div className="text-xl text-gray-700">상자를 고르세요</div>
       )}
 
       {compositionItems.length === 0 ? (
-        <p className="text-sm text-gray-500">물품을 담으면 상자를 추천합니다.</p>
+        <p className="text-sm text-gray-700">물품을 담으면 상자를 추천합니다.</p>
       ) : (
         <BoxCandidateRow
           candidates={candidates}
@@ -1053,7 +1180,7 @@ export default function StockPackingPage() {
 
       {showAllBoxes && (
         <div className="space-y-2 border-t border-gray-100 pt-3">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-700">
             전체 상자에서 고르세요 (← →). 고른 상자는 이 조합으로 기억됩니다.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -1089,10 +1216,10 @@ export default function StockPackingPage() {
                 </div>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-gray-900">{pkg.type}</div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-gray-700">
                     {pkg.widthCm} × {pkg.lengthCm} × {pkg.heightCm} cm
                   </div>
-                  <div className="text-xs text-gray-500">{BOX_KIND_LABEL[boxKindOf(pkg)]}</div>
+                  <div className="text-xs text-gray-700">{BOX_KIND_LABEL[boxKindOf(pkg)]}</div>
                 </div>
               </button>
             ))}
@@ -1100,30 +1227,66 @@ export default function StockPackingPage() {
         </div>
       )}
 
-      <p className="text-sm text-gray-500">상자 = F1 · F2 · F3 또는 ← →</p>
+      <p className="text-sm text-gray-700">상자 = F1 · F2 · F3 또는 ← →</p>
+
+      {/* 🔴 [F4] 는 이 카드 **바닥**에 붙는다(2026-09-16 사용자 지시) — 「이 박스」에 대한 동작이라
+          박스 카드에 있어야 어느 박스를 닫는 것인지 헷갈리지 않고, 위험한 동작이라 상자 고르는
+          자리와 떨어져 있어야 한다. `mt-auto` 가 남는 높이를 위로 밀어 바닥에 앉힌다.
+          🔴 키(`handlers.unused`)는 그대로다. 버튼을 옮겨도 조작은 바뀌지 않는다. */}
+      <div className="border-t border-gray-100 pt-3 xl:mt-auto">
+        <Button
+          size="lg"
+          variant="danger"
+          className="w-full"
+          onClick={() => setUnusedOpen(true)}
+          disabled={!scanResult || !isPending || isSubmitting}
+        >
+          [F4] 이 박스 사용 안 함
+        </Button>
+      </div>
     </Card>
   );
 
   /** 상자를 아직 고를 수 없는 상태(송장 대기 · 닫힌 박스)의 왼쪽 열 — 자리만 지킨다 (2609_55/D4) */
   const boxPlaceholderCard = (
-    <Card title="이 박스에 담기">
-      <p className="text-sm text-gray-500">송장을 스캔하면 상자를 추천합니다.</p>
+    <Card title="박스 추천" className="space-y-3 xl:flex xl:min-h-0 xl:flex-col xl:overflow-y-auto">
+      <p className="text-sm text-gray-700">송장을 스캔하면 상자를 추천합니다.</p>
+
+      {/* 🔴 [F4] 는 이 카드 **바닥**에 붙는다(2026-09-16 사용자 지시) — 「이 박스」에 대한 동작이라
+          박스 카드에 있어야 어느 박스를 닫는 것인지 헷갈리지 않고, 위험한 동작이라 상자 고르는
+          자리와 떨어져 있어야 한다. `mt-auto` 가 남는 높이를 위로 밀어 바닥에 앉힌다.
+          🔴 키(`handlers.unused`)는 그대로다. 버튼을 옮겨도 조작은 바뀌지 않는다. */}
+      <div className="border-t border-gray-100 pt-3 xl:mt-auto">
+        <Button
+          size="lg"
+          variant="danger"
+          className="w-full"
+          onClick={() => setUnusedOpen(true)}
+          disabled={!scanResult || !isPending || isSubmitting}
+        >
+          [F4] 이 박스 사용 안 함
+        </Button>
+      </div>
     </Card>
   );
 
   /**
-   * 가운데 열(담는 중) — 🔴 `scanInput` 을 빼지 말 것: 스캐너가 없을 때 물품을 손으로 넣는 유일한
-   * 창구이고, 스캔 버퍼가 보이는 유일한 자리다.
+   * 가운데 열(담는 중) — 「발송 상품 목록」 · 진행 바 · 완료/취소 버튼.
+   *
+   * 🔴 스캔 버퍼 칸은 여기 없다. 상단 스캔 카드 한 자리로 올라갔다(2026-09-16 사용자 지시).
+   * 스캐너가 없으면 그냥 키보드로 치면 된다 — 전역 키 수신이 받아 그 칸에 쌓인다.
+   * 여기에 입력칸을 만들지 말 것: 포커스를 가진 입력칸은 전역 수신을 꺼 버린다(`isFormField` 가드).
    */
   const productCard = (
-    <Card title="제품 스캔" className="space-y-4">
-      {scanInput}
-
-      <PackingItemList
-        items={rows}
-        activeRowKey={activeRowKey}
-        onQuantityChange={handleQuantityChange}
-      />
+    <Card title="발송 상품 목록" className="space-y-4 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
+      {/* 🔴 늘어나는 칸은 상품 목록 하나다 — 진행바·버튼은 카드 아래쪽에 붙어 있어야 한다 */}
+      <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+        <PackingItemList
+          items={rows}
+          activeRowKey={activeRowKey}
+          onQuantityChange={handleQuantityChange}
+        />
+      </div>
 
       <div className="h-2 rounded bg-gray-200">
         <div className="h-2 rounded bg-green-500" style={{ width: `${progressPercent}%` }} />
@@ -1164,19 +1327,26 @@ export default function StockPackingPage() {
    * 없는 입력을 받을 것처럼 보이면 안 된다. 거부 메시지(`handleScannedValue`)는 손대지 않는다.
    */
   const centerColumn = !scanResult ? (
-    /* 송장 대기 — 큰 스캔 영역 (2609_54/D10) */
-    <Card title="송장을 스캔하세요" className="space-y-4">
-      <div className="flex justify-center py-4">
-        <ScanLine size={96} className="text-gray-300" />
+    /*
+     * 송장 대기 — 큰 스캔 영역 (2609_54/D10).
+     * 🔴 제목을 달지 않는다: 「송장을 스캔하세요」는 **상단 정보 줄에 한 번만** 나온다
+     * (2026-09-16 사용자 지시 — 같은 문장이 두 군데 있으면 어느 쪽을 보라는 것인지 알 수 없다).
+     * 🔴 남은 주문 건수를 적지 않는다(2026-09-17 사용자 지시): 이 화면은 **지금 이 박스 하나**를
+     * 담는 일만 한다. 몇 개가 남았는지는 작업자가 할 수 있는 일이 없는 숫자다.
+     */
+    <Card className="xl:flex xl:min-h-0 xl:flex-col xl:overflow-y-auto">
+      <div className="flex items-center justify-center py-4 xl:min-h-0 xl:flex-1">
+        <ScanLine size={96} className="text-gray-500" />
       </div>
-      {scanInput}
-      <p className="text-center text-sm text-gray-500">남은 주문 {pendingParcels.length}건</p>
     </Card>
   ) : isPending ? (
     productCard
   ) : (
     /* 닫힌 박스 — 제목이 상태를 말하고 본문은 버튼 하나. 같은 문장을 본문에 또 적지 않는다(안내문 자리에 이미 떠 있다) */
-    <Card title={scanResult.parcel.status === 'PACKED' ? '출고 완료된 박스' : '사용하지 않은 박스'}>
+    <Card
+      title={scanResult.parcel.status === 'PACKED' ? '출고 완료된 박스' : '사용하지 않은 박스'}
+      className="xl:min-h-0 xl:overflow-y-auto"
+    >
       <Button variant="secondary" onClick={handleCancelBox} disabled={isSubmitting}>
         [Esc] 다음 송장 스캔
       </Button>
@@ -1207,31 +1377,28 @@ export default function StockPackingPage() {
   /**
    * 하단 유틸리티 줄 — 🔴 세 상태 모두 같은 자리에 **항상** 그린다(2609_55/D9). 지우면 기능이 사라진다.
    *
-   * ⚠️ `F4` **버튼**은 담는 중에만 활성이지만 **키**(`handlers.unused`)는 닫힌 박스에서도 팝업을 연다.
-   * 이 불일치는 지금 코드에 이미 있던 것이고, 키를 고치는 것은 조작 변경이라 여기서 맞추지 않는다.
-   * 적어 두는 이유는 다음 사람이 "둘이 다른데 어느 쪽이 맞나"로 시간을 쓰지 않게 하려는 것이다.
+   * 🔴 `[F4]` 버튼은 여기 없다 — 「박스 추천」 카드 안으로 옮겼다(2026-09-16 사용자 지시).
+   * **키는 그대로** `handlers.unused` 다. 버튼 자리를 옮기는 것과 조작을 바꾸는 것은 다른 일이다.
+   * ⚠️ `F4` **버튼**은 담는 중에만 활성이지만 **키**는 닫힌 박스에서도 팝업을 연다. 이 불일치는
+   * 지금 코드에 이미 있던 것이고, 키를 고치는 것은 조작 변경이라 여기서 맞추지 않는다.
    */
   const utilityRow = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
-        size="sm"
-        variant="danger"
-        onClick={() => setUnusedOpen(true)}
-        disabled={!scanResult || !isPending || isSubmitting}
-      >
-        [F4] 이 박스 사용 안 함
-      </Button>
-      <Button size="sm" variant="secondary" onClick={() => setHelpOpen(true)}>
+      <Button size="lg" variant="secondary" onClick={() => setHelpOpen(true)}>
         [F8] 단축키
       </Button>
-      <Button size="sm" variant="secondary" onClick={toggleVoice}>
+      <Button size="lg" variant="secondary" onClick={toggleVoice}>
         [F9] 음성 {voiceOn ? '끄기' : '켜기'}
       </Button>
       {/* 🔴 F10 과 **같은 함수**를 쓴다 — 두 곳에 각각 setRailTab 을 적으면 나중에 한쪽만 고쳐진다 */}
-      <Button size="sm" variant="secondary" onClick={toggleRailTab}>
+      <Button size="lg" variant="secondary" onClick={toggleRailTab}>
         [F10] 오른쪽 탭
       </Button>
-      <span className="text-xs text-gray-500">
+      {/* 🔴 키와 **같은 함수**를 쓴다. 몰입 레이어가 상단 바의 테마 버튼을 덮으므로 이 줄이 유일한 창구다 */}
+      <Button size="lg" variant="secondary" onClick={switchTheme}>
+        [Ctrl+Alt+D] {theme === 'dark' ? '라이트' : '다크'} 모드
+      </Button>
+      <span className="text-xs text-gray-700">
         담을 것 = ↑ ↓ · 숫자 4자리 이하 + Enter = 고른 줄 수량
       </span>
     </div>
@@ -1321,19 +1488,26 @@ export default function StockPackingPage() {
    *
    * `z-50` 은 사이드바와 같은 값이지만 페이지가 DOM 뒤쪽(`<main>` 안)이라 위에 덮인다.
    * 팝업은 body 끝 portal 이라 이 레이어보다 위에 뜬다 — 🔴 `z-[60]` 이상을 쓰지 말 것.
-   * 폭은 `CONTENT_WIDTH` 에서 온다(D10) — 손으로 `max-w-7xl` 을 적지 않는다.
+   * 🔴 **뷰포트를 꽉 채운다** — 폭 제한 없음(`max-w-*` 금지), 높이는 세로 flex 로 나눠 갖는다.
+   * 제목 줄 · 상단 줄(송장 정보 + 메시지 창) · 하단 F키 줄은 제 높이만 쓰고, 남는 높이는 3열 그리드가
+   * 전부 먹는다. 넘치는 내용은 **카드 안에서** 스크롤한다 — 페이지 전체가 밀리면 자리가 흔들린다.
+   * 1280px 미만은 비대상이라 예전처럼 세로로 쌓이고 레이어가 스크롤된다(`xl:` 접두사).
    */
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-page p-4 md:p-6">
-      <div className={`${CONTENT_WIDTH} space-y-4`}>
+    <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-page p-4 md:p-6 xl:overflow-hidden">
+      <div className="flex w-full flex-col space-y-4 xl:min-h-0 xl:flex-1">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">포장 작업</h1>
-          <span className="text-sm text-gray-500">[Esc] 나가기 · [F8] 단축키</span>
+          <span className="text-sm text-gray-700">[Esc] 나가기 · [F8] 단축키</span>
         </div>
-        {parcelHeader}
-        {messageBar}
+        {/* 🔴 상단 줄은 카드 2개다 — 왼쪽 송장 정보 · 오른쪽 메시지 창. 폭은 **반반**이다
+            (2026-09-16 사용자 지시). 아래 3열과 세로선은 맞지 않는다 — 메시지를 읽을 폭이 먼저다 */}
+        <div className="grid gap-4 xl:grid-cols-2">
+          {scanCard}
+          {messagePanel}
+        </div>
         {/* 🔴 자리를 정하는 곳은 여기 하나다 — 이 문자열이 화면에 두 번 나오면 통일이 깨진 것이다 */}
-        <div className="grid gap-4 xl:grid-cols-[22rem_1fr_20rem]">
+        <div className="grid gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[26rem_1fr_20rem]">
           {leftColumn}
           {centerColumn}
           {rightRail}

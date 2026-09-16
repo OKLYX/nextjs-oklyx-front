@@ -100,7 +100,7 @@ export function PendingParcelList({
                 <td className="px-2 py-1.5 text-center font-semibold text-gray-900">
                   {parcel.remainingQty}
                 </td>
-                <td className="px-2 py-1.5 text-center text-gray-500">{elapsed(parcel.orderedAt)}</td>
+                <td className="px-2 py-1.5 text-center text-gray-700">{elapsed(parcel.orderedAt)}</td>
               </tr>
             );
           })}
@@ -150,7 +150,7 @@ export function PendingParcelList({
               <td className="px-4 py-2 text-center font-semibold text-gray-900">
                 {parcel.remainingQty}
               </td>
-              <td className="px-4 py-2 text-center text-gray-500">{elapsed(parcel.orderedAt)}</td>
+              <td className="px-4 py-2 text-center text-gray-700">{elapsed(parcel.orderedAt)}</td>
             </tr>
             );
           })}

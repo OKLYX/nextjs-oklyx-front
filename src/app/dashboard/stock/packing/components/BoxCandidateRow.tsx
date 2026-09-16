@@ -86,10 +86,10 @@ export function BoxCandidateRow({
                 )}
                 <span className="truncate font-medium text-gray-900">{candidate.type}</span>
               </div>
-              <div className="mt-0.5 text-xs text-gray-500">
+              <div className="mt-0.5 text-xs text-gray-700">
                 {candidate.widthCm} × {candidate.lengthCm} × {candidate.heightCm} cm
               </div>
-              <div className="mt-0.5 text-xs text-gray-500">
+              <div className="mt-0.5 text-xs text-gray-700">
                 {BOX_KIND_LABEL[boxKindOf(candidate)]} · {candidate.useCount}회
               </div>
             </div>
