@@ -21,10 +21,19 @@ export interface PackingParcelView {
   status: ParcelStatus;
 }
 
-/** 화면 상단에 주문을 확인시켜 주는 최소 정보 */
+/**
+ * 화면 상단에 주문을 확인시켜 주는 최소 정보.
+ *
+ * 🔴 이름 두 개를 그대로 받고 **어느 쪽을 보일지는 화면이 정한다**(2609_54/D5): 수취인 ?? 주문자.
+ * 마스킹하지 않는다 — 작업자가 실물 송장의 받는 사람과 대조하는 값이다. 연락처·주소는 오지 않는다.
+ */
 export interface PackingOrderView {
   externalOrderId: string;
   sellerName: string | null;
+  /** 주문자 이름 */
+  ordererName: string | null;
+  /** 수취인 이름 */
+  receiverName: string | null;
 }
 
 /**
@@ -40,6 +49,8 @@ export interface RemainingItem {
   productName: string;
   barcodeId: string | null;
   remainingQty: number;
+  /** 물품 사진. 없으면 `null` → 화면이 회색 자리(아이콘)를 그린다 (2609_54/D2) */
+  imageUrl: string | null;
 }
 
 /** 전개하지 못한 주문 라인. 하나라도 있으면 이 박스는 완료할 수 없다 */
