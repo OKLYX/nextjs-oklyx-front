@@ -31,7 +31,7 @@ import { computeMissingOptionRequired } from '../[id]/components/categoryMetaVal
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 // 옵션 잠금 안내 문구 (85). 잠금 판정은 백엔드 플래그(marketRegistered) 하나만 쓴다.
-const LOCKED_ROW_TITLE = '쿠팡에 등록돼 판매 중 — 이름·수량 수정 및 삭제 불가';
+const LOCKED_ROW_TITLE = '쿠팡에 등록돼 판매 중 — 이름 수정 및 삭제 불가 (구성 수량은 수정 가능)';
 const LOCKED_DELETE_REASON = '쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다.';
 const LAST_OPTION_DELETE_REASON =
   '옵션은 1개 이상 있어야 합니다. 모든 옵션을 제거하기 위해서는 마스터 상품을 삭제해야 합니다.';
@@ -825,22 +825,23 @@ export function MasterOptionEditor({
             {components.map((c) => (
               <div key={c.productId} className="flex items-center gap-2">
                 <span className="flex-1 text-sm text-gray-700">{c.productName}</span>
+                {/* ⚠️ 84 lock 대상이 아니다 — 등록 시 잘못 넣은 수량을 고칠 유일한 경로다(이름·삭제만 잠금). */}
                 <input
                   type="number"
                   min={1}
                   step={1}
-                  className="w-24 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+                  className="w-24 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
                   value={quantities[c.productId] ?? '1'}
                   onChange={(e) => handleQuantityChange(c.productId, e.target.value)}
-                  disabled={lockedEditing}
                 />
               </div>
             ))}
           </div>
           {lockedEditing && (
             <p className="mt-2 text-[11px] text-amber-700">
-              쿠팡에 등록된 옵션이라 이름·수량은 바꿀 수 없습니다. 다른 조합이 필요하면 옵션을 새로
-              추가하세요(이름은 달라야 합니다).
+              쿠팡에 등록된 옵션이라 이름은 바꿀 수 없습니다(다른 조합이 필요하면 옵션을 새로 추가하세요).
+              구성 수량은 고칠 수 있지만, 고치면 쿠팡에 표시된 수량·고시 문구와 달라져 이 채널에 [수정
+              요청]이 필요합니다.
             </p>
           )}
           <div className="mt-3 grid grid-cols-2 gap-2">
