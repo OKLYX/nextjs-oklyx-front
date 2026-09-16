@@ -106,8 +106,9 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       open: isOrdersOpen,
       toggle: toggleOrdersMenu,
       items: [
-        // 결제완료 상품(라인) 수. 알림의 새 주문 건수(주문 단위·최근 14일)와 다른 숫자다(2609_51 D7·D8).
-        { href: ROUTES.ORDERS_SHIPMENT, label: '출고관리', badge: alerts?.paidLines, title: '결제완료 상품 수' },
+        // 결제완료 주문 수. 종 배지의 새 주문과 같은 주문 단위지만, 이쪽은 기간 상한이 없어
+        // 14일이 지난 결제완료 주문이 있으면 더 크게 나온다(2609_51 D7·D8, 2026-09-16 단위 변경).
+        { href: ROUTES.ORDERS_SHIPMENT, label: '출고관리', badge: alerts?.paidOrders, title: '결제완료 주문 수' },
         { href: ROUTES.ORDERS_RETRIEVE, label: '주문내역' },
         { href: ROUTES.ORDERS_CLAIMS, label: '반품/교환', badge: alerts?.openClaims },
         { href: ROUTES.ORDERS_INQUIRIES, label: '고객문의', badge: alerts?.unansweredInquiries },
