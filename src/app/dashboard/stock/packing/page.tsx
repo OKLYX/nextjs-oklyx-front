@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
+import { ScanLine } from 'lucide-react';
 import { PageContainer, CONTENT_WIDTH } from '@/presentation/components/PageContainer';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
@@ -24,10 +25,16 @@ import { ScanInput } from './components/ScanInput';
 import { PackingItemList, type PackedRow } from './components/PackingItemList';
 import { BoxCandidateRow } from './components/BoxCandidateRow';
 import { PendingParcelList } from './components/PendingParcelList';
+import { TodayDoneRail } from './components/TodayDoneRail';
 
 /**
  * 송장 스캔 포장 화면 — 키보드 전용 (FEATURE_2609_40 / PLAN D9 ~ D17 · D31 ~ D33,
- * FEATURE_2609_53 / PLAN D1 ~ D10).
+ * FEATURE_2609_53 / PLAN D1 ~ D10, FEATURE_2609_54 / PLAN D1 ~ D14).
+ *
+ * 🔴 **화면 상태는 네 개다**: 시작 화면(`!started`) · 송장 대기(`started && !scanResult`) ·
+ * 담는 중(`scanResult && isPending`) · 닫힌 박스(`scanResult && !isPending`). 담는 중만 3열이고
+ * 나머지는 2열이다(2609_54/D1). 🔴 안내문(`messageBar`)은 **세 상태 모두 같은 자리**다 — 송장 스캔
+ * 실패는 송장 대기 상태에서 뜨므로, 담는 중에만 자리를 주면 그 오류가 화면에서 사라진다.
  *
  * 🔴 **상태는 이 페이지가 전부 소유한다.** 자식은 값을 받아 그리고 이벤트만 올린다 — 스캔 버퍼가
  * 두 곳에 있으면 포커스가 벗어났을 때 스캔이 허공으로 간다.
@@ -225,6 +232,7 @@ export default function StockPackingPage() {
       productName: item.productName,
       itemName: item.itemName,
       barcodeId: item.barcodeId,
+      imageUrl: item.imageUrl,
       packedQty: packed[rowKey(item.orderLineId, item.productId)] ?? 0,
       remainingQty: item.remainingQty,
     }));
@@ -264,12 +272,29 @@ export default function StockPackingPage() {
     [compositionItems]
   );
 
+  /** 고른 상자 — 왼쪽 카드가 이름(크게) · 치수 · 종류를 보여준다(2609_54/Step 5) */
   const selectedBox = useMemo(() => {
     if (!selectedPackageId) return null;
     const candidate = candidates.find((item) => item.packageId === selectedPackageId);
-    if (candidate) return { type: candidate.type };
+    if (candidate) {
+      return {
+        type: candidate.type,
+        widthCm: candidate.widthCm,
+        lengthCm: candidate.lengthCm,
+        heightCm: candidate.heightCm,
+        boxKind: candidate.boxKind,
+      };
+    }
     const pkg = allPackages.find((item) => item.id === selectedPackageId);
-    return pkg ? { type: pkg.type } : null;
+    return pkg
+      ? {
+          type: pkg.type,
+          widthCm: pkg.widthCm,
+          lengthCm: pkg.lengthCm,
+          heightCm: pkg.heightCm,
+          boxKind: pkg.boxKind,
+        }
+      : null;
   }, [selectedPackageId, candidates, allPackages]);
 
   /** 기억이 없는 조합 → 전체 상자 목록에서 고르게 한다 */
@@ -883,72 +908,98 @@ export default function StockPackingPage() {
     </Card>
   );
 
-  const scanCard = (
+  /**
+   * 4-0 ① 스캔 입력 — 🔴 **인스턴스는 화면에 하나**다. 상태마다 JSX 를 다시 적으면 상태가 바뀔 때
+   * 컴포넌트가 다시 마운트되어 수동 입력칸에 쳐 둔 글자가 날아간다. 버퍼의 주인은 계속 이 페이지
+   * 하나다(2609_40/D9). `mode` 만 송장 ↔ 물품으로 바뀐다.
+   */
+  const scanInput = (
+    <ScanInput
+      mode={scanResult && isPending ? 'ITEM' : 'INVOICE'}
+      buffer={buffer}
+      disabled={isSubmitting}
+      isScanning={isScanning}
+      onScan={handleScannedValue}
+    />
+  );
+
+  /** 4-0 ② 박스 정보 — 송장·고객·택배사·순번·판매자·주문번호(담는 중이면 담음 배지까지) */
+  const parcelHeader = parcel && (
     <Card>
-      <div className="space-y-4">
-        <ScanInput
-          mode={scanResult && isPending ? 'ITEM' : 'INVOICE'}
-          buffer={buffer}
-          disabled={isSubmitting}
-          isScanning={isScanning}
-          onScan={handleScannedValue}
-        />
-
-        {parcel && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 pt-3">
-            <span className="font-mono text-lg font-semibold text-gray-900">
-              {parcel.invoiceNumber}
-            </span>
-            <span className="text-sm text-gray-500">{parcel.carrierName ?? '택배사 미상'}</span>
-            <span className="text-sm text-gray-700">
-              {parcel.totalParcels > 1
-                ? `${parcel.totalParcels}박스 중 ${parcel.parcelSeq ?? '-'}번째`
-                : '1박스'}
-            </span>
-            <span className="text-sm text-gray-700">
-              {scanResult?.order.sellerName ?? '-'} · 주문 {scanResult?.order.externalOrderId}
-            </span>
-            {scanResult?.isLastParcel && (
-              <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                마지막 박스 — 남은 물품 전량을 담아야 합니다
-              </span>
-            )}
-          </div>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <span className="font-mono text-2xl font-bold tabular-nums text-gray-900">
+          {parcel.invoiceNumber}
+        </span>
+        {/* 🔴 수취인 ?? 주문자 — 어느 쪽을 보일지는 화면이 정한다(2609_54/D5). 마스킹하지 않는다:
+            작업자가 실물 송장의 받는 사람과 대조하는 값이다 */}
+        <span className="text-xl font-semibold text-gray-900">
+          {scanResult?.order.receiverName ?? scanResult?.order.ordererName ?? '-'}
+        </span>
+        <span className="text-sm text-gray-500">{parcel.carrierName ?? '택배사 미상'}</span>
+        <span className="text-sm text-gray-500">
+          {parcel.totalParcels > 1
+            ? `${parcel.totalParcels}박스 중 ${parcel.parcelSeq ?? '-'}번째`
+            : '1박스'}
+        </span>
+        <span className="text-sm text-gray-500">
+          {scanResult?.order.sellerName ?? '-'} · 주문 {scanResult?.order.externalOrderId}
+        </span>
+        {scanResult?.isLastParcel && (
+          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+            마지막 박스 — 남은 물품 전량을 담아야 합니다
+          </span>
         )}
-
-        {message && (
-          <div className={`rounded border px-4 py-3 text-sm ${TONE_CLASS[message.tone]}`}>
-            {message.text}
-          </div>
+        {isPending && (
+          <span
+            className={`ml-auto rounded px-3 py-1 text-lg font-semibold ${
+              packedTotal >= remainingTotal
+                ? 'bg-green-100 text-green-700'
+                : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            담음 {packedTotal} / {remainingTotal}
+          </span>
         )}
       </div>
     </Card>
   );
 
-  const packingSection = scanResult && isPending && (
-    <>
-      <Card padded={false}>
-        <div className="flex items-center justify-between px-4 py-3">
-          <h2 className="font-semibold text-gray-900">담을 것</h2>
-          <span className="text-sm text-gray-500">
-            담음 {packedTotal} / 필요 {remainingTotal}
-          </span>
-        </div>
-        <PackingItemList
-          items={rows}
-          activeRowKey={activeRowKey}
-          onQuantityChange={handleQuantityChange}
-        />
-      </Card>
+  /**
+   * 4-0 ③ 안내문 — 🔴 **세 상태 모두 같은 자리**(상단 바 바로 아래, 열 위 전체 폭)에 둔다.
+   * 미등록 송장 · 이미 출고된 박스 · 구성 물품 전개 불가는 **송장 대기 상태에서** 뜬다.
+   * 자리가 상태마다 움직이면 작업자가 눈을 어디에 둘지 배울 수 없다.
+   */
+  const messageBar = message && (
+    <div className={`rounded border px-4 py-3 text-sm ${TONE_CLASS[message.tone]}`}>
+      {message.text}
+    </div>
+  );
 
-      <Card>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">상자</h2>
-            <span className="text-sm text-gray-500">
-              {selectedBox ? `선택: ${selectedBox.type}` : '선택된 상자 없음'}
-            </span>
-          </div>
+  /** 진행 바 — 담음 / 필요 (2609_54/D1) */
+  const progressPercent =
+    remainingTotal > 0 ? Math.min(100, Math.round((packedTotal / remainingTotal) * 100)) : 0;
+
+  /**
+   * 상태 ① 담는 중 — 왼쪽 상자 · 가운데 제품 · 오른쪽 오늘 완료 3열 (2609_54/D1).
+   * 🔴 F4 · F8 · F9 는 3열 아래 한 줄로 작게 남는다(D12) — 지우면 기능이 사라진다.
+   */
+  const packingSection = scanResult && isPending && (
+    <div className="space-y-3">
+      <div className="grid gap-4 xl:grid-cols-[22rem_1fr_20rem]">
+        {/* 왼쪽 — 지금 고른 상자를 화면에서 가장 크게. 🔴 무게·완충재·결제 방식은 넣지 않는다(D8):
+            시스템에 그 개념이 없다. 빈 자리도 만들지 않는다 */}
+        <Card title="이 박스에 담기" className="space-y-3">
+          {selectedBox ? (
+            <div>
+              <div className="text-4xl font-bold text-gray-900">{selectedBox.type}</div>
+              <div className="mt-1 text-sm text-gray-500">
+                {selectedBox.widthCm} × {selectedBox.lengthCm} × {selectedBox.heightCm} cm
+              </div>
+              <div className="text-sm text-gray-500">{BOX_KIND_LABEL[boxKindOf(selectedBox)]}</div>
+            </div>
+          ) : (
+            <div className="text-xl text-gray-500">상자를 고르세요</div>
+          )}
 
           {compositionItems.length === 0 ? (
             <p className="text-sm text-gray-500">물품을 담으면 상자를 추천합니다.</p>
@@ -1009,42 +1060,85 @@ export default function StockPackingPage() {
               </div>
             </div>
           )}
-        </div>
-      </Card>
 
-      <Card>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={handleComplete} isLoading={isSubmitting} loadingText="완료 처리 중...">
-            [Enter · F6] 이 박스 완료
-          </Button>
-          <Button variant="secondary" onClick={handleCancelBox} disabled={isSubmitting}>
-            [Esc · F7] 취소
-          </Button>
-          <Button variant="danger" onClick={() => setUnusedOpen(true)} disabled={isSubmitting}>
-            [F4] 이 박스 사용 안 함
-          </Button>
-          <Button variant="secondary" onClick={() => setHelpOpen(true)}>
-            [F8] 단축키
-          </Button>
-          <Button variant="secondary" onClick={toggleVoice}>
-            [F9] 음성 {voiceOn ? '끄기' : '켜기'}
-          </Button>
-          <span className="text-sm text-gray-500">
-            상자 = F1 · F2 · F3 또는 ← → · 담을 것 = ↑ ↓ · 숫자 4자리 이하 + Enter = 고른 줄 수량
-          </span>
-        </div>
-      </Card>
-    </>
+          <p className="text-sm text-gray-500">상자 = F1 · F2 · F3 또는 ← →</p>
+        </Card>
+
+        {/* 가운데 — 🔴 `scanInput` 을 빼지 말 것: 스캐너가 없을 때 물품을 손으로 넣는 유일한 창구이고,
+            스캔 버퍼가 보이는 유일한 자리다 */}
+        <Card title="제품 스캔" className="space-y-4">
+          {scanInput}
+
+          <PackingItemList
+            items={rows}
+            activeRowKey={activeRowKey}
+            onQuantityChange={handleQuantityChange}
+          />
+
+          <div className="h-2 rounded bg-gray-200">
+            <div className="h-2 rounded bg-green-500" style={{ width: `${progressPercent}%` }} />
+          </div>
+
+          {/* 🔴 문구를 「발송 완료」로 바꾸지 말 것(2609_54/D9) — 이 시스템의 발송처리는 채널에
+              송장을 올리는 일(2609_07)이고 포장 완료와 다른 일이다 */}
+          <div className="flex gap-3">
+            <Button
+              className="flex-1"
+              onClick={handleComplete}
+              isLoading={isSubmitting}
+              loadingText="완료 처리 중..."
+            >
+              [Enter · F6] 이 박스 완료
+            </Button>
+            <Button
+              className="flex-1"
+              variant="secondary"
+              onClick={handleCancelBox}
+              disabled={isSubmitting}
+            >
+              [Esc · F7] 취소
+            </Button>
+          </div>
+        </Card>
+
+        <TodayDoneRail />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="danger"
+          onClick={() => setUnusedOpen(true)}
+          disabled={isSubmitting}
+        >
+          [F4] 이 박스 사용 안 함
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => setHelpOpen(true)}>
+          [F8] 단축키
+        </Button>
+        <Button size="sm" variant="secondary" onClick={toggleVoice}>
+          [F9] 음성 {voiceOn ? '끄기' : '켜기'}
+        </Button>
+        <span className="text-xs text-gray-500">
+          담을 것 = ↑ ↓ · 숫자 4자리 이하 + Enter = 고른 줄 수량
+        </span>
+      </div>
+    </div>
   );
 
-  const closedBoxCard = scanResult && !isPending && (
-    <Card>
-      <div className="flex flex-wrap items-center gap-3">
+  /**
+   * 상태 ③ 닫힌 박스 — 이미 출고된(`PACKED`) · 사용하지 않은(`UNUSED`) 박스를 조회한 상태다.
+   * 담을 것이 없으니 왼쪽 상자 카드를 그리지 않는다 = 2열. 버튼 문구·동작은 **그대로** 둔다.
+   */
+  const closedBoxSection = scanResult && !isPending && (
+    <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
+      <Card>
         <Button variant="secondary" onClick={handleCancelBox} disabled={isSubmitting}>
           [Esc] 다음 송장 스캔
         </Button>
-      </div>
-    </Card>
+      </Card>
+      <TodayDoneRail />
+    </div>
   );
 
   const parcelListSection = (
@@ -1062,6 +1156,29 @@ export default function StockPackingPage() {
         }}
       />
     </div>
+  );
+
+  /**
+   * 상태 ② 송장 대기 — 큰 스캔 영역 + 「오늘 완료」 레일, 그 아래 작업 대상 목록 (2609_54/D10).
+   *
+   * 🔴 작업 대상 목록을 지우지 않는다 — ↑↓ + Enter 로 송장을 여는 대상이 그 목록이다(2609_53/D6).
+   * 박스를 잡고 있는 동안에는 이 상태가 아니므로 목록이 자동으로 접힌다(2609_54/D11).
+   * 🔴 오늘 완료 **건수**는 쓰지 않는다 — 데이터가 없다(D6 · D8).
+   */
+  const waitingSection = !scanResult && (
+    <>
+      <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
+        <Card title="송장을 스캔하세요" className="space-y-4">
+          <div className="flex justify-center py-4">
+            <ScanLine size={96} className="text-gray-300" />
+          </div>
+          {scanInput}
+          <p className="text-center text-sm text-gray-500">남은 주문 {pendingParcels.length}건</p>
+        </Card>
+        <TodayDoneRail />
+      </div>
+      {parcelListSection}
+    </>
   );
 
   const dialogs = (
@@ -1131,15 +1248,16 @@ export default function StockPackingPage() {
    */
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-page p-4 md:p-6">
-      <div className={`${CONTENT_WIDTH} space-y-6`}>
+      <div className={`${CONTENT_WIDTH} space-y-4`}>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">포장 작업</h1>
           <span className="text-sm text-gray-500">[Esc] 나가기 · [F8] 단축키</span>
         </div>
-        {scanCard}
+        {parcelHeader}
+        {messageBar}
         {packingSection}
-        {closedBoxCard}
-        {parcelListSection}
+        {closedBoxSection}
+        {waitingSection}
       </div>
       {dialogs}
     </div>
