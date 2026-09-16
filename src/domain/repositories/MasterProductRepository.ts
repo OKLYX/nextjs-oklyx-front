@@ -3,6 +3,7 @@ import type {
   MasterProductListParams,
   MasterProductPageResponse,
   MasterProductRequest,
+  MasterProductByComponents,
   MasterProductUpdateRequest,
   MasterOptionRequest,
   MasterOptionResponse,
@@ -22,6 +23,8 @@ import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuff
 export interface MasterProductRepository {
   list(params: MasterProductListParams): Promise<MasterProductPageResponse>;
   getById(id: number): Promise<MasterProductResponse>;
+  // 같은 구성상품 조합을 쓰는 마스터 (2609_46). 정확히 같은 집합만 — 부분집합·상위집합은 다른 마스터.
+  findByComponents(productIds: number[]): Promise<MasterProductByComponents[]>;
   create(data: MasterProductRequest): Promise<MasterProductResponse>;
   update(id: number, data: MasterProductUpdateRequest): Promise<MasterProductResponse>;
   remove(id: number): Promise<void>;

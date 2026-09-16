@@ -4,6 +4,7 @@ import type {
   MasterProductListParams,
   MasterProductPageResponse,
   MasterProductRequest,
+  MasterProductByComponents,
   MasterProductUpdateRequest,
   MasterOptionRequest,
   MasterOptionResponse,
@@ -29,6 +30,11 @@ export class MasterProductUseCase {
 
   getById(id: number): Promise<MasterProductResponse> {
     return this.repository.getById(id);
+  }
+
+  /** 같은 구성상품 조합의 마스터 (2609_46). 없으면 빈 배열 = 새로 만들어도 되는 조합. */
+  findByComponents(productIds: number[]): Promise<MasterProductByComponents[]> {
+    return this.repository.findByComponents(productIds);
   }
 
   create(data: MasterProductRequest): Promise<MasterProductResponse> {
