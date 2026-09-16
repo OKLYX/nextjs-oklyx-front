@@ -922,7 +922,7 @@ export function MasterProductCreateForm({
             {duplicateMasters.length > 0 && (
               <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2">
                 <p className="text-sm font-medium text-amber-900">
-                  이 구성상품으로 만든 마스터가 이미 있습니다. 새로 만드는 대신 그 마스터에 옵션을
+                  이 구성상품으로 만든 마스터가 이미 있습니다. 새로 만드는 대신 해당 마스터에 옵션을
                   추가하세요.
                 </p>
                 <ul className="mt-2 space-y-1">
