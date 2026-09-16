@@ -48,7 +48,7 @@ export function PackingItemList({ items, activeRowKey, onQuantityChange }: Packi
   }, [activeRowKey]);
 
   if (items.length === 0) {
-    return <div className="p-8 text-center text-gray-500">담을 물품이 없습니다</div>;
+    return <div className="p-8 text-center text-gray-700">담을 물품이 없습니다</div>;
   }
 
   return (
@@ -77,7 +77,7 @@ export function PackingItemList({ items, activeRowKey, onQuantityChange }: Packi
               />
             ) : (
               <div className="flex aspect-square w-full items-center justify-center rounded bg-gray-100">
-                <PackageIcon size={40} className="text-gray-400" aria-label="사진 없음" />
+                <PackageIcon size={40} className="text-gray-600" aria-label="사진 없음" />
               </div>
             )}
 
@@ -89,7 +89,7 @@ export function PackingItemList({ items, activeRowKey, onQuantityChange }: Packi
                 {item.productName}
               </span>
             </div>
-            <p className="truncate text-xs text-gray-500">{item.itemName}</p>
+            <p className="truncate text-xs text-gray-700">{item.itemName}</p>
 
             <div className="mt-1 flex items-baseline gap-1">
               <input
@@ -103,7 +103,7 @@ export function PackingItemList({ items, activeRowKey, onQuantityChange }: Packi
                   done ? 'text-green-600' : 'text-gray-900'
                 }`}
               />
-              <span className={`text-2xl ${done ? 'text-green-600' : 'text-gray-500'}`}>
+              <span className={`text-2xl ${done ? 'text-green-600' : 'text-gray-700'}`}>
                 / {item.remainingQty}
               </span>
             </div>

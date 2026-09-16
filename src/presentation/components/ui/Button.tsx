@@ -9,12 +9,13 @@
  * - 색은 `globals.css` 의 BRAND PALETTE REMAP 이 브랜드 색으로 바꾼다 — 여기서 `bg-brand` 로
  *   바꾸지 말 것(리맵 경로 이탈).
  * - 크기 variant 는 `sm` / `md` 둘뿐이다. 세 번째를 만들지 않는다.
- * - 표 안 동작 버튼은 `size="sm"`, 폼 제출·페이지 동작 버튼은 기본 `md`.
+ * - 표 안 동작 버튼은 `size="sm"`, 폼 제출·페이지 동작 버튼은 기본 `md`,
+ *   서서 쓰는 현장 화면(포장 작업 등)은 `size="lg"`.
  * - 아직 교체되지 않은 기존 버튼들은 해당 화면을 건드릴 때 함께 이관한다.
  *
  * **Props**
  * - `variant`: `primary`(기본) / `secondary` / `danger`.
- * - `size`: `sm`(`px-3 py-1.5 text-sm`) / `md`(기본, `px-4 py-2`).
+ * - `size`: `sm`(`px-3 py-1.5 text-sm`) / `md`(기본, `px-4 py-2`) / `lg`(`px-6 py-3 text-lg`, 현장 화면용).
  * - `isLoading`: `true` 면 `disabled` + `loadingText`(없으면 children) 표시.
  * - `className`: **레이아웃 보정 전용**(`flex items-center gap-1`, `w-full`, `flex-1` 등).
  * - 그 외 `<button>` 표준 속성 전부. `type` 기본값은 `'button'`.
@@ -43,6 +44,8 @@ const BASE = 'rounded-lg font-medium transition-colors disabled:cursor-not-allow
 const SIZE = {
   sm: 'px-3 py-1.5 text-sm',
   md: 'px-4 py-2',
+  // 서서 쓰는 현장 화면용 — 장갑 낀 손으로 누르고 1~2초 안에 읽어야 한다(포장 작업)
+  lg: 'px-6 py-3 text-lg',
 } as const;
 
 const VARIANT = {
