@@ -24,6 +24,7 @@ import type { Category } from '@/domain/entities/CategoryEntity';
 import type {
   MasterOptionRequest,
   MasterComponent,
+  MasterProductByComponents,
   CategoryAttribute,
   CategoryNotice,
 } from '@/domain/entities/MasterProductEntity';
@@ -380,7 +381,13 @@ export function MasterProductCreateForm({
   const [productQuery, setProductQuery] = useState('');
   const [productHasSearched, setProductHasSearched] = useState(false);
   // Once applied, the component set is frozen (search + add/remove disabled) until 수정 is pressed.
+  // 2609_46: 잠긴 상태 = "이 조합으로 만들어도 된다는 확인이 끝났다" → 나머지 입력이 열린다.
   const [componentsLocked, setComponentsLocked] = useState(false);
+  // 같은 조합으로 이미 있는 마스터. 비어 있지 않으면 잠그지 않고 차단한다.
+  const [duplicateMasters, setDuplicateMasters] = useState<MasterProductByComponents[]>([]);
+  // [설정 적용] per-action 스피너 + 조회 실패 안내(실패하면 잠그지 않는다).
+  const [checkingComponents, setCheckingComponents] = useState(false);
+  const [componentsError, setComponentsError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Component-product detail popup (data already loaded — no extra fetch).
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
@@ -421,34 +428,69 @@ export function MasterProductCreateForm({
     };
   }, [productsUseCase, carrierRateUseCase, packageUseCase, thumbnailTemplateUseCase]);
 
-  // Apply the picked component set: clear the search UI and freeze the section (수정 to reopen).
-  const applyComponents = () => {
-    setProductFilter('');
-    setProductQuery('');
-    setProductHasSearched(false);
-    setComponentsLocked(true);
+  /**
+   * [설정 적용] — 구성상품 조합을 확정한다 (2609_46).
+   *
+   * 마스터의 정체성은 구성상품 조합이므로, 잠그기 전에 같은 조합의 마스터가 이미 있는지 먼저 본다.
+   * - 이미 있음 → **잠그지 않고 차단**한다. 새로 만드는 대신 그 마스터에 옵션을 추가해야 한다.
+   * - 조회 실패 → 역시 **잠그지 않는다**(확인되지 않은 채로 나머지 입력을 열면 저장에서 400 을 맞는다).
+   * - 없음 → 잠그고 나머지 폼 전체를 연다.
+   */
+  const applyComponents = async () => {
+    if (selectedIds.length === 0) return;
+    setComponentsError('');
+    setDuplicateMasters([]);
+    setCheckingComponents(true);
+    try {
+      const existing = await useCase.findByComponents(selectedIds);
+      if (existing.length > 0) {
+        setDuplicateMasters(existing);
+        return;
+      }
+      setProductFilter('');
+      setProductQuery('');
+      setProductHasSearched(false);
+      setComponentsLocked(true);
+    } catch (e) {
+      setComponentsError(
+        extractErrorMessage(e, '같은 구성상품의 마스터가 있는지 확인하지 못했습니다. 다시 시도하세요.'),
+      );
+    } finally {
+      setCheckingComponents(false);
+    }
   };
 
   // Unlock components for editing; if options exist, confirm they will be discarded.
+  // 잠금이 풀리면 나머지 폼은 다시 비활성 상태로 돌아간다(중복 확인이 무효가 되므로).
+  const unlockComponents = useCallback(() => {
+    setComponentsLocked(false);
+    setDuplicateMasters([]);
+    setComponentsError('');
+  }, []);
+
   const editComponents = () => {
     if (options.length > 0) {
       setConfirmDialog({
         message: '구성상품을 수정할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
         onConfirm: () => {
           setOptions([]);
-          setComponentsLocked(false);
+          unlockComponents();
         },
       });
       return;
     }
-    setComponentsLocked(false);
+    unlockComponents();
   };
 
   const toggleProduct = (id: number) => {
     // Locked while an option is being added/edited, or after the set has been applied (수정 to reopen).
     if (optionFormOpen || componentsLocked) return;
-    const doToggle = () =>
+    const doToggle = () => {
+      // 조합이 바뀌면 직전 중복 확인 결과는 더 이상 이 조합의 답이 아니다.
+      setDuplicateMasters([]);
+      setComponentsError('');
       setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    };
     // Editing the component set invalidates existing options → confirm before dropping them.
     if (options.length > 0) {
       setConfirmDialog({
@@ -515,8 +557,10 @@ export function MasterProductCreateForm({
   );
 
   // 저장 차단 사유(있으면 [저장] disabled + 푸터 인라인 표시). 기본 택배/상자는 생성 시 필수(83B).
-  const saveBlockReason =
-    options.length === 0
+  // 2609_46: 구성상품 확정이 첫 관문 — 확정 전에는 나머지 입력 자체가 비활성이다.
+  const saveBlockReason = !componentsLocked
+    ? '구성상품을 먼저 선택하고 [설정 적용]을 누르세요.'
+    : options.length === 0
       ? '저장하려면 옵션을 1개 이상 추가하세요.'
       : defaultDeliveryId === '' || defaultPackageId === ''
         ? '기본 택배비와 기본 상자비를 선택하세요.'
@@ -568,12 +612,18 @@ export function MasterProductCreateForm({
 
   const handleSubmit = async () => {
     setError('');
-    if (!name.trim()) {
-      setError('이름을 입력하세요.');
-      return;
-    }
     if (selectedIds.length === 0) {
       setError('구성상품을 1개 이상 선택하세요.');
+      return;
+    }
+    // 2609_46: 화면 게이트가 이미 막지만, 확정 전 저장이 새어나가지 않게 한 번 더 막는다.
+    // (서버도 같은 조합의 마스터가 있으면 400 으로 거절한다 — 화면은 최종 방어선이 아니다.)
+    if (!componentsLocked) {
+      setError('구성상품을 확정한 뒤 저장하세요. [설정 적용]을 눌러 주세요.');
+      return;
+    }
+    if (!name.trim()) {
+      setError('이름을 입력하세요.');
       return;
     }
     // 기본 택배/상자는 생성 시 필수(83B). 아래 [저장] 이 이미 disabled 지만 방어적으로 한 번 더 막는다.
@@ -708,16 +758,9 @@ export function MasterProductCreateForm({
       <Card>
         {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
+        {/* 2609_46: 구성상품이 폼의 첫 항목이다 — 조합이 곧 마스터의 정체성이라, 조합을 확정하고
+            중복이 아님이 확인되기 전에는 이름을 포함한 나머지 입력이 전부 비활성이다. */}
         <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">마스터 이름 *</label>
-            <Input
-              size="sm"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">
               구성상품 ({selectedIds.length}개 선택)
@@ -756,11 +799,11 @@ export function MasterProductCreateForm({
               ) : (
                 <button
                   type="button"
-                  onClick={applyComponents}
-                  disabled={optionFormOpen || selectedIds.length === 0}
+                  onClick={() => void applyComponents()}
+                  disabled={optionFormOpen || selectedIds.length === 0 || checkingComponents}
                   className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
                 >
-                  설정적용
+                  {checkingComponents ? <Spinner label="확인 중..." /> : '설정적용'}
                 </button>
               )}
             </div>
@@ -867,263 +910,321 @@ export function MasterProductCreateForm({
                 </tbody>
               </table>
             </div>
-          </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
-              카테고리 *
-            </label>
-            {selectedCategoryId !== '' && (
-              <p className="mb-2 flex items-center gap-2 text-sm text-gray-900">
-                <span>
-                  선택된 카테고리: <span className="font-medium">{selectedCategoryName}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void revealSelectedCategory()}
-                  className="rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
-                >
-                  선택 카테고리로 이동
-                </button>
+            {componentsError && (
+              <p className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+                {componentsError}
               </p>
             )}
 
-            {/* 이름 검색 → 결과 클릭 시 트리를 그 위치로 펼치고(leaf 면 바로 선택). */}
-            <div className="mb-2 flex gap-2">
-              <input
-                className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100"
-                placeholder="카테고리 이름으로 검색"
-                value={catSearchInput}
-                disabled={categoryLocked}
-                onChange={(e) => setCatSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleCategorySearch();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleCategorySearch}
-                disabled={categoryLocked || catSearching || !catSearchInput.trim()}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {catSearching ? <Spinner label="검색 중..." /> : '검색'}
-              </button>
-              {categoryLocked ? (
-                <button
-                  type="button"
-                  onClick={editCategory}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
-                >
-                  수정
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={applyCategory}
-                  disabled={selectedCategoryId === ''}
-                  className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                >
-                  설정적용
-                </button>
-              )}
-            </div>
-            {!categoryLocked && catHasSearched && (
-              <div className="mb-2 max-h-40 overflow-y-auto rounded border border-gray-200">
-                {catResults.length === 0 ? (
-                  <p className="px-3 py-2 text-sm text-gray-500">검색 결과가 없습니다.</p>
-                ) : (
-                  <ul className="divide-y divide-gray-100">
-                    {catResults.map((r) => (
-                      <li key={r.cat.id}>
-                        <button
-                          type="button"
-                          onClick={() => void handleSelectCategoryResult(r.cat)}
-                          title={r.path}
-                          className="block w-full px-3 py-1.5 text-left hover:bg-blue-50"
-                        >
-                          <span className="block text-sm text-gray-800">{r.cat.name}</span>
-                          <span className="block break-words text-[11px] text-gray-400">{r.path}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {catTotalMatches > catResults.length && (
-                  <p className="border-t border-gray-100 px-3 py-1.5 text-[11px] text-gray-400">
-                    {catTotalMatches}개 중 {catResults.length}개 표시 — 더 구체적으로 검색하세요.
-                  </p>
-                )}
+            {/* 같은 구성상품 조합의 마스터가 이미 있으면 여기서 멈춘다 — 새로 만드는 대신 그 마스터에
+                옵션을 추가하면 된다(수량 차이는 같은 마스터의 옵션이다). */}
+            {duplicateMasters.length > 0 && (
+              <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2">
+                <p className="text-sm font-medium text-amber-900">
+                  이 구성상품으로 만든 마스터가 이미 있습니다. 새로 만드는 대신 그 마스터에 옵션을
+                  추가하세요.
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {duplicateMasters.map((m) => (
+                    <li key={m.id} className="text-sm text-amber-900">
+                      <a
+                        href={ROUTES.MASTER_PRODUCT_DETAIL(m.id)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-blue-600 hover:underline"
+                      >
+                        {m.name}
+                      </a>
+                      <span className="ml-1 text-amber-800">
+                        (옵션 {m.optionCount}개{m.active ? '' : ' · 삭제된 마스터'})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-amber-800">
+                  수량만 다른 상품(예: 1개 / 5개 묶음)은 새 마스터가 아니라 위 마스터의 옵션으로
+                  만듭니다. 삭제된 마스터라면 상세에서 다시 사용하도록 되돌릴 수 있습니다.
+                </p>
               </div>
             )}
 
-            {/* Locked: keep the tree browsable/scrollable but freeze leaf selection (no-op). */}
-            <CategoryTreeColumns
-              browse={browseTree}
-              selectedId={selectedCategoryId === '' ? null : selectedCategoryId}
-              expandTo={catExpandChain}
-              onSelectLeaf={
-                categoryLocked ? () => {} : (leaf) => chooseCategory(leaf.id, leaf.name)
-              }
-            />
-            {!categoryLocked && (
-              <p className="mt-1 text-[11px] text-gray-500">
-                카테고리가 없으면{' '}
-                <a
-                  href={ROUTES.COSTS_CATEGORY}
-                  className="text-blue-600 hover:underline"
-                >
-                  카테고리 관리
-                </a>
-                에서 추가하세요.
+            {!componentsLocked && duplicateMasters.length === 0 && (
+              <p className="mt-2 text-[11px] text-gray-500">
+                구성상품을 고르고 [설정적용]을 누르면 나머지 항목을 입력할 수 있습니다.
               </p>
             )}
           </div>
+        </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
-              필수속성 / 상품정보제공고시
-            </label>
-            <MetaPlatformTabs>
-              {(platform) => (
-                <CategoryMetaCreateFields
-                  key={platform}
-                  categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
-                  platform={platform}
-                  value={metaByPlatform[platform] ?? EMPTY_META_VALUE}
-                  onChange={(next) => handleMetaChange(platform, next)}
-                  onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad(platform, attrs, notices)}
-                  hideCategoryAttrs={hideCategoryAttrs}
-                />
-              )}
-            </MetaPlatformTabs>
-          </div>
+        {/* 구성상품이 확정되기 전에는 나머지 입력 전체가 잠긴다. `fieldset[disabled]` 이 내부
+            입력·버튼을 실제로 비활성화하고, `pointer-events-none` 이 드래그·클릭 핸들러까지 막는다. */}
+        <fieldset
+          disabled={!componentsLocked}
+          className={componentsLocked ? 'min-w-0' : 'min-w-0 opacity-60 pointer-events-none'}
+        >
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">마스터 이름 *</label>
+              <Input size="sm" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
 
-          {fields.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">
-                템플릿 필드값 (선택)
+                카테고리 *
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                {fields.map((f) => (
-                  <div key={f.key}>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
-                    <Input
-                      size="sm"
-                      value={fieldValues[f.key] ?? ''}
-                      placeholder={
-                        (BUILTIN_FIELD_KEYS as readonly string[]).includes(f.key)
-                          ? '등록상품값 사용'
-                          : '템플릿 기본값 사용'
-                      }
-                      onChange={(e) =>
-                        setFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))
-                      }
-                    />
-                  </div>
-                ))}
+              {selectedCategoryId !== '' && (
+                <p className="mb-2 flex items-center gap-2 text-sm text-gray-900">
+                  <span>
+                    선택된 카테고리: <span className="font-medium">{selectedCategoryName}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void revealSelectedCategory()}
+                    className="rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                  >
+                    선택 카테고리로 이동
+                  </button>
+                </p>
+              )}
+
+              {/* 이름 검색 → 결과 클릭 시 트리를 그 위치로 펼치고(leaf 면 바로 선택). */}
+              <div className="mb-2 flex gap-2">
+                <input
+                  className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  placeholder="카테고리 이름으로 검색"
+                  value={catSearchInput}
+                  disabled={categoryLocked}
+                  onChange={(e) => setCatSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCategorySearch();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleCategorySearch}
+                  disabled={categoryLocked || catSearching || !catSearchInput.trim()}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {catSearching ? <Spinner label="검색 중..." /> : '검색'}
+                </button>
+                {categoryLocked ? (
+                  <button
+                    type="button"
+                    onClick={editCategory}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  >
+                    수정
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={applyCategory}
+                    disabled={selectedCategoryId === ''}
+                    className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    설정적용
+                  </button>
+                )}
               </div>
+              {!categoryLocked && catHasSearched && (
+                <div className="mb-2 max-h-40 overflow-y-auto rounded border border-gray-200">
+                  {catResults.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-gray-500">검색 결과가 없습니다.</p>
+                  ) : (
+                    <ul className="divide-y divide-gray-100">
+                      {catResults.map((r) => (
+                        <li key={r.cat.id}>
+                          <button
+                            type="button"
+                            onClick={() => void handleSelectCategoryResult(r.cat)}
+                            title={r.path}
+                            className="block w-full px-3 py-1.5 text-left hover:bg-blue-50"
+                          >
+                            <span className="block text-sm text-gray-800">{r.cat.name}</span>
+                            <span className="block break-words text-[11px] text-gray-400">{r.path}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {catTotalMatches > catResults.length && (
+                    <p className="border-t border-gray-100 px-3 py-1.5 text-[11px] text-gray-400">
+                      {catTotalMatches}개 중 {catResults.length}개 표시 — 더 구체적으로 검색하세요.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Locked: keep the tree browsable/scrollable but freeze leaf selection (no-op). */}
+              <CategoryTreeColumns
+                browse={browseTree}
+                selectedId={selectedCategoryId === '' ? null : selectedCategoryId}
+                expandTo={catExpandChain}
+                onSelectLeaf={
+                  categoryLocked ? () => {} : (leaf) => chooseCategory(leaf.id, leaf.name)
+                }
+              />
+              {!categoryLocked && (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  카테고리가 없으면{' '}
+                  <a
+                    href={ROUTES.COSTS_CATEGORY}
+                    className="text-blue-600 hover:underline"
+                  >
+                    카테고리 관리
+                  </a>
+                  에서 추가하세요.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                필수속성 / 상품정보제공고시
+              </label>
+              <MetaPlatformTabs>
+                {(platform) => (
+                  <CategoryMetaCreateFields
+                    key={platform}
+                    categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
+                    platform={platform}
+                    value={metaByPlatform[platform] ?? EMPTY_META_VALUE}
+                    onChange={(next) => handleMetaChange(platform, next)}
+                    onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad(platform, attrs, notices)}
+                    hideCategoryAttrs={hideCategoryAttrs}
+                  />
+                )}
+              </MetaPlatformTabs>
+            </div>
+
+            {fields.length > 0 && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  템플릿 필드값 (선택)
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {fields.map((f) => (
+                    <div key={f.key}>
+                      <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
+                      <Input
+                        size="sm"
+                        value={fieldValues[f.key] ?? ''}
+                        placeholder={
+                          (BUILTIN_FIELD_KEYS as readonly string[]).includes(f.key)
+                            ? '등록상품값 사용'
+                            : '템플릿 기본값 사용'
+                        }
+                        onChange={(e) =>
+                          setFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  비우면 예약 필드는 등록상품 정보, 커스텀 필드는 템플릿 기본값으로 채워집니다. 채널마다
+                  다르게 하려면 등록 후 셀의 [필드값 편집]에서 조정하세요.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">태그 (선택)</label>
+              <TagChipsInput tags={tags} onChange={setTags} disabled={isSubmitting} />
               <p className="mt-1 text-[11px] text-gray-500">
-                비우면 예약 필드는 등록상품 정보, 커스텀 필드는 템플릿 기본값으로 채워집니다. 채널마다
-                다르게 하려면 등록 후 셀의 [필드값 편집]에서 조정하세요.
+                Enter 또는 콤마로 추가하세요.
               </p>
             </div>
-          )}
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">태그 (선택)</label>
-            <TagChipsInput tags={tags} onChange={setTags} disabled={isSubmitting} />
-            <p className="mt-1 text-[11px] text-gray-500">
-              Enter 또는 콤마로 추가하세요.
-            </p>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                이미지 (대표사진 + 상세페이지)
+              </label>
+              <MasterImagePool
+                masterId={null}
+                detailUseCase={detailUseCase}
+                fields={imageFields}
+                fieldFilters={imageFieldFilters}
+                buffer={imageBuffer}
+                onBufferChange={setImageBuffer}
+                productImageUseCase={productImageUseCase}
+                sourceProducts={sourceProducts}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">기본 택배비 *</label>
+                <select
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                  value={defaultDeliveryId}
+                  onChange={(e) => setDefaultDeliveryId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  {carrierRates.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.carrier} {r.type} · {formatWon(r.cost)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">기본 상자비 *</label>
+                <select
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                  value={defaultPackageId}
+                  onChange={(e) => setDefaultPackageId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  {packages.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.type} · {formatWon(p.cost)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="col-span-2 text-[11px] text-gray-500">
+                옵션에서 개별 지정하지 않으면 이 값이 모든 옵션 판매가 계산에 쓰입니다.
+              </p>
+            </div>
+
+            <div className="space-y-2 rounded border border-gray-200 p-3">
+              <h3 className="text-sm font-semibold text-gray-900">배송 설정 (전 채널 공통)</h3>
+              <p className="text-[11px] text-gray-500">
+                비우면 판매채널의 기본 배송 설정을 그대로 씁니다. 채워두면 이 마스터의 모든 채널에
+                적용되고, 채널마다 다르게 하려면 나중에 [채널 배송 설정]에서 바꿉니다. 출고지·반품지는
+                판매채널마다 달라야 해서 여기서 지정하지 않습니다.
+              </p>
+              <ShippingOverrideFields
+                level="master"
+                scope="common"
+                value={shippingOverride}
+                onChange={setShippingOverride}
+                platform="COUPANG"
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
-              이미지 (대표사진 + 상세페이지)
-            </label>
-            <MasterImagePool
-              masterId={null}
-              detailUseCase={detailUseCase}
-              fields={imageFields}
-              fieldFilters={imageFieldFilters}
-              buffer={imageBuffer}
-              onBufferChange={setImageBuffer}
-              productImageUseCase={productImageUseCase}
-              sourceProducts={sourceProducts}
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <MasterOptionEditor
+              components={createComponents}
+              options={options}
+              onOptionsChange={setOptions}
+              carrierRates={carrierRates}
+              packages={packages}
+              masterDefaults={masterDefaults}
+              categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
+              masterAttrValues={metaByPlatform['COUPANG']?.attrValues ?? {}}
+              masterNoticeValues={metaByPlatform['COUPANG']?.noticeValues ?? {}}
+              masterNoticeGroup={masterNoticeGroup}
+              hideCategoryAttrs={hideCategoryAttrs}
+              onFormOpenChange={setOptionFormOpen}
             />
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">기본 택배비 *</label>
-              <select
-                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-                value={defaultDeliveryId}
-                onChange={(e) => setDefaultDeliveryId(e.target.value ? Number(e.target.value) : '')}
-              >
-                {carrierRates.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.carrier} {r.type} · {formatWon(r.cost)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">기본 상자비 *</label>
-              <select
-                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-                value={defaultPackageId}
-                onChange={(e) => setDefaultPackageId(e.target.value ? Number(e.target.value) : '')}
-              >
-                {packages.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.type} · {formatWon(p.cost)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="col-span-2 text-[11px] text-gray-500">
-              옵션에서 개별 지정하지 않으면 이 값이 모든 옵션 판매가 계산에 쓰입니다.
-            </p>
-          </div>
-
-          <div className="space-y-2 rounded border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">배송 설정 (전 채널 공통)</h3>
-            <p className="text-[11px] text-gray-500">
-              비우면 판매채널의 기본 배송 설정을 그대로 씁니다. 채워두면 이 마스터의 모든 채널에
-              적용되고, 채널마다 다르게 하려면 나중에 [채널 배송 설정]에서 바꿉니다. 출고지·반품지는
-              판매채널마다 달라야 해서 여기서 지정하지 않습니다.
-            </p>
-            <ShippingOverrideFields
-              level="master"
-              scope="common"
-              value={shippingOverride}
-              onChange={setShippingOverride}
-              platform="COUPANG"
-              disabled={isSubmitting}
-            />
-          </div>
-        </div>
-
-        <div className="mt-6 border-t border-gray-200 pt-6">
-          <MasterOptionEditor
-            components={createComponents}
-            options={options}
-            onOptionsChange={setOptions}
-            carrierRates={carrierRates}
-            packages={packages}
-            masterDefaults={masterDefaults}
-            categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
-            masterAttrValues={metaByPlatform['COUPANG']?.attrValues ?? {}}
-            masterNoticeValues={metaByPlatform['COUPANG']?.noticeValues ?? {}}
-            masterNoticeGroup={masterNoticeGroup}
-            hideCategoryAttrs={hideCategoryAttrs}
-            onFormOpenChange={setOptionFormOpen}
-          />
-        </div>
+        </fieldset>
 
         <div className="mt-6 flex items-center justify-end gap-2 border-t border-gray-200 pt-6">
           {saveBlockReason && (
