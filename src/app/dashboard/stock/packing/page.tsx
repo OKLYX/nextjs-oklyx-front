@@ -25,16 +25,21 @@ import { ScanInput } from './components/ScanInput';
 import { PackingItemList, type PackedRow } from './components/PackingItemList';
 import { BoxCandidateRow } from './components/BoxCandidateRow';
 import { PendingParcelList } from './components/PendingParcelList';
-import { TodayDoneRail } from './components/TodayDoneRail';
+import { RightRailTabs, type RailTab } from './components/RightRailTabs';
 
 /**
  * 송장 스캔 포장 화면 — 키보드 전용 (FEATURE_2609_40 / PLAN D9 ~ D17 · D31 ~ D33,
- * FEATURE_2609_53 / PLAN D1 ~ D10, FEATURE_2609_54 / PLAN D1 ~ D14).
+ * FEATURE_2609_53 / PLAN D1 ~ D10, FEATURE_2609_54 / PLAN D1 ~ D14,
+ * FEATURE_2609_55 / PLAN D1 ~ D12).
  *
  * 🔴 **화면 상태는 네 개다**: 시작 화면(`!started`) · 송장 대기(`started && !scanResult`) ·
- * 담는 중(`scanResult && isPending`) · 닫힌 박스(`scanResult && !isPending`). 담는 중만 3열이고
- * 나머지는 2열이다(2609_54/D1). 🔴 안내문(`messageBar`)은 **세 상태 모두 같은 자리**다 — 송장 스캔
- * 실패는 송장 대기 상태에서 뜨므로, 담는 중에만 자리를 주면 그 오류가 화면에서 사라진다.
+ * 담는 중(`scanResult && isPending`) · 닫힌 박스(`scanResult && !isPending`).
+ *
+ * 🔴 **몰입 레이어 안의 세 상태는 같은 골격을 쓴다**(2609_55/D1): 상단 정보 줄 · 안내문 ·
+ * `22rem | 1fr | 20rem` 3열 · 하단 유틸리티 줄이 **항상** 그려지고 **칸의 내용만** 바뀐다.
+ * 자리가 상태마다 움직이면 작업자가 눈을 어디에 둘지 배울 수 없다. 그래서 레이아웃은
+ * `leftColumn` · `centerColumn` · `rightRail` **열 단위 조각**으로만 만든다 — 상태별로 레이아웃을
+ * 따로 들고 있으면 상태가 자리를 흔든다. `xl:grid-cols-[22rem_1fr_20rem]` 은 이 파일에 한 번만 나온다.
  *
  * 🔴 **상태는 이 페이지가 전부 소유한다.** 자식은 값을 받아 그리고 이벤트만 올린다 — 스캔 버퍼가
  * 두 곳에 있으면 포커스가 벗어났을 때 스캔이 허공으로 간다.
@@ -114,6 +119,8 @@ interface KeyHandlers {
   help: () => void;
   /** F9 — 안내 음성 켜기/끄기 */
   toggleVoice: () => void;
+  /** F10 — 오른쪽 열 탭 전환 (작업 대상 ↔ 오늘 완료). 2609_53/D7 부분 번복 = 2609_55/D6 */
+  toggleRail: () => void;
 }
 
 /** F8 도움말 표 — 화면에 적힌 두 길(F키 · 방향키)을 한 곳에 모아 둔다 */
@@ -129,6 +136,7 @@ const SHORTCUT_HELP: [string, string][] = [
   ['F4', '이 박스 사용 안 함'],
   ['F6 / F7', '이 박스 완료 / 취소'],
   ['F8 / F9', '단축키 / 안내 음성'],
+  ['F10', '오른쪽 열 탭 (작업 대상 / 오늘 완료)'],
   ['Esc', '박스 잡은 중: 이 박스 취소 · 송장 대기: 나가기'],
 ];
 
@@ -176,6 +184,8 @@ export default function StockPackingPage() {
   const [pendingLoading, setPendingLoading] = useState(false);
   /** 작업 대상 박스 목록에서 ↑↓ 로 고른 줄. 목록이 짧아질 수 있어 쓰는 쪽에서 clamp 한다 */
   const [parcelIndex, setParcelIndex] = useState(0);
+  /** 오른쪽 열 탭 — F10 으로 오간다 (2609_55/D5 · D6) */
+  const [railTab, setRailTab] = useState<RailTab>('PENDING');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [unusedOpen, setUnusedOpen] = useState(false);
@@ -375,6 +385,8 @@ export default function StockPackingPage() {
 
   const resetBox = useCallback(() => {
     setScanResult(null);
+    // 🔴 대기로 돌아오면 ↑↓ 의 대상이 보여야 한다 (2609_55/D5). 대기로 오는 모든 경로가 여기를 지난다
+    setRailTab('PENDING');
     setPacked({});
     setActiveRowKey(null);
     setCandidates([]);
@@ -653,11 +665,20 @@ export default function StockPackingPage() {
   /** ↑↓ (송장 대기) — 작업 대상 박스 목록 이동 */
   const moveParcel = useCallback(
     (delta: number) => {
+      // 🔴 「오늘 완료」 탭이 열려 있으면 고른 줄이 안 보인다 → 움직이는 목록을 보여준다.
+      //    `moveRow`(담을 것 줄)에는 넣지 않는다 — 담는 중 탭은 작업자가 둔 대로 둔다.
+      setRailTab('PENDING');
       const length = pendingParcels.length;
       if (length === 0) return;
       setParcelIndex((previous) => clampIndex(clampIndex(previous, length) + delta, length));
     },
     [pendingParcels.length]
+  );
+
+  /** F10 · 하단 버튼 — 오른쪽 열 탭 전환. 🔴 두 길이 같은 함수를 쓴다(한쪽만 고쳐지지 않게) */
+  const toggleRailTab = useCallback(
+    () => setRailTab((previous) => (previous === 'PENDING' ? 'DONE' : 'PENDING')),
+    []
   );
 
   /** ← → — 상자 이동 = **즉시 선택**. 이미 출고·미사용 박스면 아무 것도 고르지 않는다 */
@@ -782,6 +803,7 @@ export default function StockPackingPage() {
     moveBox: noop,
     help: noop,
     toggleVoice: noop,
+    toggleRail: noop,
   });
 
   // 렌더 중에 ref 를 쓰면 lint 가 막는다 → 매 렌더 뒤 이펙트에서 갱신한다(의존성 배열 없음).
@@ -809,6 +831,7 @@ export default function StockPackingPage() {
       moveBox,
       help: () => setHelpOpen(true),
       toggleVoice,
+      toggleRail: toggleRailTab,
     };
   });
 
@@ -823,8 +846,9 @@ export default function StockPackingPage() {
       //    Enter 만 버튼이 먹어서 스캔이 통째로 허공으로 간다. 전체 상자 목록은 ← → 가 고른다.
 
       // 🔴 스캐너는 문자 + Enter 만 보낸다 → F키와 절대 충돌하지 않는다.
-      //    브라우저 기본 동작(F1 = 도움말)은 여기서 막는다. F5·F10·F11·F12 는 건드리지 않는다(D7).
-      if (/^F[1-46-9]$/.test(event.key)) {
+      //    브라우저 기본 동작(F1 = 도움말)은 여기서 막는다. F5·F11·F12 는 건드리지 않는다
+      //    (2609_53/D7 — F10 만 부분 번복해 오른쪽 탭에 쓴다: 2609_55/D6).
+      if (/^(?:F[1-46-9]|F10)$/.test(event.key)) {
         event.preventDefault();
         if (event.key === 'F8') {
           handlers.help(); // 도움말은 전송 중에도 열린다
@@ -835,6 +859,8 @@ export default function StockPackingPage() {
         else if (event.key === 'F6') handlers.submitBox();
         else if (event.key === 'F7') handlers.cancel();
         else if (event.key === 'F9') handlers.toggleVoice();
+        // 🔴 마지막 else 는 `F숫자` 를 상자 후보로 읽는다 — F10 을 흘리면 10번째 후보를 고르려 든다
+        else if (event.key === 'F10') handlers.toggleRail();
         else handlers.selectCandidate(Number(event.key.slice(1)) - 1);
         return;
       }
@@ -923,42 +949,56 @@ export default function StockPackingPage() {
     />
   );
 
-  /** 4-0 ② 박스 정보 — 송장·고객·택배사·순번·판매자·주문번호(담는 중이면 담음 배지까지) */
-  const parcelHeader = parcel && (
+  /**
+   * 4-0 ② 박스 정보 — 송장·고객·택배사·순번·판매자·주문번호(담는 중이면 담음 배지까지).
+   *
+   * 🔴 **항상 그린다**(2609_55/D2). 카드가 생겼다 사라지면 아래 3열과 하단 줄이 통째로 위아래로
+   * 밀린다 — 이 화면이 없애려는 밀림이다. 대기 중에는 송장번호 자리에 안내 문구만 들어간다.
+   * 🔴 `min-h-[3.25rem]` = 담는 중 줄이 1280px 에서 두 줄로 접혀도 대기 줄과 높이가 같게 한다.
+   *    최대 높이를 주거나 `overflow-hidden` 으로 자르지 말 것 — 송장·고객은 작업자가 실물과
+   *    대조하는 값이라 가려지면 안 된다.
+   */
+  const parcelHeader = (
     <Card>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <span className="font-mono text-2xl font-bold tabular-nums text-gray-900">
-          {parcel.invoiceNumber}
-        </span>
-        {/* 🔴 수취인 ?? 주문자 — 어느 쪽을 보일지는 화면이 정한다(2609_54/D5). 마스킹하지 않는다:
-            작업자가 실물 송장의 받는 사람과 대조하는 값이다 */}
-        <span className="text-xl font-semibold text-gray-900">
-          {scanResult?.order.receiverName ?? scanResult?.order.ordererName ?? '-'}
-        </span>
-        <span className="text-sm text-gray-500">{parcel.carrierName ?? '택배사 미상'}</span>
-        <span className="text-sm text-gray-500">
-          {parcel.totalParcels > 1
-            ? `${parcel.totalParcels}박스 중 ${parcel.parcelSeq ?? '-'}번째`
-            : '1박스'}
-        </span>
-        <span className="text-sm text-gray-500">
-          {scanResult?.order.sellerName ?? '-'} · 주문 {scanResult?.order.externalOrderId}
-        </span>
-        {scanResult?.isLastParcel && (
-          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-            마지막 박스 — 남은 물품 전량을 담아야 합니다
-          </span>
-        )}
-        {isPending && (
-          <span
-            className={`ml-auto rounded px-3 py-1 text-lg font-semibold ${
-              packedTotal >= remainingTotal
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            담음 {packedTotal} / {remainingTotal}
-          </span>
+      <div className="flex min-h-[3.25rem] flex-wrap items-center gap-x-6 gap-y-2">
+        {!parcel ? (
+          <span className="text-2xl font-bold text-gray-400">송장을 스캔하세요</span>
+        ) : (
+          <>
+            <span className="font-mono text-2xl font-bold tabular-nums text-gray-900">
+              {parcel.invoiceNumber}
+            </span>
+            {/* 🔴 수취인 ?? 주문자 — 어느 쪽을 보일지는 화면이 정한다(2609_54/D5). 마스킹하지 않는다:
+                작업자가 실물 송장의 받는 사람과 대조하는 값이다 */}
+            <span className="text-xl font-semibold text-gray-900">
+              {scanResult?.order.receiverName ?? scanResult?.order.ordererName ?? '-'}
+            </span>
+            <span className="text-sm text-gray-500">{parcel.carrierName ?? '택배사 미상'}</span>
+            <span className="text-sm text-gray-500">
+              {parcel.totalParcels > 1
+                ? `${parcel.totalParcels}박스 중 ${parcel.parcelSeq ?? '-'}번째`
+                : '1박스'}
+            </span>
+            <span className="text-sm text-gray-500">
+              {scanResult?.order.sellerName ?? '-'} · 주문 {scanResult?.order.externalOrderId}
+            </span>
+            {scanResult?.isLastParcel && (
+              <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                마지막 박스 — 남은 물품 전량을 담아야 합니다
+              </span>
+            )}
+            {isPending && (
+              <span
+                className={`ml-auto rounded px-3 py-1 text-lg font-semibold ${
+                  packedTotal >= remainingTotal
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                담음 {packedTotal} / {remainingTotal}
+              </span>
+            )}
+          </>
         )}
       </div>
     </Card>
@@ -980,167 +1020,227 @@ export default function StockPackingPage() {
     remainingTotal > 0 ? Math.min(100, Math.round((packedTotal / remainingTotal) * 100)) : 0;
 
   /**
-   * 상태 ① 담는 중 — 왼쪽 상자 · 가운데 제품 · 오른쪽 오늘 완료 3열 (2609_54/D1).
-   * 🔴 F4 · F8 · F9 는 3열 아래 한 줄로 작게 남는다(D12) — 지우면 기능이 사라진다.
+   * 왼쪽 열(담는 중) — 지금 고른 상자를 화면에서 가장 크게. 🔴 무게·완충재·결제 방식은 넣지 않는다(D8):
+   * 시스템에 그 개념이 없다. 빈 자리도 만들지 않는다.
+   *
+   * 🔴 이 조각은 `scanResult` 가 있을 때만 쓰이지만 선언은 **항상 평가된다** — 안에서 `scanResult` 를
+   * 읽는 자리(`selectedBox` 등)는 이미 옵셔널을 거치고 있다. 새 `?.` 를 덧붙이며 조건을 바꾸지 않는다.
    */
-  const packingSection = scanResult && isPending && (
-    <div className="space-y-3">
-      <div className="grid gap-4 xl:grid-cols-[22rem_1fr_20rem]">
-        {/* 왼쪽 — 지금 고른 상자를 화면에서 가장 크게. 🔴 무게·완충재·결제 방식은 넣지 않는다(D8):
-            시스템에 그 개념이 없다. 빈 자리도 만들지 않는다 */}
-        <Card title="이 박스에 담기" className="space-y-3">
-          {selectedBox ? (
-            <div>
-              <div className="text-4xl font-bold text-gray-900">{selectedBox.type}</div>
-              <div className="mt-1 text-sm text-gray-500">
-                {selectedBox.widthCm} × {selectedBox.lengthCm} × {selectedBox.heightCm} cm
-              </div>
-              <div className="text-sm text-gray-500">{BOX_KIND_LABEL[boxKindOf(selectedBox)]}</div>
-            </div>
-          ) : (
-            <div className="text-xl text-gray-500">상자를 고르세요</div>
-          )}
-
-          {compositionItems.length === 0 ? (
-            <p className="text-sm text-gray-500">물품을 담으면 상자를 추천합니다.</p>
-          ) : (
-            <BoxCandidateRow
-              candidates={candidates}
-              selectedPackageId={selectedPackageId}
-              loading={candidatesLoading}
-              onSelect={handleSelectBox}
-            />
-          )}
-
-          {showAllBoxes && (
-            <div className="space-y-2 border-t border-gray-100 pt-3">
-              <p className="text-sm text-gray-500">
-                전체 상자에서 고르세요 (← →). 고른 상자는 이 조합으로 기억됩니다.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {allPackages.map((pkg) => (
-                  <button
-                    key={pkg.id}
-                    type="button"
-                    onClick={(event) => {
-                      event.currentTarget.blur();
-                      handleSelectBox(pkg.id);
-                    }}
-                    className={`flex w-52 items-center gap-2 rounded-lg border p-2 text-left ${
-                      pkg.id === selectedPackageId
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center">
-                      {pkg.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={pkg.imageUrl}
-                          alt={`${pkg.type} 상자 사진`}
-                          className="h-11 w-11 rounded border border-gray-200 object-contain"
-                        />
-                      ) : (
-                        <BoxShape
-                          widthCm={pkg.widthCm}
-                          lengthCm={pkg.lengthCm}
-                          heightCm={pkg.heightCm}
-                        />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-gray-900">{pkg.type}</div>
-                      <div className="text-xs text-gray-500">
-                        {pkg.widthCm} × {pkg.lengthCm} × {pkg.heightCm} cm
-                      </div>
-                      <div className="text-xs text-gray-500">{BOX_KIND_LABEL[boxKindOf(pkg)]}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <p className="text-sm text-gray-500">상자 = F1 · F2 · F3 또는 ← →</p>
-        </Card>
-
-        {/* 가운데 — 🔴 `scanInput` 을 빼지 말 것: 스캐너가 없을 때 물품을 손으로 넣는 유일한 창구이고,
-            스캔 버퍼가 보이는 유일한 자리다 */}
-        <Card title="제품 스캔" className="space-y-4">
-          {scanInput}
-
-          <PackingItemList
-            items={rows}
-            activeRowKey={activeRowKey}
-            onQuantityChange={handleQuantityChange}
-          />
-
-          <div className="h-2 rounded bg-gray-200">
-            <div className="h-2 rounded bg-green-500" style={{ width: `${progressPercent}%` }} />
+  const boxCard = (
+    <Card title="이 박스에 담기" className="space-y-3">
+      {selectedBox ? (
+        <div>
+          <div className="text-4xl font-bold text-gray-900">{selectedBox.type}</div>
+          <div className="mt-1 text-sm text-gray-500">
+            {selectedBox.widthCm} × {selectedBox.lengthCm} × {selectedBox.heightCm} cm
           </div>
+          <div className="text-sm text-gray-500">{BOX_KIND_LABEL[boxKindOf(selectedBox)]}</div>
+        </div>
+      ) : (
+        <div className="text-xl text-gray-500">상자를 고르세요</div>
+      )}
 
-          {/* 🔴 문구를 「발송 완료」로 바꾸지 말 것(2609_54/D9) — 이 시스템의 발송처리는 채널에
-              송장을 올리는 일(2609_07)이고 포장 완료와 다른 일이다 */}
-          <div className="flex gap-3">
-            <Button
-              className="flex-1"
-              onClick={handleComplete}
-              isLoading={isSubmitting}
-              loadingText="완료 처리 중..."
-            >
-              [Enter · F6] 이 박스 완료
-            </Button>
-            <Button
-              className="flex-1"
-              variant="secondary"
-              onClick={handleCancelBox}
-              disabled={isSubmitting}
-            >
-              [Esc · F7] 취소
-            </Button>
+      {compositionItems.length === 0 ? (
+        <p className="text-sm text-gray-500">물품을 담으면 상자를 추천합니다.</p>
+      ) : (
+        <BoxCandidateRow
+          candidates={candidates}
+          selectedPackageId={selectedPackageId}
+          loading={candidatesLoading}
+          onSelect={handleSelectBox}
+        />
+      )}
+
+      {showAllBoxes && (
+        <div className="space-y-2 border-t border-gray-100 pt-3">
+          <p className="text-sm text-gray-500">
+            전체 상자에서 고르세요 (← →). 고른 상자는 이 조합으로 기억됩니다.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {allPackages.map((pkg) => (
+              <button
+                key={pkg.id}
+                type="button"
+                onClick={(event) => {
+                  event.currentTarget.blur();
+                  handleSelectBox(pkg.id);
+                }}
+                className={`flex w-52 items-center gap-2 rounded-lg border p-2 text-left ${
+                  pkg.id === selectedPackageId
+                    ? 'border-blue-600 bg-blue-50'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+                  {pkg.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={pkg.imageUrl}
+                      alt={`${pkg.type} 상자 사진`}
+                      className="h-11 w-11 rounded border border-gray-200 object-contain"
+                    />
+                  ) : (
+                    <BoxShape
+                      widthCm={pkg.widthCm}
+                      lengthCm={pkg.lengthCm}
+                      heightCm={pkg.heightCm}
+                    />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-gray-900">{pkg.type}</div>
+                  <div className="text-xs text-gray-500">
+                    {pkg.widthCm} × {pkg.lengthCm} × {pkg.heightCm} cm
+                  </div>
+                  <div className="text-xs text-gray-500">{BOX_KIND_LABEL[boxKindOf(pkg)]}</div>
+                </div>
+              </button>
+            ))}
           </div>
-        </Card>
+        </div>
+      )}
 
-        <TodayDoneRail />
+      <p className="text-sm text-gray-500">상자 = F1 · F2 · F3 또는 ← →</p>
+    </Card>
+  );
+
+  /** 상자를 아직 고를 수 없는 상태(송장 대기 · 닫힌 박스)의 왼쪽 열 — 자리만 지킨다 (2609_55/D4) */
+  const boxPlaceholderCard = (
+    <Card title="이 박스에 담기">
+      <p className="text-sm text-gray-500">송장을 스캔하면 상자를 추천합니다.</p>
+    </Card>
+  );
+
+  /**
+   * 가운데 열(담는 중) — 🔴 `scanInput` 을 빼지 말 것: 스캐너가 없을 때 물품을 손으로 넣는 유일한
+   * 창구이고, 스캔 버퍼가 보이는 유일한 자리다.
+   */
+  const productCard = (
+    <Card title="제품 스캔" className="space-y-4">
+      {scanInput}
+
+      <PackingItemList
+        items={rows}
+        activeRowKey={activeRowKey}
+        onQuantityChange={handleQuantityChange}
+      />
+
+      <div className="h-2 rounded bg-gray-200">
+        <div className="h-2 rounded bg-green-500" style={{ width: `${progressPercent}%` }} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* 🔴 문구를 「발송 완료」로 바꾸지 말 것(2609_54/D9) — 이 시스템의 발송처리는 채널에
+          송장을 올리는 일(2609_07)이고 포장 완료와 다른 일이다 */}
+      <div className="flex gap-3">
         <Button
-          size="sm"
-          variant="danger"
-          onClick={() => setUnusedOpen(true)}
+          className="flex-1"
+          onClick={handleComplete}
+          isLoading={isSubmitting}
+          loadingText="완료 처리 중..."
+        >
+          [Enter · F6] 이 박스 완료
+        </Button>
+        <Button
+          className="flex-1"
+          variant="secondary"
+          onClick={handleCancelBox}
           disabled={isSubmitting}
         >
-          [F4] 이 박스 사용 안 함
+          [Esc · F7] 취소
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => setHelpOpen(true)}>
-          [F8] 단축키
-        </Button>
-        <Button size="sm" variant="secondary" onClick={toggleVoice}>
-          [F9] 음성 {voiceOn ? '끄기' : '켜기'}
-        </Button>
-        <span className="text-xs text-gray-500">
-          담을 것 = ↑ ↓ · 숫자 4자리 이하 + Enter = 고른 줄 수량
-        </span>
       </div>
+    </Card>
+  );
+
+  // ── 열 단위 조각 — 🔴 자리는 여기서만 정해진다 (2609_55/D1) ─────────────────
+
+  const leftColumn = scanResult && isPending ? boxCard : boxPlaceholderCard;
+
+  /**
+   * 가운데 열 — 세 상태가 **같은 자리**를 쓴다. 🔴 `scanInput` 인스턴스는 여전히 화면에 하나다
+   * (2609_40/D9) — 아래 분기에서 두 갈래가 동시에 그려지지 않는다.
+   *
+   * 🔴 닫힌 박스에는 스캔 입력칸을 두지 않는다(2609_55/D10): 이 상태의 스캔은 거부되므로 받을 수
+   * 없는 입력을 받을 것처럼 보이면 안 된다. 거부 메시지(`handleScannedValue`)는 손대지 않는다.
+   */
+  const centerColumn = !scanResult ? (
+    /* 송장 대기 — 큰 스캔 영역 (2609_54/D10) */
+    <Card title="송장을 스캔하세요" className="space-y-4">
+      <div className="flex justify-center py-4">
+        <ScanLine size={96} className="text-gray-300" />
+      </div>
+      {scanInput}
+      <p className="text-center text-sm text-gray-500">남은 주문 {pendingParcels.length}건</p>
+    </Card>
+  ) : isPending ? (
+    productCard
+  ) : (
+    /* 닫힌 박스 — 제목이 상태를 말하고 본문은 버튼 하나. 같은 문장을 본문에 또 적지 않는다(안내문 자리에 이미 떠 있다) */
+    <Card title={scanResult.parcel.status === 'PACKED' ? '출고 완료된 박스' : '사용하지 않은 박스'}>
+      <Button variant="secondary" onClick={handleCancelBox} disabled={isSubmitting}>
+        [Esc] 다음 송장 스캔
+      </Button>
+    </Card>
+  );
+
+  /**
+   * 오른쪽 열 — 「작업 대상」 · 「오늘 완료」 탭 (2609_55/D5). 🔴 세 상태 모두 항상 그린다.
+   * 🔴 박스를 잡고 있으면 작업 대상 목록은 **보이지만 조작 대상이 아니다**(D7): 고른 줄 표시도,
+   * 줄 열기도 없다 — 담고 있던 것을 날리지 않기 위해서다.
+   */
+  const rightRail = (
+    <RightRailTabs
+      tab={railTab}
+      onSelectTab={setRailTab}
+      pendingPanel={
+        <PendingParcelList
+          parcels={pendingParcels}
+          loading={pendingLoading}
+          compact
+          selectedParcelId={started && !scanResult ? selectedParcelId : null}
+          onOpen={scanResult ? null : (invoiceNumber) => handleInvoiceScan(invoiceNumber)}
+        />
+      }
+    />
+  );
+
+  /**
+   * 하단 유틸리티 줄 — 🔴 세 상태 모두 같은 자리에 **항상** 그린다(2609_55/D9). 지우면 기능이 사라진다.
+   *
+   * ⚠️ `F4` **버튼**은 담는 중에만 활성이지만 **키**(`handlers.unused`)는 닫힌 박스에서도 팝업을 연다.
+   * 이 불일치는 지금 코드에 이미 있던 것이고, 키를 고치는 것은 조작 변경이라 여기서 맞추지 않는다.
+   * 적어 두는 이유는 다음 사람이 "둘이 다른데 어느 쪽이 맞나"로 시간을 쓰지 않게 하려는 것이다.
+   */
+  const utilityRow = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        size="sm"
+        variant="danger"
+        onClick={() => setUnusedOpen(true)}
+        disabled={!scanResult || !isPending || isSubmitting}
+      >
+        [F4] 이 박스 사용 안 함
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => setHelpOpen(true)}>
+        [F8] 단축키
+      </Button>
+      <Button size="sm" variant="secondary" onClick={toggleVoice}>
+        [F9] 음성 {voiceOn ? '끄기' : '켜기'}
+      </Button>
+      {/* 🔴 F10 과 **같은 함수**를 쓴다 — 두 곳에 각각 setRailTab 을 적으면 나중에 한쪽만 고쳐진다 */}
+      <Button size="sm" variant="secondary" onClick={toggleRailTab}>
+        [F10] 오른쪽 탭
+      </Button>
+      <span className="text-xs text-gray-500">
+        담을 것 = ↑ ↓ · 숫자 4자리 이하 + Enter = 고른 줄 수량
+      </span>
     </div>
   );
 
   /**
-   * 상태 ③ 닫힌 박스 — 이미 출고된(`PACKED`) · 사용하지 않은(`UNUSED`) 박스를 조회한 상태다.
-   * 담을 것이 없으니 왼쪽 상자 카드를 그리지 않는다 = 2열. 버튼 문구·동작은 **그대로** 둔다.
+   * 🔴 시작 화면 전용 전체 폭 목록 — 몰입 레이어 안에서는 쓰지 않는다(그 자리는 오른쪽 탭이 갖는다).
+   * 시작 화면은 오른쪽 열이 없는 화면이라 통일 대상이 아니다(2609_55/D11).
    */
-  const closedBoxSection = scanResult && !isPending && (
-    <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
-      <Card>
-        <Button variant="secondary" onClick={handleCancelBox} disabled={isSubmitting}>
-          [Esc] 다음 송장 스캔
-        </Button>
-      </Card>
-      <TodayDoneRail />
-    </div>
-  );
-
   const parcelListSection = (
     <div>
       <h2 className="mb-2 font-semibold text-gray-900">작업 대상 박스</h2>
@@ -1156,29 +1256,6 @@ export default function StockPackingPage() {
         }}
       />
     </div>
-  );
-
-  /**
-   * 상태 ② 송장 대기 — 큰 스캔 영역 + 「오늘 완료」 레일, 그 아래 작업 대상 목록 (2609_54/D10).
-   *
-   * 🔴 작업 대상 목록을 지우지 않는다 — ↑↓ + Enter 로 송장을 여는 대상이 그 목록이다(2609_53/D6).
-   * 박스를 잡고 있는 동안에는 이 상태가 아니므로 목록이 자동으로 접힌다(2609_54/D11).
-   * 🔴 오늘 완료 **건수**는 쓰지 않는다 — 데이터가 없다(D6 · D8).
-   */
-  const waitingSection = !scanResult && (
-    <>
-      <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
-        <Card title="송장을 스캔하세요" className="space-y-4">
-          <div className="flex justify-center py-4">
-            <ScanLine size={96} className="text-gray-300" />
-          </div>
-          {scanInput}
-          <p className="text-center text-sm text-gray-500">남은 주문 {pendingParcels.length}건</p>
-        </Card>
-        <TodayDoneRail />
-      </div>
-      {parcelListSection}
-    </>
   );
 
   const dialogs = (
@@ -1255,9 +1332,13 @@ export default function StockPackingPage() {
         </div>
         {parcelHeader}
         {messageBar}
-        {packingSection}
-        {closedBoxSection}
-        {waitingSection}
+        {/* 🔴 자리를 정하는 곳은 여기 하나다 — 이 문자열이 화면에 두 번 나오면 통일이 깨진 것이다 */}
+        <div className="grid gap-4 xl:grid-cols-[22rem_1fr_20rem]">
+          {leftColumn}
+          {centerColumn}
+          {rightRail}
+        </div>
+        {utilityRow}
       </div>
       {dialogs}
     </div>
