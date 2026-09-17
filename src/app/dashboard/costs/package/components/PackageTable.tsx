@@ -3,7 +3,7 @@
 import type { Package } from '@/domain/entities/PackageEntity';
 import { BOX_KIND_LABEL, boxKindOf } from '@/domain/entities/PackageEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
-import { BoxShape } from '@/presentation/components/BoxShape';
+import { BoxShape, boxScale, maxBoxExtentCm } from '@/presentation/components/BoxShape';
 import { formatPackageSize, sizeIsUnset } from './packageSize';
 
 interface PackageTableProps {
@@ -23,6 +23,12 @@ function formatCost(cost: number | null | undefined): string {
   return cost !== null && cost !== undefined ? cost.toLocaleString() + '원' : '0원';
 }
 
+/**
+ * 상자 그림 칸의 한 변(px). 목록에서 가장 큰 상자가 이 크기로 그려진다.
+ * 가장 작은 상자는 BoxShape 의 하한(40%)까지 줄어드니, 그 상태에서도 모양이 보이도록 잡는다.
+ */
+const BOX_CELL_PX = 88;
+
 export function PackageTable({
   packages,
   isLoading,
@@ -31,6 +37,9 @@ export function PackageTable({
   selectedId,
   onRowClick,
 }: PackageTableProps) {
+  // 목록 안에서 대소가 보이도록 가장 큰 상자를 기준으로 삼는다
+  const referenceCm = maxBoxExtentCm(packages);
+
   const errorBanner = error ? (
     <div
       role="alert"
@@ -79,21 +88,31 @@ export function PackageTable({
                   selectedId === pkg.id ? 'bg-blue-50' : ''
                 }`}
               >
-                {/* 사진이 있으면 사진, 없으면 치수 비율 도형(PLAN 2609_40 D26) */}
+                {/* 사진이 있으면 사진, 없으면 치수 비율 도형(PLAN 2609_40 D26).
+                    사진도 같은 배율로 줄여 그린다 — 사진 유무로 크기 잣대가 달라지면 안 된다 */}
                 <td className="px-6 py-3">
-                  <div className="flex h-11 w-11 items-center justify-center">
+                  <div
+                    className="flex items-end justify-center"
+                    style={{ height: BOX_CELL_PX, width: BOX_CELL_PX }}
+                  >
                     {pkg.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={pkg.imageUrl}
                         alt={`${pkg.type} 상자 사진`}
-                        className="h-11 w-11 rounded border border-gray-200 object-contain"
+                        className="rounded border border-gray-200 object-contain"
+                        style={{
+                          height: BOX_CELL_PX * boxScale(pkg, referenceCm),
+                          width: BOX_CELL_PX * boxScale(pkg, referenceCm),
+                        }}
                       />
                     ) : (
                       <BoxShape
                         widthCm={pkg.widthCm}
                         lengthCm={pkg.lengthCm}
                         heightCm={pkg.heightCm}
+                        size={BOX_CELL_PX}
+                        referenceCm={referenceCm}
                       />
                     )}
                   </div>
