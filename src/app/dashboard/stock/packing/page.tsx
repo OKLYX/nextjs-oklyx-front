@@ -86,6 +86,15 @@ type MessageTone = 'info' | 'error' | 'success';
  * 작업자는 서서 1~2초만 보기 때문에 「색이 바뀐 면」이 「작은 띠」보다 훨씬 빨리 읽힌다.
  * 오류는 채운 빨강이다. 연한 배경 + 빨간 글씨로는 몇 미터 떨어진 작업대에서 구분이 안 된다.
  */
+/**
+ * 플랫폼 enum → 화면 이름. 🔴 모르는 값은 **원문 그대로** 보여준다(빈칸보다 낫다) —
+ * 새 채널이 붙었을 때 화면이 조용히 비지 않게.
+ */
+const PLATFORM_LABEL: Record<string, string> = {
+  COUPANG: '쿠팡',
+  NAVER: '네이버',
+};
+
 const TONE_LABEL: Record<MessageTone, string> = {
   info: '상태 메시지',
   error: '오류',
@@ -1024,6 +1033,13 @@ export default function StockPackingPage() {
 
   const parcel = scanResult?.parcel;
 
+  /** 채널 표시 — 별칭이 있으면 그것이 더 구체적이다(같은 플랫폼에 계정이 여럿) */
+  const channelLabel =
+    scanResult?.order.accountAlias?.trim() ||
+    PLATFORM_LABEL[scanResult?.order.platform ?? ''] ||
+    scanResult?.order.platform ||
+    '-';
+
   /**
    * 🔴 두 갈래(시작 화면 · 몰입 레이어)가 **함께 쓰는** 조각들은 여기서 한 번만 만든다.
    * 양쪽에 복사하면 같은 확인창이 두 개 뜨고 목록 상태가 갈라진다.
@@ -1091,8 +1107,20 @@ export default function StockPackingPage() {
     <Card className="h-full space-y-4">
       <div className="min-h-[3.25rem]">
         {!parcel ? (
-          /* 송장번호가 들어올 자리 — 대기 중에는 무엇을 해야 하는지로 자리를 지킨다 */
-          <span className="text-2xl font-bold text-gray-600">송장 바코드를 스캔해 주세요</span>
+          /* 🔴 대기 중에도 **같은 골격**을 그린다(2026-09-17 사용자 지시) — 값만 `-` 다.
+             안내 한 줄만 그리면 스캔하는 순간 이 카드가 세 줄만큼 커지면서 아래 3열이 통째로
+             밀려 내려간다. 이 화면이 없애려던 밀림이다. */
+          <div className="space-y-3">
+            <span className="text-2xl font-bold text-gray-600">송장 바코드를 스캔해 주세요</span>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-gray-100 pt-3 sm:grid-cols-3">
+              {headerField('판매자', '-', true)}
+              {headerField('채널', '-', true)}
+              {headerField('수취인', '-')}
+              {headerField('주문번호', '-')}
+              {headerField('택배사', '-')}
+              {headerField('박스', '-')}
+            </div>
+          </div>
         ) : (
           <div className="space-y-3">
             {/* 송장번호 = 실물과 맞춰 보는 값이라 제일 크게. 등폭 숫자로 자릿수를 세기 쉽게 */}
@@ -1119,9 +1147,9 @@ export default function StockPackingPage() {
 
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-gray-100 pt-3 sm:grid-cols-3">
               {headerField('판매자', scanResult?.order.sellerName ?? '-', true)}
-              {/* 🔴 채널(마켓)은 **아직 서버가 주지 않는다** — `PackingOrderView` 에 없다.
-                  지어내지 않고 자리만 잡아 둔다. 백엔드가 `platform` 을 실으면 여기만 바꾼다. */}
-              {headerField('채널', '-', true)}
+              {/* 🔴 채널 = 별칭 ?? 플랫폼 — **무엇을 보일지는 화면이 정한다**(수취인/주문자와 같은 규칙).
+                  같은 채널에 계정이 여럿이면 별칭이 그 계정을 가리키고, 없으면 플랫폼 이름이 남는다. */}
+              {headerField('채널', channelLabel, true)}
               {headerField(
                 '수취인',
                 /* 🔴 수취인 ?? 주문자 (2609_54/D5). 마스킹하지 않는다 — 작업자가 실물 송장의
