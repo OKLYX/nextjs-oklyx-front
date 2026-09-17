@@ -34,6 +34,10 @@ export interface PackingOrderView {
   ordererName: string | null;
   /** 수취인 이름 */
   receiverName: string | null;
+  /** 판매 채널 enum 이름(`COUPANG`). 무엇을 보일지는 화면이 정한다 — 이름 두 개와 같은 규칙 */
+  platform: string | null;
+  /** 같은 채널에 계정이 여럿일 때 구분하는 별칭. 없을 수 있다 */
+  accountAlias: string | null;
 }
 
 /**

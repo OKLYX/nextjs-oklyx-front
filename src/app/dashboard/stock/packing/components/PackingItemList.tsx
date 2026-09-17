@@ -61,7 +61,7 @@ export function PackingItemList({ items, activeRowKey, onQuantityChange }: Packi
           <div
             key={key}
             ref={highlighted ? activeTileRef : undefined}
-            className={`rounded-lg border p-3 ${done ? 'bg-gray-50' : 'bg-white'} ${
+            className={`rounded-lg border p-3 bg-white ${
               highlighted ? 'border-amber-400 ring-2 ring-amber-400' : 'border-gray-200'
             }`}
           >
@@ -97,21 +97,40 @@ export function PackingItemList({ items, activeRowKey, onQuantityChange }: Packi
             </div>
             <p className="truncate text-xs text-gray-700">{item.itemName}</p>
 
-            <div className="mt-1 flex items-baseline gap-1">
-              <input
-                type="number"
-                min={0}
-                max={item.remainingQty}
-                value={item.packedQty}
-                onChange={(event) => onQuantityChange(key, Number(event.target.value))}
-                aria-label={`${item.productName} 담은 수량`}
-                className={`w-16 border-0 bg-transparent p-0 text-3xl font-bold tabular-nums focus:rounded focus:ring-2 focus:ring-blue-500 ${
-                  done ? 'text-green-600' : 'text-gray-900'
-                }`}
-              />
-              <span className={`text-2xl ${done ? 'text-green-600' : 'text-gray-700'}`}>
-                / {item.remainingQty}
+            {/* 🔴 담은 수량 = 「담음 / 필요」 한 줄(2026-09-17 사용자 지시).
+                ① 라벨을 붙여 `0/6` 이 무슨 숫자인지 읽지 않아도 알게 하고
+                ② 담은 쪽만 크게·진하게(작업자가 좇는 숫자는 이것 하나다)
+                ③ 다 담으면 줄 전체가 초록 면으로 바뀐다 — 타일을 훑을 때 색으로 먼저 걸린다.
+                🔴 큰 숫자 **자체가 입력칸**이다(2609_54/D3). 숫자로만 바꾸면 마우스로 고치는 길이
+                사라진다 — 2609_53/D8 이 일부러 살려 둔 길이다. */}
+            <div
+              className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 ${
+                done ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-900'
+              }`}
+            >
+              <span
+                className={`text-xs font-medium ${done ? 'text-white/80' : 'text-gray-700'}`}
+              >
+                담음
               </span>
+              <div className="flex items-baseline gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  max={item.remainingQty}
+                  value={item.packedQty}
+                  onChange={(event) => onQuantityChange(key, Number(event.target.value))}
+                  aria-label={`${item.productName} 담은 수량`}
+                  className="w-12 border-0 bg-transparent p-0 text-right text-3xl font-bold tabular-nums text-inherit focus:rounded focus:ring-2 focus:ring-blue-500"
+                />
+                <span
+                  className={`text-xl font-semibold tabular-nums ${
+                    done ? 'text-white/80' : 'text-gray-700'
+                  }`}
+                >
+                  / {item.remainingQty}
+                </span>
+              </div>
             </div>
           </div>
         );
