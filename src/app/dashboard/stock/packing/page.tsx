@@ -41,7 +41,7 @@ import { RightRailTabs, type RailTab } from './components/RightRailTabs';
  * 담는 중(`scanResult && isPending`) · 닫힌 박스(`scanResult && !isPending`).
  *
  * 🔴 **몰입 레이어 안의 세 상태는 같은 골격을 쓴다**(2609_55/D1): 상단 정보 줄 · 안내문 ·
- * `22rem | 1fr | 20rem` 3열 · 하단 유틸리티 줄이 **항상** 그려지고 **칸의 내용만** 바뀐다.
+ * `26rem | 1fr | 20rem` 3열 · 하단 유틸리티 줄이 **항상** 그려지고 **칸의 내용만** 바뀐다.
  * 자리가 상태마다 움직이면 작업자가 눈을 어디에 둘지 배울 수 없다. 그래서 레이아웃은
  * `leftColumn` · `centerColumn` · `rightRail` **열 단위 조각**으로만 만든다 — 상태별로 레이아웃을
  * 따로 들고 있으면 상태가 자리를 흔든다. `xl:grid-cols-[26rem_1fr_20rem]` 은 이 파일에 한 번만 나온다.
