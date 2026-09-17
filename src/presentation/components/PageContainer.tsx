@@ -59,8 +59,10 @@ export const CONTENT_WIDTH = 'max-w-7xl mx-auto';
  * - 페이지마다 `bg-gray-50` 등 색상 하드코딩 → `bg-page` 토큰만 사용
  * - 직접 `-m-6 p-6 bg-page min-h-full` div 작성 → 이 Component 사용
  *   (예외 1곳 = `stock/packing` 몰입 레이어. `<main>` 안에 들어가면 사이드바를 덮지 못해
- *   `fixed inset-0` 레이어를 직접 그린다. 폭은 손으로 적지 않고 `CONTENT_WIDTH` 를 import 한다 —
- *   그래서 이 상수가 export 다. eslint 예외와 같은 사유·같은 방식이다)
+ *   `fixed inset-0` 레이어를 직접 그린다. eslint 예외와 같은 사유·같은 방식이다.
+ *   🔁 2026-09-16 번복: 원래는 그 레이어도 `CONTENT_WIDTH` 를 import 해 폭을 맞추기로 해서
+ *   이 상수를 export 로 바꿨으나, 몰입 레이어는 **디스플레이를 꽉 채운다**로 다시 정해졌다
+ *   — 넓은 현장 PC 에서 `max-w-7xl` 을 씌우면 양옆이 죽는다. 지금 이 상수를 import 하는 곳은 없다)
  * - 페이지에서 직접 `<h1>` 작성 → `title` props 사용
  * - 페이지에서 `max-w-*` / `space-y-*`로 본문 폭·간격 재정의 → 폭·간격은 이 컴포넌트가 소유한다
  * - 제목 아래 부제(description) 추가 → 부제는 두지 않기로 결정됨(2026-09-11 `34cee44`)
