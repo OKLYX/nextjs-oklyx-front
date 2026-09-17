@@ -8,13 +8,13 @@
  * - 신규 버튼은 이 컴포넌트를 쓴다. `bg-blue-600` / `bg-red-600` 클래스를 새로 작성하지 않는다.
  * - 색은 `globals.css` 의 BRAND PALETTE REMAP 이 브랜드 색으로 바꾼다 — 여기서 `bg-brand` 로
  *   바꾸지 말 것(리맵 경로 이탈).
- * - 크기 variant 는 `sm` / `md` 둘뿐이다. 세 번째를 만들지 않는다.
+ * - 크기 variant 는 `sm` / `md` / `lg` 셋뿐이다. 네 번째를 만들지 않는다.
  * - 표 안 동작 버튼은 `size="sm"`, 폼 제출·페이지 동작 버튼은 기본 `md`,
  *   서서 쓰는 현장 화면(포장 작업 등)은 `size="lg"`.
  * - 아직 교체되지 않은 기존 버튼들은 해당 화면을 건드릴 때 함께 이관한다.
  *
  * **Props**
- * - `variant`: `primary`(기본) / `secondary` / `danger`.
+ * - `variant`: `primary`(기본) / `secondary` / `danger` / `confirm`(확정·긍정 액션, 초록).
  * - `size`: `sm`(`px-3 py-1.5 text-sm`) / `md`(기본, `px-4 py-2`) / `lg`(`px-6 py-3 text-lg`, 현장 화면용).
  * - `isLoading`: `true` 면 `disabled` + `loadingText`(없으면 children) 표시.
  * - `className`: **레이아웃 보정 전용**(`flex items-center gap-1`, `w-full`, `flex-1` 등).
@@ -52,6 +52,8 @@ const VARIANT = {
   primary: 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400',
   secondary: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50',
   danger: 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50',
+  // 확정·긍정 액션. `bg-green-600` 은 globals.css 의 브랜드 리맵이 최종 색을 정한다
+  confirm: 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50',
 } as const;
 
 export type ButtonVariant = keyof typeof VARIANT;
