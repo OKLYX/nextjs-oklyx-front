@@ -303,6 +303,22 @@ export default function StockPackingPage() {
   const allPacked = remainingTotal > 0 && packedTotal >= remainingTotal;
 
   /**
+   * 이 박스가 **마지막 박스**인가 — 서버 판정이다(2609_40/D13).
+   * 🔴 `totalParcels`·`parcelSeq` 로 프론트가 다시 계산하지 않는다: 앞 박스가 취소되면 번호와
+   *    실제 마지막 여부가 어긋난다.
+   */
+  const isLastParcel = scanResult?.isLastParcel === true;
+
+  /**
+   * [이 박스 완료] 를 누를 수 있는가 — 🔴 `handleComplete` 의 검문과 **같은 규칙**이어야 한다
+   * (2026-09-17 사용자 결정). 버튼만 더 빡빡하게 걸면 분할 배송의 앞 박스를 영영 닫을 수 없다.
+   * ① 아무것도 안 담았으면 불가(닫을 것이 없다 — 빈 박스는 `[F4]` 소관)
+   * ② 마지막 박스면 **전량**을 담아야 한다
+   * ③ 마지막이 아니면 담은 만큼 닫는다 — 나머지는 다음 송장이 받는다
+   */
+  const canComplete = packedTotal > 0 && (allPacked || !isLastParcel);
+
+  /**
    * 상자 후보를 물을 조합 — 키는 물품 × 수량뿐이다(D22). 여러 라인의 같은 물품은 합친다.
    *
    * 🔴 **이 박스에 담아야 할 전량**(`remainingQty`)으로 만든다(2026-09-17 사용자 지시).
@@ -1080,10 +1096,18 @@ export default function StockPackingPage() {
             <span className="text-sm text-gray-700">
               {scanResult?.order.sellerName ?? '-'} · 주문 {scanResult?.order.externalOrderId}
             </span>
-            {scanResult?.isLastParcel && (
-              <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+            {/* 🔴 분할 배송은 박스마다 규칙이 다르다 — 어느 쪽인지 **송장 정보 칸에서** 알려준다
+                (2026-09-17 사용자 결정). 앞 박스는 담을 만큼만, 마지막 박스는 전량이다. */}
+            {isLastParcel ? (
+              <span className="rounded bg-amber-100 px-2 py-0.5 text-sm font-medium text-amber-800">
                 마지막 박스 — 남은 물품 전량을 담아야 합니다
               </span>
+            ) : (
+              parcel.totalParcels > 1 && (
+                <span className="rounded bg-blue-100 px-2 py-0.5 text-sm font-medium text-blue-800">
+                  분할 배송 상품입니다 — 이 박스에 담을 만큼만 담으세요
+                </span>
+              )
             )}
             {isPending && (
               <span
@@ -1329,26 +1353,6 @@ export default function StockPackingPage() {
         <div className="h-2 rounded bg-green-500" style={{ width: `${progressPercent}%` }} />
       </div>
 
-      {/* 🔴 문구를 「발송 완료」로 바꾸지 말 것(2609_54/D9) — 이 시스템의 발송처리는 채널에
-          송장을 올리는 일(2609_07)이고 포장 완료와 다른 일이다 */}
-      <div className="flex gap-3">
-        <Button
-          className="flex-1"
-          onClick={handleComplete}
-          isLoading={isSubmitting}
-          loadingText="완료 처리 중..."
-        >
-          [Enter · F6] 이 박스 완료
-        </Button>
-        <Button
-          className="flex-1"
-          variant="secondary"
-          onClick={handleCancelBox}
-          disabled={isSubmitting}
-        >
-          [Esc · F7] 취소
-        </Button>
-      </div>
     </Card>
   );
 
@@ -1438,6 +1442,47 @@ export default function StockPackingPage() {
       <span className="text-xs text-gray-700">
         담을 것 = ↑ ↓ · 숫자 4자리 이하 + Enter = 고른 줄 수량
       </span>
+
+      {/*
+       * 🔴 박스를 끝내는 두 버튼은 **하단 줄 오른쪽**이다(2026-09-17 사용자 지시) — 카드 안에
+       *    있으면 목록 길이에 따라 위아래로 움직인다. `ml-auto` 가 오른쪽으로 민다.
+       * 🔴 문구를 「발송 완료」로 바꾸지 말 것(2609_54/D9) — 이 시스템의 발송처리는 채널에
+       *    송장을 올리는 일(2609_07)이고 포장 완료와 다른 일이다.
+       * 🔴 박스를 잡고 있을 때만 그린다. 다른 상태에서는 누를 대상이 없다.
+       */}
+      {scanResult && isPending && (
+        <div className="ml-auto flex items-center gap-3">
+          <Button
+            size="lg"
+            variant="secondary"
+            onClick={handleCancelBox}
+            disabled={isSubmitting}
+          >
+            [Esc · F7] 취소
+          </Button>
+          <Button
+            size="lg"
+            variant="confirm"
+            onClick={handleComplete}
+            isLoading={isSubmitting}
+            loadingText="완료 처리 중..."
+            /* 🔴 판정은 `canComplete` 하나다 — `handleComplete` 의 검문과 같은 규칙이라
+               버튼이 막는 경우와 눌렀을 때 거부되는 경우가 어긋나지 않는다.
+               ⚠️ **키(`F6`·`Enter`)는 그대로다** — 조작 변경은 별개의 일이라(2609_55/D12)
+               손대지 않았다. 키로 눌러도 `handleComplete` 가 같은 규칙으로 받는다. */
+            disabled={!canComplete || isSubmitting}
+            title={
+              canComplete
+                ? undefined
+                : packedTotal === 0
+                  ? '담은 물품이 없습니다 — 빈 박스는 [F4] 로 닫으세요'
+                  : '마지막 박스입니다 — 남은 물품을 모두 담아야 완료할 수 있습니다'
+            }
+          >
+            [Enter · F6] 이 박스 완료
+          </Button>
+        </div>
+      )}
     </div>
   );
 
