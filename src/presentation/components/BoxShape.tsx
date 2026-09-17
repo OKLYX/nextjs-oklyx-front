@@ -65,6 +65,9 @@ const DEPTH_RATIO = 0.4;
 /** 아무리 작은 상자도 이 배율 아래로는 줄이지 않는다 — 점으로 보이면 모양 구분이 불가능하다 */
 const MIN_SCALE = 0.4;
 
+/** 선 두께(px). `vectorEffect="non-scaling-stroke"` 라 상자 크기와 무관하게 이 두께로 그려진다 */
+const STROKE_PX = 1.5;
+
 /** 치수가 하나라도 비었는지 */
 function isUnset({ widthCm, lengthCm, heightCm }: BoxDimensionsCm): boolean {
   return !(widthCm > 0) || !(lengthCm > 0) || !(heightCm > 0);
@@ -127,7 +130,7 @@ export function BoxShape({
             height="8"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1"
+            strokeWidth={STROKE_PX}
             strokeDasharray="2 1.5"
             vectorEffect="non-scaling-stroke"
           />
@@ -144,13 +147,18 @@ export function BoxShape({
   const vbW = w + depth;
   const vbH = h + depth;
 
+  // viewBox 를 도형에 딱 맞추면 바깥 테두리 선이 절반 잘려 세로선만 얇아 보인다.
+  // 선 두께의 절반 + 1px 만큼 여백을 둔다(px → 사용자 단위 환산).
+  const unitPerPx = Math.max(vbW, vbH) / rendered;
+  const pad = (STROKE_PX / 2 + 1) * unitPerPx;
+
   const label = `${widthCm} × ${lengthCm} × ${heightCm} cm 상자`;
 
   return (
     <svg
       width={rendered}
       height={rendered}
-      viewBox={`0 0 ${vbW} ${vbH}`}
+      viewBox={`${-pad} ${-pad} ${vbW + pad * 2} ${vbH + pad * 2}`}
       preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label={label}
@@ -164,21 +172,21 @@ export function BoxShape({
         width={w}
         height={h}
         className="fill-amber-100 stroke-amber-700"
-        strokeWidth="1"
+        strokeWidth={STROKE_PX}
         vectorEffect="non-scaling-stroke"
       />
       {/* 윗면 */}
       <polygon
         points={`0,${depth} ${depth},0 ${w + depth},0 ${w},${depth}`}
         className="fill-amber-50 stroke-amber-700"
-        strokeWidth="1"
+        strokeWidth={STROKE_PX}
         vectorEffect="non-scaling-stroke"
       />
       {/* 옆면 */}
       <polygon
         points={`${w},${depth} ${w + depth},0 ${w + depth},${h} ${w},${h + depth}`}
         className="fill-amber-200 stroke-amber-700"
-        strokeWidth="1"
+        strokeWidth={STROKE_PX}
         vectorEffect="non-scaling-stroke"
       />
     </svg>
