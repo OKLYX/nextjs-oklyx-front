@@ -1063,64 +1063,81 @@ export default function StockPackingPage() {
   );
 
   /**
-   * 4-0 ② 박스 정보 — 송장·고객·택배사·순번·판매자·주문번호(담는 중이면 담음 배지까지).
+   * 4-0 ② 송장 정보 — 송장번호(제일 큼) · 라벨 붙은 값들 · 분할 배송 안내.
    *
    * 🔴 **항상 그린다**(2609_55/D2). 카드가 생겼다 사라지면 아래 3열과 하단 줄이 통째로 위아래로
    * 밀린다 — 이 화면이 없애려는 밀림이다. 대기 중에는 송장번호 자리에 안내 문구만 들어간다.
-   * 🔴 `min-h-[3.25rem]` = 담는 중 줄이 1280px 에서 두 줄로 접혀도 대기 줄과 높이가 같게 한다.
-   *    최대 높이를 주거나 `overflow-hidden` 으로 자르지 말 것 — 송장·고객은 작업자가 실물과
-   *    대조하는 값이라 가려지면 안 된다.
+   * 🔴 값마다 **라벨을 붙인다**(2026-09-17 사용자 지시). 라벨 없이 나열하면 「쿠팡」이 판매자인지
+   *    채널인지 작업자가 추측해야 한다. 판매자·채널은 한 단계 크게 — 어느 가게 물건인지가
+   *    포장·송장 규칙을 가르는 값이다.
+   * 🔴 **담음 N / 필요 N 을 여기에 두지 않는다**(2026-09-17 사용자 지시). 그것은 송장의 성질이
+   *    아니라 **작업 진행 상황**이라 「발송 상품 목록」 카드(진행 바 · 담기 완료 배지)의 것이다.
+   * 🔴 `min-h-[3.25rem]` 은 대기 줄과 높이를 맞춘다. 최대 높이를 주거나 `overflow-hidden` 으로
+   *    자르지 말 것 — 송장·수취인은 작업자가 실물과 대조하는 값이라 가려지면 안 된다.
    */
+  const headerField = (label: string, value: string, strong = false) => (
+    <div className="min-w-0">
+      <div className="text-xs font-medium uppercase tracking-wide text-gray-700">{label}</div>
+      <div
+        className={`truncate ${strong ? 'text-xl font-bold text-gray-900' : 'text-base font-semibold text-gray-900'}`}
+        title={value}
+      >
+        {value}
+      </div>
+    </div>
+  );
+
   const parcelHeader = (
     <Card className="h-full space-y-4">
-      <div className="flex min-h-[3.25rem] flex-wrap items-center gap-x-6 gap-y-2">
+      <div className="min-h-[3.25rem]">
         {!parcel ? (
           /* 송장번호가 들어올 자리 — 대기 중에는 무엇을 해야 하는지로 자리를 지킨다 */
           <span className="text-2xl font-bold text-gray-600">송장 바코드를 스캔해 주세요</span>
         ) : (
-          <>
-            <span className="font-mono text-2xl font-bold tabular-nums text-gray-900">
-              {parcel.invoiceNumber}
-            </span>
-            {/* 🔴 수취인 ?? 주문자 — 어느 쪽을 보일지는 화면이 정한다(2609_54/D5). 마스킹하지 않는다:
-                작업자가 실물 송장의 받는 사람과 대조하는 값이다 */}
-            <span className="text-xl font-semibold text-gray-900">
-              {scanResult?.order.receiverName ?? scanResult?.order.ordererName ?? '-'}
-            </span>
-            <span className="text-sm text-gray-700">{parcel.carrierName ?? '택배사 미상'}</span>
-            <span className="text-sm text-gray-700">
-              {parcel.totalParcels > 1
-                ? `${parcel.totalParcels}박스 중 ${parcel.parcelSeq ?? '-'}번째`
-                : '1박스'}
-            </span>
-            <span className="text-sm text-gray-700">
-              {scanResult?.order.sellerName ?? '-'} · 주문 {scanResult?.order.externalOrderId}
-            </span>
-            {/* 🔴 분할 배송은 박스마다 규칙이 다르다 — 어느 쪽인지 **송장 정보 칸에서** 알려준다
-                (2026-09-17 사용자 결정). 앞 박스는 담을 만큼만, 마지막 박스는 전량이다. */}
-            {isLastParcel ? (
-              <span className="rounded bg-amber-100 px-2 py-0.5 text-sm font-medium text-amber-800">
-                마지막 박스 — 남은 물품 전량을 담아야 합니다
+          <div className="space-y-3">
+            {/* 송장번호 = 실물과 맞춰 보는 값이라 제일 크게. 등폭 숫자로 자릿수를 세기 쉽게 */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="font-mono text-2xl font-bold tabular-nums text-gray-900">
+                {parcel.invoiceNumber}
               </span>
-            ) : (
-              parcel.totalParcels > 1 && (
-                <span className="rounded bg-blue-100 px-2 py-0.5 text-sm font-medium text-blue-800">
-                  분할 배송 상품입니다 — 이 박스에 담을 만큼만 담으세요
+              {/* 🔴 분할 배송은 박스마다 규칙이 다르다 — 어느 쪽인지 **송장 정보 칸에서** 알려준다
+                  (2026-09-17 사용자 결정). 앞 박스는 담을 만큼만, 나머지는 전량이다.
+                  🔴 「마지막 박스」라는 말을 쓰지 않는다(2026-09-17 사용자 지시): 한 박스짜리
+                  주문에도 붙어 자연스럽지 않았다. 작업자에게 필요한 것은 순번이 아니라 **할 일**이다. */}
+              {isLastParcel ? (
+                <span className="rounded bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
+                  발송 상품 목록 내 물품을 모두 포장해야 합니다.
                 </span>
-              )
-            )}
-            {isPending && (
-              <span
-                className={`ml-auto rounded px-3 py-1 text-lg font-semibold ${
-                  packedTotal >= remainingTotal
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-700'
-                }`}
-              >
-                담음 {packedTotal} / {remainingTotal}
-              </span>
-            )}
-          </>
+              ) : (
+                parcel.totalParcels > 1 && (
+                  <span className="rounded bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+                    분할 배송 상품입니다 — 이 박스에 담을 만큼만 담으세요
+                  </span>
+                )
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-gray-100 pt-3 sm:grid-cols-3">
+              {headerField('판매자', scanResult?.order.sellerName ?? '-', true)}
+              {/* 🔴 채널(마켓)은 **아직 서버가 주지 않는다** — `PackingOrderView` 에 없다.
+                  지어내지 않고 자리만 잡아 둔다. 백엔드가 `platform` 을 실으면 여기만 바꾼다. */}
+              {headerField('채널', '-', true)}
+              {headerField(
+                '수취인',
+                /* 🔴 수취인 ?? 주문자 (2609_54/D5). 마스킹하지 않는다 — 작업자가 실물 송장의
+                   받는 사람과 대조하는 값이다 */
+                scanResult?.order.receiverName ?? scanResult?.order.ordererName ?? '-'
+              )}
+              {headerField('주문번호', scanResult?.order.externalOrderId ?? '-')}
+              {headerField('택배사', parcel.carrierName ?? '택배사 미상')}
+              {headerField(
+                '박스',
+                parcel.totalParcels > 1
+                  ? `${parcel.totalParcels}박스 중 ${parcel.parcelSeq ?? '-'}번째`
+                  : '1박스'
+              )}
+            </div>
+          </div>
         )}
       </div>
 
@@ -1476,7 +1493,7 @@ export default function StockPackingPage() {
                 ? undefined
                 : packedTotal === 0
                   ? '담은 물품이 없습니다 — 빈 박스는 [F4] 로 닫으세요'
-                  : '마지막 박스입니다 — 남은 물품을 모두 담아야 완료할 수 있습니다'
+                  : '발송 상품 목록 내 물품을 모두 포장해야 합니다.'
             }
           >
             [Enter · F6] 이 박스 완료
