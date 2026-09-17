@@ -154,7 +154,7 @@ const SHORTCUT_HELP: [string, string][] = [
   ['↑ ↓', '송장 대기: 작업 대상 박스 이동 / 박스 잡은 중: 담을 것 줄 이동'],
   ['← →', '상자 고르기 (즉시 선택)'],
   ['F1 · F2 · F3', '추천 상자 1 · 2 · 3'],
-  ['F4', '이 박스 사용 안 함'],
+  ['F4', '송장 미사용 처리'],
   ['F6 / F7', '이 박스 완료 / 취소'],
   ['F8 / F9', '단축키 / 안내 음성'],
   ['F10', '오른쪽 열 탭 (작업 대상 / 오늘 완료)'],
@@ -490,7 +490,7 @@ export default function StockPackingPage() {
         if (result.parcel.status === 'PACKED') {
           notify('error', '이미 출고된 박스입니다', '이미 출고된 박스입니다');
         } else if (result.parcel.status === 'UNUSED') {
-          notify('error', '사용하지 않은 박스입니다', '사용하지 않은 박스입니다');
+          notify('error', '미사용 처리된 송장입니다', '미사용 처리된 송장입니다');
         } else if (result.unexpanded.length > 0) {
           notify(
             'error',
@@ -500,7 +500,7 @@ export default function StockPackingPage() {
         } else if (result.remaining.length === 0) {
           notify(
             'info',
-            '담을 물품이 없습니다 — [F4] 이 박스 사용 안 함으로 닫으세요',
+            '담을 물품이 없습니다 — [F4] 송장 미사용 처리로 닫으세요',
             '담을 물품이 없습니다'
           );
         } else {
@@ -628,7 +628,7 @@ export default function StockPackingPage() {
     if (!isPending) {
       notify(
         'error',
-        scanResult.parcel.status === 'PACKED' ? '이미 출고된 박스입니다' : '사용하지 않은 박스입니다'
+        scanResult.parcel.status === 'PACKED' ? '이미 출고된 박스입니다' : '미사용 처리된 송장입니다'
       );
       return;
     }
@@ -643,7 +643,7 @@ export default function StockPackingPage() {
     if (packedItems.length === 0) {
       notify(
         'error',
-        '담을 물품이 없습니다 — [F4] 이 박스 사용 안 함으로 닫으세요',
+        '담을 물품이 없습니다 — [F4] 송장 미사용 처리로 닫으세요',
         '담을 물품이 없습니다'
       );
       return;
@@ -708,7 +708,7 @@ export default function StockPackingPage() {
     try {
       await packingUseCase.markUnused(scanResult.parcel.id);
       resetBox();
-      notify('success', '사용하지 않은 박스로 닫았습니다', '닫았습니다');
+      notify('success', '송장을 미사용 처리했습니다', '미사용 처리했습니다');
       loadPending();
     } catch (error) {
       const text = serverMessage(error, '박스를 닫지 못했습니다');
@@ -823,7 +823,7 @@ export default function StockPackingPage() {
           'error',
           scanResult.parcel.status === 'PACKED'
             ? '이미 출고된 박스입니다 — [Esc] 로 취소하고 다음 송장을 스캔하세요'
-            : '사용하지 않은 박스입니다 — [Esc] 로 취소하고 다음 송장을 스캔하세요'
+            : '미사용 처리된 송장입니다 — [Esc] 로 취소하고 다음 송장을 스캔하세요'
         );
         return;
       }
@@ -1141,6 +1141,22 @@ export default function StockPackingPage() {
         )}
       </div>
 
+      {/* 🔴 [F4] 는 **송장 정보 칸**에 있다(2026-09-17 사용자 지시) — 이 동작의 대상은 상자(규격)가
+          아니라 **이 송장 한 장**이다. 「박스 추천」 카드 안에 두었더니 추천을 안 쓴다는 뜻으로 읽혔다.
+          🔴 자리를 지키려고 **항상 그린다**(대기 중에는 비활성). 버튼이 생겼다 사라지면 이 카드
+          높이가 바뀌어 아래 3열이 밀린다.
+          🔴 키(`handlers.unused`)는 그대로다. 버튼을 옮겨도 조작은 바뀌지 않는다. */}
+      <div className="flex justify-end border-t border-gray-100 pt-3">
+        <Button
+          size="lg"
+          variant="danger"
+          onClick={() => setUnusedOpen(true)}
+          disabled={!scanResult || !isPending || isSubmitting}
+        >
+          [F4] 송장 미사용 처리
+        </Button>
+      </div>
+
       {/* 🔴 여기 스캔칸은 **송장용**이다. 물품 스캔칸은 「발송 상품 목록」 카드 맨 위에 있다
           (2026-09-17 사용자 지시) — 담는 동안 눈이 머무는 카드가 그쪽이다.
           🔴 두 자리에 동시에 그리지 않는다. 화면에 있는 인스턴스는 언제나 하나다(2609_40/D9).
@@ -1213,7 +1229,7 @@ export default function StockPackingPage() {
    * 읽는 자리(`selectedBox` 등)는 이미 옵셔널을 거치고 있다. 새 `?.` 를 덧붙이며 조건을 바꾸지 않는다.
    */
   const boxCard = (
-    <Card title="박스 추천" className="space-y-3 xl:flex xl:min-h-0 xl:flex-col xl:overflow-y-auto">
+    <Card title="박스 추천" className="space-y-3 xl:min-h-0 xl:overflow-y-auto">
       {selectedBox ? (
         <div>
           <div className="text-4xl font-bold text-gray-900">{selectedBox.type}</div>
@@ -1288,44 +1304,14 @@ export default function StockPackingPage() {
 
       <p className="text-sm text-gray-700">상자 = F1 · F2 · F3 또는 ← →</p>
 
-      {/* 🔴 [F4] 는 이 카드 **바닥**에 붙는다(2026-09-16 사용자 지시) — 「이 박스」에 대한 동작이라
-          박스 카드에 있어야 어느 박스를 닫는 것인지 헷갈리지 않고, 위험한 동작이라 상자 고르는
-          자리와 떨어져 있어야 한다. `mt-auto` 가 남는 높이를 위로 밀어 바닥에 앉힌다.
-          🔴 키(`handlers.unused`)는 그대로다. 버튼을 옮겨도 조작은 바뀌지 않는다. */}
-      <div className="border-t border-gray-100 pt-3 xl:mt-auto">
-        <Button
-          size="lg"
-          variant="danger"
-          className="w-full"
-          onClick={() => setUnusedOpen(true)}
-          disabled={!scanResult || !isPending || isSubmitting}
-        >
-          [F4] 이 박스 사용 안 함
-        </Button>
-      </div>
     </Card>
   );
 
   /** 상자를 아직 고를 수 없는 상태(송장 대기 · 닫힌 박스)의 왼쪽 열 — 자리만 지킨다 (2609_55/D4) */
   const boxPlaceholderCard = (
-    <Card title="박스 추천" className="space-y-3 xl:flex xl:min-h-0 xl:flex-col xl:overflow-y-auto">
+    <Card title="박스 추천" className="space-y-3 xl:min-h-0 xl:overflow-y-auto">
       <p className="text-sm text-gray-700">송장을 스캔하면 상자를 추천합니다.</p>
 
-      {/* 🔴 [F4] 는 이 카드 **바닥**에 붙는다(2026-09-16 사용자 지시) — 「이 박스」에 대한 동작이라
-          박스 카드에 있어야 어느 박스를 닫는 것인지 헷갈리지 않고, 위험한 동작이라 상자 고르는
-          자리와 떨어져 있어야 한다. `mt-auto` 가 남는 높이를 위로 밀어 바닥에 앉힌다.
-          🔴 키(`handlers.unused`)는 그대로다. 버튼을 옮겨도 조작은 바뀌지 않는다. */}
-      <div className="border-t border-gray-100 pt-3 xl:mt-auto">
-        <Button
-          size="lg"
-          variant="danger"
-          className="w-full"
-          onClick={() => setUnusedOpen(true)}
-          disabled={!scanResult || !isPending || isSubmitting}
-        >
-          [F4] 이 박스 사용 안 함
-        </Button>
-      </div>
     </Card>
   );
 
@@ -1402,7 +1388,7 @@ export default function StockPackingPage() {
   ) : (
     /* 닫힌 박스 — 제목이 상태를 말하고 본문은 버튼 하나. 같은 문장을 본문에 또 적지 않는다(안내문 자리에 이미 떠 있다) */
     <Card
-      title={scanResult.parcel.status === 'PACKED' ? '출고 완료된 박스' : '사용하지 않은 박스'}
+      title={scanResult.parcel.status === 'PACKED' ? '출고 완료된 박스' : '미사용 처리된 송장'}
       className="xl:min-h-0 xl:overflow-y-auto"
     >
       <Button variant="secondary" onClick={handleCancelBox} disabled={isSubmitting}>
@@ -1528,9 +1514,9 @@ export default function StockPackingPage() {
     <>
       <ConfirmDialog
         isOpen={unusedOpen}
-        title="이 박스 사용 안 함"
-        message="송장을 쓰지 않은 박스로 닫습니다. 출고·상자 기억을 남기지 않으며 되돌릴 수 없습니다."
-        confirmText="사용 안 함으로 닫기"
+        title="송장 미사용 처리"
+        message="이 송장을 쓰지 않은 것으로 닫습니다. 출고·상자 기억을 남기지 않으며 되돌릴 수 없습니다. ⚠️ 택배사의 송장이 취소되는 것은 아닙니다 — 실물 라벨은 폐기하세요."
+        confirmText="미사용으로 닫기"
         onConfirm={handleMarkUnused}
         onCancel={() => setUnusedOpen(false)}
         isDangerous
