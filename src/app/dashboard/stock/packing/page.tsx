@@ -5,6 +5,10 @@ import axios from 'axios';
 import { ScanLine } from 'lucide-react';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { useThemeStore } from '@/infrastructure/stores/themeStore';
+import { usePackingSoundStore } from '@/infrastructure/stores/packingSoundStore';
+import { playPackingSound, unlockAudio } from '@/infrastructure/utils/packingSounds';
+import type { PackingSoundEvent } from '@/infrastructure/utils/packingSounds';
+import { PackingSettingsModal } from './components/PackingSettingsModal';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
@@ -189,6 +193,31 @@ export default function StockPackingPage() {
   // 🔴 브라우저는 사용자가 한 번 클릭하기 전에는 소리를 내지 않는다 → [작업 시작] 이 그 클릭이다
   const [started, setStarted] = useState(false);
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  /**
+   * 효과음 — 스캔은 손이 바쁜 채로 일어나서 **눈보다 귀가 먼저 안다**(2026-09-17 사용자 요청).
+   *
+   * 🔴 설정을 `useCallback` 의존성에 넣지 않으려고 **ref 거울**을 쓴다. store 값을 직접 읽으면
+   *    음량을 한 칸 옮길 때마다 스캔 핸들러가 전부 새로 만들어지고, 그 핸들러를 `handlersRef` 가
+   *    물고 있어 전역 키 수신까지 흔들린다(`voiceOnRef` 와 같은 이유).
+   * 🔴 소리는 **보조 신호**다 — 실패해도 조용히 지나간다(`playPackingSound` 안에서 삼킨다).
+   */
+  const soundConfig = usePackingSoundStore();
+  const soundRef = useRef(soundConfig);
+  // 렌더 중에 ref 를 쓰면 lint 가 막는다 → 매 렌더 뒤 이펙트에서 갱신한다(`handlersRef` 와 같다)
+  useEffect(() => {
+    soundRef.current = soundConfig;
+  });
+
+  const playSound = useCallback((event: PackingSoundEvent) => {
+    const { soundOn, volume, sounds } = soundRef.current;
+    if (!soundOn) return;
+    const setting = sounds[event];
+    if (!setting?.enabled) return;
+    playPackingSound(setting.preset, volume);
+  }, []);
+
   /** 라이트 ↔ 다크. 몰입 레이어가 상단 바를 덮으므로 이 화면 안에 전환 창구가 따로 필요하다 */
   const theme = useThemeStore((state) => state.theme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
@@ -301,6 +330,12 @@ export default function StockPackingPage() {
       remainingQty: item.remainingQty,
     }));
   }, [scanResult, packed]);
+
+  /** 🔴 `addOne` 이 의존성 없이 최신 줄 목록을 읽는 거울(`voiceOnRef` 와 같은 이유) */
+  const rowsRef = useRef<PackedRow[]>([]);
+  useEffect(() => {
+    rowsRef.current = rows;
+  });
 
   const remainingTotal = useMemo(
     () => rows.reduce((sum, row) => sum + row.remainingQty, 0),
@@ -488,6 +523,8 @@ export default function StockPackingPage() {
       try {
         const result = await packingUseCase.scan(invoiceNumber);
         setScanResult(result);
+        // ① 송장 인식 — 박스를 열었다는 신호. 거부 상태(PACKED/UNUSED)도 "읽긴 읽었다"이므로 낸다
+        playSound('invoiceScan');
         setPacked({});
         // 첫 줄을 고른 상태로 시작한다 — 바로 「숫자 + Enter」가 먹히게 (D8)
         const first = result.remaining[0];
@@ -527,15 +564,41 @@ export default function StockPackingPage() {
         setIsScanning(false);
       }
     },
-    [packingUseCase, notify, setMessage]
+    [packingUseCase, notify, setMessage, playSound]
   );
 
-  const addOne = useCallback((row: PackedRow) => {
-    const key = rowKey(row.orderLineId, row.productId);
-    setPacked((previous) => ({ ...previous, [key]: (previous[key] ?? 0) + 1 }));
-    setActiveRowKey(key);
-    setMessage(null);
-  }, [setMessage]);
+  /**
+   * 물품 하나를 담는다 — 효과음 ②③④ 가 전부 여기서 갈린다.
+   *
+   * 🔴 판정은 **`setPacked` 안에서** 한다. 밖에서 `packed` 를 읽으면 직전 렌더의 값이라
+   *    빠르게 연속 스캔할 때(스캐너는 초당 여러 번) 한 박자 늦은 소리가 난다.
+   * 🔴 소리는 한 번에 하나만 — 완료면 완료 소리가 스캔 소리를 대신한다(겹치면 둘 다 안 들린다).
+   */
+  const addOne = useCallback(
+    (row: PackedRow) => {
+      const key = rowKey(row.orderLineId, row.productId);
+      setPacked((previous) => {
+        const next = { ...previous, [key]: (previous[key] ?? 0) + 1 };
+
+        const itemDone = next[key] >= row.remainingQty;
+        // ④ 전부 담음 = 이 스캔으로 박스가 완성됐는가(이 줄만이 아니라 전 줄 합)
+        const packedNow = rowsRef.current.reduce(
+          (sum, item) => sum + (next[rowKey(item.orderLineId, item.productId)] ?? 0),
+          0
+        );
+        const requiredNow = rowsRef.current.reduce((sum, item) => sum + item.remainingQty, 0);
+
+        if (requiredNow > 0 && packedNow >= requiredNow) playSound('allDone');
+        else if (itemDone) playSound('itemDone');
+        else playSound('itemScan');
+
+        return next;
+      });
+      setActiveRowKey(key);
+      setMessage(null);
+    },
+    [setMessage, playSound]
+  );
 
   const handleItemScan = useCallback(
     async (value: string) => {
@@ -674,6 +737,7 @@ export default function StockPackingPage() {
         items: packedItems,
       });
       const left = remainingTotal - packedTotal;
+      playSound('parcelComplete'); // ⑤ 박스 완료 — 손을 떼도 되는 유일한 순간
       resetBox();
       notify(
         'success',
@@ -689,6 +753,7 @@ export default function StockPackingPage() {
       setIsSubmitting(false);
     }
   }, [
+    playSound,
     scanResult,
     isPending,
     packedItems,
@@ -1053,6 +1118,9 @@ export default function StockPackingPage() {
         <Button
           onClick={(event) => {
             event.currentTarget.blur();
+            // 🔴 브라우저는 **사용자가 누른 직후**에만 소리를 허용한다 — 여기가 그 자리다.
+            //    안 부르면 스캔 효과음이 통째로 무음인데 에러도 안 난다.
+            unlockAudio();
             setStarted(true);
           }}
         >
@@ -1104,7 +1172,7 @@ export default function StockPackingPage() {
   );
 
   const parcelHeader = (
-    <Card className="h-full space-y-4">
+    <Card className="h-full space-y-3">
       <div className="min-h-[3.25rem]">
         {!parcel ? (
           /* 🔴 대기 중에도 **같은 골격**을 그린다(2026-09-17 사용자 지시) — 값만 `-` 다.
@@ -1169,14 +1237,23 @@ export default function StockPackingPage() {
         )}
       </div>
 
-      {/* 🔴 [F4] 는 **송장 정보 칸**에 있다(2026-09-17 사용자 지시) — 이 동작의 대상은 상자(규격)가
-          아니라 **이 송장 한 장**이다. 「박스 추천」 카드 안에 두었더니 추천을 안 쓴다는 뜻으로 읽혔다.
-          🔴 자리를 지키려고 **항상 그린다**(대기 중에는 비활성). 버튼이 생겼다 사라지면 이 카드
-          높이가 바뀌어 아래 3열이 밀린다.
-          🔴 키(`handlers.unused`)는 그대로다. 버튼을 옮겨도 조작은 바뀌지 않는다. */}
-      <div className="flex justify-end border-t border-gray-100 pt-3">
+      {/*
+       * 🔴 스캔칸과 [F4] 를 **한 줄**에 둔다(2026-09-17 사용자 지시) — 세로 공간을 아껴 아래
+       *    3열에 더 준다. 둘 다 「이 송장 한 장」에 대한 것이라 같은 줄에 있어도 뜻이 흐려지지 않는다.
+       * 🔴 여기 스캔칸은 **송장용**이다. 물품 스캔칸은 「발송 상품 목록」 카드 맨 위에 있다 —
+       *    담는 동안 눈이 머무는 카드가 그쪽이다. 두 자리에 동시에 그리지 않는다(2609_40/D9).
+       * 🔴 담는 중에도 **자리는 비워 둔다**(`min-h-14`). 칸이 사라지면 이 줄이 짧아지면서 아래
+       *    3열이 통째로 위로 올라간다 — 이 화면이 없애려던 밀림이다.
+       * 🔴 [F4] 의 대상은 상자(규격)가 아니라 **이 송장 한 장**이다. 「박스 추천」 카드 안에
+       *    두었더니 추천을 안 쓴다는 뜻으로 읽혔다. 자리를 지키려고 **항상 그린다**(대기 중 비활성).
+       * 🔴 키(`handlers.unused`)는 그대로다. 버튼을 옮겨도 조작은 바뀌지 않는다.
+       */}
+      <div className="flex min-h-14 items-center gap-3 border-t border-gray-100 pt-3">
+        {/* 스캔칸이 남는 폭을 전부 먹는다 — 버퍼는 길어질 수 있고 버튼은 길이가 고정이다 */}
+        <div className="min-w-0 flex-1">{!isPending && scanInput}</div>
         <Button
           size="lg"
+          className="shrink-0"
           variant="danger"
           onClick={() => setUnusedOpen(true)}
           disabled={!scanResult || !isPending || isSubmitting}
@@ -1184,13 +1261,6 @@ export default function StockPackingPage() {
           [F4] 송장 미사용 처리
         </Button>
       </div>
-
-      {/* 🔴 여기 스캔칸은 **송장용**이다. 물품 스캔칸은 「발송 상품 목록」 카드 맨 위에 있다
-          (2026-09-17 사용자 지시) — 담는 동안 눈이 머무는 카드가 그쪽이다.
-          🔴 두 자리에 동시에 그리지 않는다. 화면에 있는 인스턴스는 언제나 하나다(2609_40/D9).
-          🔴 담는 중에도 **자리는 비워 둔다**(`min-h-14` = 스캔칸 높이). 칸이 사라지면 이 줄이
-          짧아지면서 아래 3열이 통째로 위로 올라간다 — 이 화면이 없애려던 밀림이다. */}
-      <div className="min-h-14">{!isPending && scanInput}</div>
     </Card>
   );
 
@@ -1467,6 +1537,11 @@ export default function StockPackingPage() {
         [F10] 오른쪽 탭
       </Button>
       {/* 🔴 키와 **같은 함수**를 쓴다. 몰입 레이어가 상단 바의 테마 버튼을 덮으므로 이 줄이 유일한 창구다 */}
+      {/* 🔴 효과음·화면 설정 창구는 이 버튼 하나다(2026-09-17 사용자 요청).
+          F키를 주지 않는다 — F1~F10 은 전부 임자가 있고, 설정은 작업 중 누를 키가 아니다 */}
+      <Button size="lg" variant="secondary" onClick={() => setSettingsOpen(true)}>
+        설정
+      </Button>
       <Button size="lg" variant="secondary" onClick={switchTheme}>
         [Ctrl+Alt+D] {theme === 'dark' ? '라이트' : '다크'} 모드
       </Button>
@@ -1540,6 +1615,8 @@ export default function StockPackingPage() {
 
   const dialogs = (
     <>
+      <PackingSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
       <ConfirmDialog
         isOpen={unusedOpen}
         title="송장 미사용 처리"
