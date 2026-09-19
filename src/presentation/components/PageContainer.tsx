@@ -6,8 +6,11 @@ import type { ReactNode } from 'react';
  * 페이지마다 폭을 고르는 `width` props 는 제거됐다(2026-09-11). 프리셋이 있으면
  * 같은 성격의 화면이 서로 다른 폭으로 갈라진다(실제로 비용 관리 5개 페이지가
  * sm/md 로 갈려 있었다). 폭을 바꿔야 하면 이 상수 하나만 고친다.
+ *
+ * ⚠️ 가운데 정렬(`mx-auto`)은 없다 — 본문은 **왼쪽에 붙는다**(2026-09-19 사용자 결정).
+ * 넓은 화면에서 좌우 여백이 갈라지면 사이드바와 본문 사이가 떠 보인다.
  */
-export const CONTENT_WIDTH = 'max-w-7xl mx-auto';
+export const CONTENT_WIDTH = 'max-w-7xl';
 
 /**
  * 대시보드 페이지의 공통 레이아웃/배경/헤더 래퍼 컴포넌트.
@@ -20,7 +23,7 @@ export const CONTENT_WIDTH = 'max-w-7xl mx-auto';
  * - 가장자리 채움: `-m-4 md:-m-6`로 DashboardLayout `<main>`의 `p-4 md:p-6` 패딩을 상쇄
  * - 내부 여백: `p-4 md:p-6`로 콘텐츠 패딩 복원, `min-h-full`로 영역 채움
  * - 페이지 제목(`title`): `<h1>`을 이 컴포넌트가 렌더링한다. 페이지가 직접 `<h1>`을 쓰지 않는다
- * - 본문 최대폭: 전 페이지 동일(`max-w-7xl mx-auto`). 페이지가 폭을 정하지 않는다
+ * - 본문 최대폭: 전 페이지 동일(`max-w-7xl`, 왼쪽 정렬). 페이지가 폭을 정하지 않는다
  * - 세로 간격: 항상 `space-y-6`. 페이지가 정하지 않는다
  * - 최소 가로폭 없음(콘텐츠 유동): 페이지 전체엔 min-width를 두지 않는다. 브라우저 폭이
  *   줄면 콘텐츠도 함께 줄어들고, **테이블만** 자체 최소폭(`.list-table-scroll` →
@@ -37,7 +40,7 @@ export const CONTENT_WIDTH = 'max-w-7xl mx-auto';
  *   `flex items-center justify-between`으로 배치된다.
  *
  * @example
- * // 기본 (가운데 정렬, max-w-7xl, 세로 간격 space-y-6)
+ * // 기본 (왼쪽 정렬, max-w-7xl, 세로 간격 space-y-6)
  * <PageContainer title="택배비">
  *   <SearchCard />
  *   <DataTable />
