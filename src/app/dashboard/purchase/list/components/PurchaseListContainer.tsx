@@ -9,7 +9,7 @@ import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepo
 import { GetProductDetailUseCase } from '@/application/usecases/GetProductDetailUseCase';
 import { OrderRepositoryImpl } from '@/infrastructure/repositories/OrderRepositoryImpl';
 import { OrderUseCase } from '@/application/usecases/OrderUseCase';
-import { getImageUrl } from '@/infrastructure/utils/imageUrl';
+import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 import type { PurchaseList, PurchaseListItem } from '@/domain/entities/PurchaseListEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { AddManualItemRequest } from '@/application/dto/PurchaseListDTOs';
@@ -75,7 +75,10 @@ export function PurchaseListContainer() {
       items.map(async (item) => {
         try {
           const product = await getProductDetailUseCase.getProduct(item.productId);
-          return [item.productId, getImageUrl(product.imageUrl, item.productId)] as const;
+          // 상품조회 목록과 같은 해석기를 쓴다(FEATURE 2609 상품목록 썸네일).
+          // `getImageUrl` 은 productId 가 있으면 항상 백엔드 프록시로 떨어져,
+          // 이미지가 S3 에 있는 dev/prod 에서는 썸네일이 뜨지 않았다.
+          return [item.productId, getProductThumbUrl(product.imageUrl, item.productId)] as const;
         } catch {
           return [item.productId, null] as const;
         }
