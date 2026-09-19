@@ -125,6 +125,7 @@ export function ProductListContainer() {
       <SearchBar initialValue={search} onSearch={handleSearch} />
       <ProductTable
         products={products}
+        listQuery={searchKey}
         isLoading={isLoading}
         error={error}
         currentPage={page}
