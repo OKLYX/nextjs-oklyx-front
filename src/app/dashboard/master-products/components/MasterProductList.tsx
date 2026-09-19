@@ -7,6 +7,7 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { Pagination } from '@/presentation/components/Pagination';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
+import { detailHrefWithReturn } from '@/infrastructure/utils/listReturn';
 import { ROUTES } from '@/config/routes';
 import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
@@ -162,7 +163,11 @@ export function MasterProductList() {
                   <tr
                     key={m.id}
                     className="cursor-pointer border-b border-gray-100 text-sm text-gray-900 hover:bg-gray-50"
-                    onClick={() => router.push(ROUTES.MASTER_PRODUCT_DETAIL(m.id))}
+                    onClick={() =>
+                      router.push(
+                        detailHrefWithReturn(ROUTES.MASTER_PRODUCT_DETAIL(m.id), searchKey),
+                      )
+                    }
                   >
                     <td className="px-4 py-2">
                       <div className="h-12 w-12 overflow-hidden rounded bg-gray-100">

@@ -7,6 +7,7 @@ import { ViewModeToggle } from '@/presentation/components/ViewModeToggle';
 import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 import { useListViewStore } from '@/infrastructure/stores/listViewStore';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
+import { detailHrefWithReturn } from '@/infrastructure/utils/listReturn';
 import type { Product } from '@/domain/entities/Product';
 
 interface ProductTableProps {
@@ -15,10 +16,21 @@ interface ProductTableProps {
   error: string | null;
   currentPage: number;
   pageSize: number;
+  /** 목록의 조회 조건(URL 쿼리스트링). 상세에 실어 보내 [← 목록] 이 같은 페이지로 돌아오게 한다. */
+  listQuery?: string;
 }
 
-export function ProductTable({ products, isLoading, error, currentPage, pageSize }: ProductTableProps) {
+export function ProductTable({
+  products,
+  isLoading,
+  error,
+  currentPage,
+  pageSize,
+  listQuery = '',
+}: ProductTableProps) {
   const router = useRouter();
+  const openDetail = (id: number) =>
+    router.push(detailHrefWithReturn(ROUTES.PRODUCT_DETAIL(id), listQuery));
   const isMobile = useIsMobile();
   const viewMode = useListViewStore((state) => state.viewMode);
   // Card view is a narrow-screen affordance only; md+ always shows the table.
@@ -121,7 +133,7 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
             {products.map((product, index) => (
               <tr
                 key={product.id}
-                onClick={() => router.push(ROUTES.PRODUCT_DETAIL(product.id))}
+                onClick={() => openDetail(product.id)}
                 className="border-b border-gray-300 hover:bg-gray-50 cursor-pointer transition-colors"
               >
                 <td className="px-4 py-3 text-sm text-gray-900">{currentPage * pageSize + index + 1}</td>
@@ -144,7 +156,7 @@ export function ProductTable({ products, isLoading, error, currentPage, pageSize
           {products.map((product) => (
             <DataCard
               key={product.id}
-              onClick={() => router.push(ROUTES.PRODUCT_DETAIL(product.id))}
+              onClick={() => openDetail(product.id)}
               fields={[
                 { label: '이미지', value: thumbnail(product) },
                 { label: '상품명', value: product.productName },

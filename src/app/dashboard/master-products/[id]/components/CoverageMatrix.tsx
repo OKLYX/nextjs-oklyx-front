@@ -6,6 +6,7 @@ import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { ROUTES } from '@/config/routes';
+import { listReturnHref } from '@/infrastructure/utils/listReturn';
 import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
@@ -748,7 +749,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push(ROUTES.MASTER_PRODUCTS)}
+            onClick={() => router.push(listReturnHref(ROUTES.MASTER_PRODUCTS, searchParams))}
             className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
           >
             ← 목록
