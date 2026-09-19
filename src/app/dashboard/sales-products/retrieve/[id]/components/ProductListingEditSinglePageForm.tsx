@@ -593,7 +593,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
   // 2609_22/D32: 마스터에 연결된 셀은 /{id}/edit 로 직접 들어와도 폼을 열지 않는다.
   if (existingListing?.masterProductId != null) {
     return (
-      <div className="w-full max-w-4xl mx-auto py-8 space-y-4">
+      <div className="w-full max-w-4xl py-8 space-y-4">
         <h1 className="text-3xl font-bold">판매상품 수정</h1>
         <p className="text-sm text-gray-700">
           마스터에 연결된 판매상품입니다. 마스터 상세에서 수정하세요.{' '}
@@ -618,7 +618,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
   const isAllComplete = selectedPlatform && productListingName.trim() && platformProductId && selectedCategory && selectedCarrierRateId && selectedPackageId && optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0);
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-8">
+    <div className="w-full max-w-4xl py-8">
       <h1 className="text-3xl font-bold mb-8">판매상품 수정</h1>
 
       {error && (
