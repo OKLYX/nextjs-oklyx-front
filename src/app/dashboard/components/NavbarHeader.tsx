@@ -34,7 +34,7 @@ export function NavbarHeader({
   const labelCls = collapsed ? 'hidden group-hover:inline' : '';
 
   return (
-    <div className="flex items-center py-3 border-b border-gray-200">
+    <div className="flex items-center py-3">
       <Link
         href={ROUTES.DASHBOARD}
         className="flex flex-1 items-center text-xl font-bold text-gray-900"
