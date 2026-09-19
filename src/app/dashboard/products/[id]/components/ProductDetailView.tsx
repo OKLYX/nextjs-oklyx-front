@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
@@ -12,9 +11,19 @@ interface ProductDetailViewProps {
   product: Product;
   onDelete: () => Promise<void>;
   imageUseCase: ProductImageUseCase;
+  /** [← 목록] 목적지. 목록에서 들어왔으면 그 페이지·검색어가 붙어 있다. */
+  backHref: string;
+  /** [수정] 목적지. 목록 조회 조건을 그대로 달고 간다. */
+  editHref: string;
 }
 
-export function ProductDetailView({ product, onDelete, imageUseCase }: ProductDetailViewProps) {
+export function ProductDetailView({
+  product,
+  onDelete,
+  imageUseCase,
+  backHref,
+  editHref,
+}: ProductDetailViewProps) {
   const router = useRouter();
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -23,19 +32,26 @@ export function ProductDetailView({ product, onDelete, imageUseCase }: ProductDe
     setIsDeleting(true);
     try {
       await onDelete();
-      router.push(ROUTES.PRODUCTS_RETRIEVE);
+      router.push(backHref);
     } catch {
       setIsDeleting(false);
       setShowDeleteConfirmation(false);
     }
-  }, [onDelete, router]);
+  }, [onDelete, router, backHref]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => router.push(backHref)}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+        >
+          ← 목록
+        </button>
         <div className="flex gap-2">
           <button
-            onClick={() => router.push(ROUTES.PRODUCT_EDIT(product.id))}
+            onClick={() => router.push(editHref)}
             className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
             수정

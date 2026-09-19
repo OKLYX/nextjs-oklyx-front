@@ -11,6 +11,7 @@ import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepo
 import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 import { ROUTES } from '@/config/routes';
+import { detailHrefWithReturn, listReturnHref } from '@/infrastructure/utils/listReturn';
 import type { Product } from '@/domain/entities/Product';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -29,6 +30,12 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
   const [error, setError] = useState<string | null>(null);
 
   const isEditMode = searchParams.get('mode') === 'edit';
+
+  // 목록에서 실려 온 조회 조건. 수정 모드를 오갈 때도 잃지 않게 상세 URL 에 계속 달고 다닌다.
+  const listQuery = searchParams.get('from') ?? '';
+  const backHref = listReturnHref(ROUTES.PRODUCTS_RETRIEVE, searchParams);
+  const detailHref = detailHrefWithReturn(ROUTES.PRODUCT_DETAIL(id), listQuery);
+  const editHref = detailHrefWithReturn(ROUTES.PRODUCT_EDIT(id), listQuery);
 
   const getUseCase = useMemo(
     () => new GetProductDetailUseCase(new ProductRepositoryImpl()),
@@ -82,19 +89,19 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
       try {
         const updated = await updateUseCase.updateProduct(id, data);
         setProduct(updated);
-        router.push(ROUTES.PRODUCT_DETAIL(id));
+        router.push(detailHref);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to update product';
         setError(errorMessage);
         throw err;
       }
     },
-    [id, updateUseCase, router]
+    [id, updateUseCase, router, detailHref]
   );
 
   const handleCancel = useCallback(() => {
-    router.push(ROUTES.PRODUCT_DETAIL(id));
-  }, [id, router]);
+    router.push(detailHref);
+  }, [router, detailHref]);
 
   const handleCheckBarcode = useCallback(
     async (barcodeId: string) => {
@@ -157,6 +164,8 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
         product={product}
         onDelete={handleDelete}
         imageUseCase={imageUseCase}
+        backHref={backHref}
+        editHref={editHref}
       />
     </PageContainer>
   );
