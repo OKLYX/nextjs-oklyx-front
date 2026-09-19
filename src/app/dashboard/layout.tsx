@@ -25,9 +25,9 @@ const EXPAND_BREAKPOINT = 1304;
 //    instead of being overridden on every resize tick. Collapsed rail hover
 //    peeks open to w-56 as a floating overlay (no reflow). Hamburger pins/collapses.
 //  - Below md (mobile): an off-canvas drawer instead of the rail. Hidden by
-//    default (-translate-x-full); the md:hidden TopBar hamburger opens it as an
+//    default (-translate-x-full); the same top-bar button opens it as an
 //    overlay with a backdrop. Tapping the backdrop, a menu item (route change),
-//    or the in-drawer hamburger closes it. Content has no left padding (pl-0).
+//    or the button again closes it. Content has no left padding (pl-0).
 export default function DashboardLayout({
   children,
 }: {
@@ -148,18 +148,29 @@ export default function DashboardLayout({
         }`}
       >
         <div className="flex items-stretch bg-white">
-          {/* Mobile-only menu trigger — the in-drawer hamburger is off-screen
-              when the drawer is closed, so the drawer needs this opener. */}
+          {/* Sidebar toggle — the only one. Lives at the top bar's far left on
+              every screen size: desktop pins/collapses the rail, mobile opens
+              and closes the drawer (whose own hamburger is off-screen while
+              closed). Previously it sat inside the rail header, where a
+              collapsed rail hid it until hover. */}
           <button
             type="button"
             onClick={toggleSidebar}
-            aria-label="메뉴 열기"
-            className="md:hidden shrink-0 pl-4 pr-2 text-gray-900 hover:text-gray-600 transition-colors"
+            aria-label={
+              isMobile
+                ? isSidebarOpen
+                  ? '메뉴 닫기'
+                  : '메뉴 열기'
+                : isSidebarOpen
+                  ? '메뉴 고정 해제'
+                  : '메뉴 고정'
+            }
+            aria-expanded={isSidebarOpen}
+            className="shrink-0 pl-4 pr-2 text-gray-900 hover:text-gray-600 transition-colors"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
             </svg>
           </button>
           <div className="flex-1 min-w-0">
