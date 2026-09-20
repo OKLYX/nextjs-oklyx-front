@@ -700,6 +700,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     }
   };
 
+  // 2609_63: 연결 해제·미전송 삭제 성공 → 상단 배너 + 재조회. 성공 문구를 셀 안에서 띄우면
+  // 재조회로 그 액션 영역이 사라져 문구도 같이 사라진다 → 알림은 부모(매트릭스)가 소유한다.
+  const handleCellRemoved = async (message: string) => {
+    setBanner({ text: message, tone: 'green' });
+    await load();
+  };
+
   // 2609_22: 가져오기 성공 → 매트릭스 재조회 + 커밋에서 처음 온 카테고리 경고를 그대로 노출.
   const handleImportDone = async (categoryWarning: string | null) => {
     setBanner(categoryWarning ? { text: categoryWarning, tone: 'amber' } : null);
@@ -1152,6 +1159,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
             <tbody>
               {matrix.rows.map((row) => {
                 const badge = !row.registered ? '미등록' : STATUS_LABEL[cellStatus(row.cell)];
+                // 2609_63/D10-1: 상품 ID 열과 액션 열(해제·삭제 버튼)이 **같은 목록**을 봐야
+                // ID 줄 수와 버튼 수가 어긋나지 않는다. ⚠️ `row.cell`(첫 셀) 계약은 그대로다
+                // (2609_61/D5 — 썸네일·상태·판매가·나머지 액션이 전부 그 위에 있다).
+                const rowCells = row.cells ?? (row.cell ? [row.cell] : []);
                 return (
                   <Fragment key={row.accountId}>
                   <tr
@@ -1231,11 +1242,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                         (96px)이 행을 늘려 놓아서, 이 칸만 위로 붙이면 눈에 띄게 어긋난다. */}
                     <td className="px-4 py-3">
                       {(() => {
-                        const cells = row.cells ?? (row.cell ? [row.cell] : []);
-                        if (cells.length === 0) return <span className="text-gray-400">–</span>;
+                        if (rowCells.length === 0) return <span className="text-gray-400">–</span>;
                         return (
                           <div className="space-y-0.5">
-                            {cells.map((c) => (
+                            {rowCells.map((c) => (
                               <div key={c.productListingId} className="flex items-center gap-1">
                                 {c.platformProductId ? (
                                   <>
@@ -1431,6 +1441,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           usesOwnCategory={row.cell.usesOwnCategory === true}
                           channelCategoryLabel={row.cell.categoryName ?? row.cell.categoryCode ?? null}
                           masterCategoryName={matrix.masterCategoryName ?? null}
+                          cells={rowCells}
+                          onCellRemoved={handleCellRemoved}
                         />
                       )}
                     </td>

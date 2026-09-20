@@ -43,7 +43,8 @@ const importErrorMessage = (e: unknown): string => {
     return `${message} 이미 이 판매자·플랫폼 셀이 있습니다. 기존 셀을 지우거나 다른 마스터를 선택하세요.`;
   }
   if (status === 400 && message.includes('이미 다른 상품에 연결된')) {
-    return `${message} 이 쿠팡 상품은 다른 마스터에 이미 연결돼 있습니다.`;
+    // 2609_63: 이 400 은 여전히 발생한다(연결된 셀은 재사용 대상이 아니다) — 조치 방법만 덧붙인다.
+    return `${message} 그 마스터에서 [마스터 연결 해제] 한 뒤 다시 시도하세요.`;
   }
   if ((status === 400 || status === 404) && message.includes('계정')) {
     return `${message} 판매자 관리에서 쿠팡 계정을 먼저 등록·활성화하세요.`;
@@ -222,6 +223,17 @@ export function ImportCoupangProductModal({
                 · 태그 {preview.channelTags.length}개
               </span>
             </p>
+            {/* 2609_63/D11: 경고가 아니라 사실 안내라 categoryWarning(amber)과 다른 색을 쓴다.
+                뒷문장은 실제 동작이다 — 편입은 판매가·옵션명을 채널 지정값으로 넣고 재생성이 그 둘을
+                건너뛴다. 🔴 되돌리는 창구는 이미 있다([기본값으로 변경]·[옵션명 일괄 적용]). */}
+            {preview.reusesExistingListing && (
+              <p className="rounded bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                이 쿠팡 상품에는 마스터 연결이 끊긴 판매상품이 있습니다. 새로 만들지 않고 그 판매상품을
+                이 마스터에 다시 붙입니다 — 주문·고객문의·정산 기록이 함께 따라옵니다. 판매가·옵션명은
+                쿠팡의 현재 값으로 들어오니, 이 마스터 기준으로 자동 계산하려면 가져온 뒤 [가격 설정] →
+                [기본값으로 변경] 을 누르세요.
+              </p>
+            )}
             {preview.categoryWarning && (
               <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-700">
                 {preview.categoryWarning}

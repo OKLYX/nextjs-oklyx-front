@@ -102,6 +102,16 @@ export interface ListingRegistrationRepository {
   /** 2609_22: 가져오기 커밋 — 성공 시 새 셀 id 를 담은 ChannelAddResponse. */
   importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse>;
   /**
+   * 2609_63/D3: 이 채널 셀을 마스터에서 떼어낸다. 로컬만 바뀐다 — 마켓 호출 0회, 판매상품 행은 남는다.
+   * 마켓 상품 ID 가 있는 셀만 가능하다(미전송 셀은 백엔드가 400, D4).
+   */
+  unlinkChannel(masterId: number, listingId: number): Promise<void>;
+  /**
+   * 2609_63/D13: 마켓에 보낸 적 없는(미전송) 채널 줄을 지운다.
+   * 🔴 해제(`unlinkChannel`)와 경로가 다르다 — 되돌릴 수 있는 정도가 달라 합치지 않는다.
+   */
+  deleteDraftChannel(masterId: number, listingId: number): Promise<void>;
+  /**
    * 2609_45/D13: 이 셀이 마스터 카테고리를 따르게 한다. 마켓에는 지금 아무것도 보내지 않는다
    * (실제 반영은 다음 [수정 요청]). `useMasterCategory=false` 는 백엔드가 400 으로 막는다.
    */

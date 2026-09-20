@@ -248,6 +248,16 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     return response.data.data;
   }
 
+  // 2609_63: 두 경로는 `/link` 접미사 하나로 갈린다 — 떼어내기와 지우기를 한 호출로 합치지 않는다(D13).
+  // 응답 본문이 없다(ResponseDTO<Void>) → `response.data.data` 를 읽지 않는다.
+  async unlinkChannel(masterId: number, listingId: number): Promise<void> {
+    await axiosInstance.delete(`${masterBase}/${masterId}/listings/${listingId}/link`);
+  }
+
+  async deleteDraftChannel(masterId: number, listingId: number): Promise<void> {
+    await axiosInstance.delete(`${masterBase}/${masterId}/listings/${listingId}`);
+  }
+
   async setCategorySource(listingId: number, useMasterCategory: boolean): Promise<void> {
     await axiosInstance.patch(`${listingBase}/${listingId}/category-source`, { useMasterCategory });
   }

@@ -185,6 +185,16 @@ export class ListingRegistrationUseCase {
     return this.repository.importListing(masterId, body);
   }
 
+  /** 2609_63/D3: 채널 셀을 마스터에서 떼어낸다(로컬만 — 마켓 호출 0회). */
+  unlinkChannel(masterId: number, listingId: number): Promise<void> {
+    return this.repository.unlinkChannel(masterId, listingId);
+  }
+
+  /** 2609_63/D13: 미전송 채널 줄을 지운다(해제와 다른 경로). */
+  deleteDraftChannel(masterId: number, listingId: number): Promise<void> {
+    return this.repository.deleteDraftChannel(masterId, listingId);
+  }
+
   /** 2609_45/D13: 이 셀을 마스터 카테고리로 되돌린다(마켓 반영은 다음 [수정 요청] 때). */
   setCategorySource(listingId: number, useMasterCategory: boolean): Promise<void> {
     return this.repository.setCategorySource(listingId, useMasterCategory);
