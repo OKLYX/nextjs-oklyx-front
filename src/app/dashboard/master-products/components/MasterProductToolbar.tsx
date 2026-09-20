@@ -9,7 +9,7 @@ interface MasterProductToolbarProps {
 }
 
 /**
- * 판매상품 마스터 목록의 조회 조건 툴바 (이름 검색 · 페이지 크기 · 정렬).
+ * 판매상품 마스터 목록의 조회 조건 툴바 (이름·플랫폼 ID 검색 · 페이지 크기 · 정렬).
  * File: src/app/dashboard/master-products/components/MasterProductToolbar.tsx
  *
  * ⚠️ 컨트롤은 상태를 갖지 않는다 — 값은 `query`(URL 파생)에서 오고 변경은 `onChange` 로 위임한다.
@@ -60,7 +60,7 @@ export function MasterProductToolbar({ query, onChange }: MasterProductToolbarPr
       <div className="flex gap-2 sm:max-w-md sm:flex-1">
         <input
           type="text"
-          placeholder="이름 검색..."
+          placeholder="이름 · 상품ID · 옵션ID 검색..."
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
