@@ -60,6 +60,7 @@ import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroup
 import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import { submitNoticeGroup } from './categoryMetaValidation';
 import { DetailSection } from './DetailSection';
+import { ChannelOptionTable } from './ChannelOptionTable';
 import { MasterCategoryPanel } from './MasterCategoryPanel';
 import { CategoryMetaPanel } from './CategoryMetaPanel';
 import { MasterBasicInfoPanel } from './MasterBasicInfoPanel';
@@ -70,6 +71,7 @@ import { MasterRegistrationSuffixPanel } from './MasterRegistrationSuffixPanel';
 import { MasterShippingOverridePanel } from './MasterShippingOverridePanel';
 import { CellActions } from './CellActions';
 import { ImportCoupangProductModal } from './ImportCoupangProductModal';
+import { CopyIdButton } from './CopyIdButton';
 import { DisplayNameRow } from './DisplayNameRow';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 
@@ -267,6 +269,15 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   // Per-channel option activation (43): the listing id currently saving an active-set change.
   const [optionBusyId, setOptionBusyId] = useState<number | null>(null);
+  // 2609_61: 옵션×채널 표 → 「상품 기본 정보 > 옵션」 이동. `basicOpenSignal` 은 섹션을 여는 신호(닫지
+  // 않는다), `focusOption` 은 옵션 에디터가 반응할 대상이다. ⚠️ 초기값 undefined — 0 으로 두면 마운트
+  // 때 섹션이 저절로 펼쳐진다(기본은 전부 접힘).
+  const [basicOpenSignal, setBasicOpenSignal] = useState<number | undefined>(undefined);
+  const [focusOption, setFocusOption] = useState<{ optionId: number; nonce: number } | undefined>(
+    undefined,
+  );
+  // 표 갱신 신호. 매트릭스 재조회(`load`)가 돌 때마다 올려 표의 값도 함께 새로 읽는다.
+  const [channelOptionReloadKey, setChannelOptionReloadKey] = useState(0);
 
   // 2609_22: 쿠팡 상품 가져오기 대상 행(모달 mount). null = 닫힘.
   const [importTarget, setImportTarget] = useState<{
@@ -351,6 +362,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       void fetchGenerated(m); // fire-and-forget; table draws immediately, previews fill in after
       void fetchPlaces(m); // ditto — the 배송 설정 warning on unregistered rows fills in after
       void fetchSyncPreview().catch(() => setSyncPreview(null)); // ditto — banner fills in after
+      // 2609_61: 옵션·가격·재고가 바뀌는 경로는 전부 이 재조회를 지나므로 표 갱신도 여기 한 곳에서.
+      setChannelOptionReloadKey((k) => k + 1);
     } catch {
       setError('커버리지 매트릭스를 불러오지 못했습니다.');
     } finally {
@@ -393,6 +406,18 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const handlePanelSaved = useCallback((patched: MasterProductResponse) => {
     setMaster((prev) => (prev ? { ...prev, ...patched } : patched));
     setMatrix((prev) => (prev ? { ...prev, masterName: patched.name } : prev));
+  }, []);
+
+  /**
+   * 2609_61: 옵션×채널 표의 [옵션 수정] — 「상품 기본 정보」를 펼치고 그 옵션의 수정 폼으로 보낸다.
+   * 🔴 `router.push` 를 쓰지 말 것 — 페이지가 다시 렌더되며 매트릭스 상태(선택·배너·썸네일)가 날아간다.
+   * 해시는 새로고침·뒤로가기에도 "어디로 갔었는지" 가 남도록 `replaceState` 로만 바꾼다.
+   */
+  const handleEditMasterOption = useCallback((masterOptionId: number) => {
+    setBasicOpenSignal((n) => (n ?? 0) + 1);
+    // nonce = 같은 옵션을 다시 눌러도 에디터가 또 반응하게 하는 값.
+    setFocusOption({ optionId: masterOptionId, nonce: Date.now() });
+    window.history.replaceState(null, '', `#master-option-${masterOptionId}`);
   }, []);
 
   // 혼합구성 판정 = 구성품 종수 >= 2 (백엔드 63 미러, 생성 모달 106행과 같은 규칙). 카테고리 메타 패널과
@@ -511,6 +536,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         master.sourceImageUrl ? '대표사진 있음' : '대표사진 없음'
       }`
     : undefined;
+  // 2609_61 표 요약 = 옵션 수 · 채널 셀 수. ⚠️ 계정 수가 아니라 셀 수다(한 계정에 셀이 여럿일 수 있다).
+  const channelCellCount = (matrix?.rows ?? []).reduce(
+    (sum, row) => sum + (row.cells ?? (row.cell ? [row.cell] : [])).length,
+    0,
+  );
+  const channelOptionSummary = `옵션 ${options.length}개 · 채널 ${channelCellCount}개`;
   const fieldValuesSummary = filledFieldCount > 0 ? `${filledFieldCount}개 입력됨` : '입력 없음';
   const summaryCarrier = carrierRates.find((r) => r.id === master?.defaultDeliveryId);
   const summaryPackage = packages.find((p) => p.id === master?.defaultPackageId);
@@ -917,7 +948,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           조회가 함께 일어난다(그룹 단위 lazy mount). ⚠️ 두 카테고리 패널은 `master` 가 로드된 뒤에만
           렌더된다(그룹 조건) — 예전 단독 섹션은 `isAdmin` 만 봤다. */}
       {isAdmin && master && (
-        <DetailSection title="상품 기본 정보" summary={basicSummary}>
+        <DetailSection title="상품 기본 정보" summary={basicSummary} openSignal={basicOpenSignal}>
           <MasterBasicInfoPanel
             master={master}
             useCase={masterUseCase}
@@ -970,6 +1001,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
               masterNoticeGroup={masterNoticeGroup}
               hideCategoryAttrs={hideCategoryAttrs}
               onChanged={load}
+              focusOption={focusOption}
             />
           </div>
 
@@ -1069,6 +1101,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                 <th className="px-4 py-3">판매자</th>
                 <th className="px-4 py-3">플랫폼</th>
                 <th className="px-4 py-3">계정</th>
+                {/* 2609_61/D1: 「등록상품 ID」가 아니라 「상품 ID」 — 이 제품에서 "등록상품"은
+                    자동 생성되는 등록상품명을 가리킨다(판매상품 상세의 기존 레이블과 같은 말). */}
+                <th className="px-4 py-3">상품 ID</th>
                 <th className="px-4 py-3">상태</th>
                 <th className="px-4 py-3">판매가</th>
                 <th className="px-4 py-3">액션</th>
@@ -1148,6 +1183,38 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     <td className="px-4 py-3">{row.sellerName}</td>
                     <td className="px-4 py-3">{row.platform}</td>
                     <td className="px-4 py-3">{row.accountLabel}</td>
+                    {/* 상품 ID (2609_61): 이 계정이 가진 **모든** 셀을 세로로 나열한다 — 한 계정이
+                        같은 마스터로 쿠팡 페이지를 여러 개 가질 수 있어(2026-09-19 편입 가드 완화)
+                        첫 셀만 보여주면 나머지 페이지가 화면에 없는 것처럼 된다.
+                        ⚠️ `cells` 가 없는 예전 응답에서도 칸이 비지 않도록 `cell` 로 폴백한다. */}
+                    <td className="px-4 py-3 align-top">
+                      {(() => {
+                        const cells = row.cells ?? (row.cell ? [row.cell] : []);
+                        if (cells.length === 0) return <span className="text-gray-400">–</span>;
+                        return (
+                          <div className="space-y-0.5">
+                            {cells.map((c) => (
+                              <div key={c.productListingId} className="flex items-center gap-1">
+                                {c.platformProductId ? (
+                                  <>
+                                    <span className="font-mono text-xs tabular-nums text-gray-900">
+                                      {c.platformProductId}
+                                    </span>
+                                    <CopyIdButton value={c.platformProductId} />
+                                  </>
+                                ) : (
+                                  // 2609_61/D2: DRAFT 셀은 아직 마켓이 ID 를 주지 않았다 —
+                                  // 오류가 아니므로 경고색·아이콘을 쓰지 않는다.
+                                  <span className="text-gray-400" title="마켓 등록 후 부여">
+                                    –
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`rounded px-1.5 py-0.5 text-[10px] ${
@@ -1346,6 +1413,23 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       <p className="text-[11px] text-amber-700">
         {`${MARKET_OPTION_LOCK_REASON} 옵션 추가는 언제든 가능합니다.`}
       </p>
+
+      {/* 2609_61: 옵션 × 채널 표. ⚠️ `DetailSection` 은 처음 펼칠 때 children 을 마운트한다 →
+          표를 열지 않으면 `channel-options` 도 부르지 않는다(의도).
+          🔴 ADMIN 게이트 필수 — `channel-options` 는 `/api/admin/**` 이고 이 페이지는 비-ADMIN 도
+          열리므로, 게이트가 없으면 펼치는 순간 403 이다(90 의 `fetchSyncPreview` 와 같은 이유).
+          [옵션 수정] 의 도착지인 「상품 기본 정보」도 ADMIN 에게만 렌더된다. */}
+      {isAdmin && master && (
+        <DetailSection title="채널별 옵션" summary={channelOptionSummary}>
+          <ChannelOptionTable
+            masterId={masterId}
+            rows={matrix?.rows ?? []}
+            masterOptions={options}
+            reloadKey={channelOptionReloadKey}
+            onEditMasterOption={handleEditMasterOption}
+          />
+        </DetailSection>
+      )}
 
       {importTarget && (
         <ImportCoupangProductModal

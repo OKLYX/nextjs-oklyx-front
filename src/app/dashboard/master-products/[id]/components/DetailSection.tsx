@@ -1,12 +1,18 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface DetailSectionProps {
   title: string;
   summary?: ReactNode; // one-line current value, shown while collapsed
   defaultOpen?: boolean;
+  /**
+   * 값이 바뀔 때마다 섹션을 **연다**(밖에서 이 섹션 안의 특정 항목으로 사용자를 보낼 때).
+   * 닫지는 않는다 — 열림 상태의 주인은 여전히 이 컴포넌트다(제어형으로 바꾸지 말 것).
+   * 같은 대상을 다시 지목해도 반응해야 하므로 호출부는 매번 **다른 값**(카운터·타임스탬프)을 넘긴다.
+   */
+  openSignal?: number;
   children: ReactNode;
 }
 
@@ -21,6 +27,8 @@ interface DetailSectionProps {
  * - 마스터 상세(`CoverageMatrix`)에 새 편집 패널을 추가할 때는 항상 이 컴포넌트로 감싼다.
  * - `summary` 에 현재값 한 줄을 넣어 접힌 상태에서도 상태를 읽을 수 있게 한다.
  * - 열림 상태는 **컴포넌트 로컬**이다. 전역 store·localStorage 로 persist 하지 않는다.
+ * - 밖에서 이 섹션 안으로 사용자를 보내야 하면 `openSignal`(여는 신호)만 쓴다. 열림 상태를
+ *   완전한 제어형(`isOpen`/`onToggle`)으로 바꾸지 말 것 — 로컬 소유가 위 마운트 규칙의 전제다.
  *
  * ⚠️ **마운트 규칙**: 접힌 초기 상태에서는 children 을 렌더하지 않지만, **한 번 열린 뒤에는
  * 접어도 마운트를 유지**한다(`hasOpened`). 두 성질이 다 필요하다 —
@@ -41,10 +49,27 @@ interface DetailSectionProps {
  *   <MasterTagsPanel ... />
  * </DetailSection>
  */
-export function DetailSection({ title, summary, defaultOpen = false, children }: DetailSectionProps) {
+export function DetailSection({
+  title,
+  summary,
+  defaultOpen = false,
+  openSignal,
+  children,
+}: DetailSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   // Once opened, children stay mounted (hidden) so unsaved edits survive a collapse.
   const [hasOpened, setHasOpened] = useState(defaultOpen);
+
+  // Open-only signal from outside (2609_61): already-open sections stay open, never toggled shut.
+  // ⚠️ setState 는 microtask 로 미룬다 — effect 본문에서 동기로 부르면 프로젝트 lint
+  // (`react-hooks/set-state-in-effect`)가 error 로 막는다.
+  useEffect(() => {
+    if (openSignal === undefined) return;
+    queueMicrotask(() => {
+      setIsOpen(true);
+      setHasOpened(true);
+    });
+  }, [openSignal]);
 
   const toggle = () => {
     setIsOpen((prev) => !prev);

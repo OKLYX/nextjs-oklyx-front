@@ -17,6 +17,7 @@ import type {
   CategoryMetaSchemaResponse,
   CategoryAttributesRequest,
   ListingMatrixResponse,
+  MasterChannelOptionsResponse,
   TagsUpdateRequest,
   ShippingOverrideUpdateRequest,
   ShippingForceApplyRequest,
@@ -96,6 +97,12 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
 
   async getMatrix(id: number): Promise<ListingMatrixResponse> {
     const response = await axiosInstance.get(`${base}/${id}/matrix`);
+    return response.data.data;
+  }
+
+  // 2609_61/D6: 옵션×채널 표의 유일한 데이터 출처. 셀 수와 무관하게 호출 1번.
+  async getChannelOptions(id: number): Promise<MasterChannelOptionsResponse> {
+    const response = await axiosInstance.get(`${base}/${id}/channel-options`);
     return response.data.data;
   }
 
