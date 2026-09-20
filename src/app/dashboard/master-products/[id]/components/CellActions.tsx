@@ -26,6 +26,14 @@ interface CellListing {
   status: ListingStatus;
 }
 
+/**
+ * 해제·삭제 대상이 되는 셀 한 줄(2609_63/D10-1). 매트릭스의 `MatrixCell` 중 이 컴포넌트가 쓰는 두 값만 받는다.
+ */
+interface CellRef {
+  productListingId: number;
+  platformProductId: string | null;
+}
+
 interface CellActionsProps {
   masterId: number;
   listing: CellListing;
@@ -45,9 +53,25 @@ interface CellActionsProps {
   usesOwnCategory: boolean;
   channelCategoryLabel: string | null; // categoryName ?? categoryCode (둘 다 없으면 null)
   masterCategoryName: string | null;
+  /**
+   * 이 계정의 **모든** 셀(2609_63/D10-1). 상품 ID 열(`CoverageMatrix.tsx`)이 나열하는 것과 같은 목록이다.
+   * 🔴 해제·삭제만 이것을 읽는다 — 나머지 액션은 첫 셀(`listing`) 계약 그대로다(2609_61/D5).
+   *    첫 셀에만 해제 버튼을 달면 잘못 붙은 게 두 번째 셀일 때 영영 떼지 못한다.
+   */
+  cells: CellRef[];
+  /** 해제·삭제 성공 시 부모가 배너를 띄우고 다시 읽는다(두 동작 공용). */
+  onCellRemoved: (message: string) => void;
 }
 
-type Busy = 'register' | 'fetch' | 'regenerate' | 'update' | 'category-source' | null;
+type Busy =
+  | 'register'
+  | 'fetch'
+  | 'regenerate'
+  | 'update'
+  | 'category-source'
+  | 'unlink'
+  | 'delete-cell'
+  | null;
 
 /**
  * 등록됨/DRAFT 셀의 상태별 액션 버튼 (register / update-request / fetch-status / regenerate / 필드값 편집).
@@ -71,6 +95,8 @@ export function CellActions({
   usesOwnCategory,
   channelCategoryLabel,
   masterCategoryName,
+  cells,
+  onCellRemoved,
 }: CellActionsProps) {
   const router = useRouter();
   const useCase = useMemo(
@@ -89,6 +115,10 @@ export function CellActions({
   const [showPrice, setShowPrice] = useState(false);
   const [showOptionName, setShowOptionName] = useState(false);
   const [showCategorySource, setShowCategorySource] = useState(false);
+  // 2609_63: boolean 이 아니라 **대상 셀**을 담는다 — 한 계정에 셀이 여럿일 수 있어(D10-1)
+  // "열려 있다"만으로는 어느 셀을 떼는지 알 수 없다.
+  const [unlinkTarget, setUnlinkTarget] = useState<CellRef | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CellRef | null>(null);
 
   const optionName = (id: number) => options.find((o) => o.id === id)?.name ?? `옵션 #${id}`;
 
@@ -147,6 +177,47 @@ export function CellActions({
       const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
       setShowCategorySource(false);
       setError(msg ?? '마스터 카테고리로 변경하지 못했습니다.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // 마스터 연결 해제(2609_63/D3). handleCategorySource 와 같은 이유로 run() 을 타지 않는다:
+  // 백엔드 400 사유(이 마스터의 채널이 아닙니다 / 마켓에 등록되지 않은 채널…)를 그대로 보여줘야 한다.
+  // 🔴 대상은 `listing.id`(첫 셀)가 아니라 버튼이 넘긴 `cell.productListingId` 다.
+  // 성공 문구는 부모가 소유한다 — 다시 읽으면 이 액션 영역 자체가 사라져 여기 띄운 문구도 같이 사라진다.
+  const handleUnlink = async (cell: CellRef) => {
+    setBusy('unlink');
+    setError('');
+    setPushedBanner('');
+    try {
+      await useCase.unlinkChannel(masterId, cell.productListingId);
+      setUnlinkTarget(null);
+      onCellRemoved(
+        '마스터 연결을 해제했습니다. 판매상품 목록의 「마스터 미연결만」에서 볼 수 있습니다.',
+      );
+    } catch (e) {
+      const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
+      setUnlinkTarget(null);
+      setError(msg ?? '마스터 연결을 해제하지 못했습니다.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // 미전송 채널 삭제(2609_63/D13). ⚠️ 해제와 합치지 않는다 — 확인창·문구·백엔드 경로가 다르다.
+  const handleDeleteCell = async (cell: CellRef) => {
+    setBusy('delete-cell');
+    setError('');
+    setPushedBanner('');
+    try {
+      await useCase.deleteDraftChannel(masterId, cell.productListingId);
+      setDeleteTarget(null);
+      onCellRemoved('채널을 삭제했습니다.');
+    } catch (e) {
+      const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
+      setDeleteTarget(null);
+      setError(msg ?? '채널을 삭제하지 못했습니다.');
     } finally {
       setBusy(null);
     }
@@ -318,6 +389,35 @@ export function CellActions({
             )}
           </button>
         )}
+
+        {/* 2609_63: 파괴적 조작은 액션 줄 맨 끝에 둔다. 🔴 버튼은 **셀마다 하나씩**(D10-1) —
+            마켓 상품 ID 가 있으면 [마스터 연결 해제], 없으면(미전송) [채널 삭제] 다.
+            한 셀에 둘이 동시에 보이는 일은 없다. 셀이 둘 이상이면 라벨에 그 셀의 상품 ID 를 붙인다
+            — 없으면 같은 버튼이 여러 개 서서 어느 쿠팡 페이지를 떼는지 알 수 없다.
+            ⚠️ 셀별 스피너를 두지 않는다 — 한 번에 한 동작이라 `busy !== null` 이면 전부 잠긴다. */}
+        {cells.map((c) =>
+          c.platformProductId ? (
+            <button
+              key={c.productListingId}
+              type="button"
+              onClick={() => setUnlinkTarget(c)}
+              disabled={busy !== null}
+              className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              마스터 연결 해제{cells.length > 1 ? ` · ${c.platformProductId}` : ''}
+            </button>
+          ) : (
+            <button
+              key={c.productListingId}
+              type="button"
+              onClick={() => setDeleteTarget(c)}
+              disabled={busy !== null}
+              className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              채널 삭제{cells.length > 1 ? ' · 미전송' : ''}
+            </button>
+          ),
+        )}
       </div>
 
       {status === 'DRAFT' && shippingBlocked && (
@@ -417,6 +517,55 @@ export function CellActions({
         onConfirm={handleCategorySource}
         onCancel={() => setShowCategorySource(false)}
         isLoading={busy === 'category-source'}
+      />
+
+      {/* 2609_63/D10: 문구는 결과를 그대로 말한다. 지우는 게 아니므로 "삭제"·"편입 취소"로 쓰지 않는다.
+          ⚠️ 「마스터 미연결만」은 실제 화면 라벨이다(ProductListingSearchCard) — 바꿔 쓰지 말 것. */}
+      <ConfirmDialog
+        isOpen={unlinkTarget !== null}
+        title="마스터 연결 해제"
+        message={
+          <>
+            <b>{channelLabel}</b> 채널
+            {unlinkTarget?.platformProductId ? ` (상품 ID ${unlinkTarget.platformProductId})` : ''}을
+            이 마스터에서 떼어냅니다.
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-base">
+              <li>쿠팡에는 아무것도 전송하지 않습니다 — 상품은 그대로 팔립니다.</li>
+              <li>주문·고객문의·정산 기록은 이 판매상품에 그대로 남습니다.</li>
+              <li>해제하면 판매상품 목록의 「마스터 미연결만」에서 볼 수 있습니다.</li>
+              <li>
+                올바른 마스터에서 [쿠팡 상품 가져오기] 에 같은 상품 ID 를 넣으면 이 판매상품이 그대로
+                다시 붙습니다.
+              </li>
+            </ul>
+          </>
+        }
+        confirmText="연결 해제"
+        isDangerous
+        isLoading={busy === 'unlink'}
+        onConfirm={() => unlinkTarget && handleUnlink(unlinkTarget)}
+        onCancel={() => setUnlinkTarget(null)}
+      />
+
+      {/* 지워지는 것은 **이 채널 줄**뿐이다 — 마스터의 옵션·구성상품은 그대로다(2609_63/D13). */}
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        title="채널 삭제"
+        message={
+          <>
+            <b>{channelLabel}</b> 채널 1줄을 지웁니다. 아직 쿠팡에 보낸 적이 없는 채널입니다.
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-base">
+              <li>이 채널의 옵션·구성·자동 생성된 썸네일·상세가 함께 지워집니다.</li>
+              <li>쿠팡에는 아무것도 전송하지 않습니다.</li>
+              <li>되돌릴 수 없습니다 — 다시 만들려면 [채널 추가] 를 쓰세요.</li>
+            </ul>
+          </>
+        }
+        confirmText="삭제"
+        isDangerous
+        isLoading={busy === 'delete-cell'}
+        onConfirm={() => deleteTarget && handleDeleteCell(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
       />
 
       {showOptionName && (
