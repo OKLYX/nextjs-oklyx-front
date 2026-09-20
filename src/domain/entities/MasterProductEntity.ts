@@ -136,6 +136,22 @@ export interface MasterOptionRequest {
   stockQuantity?: number;
 }
 
+// 2609_64: 구성상품 + 옵션 전체를 한 번에 교체한다. 구성과 옵션 수량 벡터는 서로를 검증하므로
+// 따로 저장하면 어느 쪽도 바꿀 수 없다. `PUT /{id}/composition` 전용.
+// 🔴 배송·박스 override / categoryAttributes / categoryNotices / stockQuantity 를 여기에 넣지 말 것 —
+// 백엔드가 기존 행에서 그대로 이어받는다. 보내면 화면이 모르는 값이 조용히 지워진다.
+export interface MasterCompositionOptionSpec {
+  optionId?: number; // 생략 = 새 옵션
+  name: string;
+  items: MasterOptionRequestItem[];
+}
+
+export interface MasterCompositionRequest {
+  componentProductIds: number[];
+  // 저장 후 이 마스터가 가질 옵션 전체. 여기 없는 기존 옵션은 삭제된다.
+  options: MasterCompositionOptionSpec[];
+}
+
 // Master standard category (single, backend 44). The per-platform market code is
 // resolved from CategoryMapping, not stored here. Repo normalizes the "unset" case
 // (backend returns null fields) to a null object.

@@ -29,6 +29,9 @@ export const ROUTES = {
   MASTER_PRODUCT_DETAIL: (id: number | string) => `/dashboard/master-products/${id}` as const,
   MASTER_PRODUCT_DETAIL_EDIT: (masterId: number | string, listingId: number | string) =>
     `/dashboard/master-products/${masterId}/detail/${listingId}` as const,
+  // 2609_64/D9: 구성상품 변경은 팝업이 아니라 페이지다(검색·선택 + 옵션×구성상품 수량 격자 = 긴 작업).
+  MASTER_PRODUCT_COMPOSITION: (id: number | string) =>
+    `/dashboard/master-products/${id}/composition` as const,
   MARGIN_POLICIES: '/dashboard/margin-policies' as const,
   LISTINGS_SYNC: '/dashboard/listings/sync' as const,
   // 🔴 LISTINGS_SYNC(콘텐츠 재전송·재심사) 와 다른 화면이다 — 이쪽은 가격 전송(FEATURE_2609_39 / PLAN D12).
