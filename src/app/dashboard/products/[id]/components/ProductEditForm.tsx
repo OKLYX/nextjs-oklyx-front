@@ -7,6 +7,7 @@ import type { UpdateProductRequest } from '@/domain/repositories/ProductReposito
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
 import { Input } from '@/presentation/components/ui/Input';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface ProductEditFormValues {
   productName: string;
@@ -285,16 +286,24 @@ export function ProductEditForm({
         </div>
       </fieldset>
 
-      <div className="flex gap-4">
-        <button type="submit" disabled={!!barcodeError || isSaving} className="btn-primary">
-          {isSaving ? '저장 중...' : '저장'}
-        </button>
-        <button type="button" onClick={onCancel} className="btn-secondary">
-          취소
-        </button>
-      </div>
-
       <ProductImageGallery productId={product.id} useCase={imageUseCase} />
+
+      {/* 폼 하단 [취소][저장] — 다른 편집 화면(`MasterProductCreateForm` 등)과 같은 줄이다:
+          오른쪽 정렬 · 취소(secondary) 가 왼쪽 · `ui/Button`. 손으로 만든 버튼으로 되돌리지 말 것
+          (종전 `btn-primary`/`btn-secondary` 는 CSS 에 정의조차 없어 민짜 버튼으로 나왔다). */}
+      <div className="flex items-center justify-end gap-2 border-t border-gray-200 pt-6">
+        <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
+          취소
+        </Button>
+        <Button
+          type="submit"
+          disabled={!!barcodeError}
+          isLoading={isSaving}
+          loadingText="저장 중..."
+        >
+          저장
+        </Button>
+      </div>
     </form>
   );
 }
