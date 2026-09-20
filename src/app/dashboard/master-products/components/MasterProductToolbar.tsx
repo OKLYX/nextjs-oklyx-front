@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { Card } from '@/presentation/components/ui/Card';
 import { PAGE_SIZES, SORT_OPTIONS, type MasterListQuery } from '../masterListQuery';
 
 interface MasterProductToolbarProps {
@@ -25,6 +26,8 @@ interface MasterProductToolbarProps {
  * `onChange` 는 ref 로 최신값만 읽고, 마지막으로 커밋한 검색어와 같으면 아예 커밋하지 않는다.
  *
  * ❌ 옵션을 JSX 에 하드코딩하지 말 것 — PAGE_SIZES / SORT_OPTIONS 를 map 한다.
+ * ❌ 흰 표면(`bg-white rounded-lg shadow`)을 직접 작성하지 말 것 — 다른 화면의 검색 카드와 같이
+ *    `ui/Card` 가 배경·모서리·그림자·여백을 소유한다(선례: `SellerSearchCard` · `PackageSearchCard`).
  */
 export function MasterProductToolbar({ query, onChange }: MasterProductToolbarProps) {
   const [draft, setDraft] = useState(() => query.q ?? '');
@@ -56,51 +59,53 @@ export function MasterProductToolbar({ query, onChange }: MasterProductToolbarPr
   };
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex gap-2 sm:max-w-md sm:flex-1">
-        <input
-          type="text"
-          placeholder="이름 · 상품ID · 옵션ID 검색..."
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button
-          type="button"
-          onClick={handleReset}
-          className="rounded-lg bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300"
-        >
-          초기화
-        </button>
-      </div>
+    <Card>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-2 sm:max-w-md sm:flex-1">
+          <input
+            type="text"
+            placeholder="이름 · 상품ID · 옵션ID 검색..."
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="button"
+            onClick={handleReset}
+            className="rounded-lg bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300"
+          >
+            초기화
+          </button>
+        </div>
 
-      <div className="flex gap-2">
-        <select
-          value={query.size}
-          onChange={(e) => onChange({ size: Number(e.target.value) })}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label="페이지당 개수"
-        >
-          {PAGE_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}개씩
-            </option>
-          ))}
-        </select>
+        <div className="flex gap-2">
+          <select
+            value={query.size}
+            onChange={(e) => onChange({ size: Number(e.target.value) })}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="페이지당 개수"
+          >
+            {PAGE_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}개씩
+              </option>
+            ))}
+          </select>
 
-        <select
-          value={query.sort}
-          onChange={(e) => onChange({ sort: e.target.value })}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label="정렬"
-        >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          <select
+            value={query.sort}
+            onChange={(e) => onChange({ sort: e.target.value })}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="정렬"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }
