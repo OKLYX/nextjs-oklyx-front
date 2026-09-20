@@ -13,10 +13,19 @@ import { Card } from '@/presentation/components/ui/Card';
  * 등록/수정/상세 3화면에서 재사용한다.
  * File: src/app/dashboard/products/[id]/components/ProductImageGallery.tsx
  *
- * **용도**: 여러 장 업로드·대체·삭제·순서변경(◀▶)·원본 다운로드. 첫 장이 "대표"(백엔드 규칙).
+ * **용도**: 여러 장 업로드(버튼 + 드래그앤드롭)·대체·삭제·순서변경(◀▶)·원본 다운로드.
+ *   첫 장이 "대표"(백엔드 규칙).
  *   - [다운로드]는 읽기 전용이라 `isViewMode` 에서도 노출한다. 수정/상세 모드는 same-origin
  *     프록시(`/api/image-download?url=…`)를 거친다 — S3 URL 은 교차 출처라 `<a download>` 가
  *     무시되기 때문(등록 모드는 blob: URL 이라 그대로 저장됨).
+ *
+ * **드래그앤드롭 업로드**: 카드 전체가 드롭존이다(여러 장 동시 가능). [이미지 업로드] 버튼과
+ *   **같은 경로**(`ingestFiles`)를 타므로 검증·버퍼/서버 분기가 한 곳에만 있다.
+ *   - `onDragOver` 에서 `preventDefault()` 를 빼면 브라우저가 파일을 새 탭으로 열어 버린다.
+ *   - 겹침 표시는 **depth 카운터**로 센다 — 자식 카드 위를 지날 때마다 `dragleave` 가 떠서
+ *     boolean 하나로는 오버레이가 깜빡인다.
+ *   - 오버레이는 `pointer-events-none` 필수. 드롭을 가로채면 업로드가 아예 안 된다.
+ *   - 조회 모드(`isViewMode`)·업로드 중(`busy`)에는 받지 않는다.
  *
  * **모드**:
  *   - 수정/상세(`productId != null`): 마운트 시 서버 조회, 각 연산 즉시 서버 반영(backend 39).
@@ -31,6 +40,7 @@ import { Card } from '@/presentation/components/ui/Card';
  *   - 삭제 409 = 마스터 풀에 배치돼 사용 중 → 백엔드 메시지 안내(§5).
  *
  * ❌ 금지 패턴:
+ *   - 드롭 처리를 이 컴포넌트 밖(페이지)에서 따로 구현 — 업로드 경로가 둘로 갈린다.
  *   - 등록 모드에서 서버 호출(버퍼만).
  *   - `getImageUrl(imageUrl, productId)` 로 갤러리 이미지 렌더(대표 프록시 → 전 카드 동일).
  */
@@ -154,27 +164,73 @@ export function ProductImageGallery({
   }, []);
 
   // ---- Upload ----
+  // The one upload path: [이미지 업로드] 버튼과 드롭이 모두 여기로 들어온다. 새 입력 수단이
+  // 생기면 File[] 을 모아 이 함수에 넘길 것 — 검증·버퍼/서버 분기를 복제하지 말 것.
+  const ingestFiles = useCallback(
+    async (selected: File[]) => {
+      if (selected.length === 0) return;
+      setError('');
+      const valid = filterValid(selected);
+      if (valid.length === 0) return;
+      if (!isEdit) {
+        onBufferChange?.([...(bufferFiles ?? []), ...valid]);
+        return;
+      }
+      if (productId == null) return;
+      setBusy(true);
+      try {
+        await useCase.add(productId, valid);
+        await reload();
+      } catch {
+        setError('이미지 업로드에 실패했습니다.');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [filterValid, isEdit, onBufferChange, bufferFiles, productId, useCase, reload],
+  );
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (selected.length === 0) return;
-    setError('');
-    const valid = filterValid(selected);
-    if (valid.length === 0) return;
-    if (!isEdit) {
-      onBufferChange?.([...(bufferFiles ?? []), ...valid]);
-      return;
-    }
-    if (productId == null) return;
-    setBusy(true);
-    try {
-      await useCase.add(productId, valid);
-      await reload();
-    } catch {
-      setError('이미지 업로드에 실패했습니다.');
-    } finally {
-      setBusy(false);
-    }
+    await ingestFiles(selected);
+  };
+
+  // ---- Drag & drop ----
+  // dragenter/dragleave fire for every child element, so nesting depth is counted rather than
+  // toggling a boolean — otherwise the overlay flickers off whenever the cursor crosses a card.
+  const dragDepth = useRef(0);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const canDrop = !isViewMode && !busy;
+  // Ignore drags that carry no file (text selections, images dragged from another page).
+  const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes('Files');
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!canDrop || !hasFiles(e)) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setIsDragOver(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!canDrop || !hasFiles(e)) return;
+    // Required: without it the browser navigates to the dropped file instead of firing onDrop.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDragLeave = () => {
+    if (!canDrop) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    if (!canDrop || !hasFiles(e)) return;
+    e.preventDefault();
+    dragDepth.current = 0;
+    setIsDragOver(false);
+    await ingestFiles(Array.from(e.dataTransfer.files));
   };
 
   // ---- Replace (both modes) ----
@@ -262,118 +318,135 @@ export function ProductImageGallery({
   };
 
   return (
-    <Card
-      title="상품 이미지"
-      action={
-        <div className="flex items-center gap-3">
-          {busy && <Spinner size={18} />}
-          {!isViewMode && (
-            <label className="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              이미지 업로드
-              <input
-                ref={uploadRef}
-                type="file"
-                accept={ACCEPT}
-                multiple
-                onChange={handleUpload}
-                disabled={busy}
-                hidden
-              />
-            </label>
-          )}
-        </div>
-      }
+    <div
+      className="relative"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      {error && (
-        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      )}
+      <Card
+        title="상품 이미지"
+        action={
+          <div className="flex items-center gap-3">
+            {busy && <Spinner size={18} />}
+            {!isViewMode && (
+              <label className="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                이미지 업로드
+                <input
+                  ref={uploadRef}
+                  type="file"
+                  accept={ACCEPT}
+                  multiple
+                  onChange={handleUpload}
+                  disabled={busy}
+                  hidden
+                />
+              </label>
+            )}
+          </div>
+        }
+      >
+        {error && (
+          <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        )}
 
-      {/* Shared hidden input for per-card [대체]. */}
-      {!isViewMode && (
-        <input
-          ref={replaceRef}
-          type="file"
-          accept={ACCEPT}
-          onChange={handleReplaceFile}
-          hidden
-        />
-      )}
+        {/* Shared hidden input for per-card [대체]. */}
+        {!isViewMode && (
+          <input
+            ref={replaceRef}
+            type="file"
+            accept={ACCEPT}
+            onChange={handleReplaceFile}
+            hidden
+          />
+        )}
 
-      {isEdit && isLoading ? (
-        <div className="flex min-h-24 items-center justify-center">
-          <Spinner size={20} label="이미지 불러오는 중..." />
-        </div>
-      ) : items.length === 0 ? (
-        <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-gray-300 bg-gray-100">
-          <p className="text-gray-500">이미지 없음</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-          {items.map((item, index) => (
-            <div key={item.key} className="rounded-lg border border-gray-200 p-2">
-              <div className="relative mb-2 aspect-square overflow-hidden rounded bg-gray-100">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.url} alt="상품 이미지" className="h-full w-full object-contain" />
-                {index === 0 && (
-                  <span className="absolute left-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                    대표
-                  </span>
-                )}
-              </div>
-              <div className="space-y-1">
-                {!isViewMode && (
-                  <>
-                    <div className="flex gap-1">
+        {isEdit && isLoading ? (
+          <div className="flex min-h-24 items-center justify-center">
+            <Spinner size={20} label="이미지 불러오는 중..." />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-gray-300 bg-gray-100">
+            <p className="text-gray-500">이미지 없음</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+            {items.map((item, index) => (
+              <div key={item.key} className="rounded-lg border border-gray-200 p-2">
+                <div className="relative mb-2 aspect-square overflow-hidden rounded bg-gray-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.url} alt="상품 이미지" className="h-full w-full object-contain" />
+                  {index === 0 && (
+                    <span className="absolute left-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      대표
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {!isViewMode && (
+                    <>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleMove(index, -1)}
+                          disabled={busy || index === 0}
+                          aria-label="앞으로"
+                          className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                        >
+                          ◀
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMove(index, 1)}
+                          disabled={busy || index === items.length - 1}
+                          aria-label="뒤로"
+                          className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                        >
+                          ▶
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => handleMove(index, -1)}
-                        disabled={busy || index === 0}
-                        aria-label="앞으로"
-                        className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                        onClick={() => triggerReplace(item, index)}
+                        disabled={busy}
+                        className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                       >
-                        ◀
+                        대체
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleMove(index, 1)}
-                        disabled={busy || index === items.length - 1}
-                        aria-label="뒤로"
-                        className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                        onClick={() => handleDelete(item, index)}
+                        disabled={busy}
+                        className="w-full rounded border border-red-300 px-1.5 py-0.5 text-[11px] text-red-600 hover:bg-red-50 disabled:opacity-50"
                       >
-                        ▶
+                        삭제
                       </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => triggerReplace(item, index)}
-                      disabled={busy}
-                      className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                    >
-                      대체
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item, index)}
-                      disabled={busy}
-                      className="w-full rounded border border-red-300 px-1.5 py-0.5 text-[11px] text-red-600 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      삭제
-                    </button>
-                  </>
-                )}
-                {/* Read-only action: available in view mode too. */}
-                <a
-                  href={item.downloadHref}
-                  download={item.downloadName}
-                  className="block w-full rounded border border-gray-300 px-1.5 py-0.5 text-center text-[11px] text-gray-700 hover:bg-gray-100"
-                >
-                  다운로드
-                </a>
+                    </>
+                  )}
+                  {/* Read-only action: available in view mode too. */}
+                  <a
+                    href={item.downloadHref}
+                    download={item.downloadName}
+                    className="block w-full rounded border border-gray-300 px-1.5 py-0.5 text-center text-[11px] text-gray-700 hover:bg-gray-100"
+                  >
+                    다운로드
+                  </a>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* pointer-events-none 필수 — 이 층이 드롭을 먹으면 onDrop 이 안 뜬다. */}
+      {isDragOver && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-50/80">
+          <p className="text-sm font-medium text-blue-700">
+            여기에 놓아 업로드 (JPEG/PNG · 20MB 이하)
+          </p>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
