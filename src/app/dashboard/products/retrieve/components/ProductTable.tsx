@@ -19,6 +19,11 @@ interface ProductTableProps {
   pageSize: number;
   /** 목록의 조회 조건(URL 쿼리스트링). 상세에 실어 보내 [← 목록] 이 같은 페이지로 돌아오게 한다. */
   listQuery?: string;
+  /** 일괄 조작 대상으로 체크된 물품 id (FEATURE_2609_65). 선택 state 는 컨테이너가 소유한다. */
+  selectedIds: number[];
+  onToggle: (id: number) => void;
+  /** 현재 페이지 전체 선택/해제. 🔴 다른 페이지 물품까지 고르지 않는다. */
+  onToggleAll: (checked: boolean) => void;
 }
 
 export function ProductTable({
@@ -28,6 +33,9 @@ export function ProductTable({
   currentPage,
   pageSize,
   listQuery = '',
+  selectedIds,
+  onToggle,
+  onToggleAll,
 }: ProductTableProps) {
   const router = useRouter();
   const openDetail = (id: number) =>
@@ -36,6 +44,9 @@ export function ProductTable({
   const viewMode = useListViewStore((state) => state.viewMode);
   // Card view is a narrow-screen affordance only; md+ always shows the table.
   const showCards = isMobile && viewMode === 'card';
+
+  // 전체 선택은 **현재 페이지 기준**이다(PLAN D10 — 화면에 보이는 것만 건드린다).
+  const allSelected = products.length > 0 && products.every((p) => selectedIds.includes(p.id));
 
   const formatDate = (dateString: string): string => {
     return dateString.substring(0, 10);
@@ -114,6 +125,20 @@ export function ProductTable({
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr>
+              {/* 🔴 행 전체가 상세로 가는 onClick 을 갖고 있다 — 체크박스 칸은 클릭을 여기서 끊는다. */}
+              <th
+                className="px-4 py-3 text-left text-sm font-semibold text-gray-900"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  aria-label="현재 페이지 전체 선택"
+                  className="h-4 w-4 cursor-pointer"
+                  checked={allSelected}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => onToggleAll(e.target.checked)}
+                />
+              </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">번호</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">이미지</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상품명</th>
@@ -132,6 +157,16 @@ export function ProductTable({
                 onClick={() => openDetail(product.id)}
                 className="border-b border-gray-300 hover:bg-gray-50 cursor-pointer transition-colors"
               >
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    aria-label={`${product.productName} 선택`}
+                    className="h-4 w-4 cursor-pointer"
+                    checked={selectedIds.includes(product.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => onToggle(product.id)}
+                  />
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-900">{currentPage * pageSize + index + 1}</td>
                 <td className="px-4 py-3">{thumbnail(product)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.productName}</td>
@@ -147,7 +182,8 @@ export function ProductTable({
         </table>
       </div>
 
-      {/* Below md + card mode: one DataCard per row, same tap → detail. */}
+      {/* Below md + card mode: one DataCard per row, same tap → detail.
+          🔴 카드 뷰에는 체크박스를 넣지 않는다 — 일괄 조작은 표 화면 전용이다(PLAN D10). */}
       {showCards && (
         <div className="md:hidden space-y-3">
           {products.map((product) => (
