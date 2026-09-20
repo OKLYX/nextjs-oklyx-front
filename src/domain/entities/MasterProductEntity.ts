@@ -1,5 +1,5 @@
 // MasterProduct (판매상품 마스터) domain types — mirror of the backend confirmed fields.
-import type { ListingStatus } from './ListingRegistrationEntity';
+import type { ListingStatus, ListingOptionSummary } from './ListingRegistrationEntity';
 // Backend endpoints are all /api/admin/master-products/** (ADMIN-only).
 
 export interface MasterComponent {
@@ -240,6 +240,24 @@ export interface ListingMatrixResponse {
   // 마스터 표준 카테고리를 플랫폼 코드로 해석한 이름(2609_45/D13). 셀마다 같은 값이라 최상위에 온다.
   // [마스터 카테고리로 변경] 안내의 "A → B" 중 B 쪽. 해석 불가/미배포면 null·없음.
   masterCategoryName?: string | null;
+}
+
+// 마스터의 **모든** 채널 셀 + 셀별 옵션 전체(2609_61/D6). 셀마다
+// `GET /product-listings/{id}/options` 를 부르는 대신 한 번에 받는다 — 셀이 늘어도 호출은 1번.
+// ⚠️ 채널 라벨(판매자·플랫폼·계정)은 이 응답에 없다. 화면은 매트릭스(`getMatrix`)의 행과
+// `productListingId` 로 맞춰 라벨을 가져온다 — 라벨을 두 응답에 두면 서로 어긋난다(백엔드 DTO 주석).
+export interface MasterChannelOptionsResponse {
+  masterId: number;
+  cells: MasterChannelOptionCell[];
+}
+
+export interface MasterChannelOptionCell {
+  productListingId: number;
+  // 「상품 ID」(쿠팡 sellerProductId). null = 아직 마켓에 없음(DRAFT) — 오류가 아니다(D2).
+  platformProductId: string | null;
+  status: ListingStatus;
+  // 활성·비활성 옵션 전부. 옵션 DTO 는 셀 옵션 조회와 **같은 타입**을 재사용한다(백엔드 D6).
+  options: ListingOptionSummary[];
 }
 
 // ── List query (110/111) ─────────────────────────────────────────────────────
