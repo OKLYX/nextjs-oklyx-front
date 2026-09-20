@@ -13,6 +13,7 @@ import type {
   CategoryMetaSchemaResponse,
   CategoryAttributesRequest,
   ListingMatrixResponse,
+  MasterChannelOptionsResponse,
   TagsUpdateRequest,
   ShippingOverrideUpdateRequest,
   ShippingForceApplyRequest,
@@ -33,6 +34,8 @@ export interface MasterProductRepository {
   updateOption(id: number, optionId: number, data: MasterOptionRequest): Promise<MasterOptionResponse>;
   deleteOption(id: number, optionId: number): Promise<void>;
   getMatrix(id: number): Promise<ListingMatrixResponse>;
+  // 2609_61/D6: 마스터의 모든 채널 셀 + 옵션을 한 번에. 셀마다 옵션을 조회하지 말 것.
+  getChannelOptions(id: number): Promise<MasterChannelOptionsResponse>;
   getCategory(id: number): Promise<MasterCategoryResponse | null>;
   setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
   clearCategory(id: number): Promise<void>;

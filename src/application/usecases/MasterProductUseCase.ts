@@ -14,6 +14,7 @@ import type {
   CategoryMetaSchemaResponse,
   CategoryAttributesRequest,
   ListingMatrixResponse,
+  MasterChannelOptionsResponse,
   TagsUpdateRequest,
   ShippingOverrideUpdateRequest,
   ShippingForceApplyRequest,
@@ -67,6 +68,11 @@ export class MasterProductUseCase {
 
   getMatrix(id: number): Promise<ListingMatrixResponse> {
     return this.repository.getMatrix(id);
+  }
+
+  /** 모든 채널 셀의 옵션(옵션 ID 포함)을 한 번에 (2609_61). 셀이 없으면 `cells` 가 빈 배열이다. */
+  getChannelOptions(id: number): Promise<MasterChannelOptionsResponse> {
+    return this.repository.getChannelOptions(id);
   }
 
   getCategory(id: number): Promise<MasterCategoryResponse | null> {

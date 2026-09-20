@@ -36,6 +36,9 @@ const LOCKED_DELETE_REASON = '쿠팡에 등록돼 판매 중 — 삭제할 수 �
 const LAST_OPTION_DELETE_REASON =
   '옵션은 1개 이상 있어야 합니다. 모든 옵션을 제거하기 위해서는 마스터 상품을 삭제해야 합니다.';
 
+// 2609_61: 강조가 완전히 꺼질 때까지의 시간(전환 2초 + 시작 지연). 반복 점멸이 아니라 1회 전환이다.
+const HIGHLIGHT_TOTAL_MS = 2200;
+
 type StringMapSetter = (updater: (prev: Record<string, string>) => Record<string, string>) => void;
 
 // Sum of an option's component quantities (a missing entry counts as the displayed default 1).
@@ -236,6 +239,12 @@ interface MasterOptionEditorProps {
   hideCategoryAttrs?: boolean;
   // 옵션 추가/수정 폼이 열려 있는지 부모에 통지 → 부모가 구성상품 편집을 잠금.
   onFormOpenChange?: (open: boolean) => void;
+  /**
+   * 2609_61: 밖에서 "이 옵션을 고치러 왔다"고 지목한다(옵션×채널 표의 [옵션 수정]).
+   * `nonce` 가 바뀔 때마다 다시 반응한다 — 같은 옵션을 다시 눌러도 이동·강조가 또 일어난다.
+   * ⚠️ edit 모드(master 있음)에서만 의미가 있다. 생성 모드의 버퍼 옵션은 서버 id 가 없다.
+   */
+  focusOption?: { optionId: number; nonce: number };
 }
 
 /**
@@ -265,6 +274,7 @@ export function MasterOptionEditor({
   masterNoticeGroup = null,
   hideCategoryAttrs = false,
   onFormOpenChange,
+  focusOption,
 }: MasterOptionEditorProps) {
   const isEdit = master != null;
   const components = master?.components ?? propComponents ?? [];
@@ -307,6 +317,9 @@ export function MasterOptionEditor({
   const [clampNotice, setClampNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [busyOptionId, setBusyOptionId] = useState<number | null>(null);
+  // 2609_61: 밖에서 지목한 옵션 줄을 한 번 켰다 끄는 강조. `fading` = 꺼지는 중(2초 전환).
+  // 🔴 반복 점멸 금지(PLAN/D9) — 켜짐 → 꺼짐 한 번의 전환이다.
+  const [highlight, setHighlight] = useState<{ optionId: number; fading: boolean } | null>(null);
 
   // Category attribute + notice schema (backend-driven). Loaded per category.
   // categoryId==null → override section hidden.
@@ -326,7 +339,14 @@ export function MasterOptionEditor({
   const touchedNoticesRef = useRef(touchedNotices);
   const seededAttrKeysRef = useRef(seededAttrKeys);
   const seededNoticeKeysRef = useRef(seededNoticeKeys);
+  // 2609_61 이동용 최신값. ⚠️ 이동 effect 의 deps 는 `nonce` 하나여야 하므로(같은 옵션 재클릭에만
+  // 반응) 옵션 목록·폼 열기 함수는 ref 로 읽는다.
+  const masterRef = useRef(master);
+  const focusTargetRef = useRef(focusOption);
+  const openEditServerRef = useRef<(opt: MasterOptionResponse) => void>(() => {});
   useEffect(() => {
+    masterRef.current = master;
+    focusTargetRef.current = focusOption;
     showFormRef.current = showForm;
     quantitiesRef.current = quantities;
     componentsRef.current = components;
@@ -503,6 +523,50 @@ export function MasterOptionEditor({
     );
   };
 
+  // 폼 열기 함수는 선언 뒤에 따로 싣는다(위 ref 묶음에 넣으면 선언 전 접근이 된다).
+  useEffect(() => {
+    openEditServerRef.current = openEditServer;
+  });
+
+  /**
+   * 2609_61: 옵션×채널 표의 [옵션 수정] 도착 동작 — ① 그 옵션의 수정 폼을 열고 ② 그 줄로 스크롤하고
+   * ③ 한 번 강조한다. deps 는 `nonce` 하나 = 같은 옵션을 다시 눌러도 또 일어난다.
+   *
+   * ⚠️ 폼 열기는 목록 [수정] 이 쓰는 `openEditServer` 를 그대로 부른다 — 별도 "열기" 분기를 만들면
+   * 폼 seed 로직이 두 벌이 된다.
+   * ⚠️ 실제 동작은 `requestAnimationFrame` 안에서 한다. 섹션이 방금 펼쳐진 직후라 즉시 스크롤하면
+   * 위치가 틀어지고, setState 를 effect 본문에서 동기로 부르면 lint(`set-state-in-effect`)에 걸린다.
+   * ⚠️ 목록에 없는 옵션(삭제됨)은 **아무 일도 하지 않는다** — 에러를 띄우지 않는다.
+   */
+  const focusNonce = focusOption?.nonce;
+  useEffect(() => {
+    if (focusNonce === undefined) return;
+    const target = focusTargetRef.current;
+    if (target == null) return;
+    let innerRaf = 0;
+    let fadeTimer: ReturnType<typeof setTimeout> | undefined;
+    let clearTimer: ReturnType<typeof setTimeout> | undefined;
+    const raf = requestAnimationFrame(() => {
+      const opt = masterRef.current?.options.find((o) => o.id === target.optionId);
+      if (opt == null) return; // 삭제된 옵션 — 조용히 넘어간다
+      openEditServerRef.current(opt);
+      setHighlight({ optionId: opt.id, fading: false });
+      innerRaf = requestAnimationFrame(() => {
+        document
+          .getElementById(`master-option-${opt.id}`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      fadeTimer = setTimeout(() => setHighlight({ optionId: opt.id, fading: true }), 100);
+      clearTimer = setTimeout(() => setHighlight(null), HIGHLIGHT_TOTAL_MS);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      if (innerRaf) cancelAnimationFrame(innerRaf);
+      if (fadeTimer) clearTimeout(fadeTimer);
+      if (clearTimer) clearTimeout(clearTimer);
+    };
+  }, [focusNonce]);
+
   // A picked measure unit clears the other side of the pair (only one of weight/volume carries a value).
   const handleOptMeasureUnit = (p: MeasurePair, unit: string) => {
     const clearName = unit === '중량' ? p.volume.name : unit === '용량' ? p.weight.name : '';
@@ -667,6 +731,8 @@ export function MasterOptionEditor({
         const locked = opt.marketRegistered === true;
         return {
           key: `s-${opt.id}`,
+          // 2609_61: 밖에서 이 줄로 보내기 위한 앵커 id 의 원본. 생성 모드 버퍼 옵션엔 없다.
+          optionId: opt.id as number | undefined,
           name: opt.name,
           summary: summaryOf(opt.items),
           busy: busyOptionId === opt.id,
@@ -682,6 +748,8 @@ export function MasterOptionEditor({
       })
     : (options ?? []).map((opt, index) => ({
         key: `b-${index}`,
+        // 생성 모드 버퍼 옵션은 서버 id 가 없다 → 앵커를 달지 않는다.
+        optionId: undefined as number | undefined,
         name: opt.name,
         summary: summaryOf(opt.items),
         busy: false,
@@ -746,7 +814,14 @@ export function MasterOptionEditor({
           {rows.map((row) => (
             <li
               key={row.key}
-              className="flex items-center justify-between rounded border border-gray-200 px-3 py-2 text-sm text-gray-900"
+              id={row.optionId != null ? `master-option-${row.optionId}` : undefined}
+              className={`flex items-center justify-between rounded border px-3 py-2 text-sm text-gray-900 ${
+                row.optionId != null && highlight?.optionId === row.optionId
+                  ? highlight.fading
+                    ? 'border-gray-200 bg-transparent transition-colors duration-[2000ms]'
+                    : 'border-amber-400 bg-amber-100'
+                  : 'border-gray-200'
+              }`}
             >
               <span>
                 <span className="font-medium">{row.name}</span>{' '}

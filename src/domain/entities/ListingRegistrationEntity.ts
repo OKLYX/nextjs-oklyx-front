@@ -216,6 +216,11 @@ export interface ListingOptionSummary {
   optionNameSource?: 'AUTO' | 'MANUAL_OVERRIDE';
   // 2609_22/D2: 마스터에 대응 옵션이 없는 채널 전용 옵션.
   channelOnly?: boolean;
+  // 2609_61: 쿠팡 vendorItemId(화면 용어 「옵션 ID」). 승인 후에만 값이 있다(미승인·DRAFT = null).
+  // 값이 없는 것은 오류가 아니다 — 경고색으로 그리지 말 것(2609_61/D2).
+  platformOptionId?: string | null;
+  // 2609_61: 연결된 마스터 옵션 id. null = 채널 전용 옵션(2609_22/D2) = 마스터에 고칠 곳이 없다.
+  masterOptionId?: number | null;
 }
 
 export interface ListingOptionsResponse {
