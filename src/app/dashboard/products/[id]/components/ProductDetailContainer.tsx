@@ -15,6 +15,8 @@ import { detailHrefWithReturn, listReturnHref } from '@/infrastructure/utils/lis
 import type { Product } from '@/domain/entities/Product';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
 import { PageContainer } from '@/presentation/components/PageContainer';
+import { Card } from '@/presentation/components/ui/Card';
+import { StateBlock } from '@/presentation/components/ui/StateBlock';
 import { ProductDetailView } from './ProductDetailView';
 import { ProductEditForm } from './ProductEditForm';
 
@@ -114,32 +116,34 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
     [updateUseCase]
   );
 
+  // 로딩·에러·없음은 다른 화면과 같은 공용 조합이다: `Card padded={false}` + `StateBlock`.
+  // 손으로 만든 빨간 박스·영어 문구로 되돌리지 말 것.
   if (isLoading) {
     return (
-      <PageContainer>
-        <div className="flex items-center justify-center min-h-96">
-          <p className="text-gray-600">Loading...</p>
-        </div>
+      <PageContainer title={isEditMode ? '상품 수정' : '상품 상세'}>
+        <Card padded={false}>
+          <StateBlock variant="loading" message="불러오는 중..." />
+        </Card>
       </PageContainer>
     );
   }
 
   if (error) {
     return (
-      <PageContainer>
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-700">{error}</p>
-        </div>
+      <PageContainer title={isEditMode ? '상품 수정' : '상품 상세'}>
+        <Card padded={false}>
+          <StateBlock variant="error" message={error} />
+        </Card>
       </PageContainer>
     );
   }
 
   if (!product) {
     return (
-      <PageContainer>
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-700">Product not found</p>
-        </div>
+      <PageContainer title={isEditMode ? '상품 수정' : '상품 상세'}>
+        <Card padded={false}>
+          <StateBlock variant="empty" message="상품을 찾을 수 없습니다." />
+        </Card>
       </PageContainer>
     );
   }

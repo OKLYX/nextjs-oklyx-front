@@ -8,6 +8,7 @@ import type { ProductImageUseCase } from '@/application/usecases/ProductImageUse
 import { ProductImageGallery } from './ProductImageGallery';
 import { Input } from '@/presentation/components/ui/Input';
 import { Button } from '@/presentation/components/ui/Button';
+import { Card } from '@/presentation/components/ui/Card';
 
 interface ProductEditFormValues {
   productName: string;
@@ -113,7 +114,7 @@ export function ProductEditForm({
   );
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       {/* [취소][저장] 은 폼 **오른쪽 위**다 — 상세 화면의 [수정][삭제] 와 같은 자리라 수정 모드를
           오갈 때 버튼이 움직이지 않는다. `ui/Button` 사용(취소=secondary 가 왼쪽).
           ⚠️ 폼 맨 아래로 되돌리지 말 것(2026-09-20). */}
@@ -131,8 +132,7 @@ export function ProductEditForm({
         </Button>
       </div>
 
-      <fieldset className="border border-gray-300 rounded-lg p-6 bg-gray-50">
-        <legend className="text-lg font-semibold text-gray-900 px-2">필수 항목</legend>
+      <Card title="필수 항목">
         <div className="space-y-4">
           <div>
             <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
@@ -160,10 +160,9 @@ export function ProductEditForm({
             />
           </div>
         </div>
-      </fieldset>
+      </Card>
 
-      <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
-        <legend className="text-lg font-semibold text-gray-900 px-2">선택 항목</legend>
+      <Card title="선택 항목">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -301,7 +300,7 @@ export function ProductEditForm({
             />
           </div>
         </div>
-      </fieldset>
+      </Card>
 
       <ProductImageGallery productId={product.id} useCase={imageUseCase} />
     </form>
