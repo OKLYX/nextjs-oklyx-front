@@ -5,6 +5,14 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { TagChipsInput } from '@/presentation/components/TagChipsInput';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
+import type { ListingOptionSummary } from '@/domain/entities/ListingRegistrationEntity';
+import { CopyIdButton } from './CopyIdButton';
+
+const CHANNEL_ONLY_REASON = '마스터 옵션이 없는 채널 전용 옵션입니다';
+const OPTION_ID_PENDING_HINT = '승인 후 부여';
+
+// 매트릭스 판매가 열·「채널별 옵션」 표와 같은 표기(`12,900원`).
+const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 interface DisplayNameRowProps {
   listingId: number;
@@ -12,6 +20,15 @@ interface DisplayNameRowProps {
   // Registration name (등록상품명, 67/68): always auto-computed, read-only. Always present.
   registrationName: string;
   tags: string[];
+  /**
+   * 2609_61: 이 셀의 채널 옵션(활성·비활성 전부). 조회는 `CoverageMatrix` 가 마스터 단위로 한 번
+   * 한다 — 이 컴포넌트는 채널 수만큼 렌더되므로 여기서 조회하면 화면 하나에 HTTP N 번이다(D6).
+   */
+  options: ListingOptionSummary[];
+  /** 위 집계가 아직 안 온 상태. 빈 목록("옵션 없음")과 구분해 스피너를 보여준다. */
+  optionsLoading: boolean;
+  /** [옵션 수정] — 「상품 기본 정보 > 옵션」의 그 옵션으로 보낸다(「채널별 옵션」 표와 같은 동작). */
+  onEditMasterOption: (masterOptionId: number) => void;
   onSaved: () => void;
 }
 
@@ -28,6 +45,9 @@ interface DisplayNameRowProps {
  *   옵션 활성 토글(43) 시 CoverageMatrix 가 그 셀 값만 갱신한다.
  * - 태그: 채널 raw 태그(prompt 33). 현재값은 CoverageMatrix 가 이미 fetch 한
  *   generated[listingId].tags 를 prop 으로 받아 재사용(추가 호출 없음). 빈 리스트 저장(=태그 제거) 허용.
+ * - 옵션(2609_61): 이 셀의 옵션을 옵션 ID·판매가·재고와 함께 나열하고, 옵션마다 [옵션 수정] 으로
+ *   「상품 기본 정보 > 옵션」의 그 옵션으로 보낸다. 🔴 **여기서 옵션을 편집하지 않는다**(D7) —
+ *   옵션을 고치는 곳은 그 한 곳이고, 채널 값(가격·재고·활성)은 매트릭스 행의 기존 모달이 담당한다.
  *
  * 저장은 모두 상위 load 재조회(onSaved)로 갱신한다. 마스터 풀과의 태그 결합은 백엔드
  * push 시점 처리(아웃 오브 스코프).
@@ -37,6 +57,9 @@ export function DisplayNameRow({
   name,
   registrationName,
   tags,
+  options,
+  optionsLoading,
+  onEditMasterOption,
   onSaved,
 }: DisplayNameRowProps) {
   const listingUseCase = useMemo(
@@ -213,6 +236,67 @@ export function DisplayNameRow({
               </>
             )}
             {tagsError && <span className="text-xs text-red-600">{tagsError}</span>}
+          </div>
+
+          {/* 옵션 (2609_61): 이 셀의 옵션 + 옵션 ID + [옵션 수정]. */}
+          <div className="flex flex-wrap items-start gap-2 text-sm text-gray-700">
+            <span className="shrink-0 rounded bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600">
+              옵션
+            </span>
+            <div className="flex-1 space-y-1">
+              {optionsLoading ? (
+                <Spinner size={12} label="불러오는 중" />
+              ) : options.length === 0 ? (
+                <span className="text-gray-400">없음</span>
+              ) : (
+                options.map((option) => {
+                  const active = option.active !== false;
+                  // 2609_22/D2: 마스터에 대응 옵션이 없으면 보낼 곳이 없다 → 버튼 비활성 + 사유.
+                  const masterOptionId = option.masterOptionId ?? null;
+                  return (
+                    <div
+                      key={option.optionId}
+                      className="flex flex-wrap items-center gap-2 text-sm"
+                    >
+                      <span className={active ? 'font-medium text-gray-900' : 'text-gray-400'}>
+                        {option.optionName}
+                      </span>
+                      <span className={active ? 'text-gray-600' : 'text-gray-400'}>
+                        {active
+                          ? `${formatWon(option.sellingPrice)} / ${option.stockQuantity ?? option.maxStock}`
+                          : '미사용'}
+                      </span>
+                      {/* 2609_61/D2: 옵션 ID 는 승인 후에 생긴다 — 없다고 경고색으로 그리지 않는다. */}
+                      {option.platformOptionId ? (
+                        <span className="flex items-center gap-1">
+                          <span className="font-mono text-xs tabular-nums text-gray-600">
+                            옵션ID {option.platformOptionId}
+                          </span>
+                          <CopyIdButton value={option.platformOptionId} />
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400" title={OPTION_ID_PENDING_HINT}>
+                          옵션ID –
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={
+                          masterOptionId == null
+                            ? undefined
+                            : () => onEditMasterOption(masterOptionId)
+                        }
+                        disabled={masterOptionId == null}
+                        title={masterOptionId == null ? CHANNEL_ONLY_REASON : undefined}
+                        className="rounded border border-blue-300 px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-transparent"
+                      >
+                        옵션 수정
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       </td>
