@@ -8,6 +8,7 @@ import { ProductImageGallery } from './ProductImageGallery';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
+import { formatKrw } from '@/infrastructure/utils/money';
 
 interface ProductDetailViewProps {
   product: Product;
@@ -78,7 +79,7 @@ export function ProductDetailView({
             {product.price && (
               <div>
                 <p className="text-sm text-gray-600">가격</p>
-                <p className="text-lg font-semibold text-gray-900">${product.price}</p>
+                <p className="text-lg font-semibold text-gray-900">{formatKrw(product.price)}</p>
               </div>
             )}
             {product.store && (

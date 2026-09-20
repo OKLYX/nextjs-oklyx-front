@@ -117,10 +117,11 @@ export function ProductRegistrationForm({
           ...data,
           barcodeId: data.barcodeId || undefined,
           price: data.price ? Number(data.price) : undefined,
-          packageHeight: data.packageHeight ? Number(data.packageHeight) : undefined,
-          packageLength: data.packageLength ? Number(data.packageLength) : undefined,
-          packageWidth: data.packageWidth ? Number(data.packageWidth) : undefined,
-          netContent: data.netContent ? Number(data.netContent) : undefined,
+          // 치수·내용물 양은 문자열 컬럼이다("160mm") → 숫자로 바꾸지 않는다.
+          packageHeight: data.packageHeight?.trim() || undefined,
+          packageLength: data.packageLength?.trim() || undefined,
+          packageWidth: data.packageWidth?.trim() || undefined,
+          netContent: data.netContent?.trim() || undefined,
         };
         await onSubmit(payload);
         reset();
@@ -249,7 +250,7 @@ export function ProductRegistrationForm({
                 type="text"
                 inputMode="decimal"
                 pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0.00"
+                placeholder="0"
                 disabled={isLoading}
                 {...register('price')}
               />
@@ -302,9 +303,7 @@ export function ProductRegistrationForm({
               <Input
                 id="packageHeight"
                 type="text"
-                inputMode="decimal"
-                pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0"
+                placeholder="예: 160mm"
                 disabled={isLoading}
                 {...register('packageHeight')}
               />
@@ -318,9 +317,7 @@ export function ProductRegistrationForm({
               <Input
                 id="packageLength"
                 type="text"
-                inputMode="decimal"
-                pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0"
+                placeholder="예: 75mm"
                 disabled={isLoading}
                 {...register('packageLength')}
               />
@@ -336,9 +333,7 @@ export function ProductRegistrationForm({
               <Input
                 id="packageWidth"
                 type="text"
-                inputMode="decimal"
-                pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0"
+                placeholder="예: 8.9mm"
                 disabled={isLoading}
                 {...register('packageWidth')}
               />

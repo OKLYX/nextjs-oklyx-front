@@ -8,6 +8,7 @@ import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 import { useListViewStore } from '@/infrastructure/stores/listViewStore';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 import { detailHrefWithReturn } from '@/infrastructure/utils/listReturn';
+import { formatKrw } from '@/infrastructure/utils/money';
 import type { Product } from '@/domain/entities/Product';
 
 interface ProductTableProps {
@@ -35,15 +36,6 @@ export function ProductTable({
   const viewMode = useListViewStore((state) => state.viewMode);
   // Card view is a narrow-screen affordance only; md+ always shows the table.
   const showCards = isMobile && viewMode === 'card';
-
-  const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat('ko-KR', {
-      style: 'currency',
-      currency: 'KRW',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price);
-  };
 
   const formatDate = (dateString: string): string => {
     return dateString.substring(0, 10);
@@ -145,7 +137,7 @@ export function ProductTable({
                 <td className="px-4 py-3 text-sm text-gray-900">{product.productName}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{barcode(product)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.brand}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{formatPrice(product.price)}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{formatKrw(product.price)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.store}</td>
                 <td className="px-4 py-3 text-sm">{statusChip(product.active)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{formatDate(product.createdDate)}</td>
@@ -167,7 +159,7 @@ export function ProductTable({
                 { label: '상품명', value: product.productName },
                 { label: '바코드', value: barcode(product) },
                 { label: '브랜드', value: product.brand },
-                { label: '가격', value: formatPrice(product.price) },
+                { label: '가격', value: formatKrw(product.price) },
                 { label: '구매처', value: product.store },
                 { label: '상태', value: statusChip(product.active) },
                 { label: '등록일', value: formatDate(product.createdDate) },

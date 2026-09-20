@@ -97,13 +97,15 @@ export function ProductEditForm({
     async (data: ProductEditFormValues) => {
       setIsSaving(true);
       try {
+        // 치수·내용물 양은 서버에서 문자열이다 → 입력한 글자를 그대로 보낸다.
+        // 빈칸은 `null` 이 아니라 `''` 로 보내야 실제로 지워진다(서버의 `null` = 필드 미전송).
         const payload: UpdateProductRequest = {
           ...data,
           price: data.price ? Number(data.price) : null,
-          packageHeight: data.packageHeight ? Number(data.packageHeight) : null,
-          packageLength: data.packageLength ? Number(data.packageLength) : null,
-          packageWidth: data.packageWidth ? Number(data.packageWidth) : null,
-          netContent: data.netContent ? Number(data.netContent) : null,
+          packageHeight: data.packageHeight.trim(),
+          packageLength: data.packageLength.trim(),
+          packageWidth: data.packageWidth.trim(),
+          netContent: data.netContent.trim(),
         };
         await onSave(payload);
       } catch {
@@ -186,7 +188,7 @@ export function ProductEditForm({
                 type="text"
                 inputMode="decimal"
                 pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0.00"
+                placeholder="0"
                 {...register('price')}
               />
             </div>
@@ -235,9 +237,7 @@ export function ProductEditForm({
               <Input
                 id="packageHeight"
                 type="text"
-                inputMode="decimal"
-                pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0"
+                placeholder="예: 160mm"
                 {...register('packageHeight')}
               />
             </div>
@@ -249,9 +249,7 @@ export function ProductEditForm({
               <Input
                 id="packageLength"
                 type="text"
-                inputMode="decimal"
-                pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0"
+                placeholder="예: 75mm"
                 {...register('packageLength')}
               />
             </div>
@@ -265,9 +263,7 @@ export function ProductEditForm({
               <Input
                 id="packageWidth"
                 type="text"
-                inputMode="decimal"
-                pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0"
+                placeholder="예: 8.9mm"
                 {...register('packageWidth')}
               />
             </div>
