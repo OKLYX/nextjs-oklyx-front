@@ -6,6 +6,8 @@ import type { Product } from '@/domain/entities/Product';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { Button } from '@/presentation/components/ui/Button';
+import { Card } from '@/presentation/components/ui/Card';
 
 interface ProductDetailViewProps {
   product: Product;
@@ -42,32 +44,20 @@ export function ProductDetailView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => router.push(backHref)}
-          className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
-        >
+        <Button variant="secondary" size="sm" onClick={() => router.push(backHref)}>
           ← 목록
-        </button>
+        </Button>
         <div className="flex gap-2">
-          <button
-            onClick={() => router.push(editHref)}
-            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            수정
-          </button>
-          <button
-            onClick={() => setShowDeleteConfirmation(true)}
-            className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
-          >
+          <Button onClick={() => router.push(editHref)}>수정</Button>
+          <Button variant="danger" onClick={() => setShowDeleteConfirmation(true)}>
             삭제
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Product Details */}
       <div className="grid grid-cols-2 gap-6">
-        <div className="border border-gray-200 rounded-lg p-6 bg-white">
+        <Card>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-gray-600">상품명</p>
@@ -104,9 +94,9 @@ export function ProductDetailView({
               </div>
             )}
           </div>
-        </div>
+        </Card>
 
-        <div className="border border-gray-200 rounded-lg p-6 bg-white">
+        <Card>
           <div className="space-y-4">
             {product.packageHeight && (
               <div>
@@ -133,15 +123,14 @@ export function ProductDetailView({
               </div>
             )}
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Description */}
       {product.description && (
-        <div className="border border-gray-200 rounded-lg p-6 bg-white">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">설명</h2>
+        <Card title="설명">
           <p className="text-gray-700 whitespace-pre-wrap">{product.description}</p>
-        </div>
+        </Card>
       )}
 
       {/* Image gallery */}

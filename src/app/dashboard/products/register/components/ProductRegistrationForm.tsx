@@ -6,6 +6,8 @@ import type { CreateProductRequest } from '@/domain/repositories/ProductReposito
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from '@/app/dashboard/products/[id]/components/ProductImageGallery';
 import { Input } from '@/presentation/components/ui/Input';
+import { Card } from '@/presentation/components/ui/Card';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface ProductRegistrationFormValues {
   productName: string;
@@ -151,10 +153,9 @@ export function ProductRegistrationForm({
   const isSubmitDisabled = !hasProductName || hasBarcodeWithoutValidation;
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       {/* Required Fields */}
-      <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
-        <legend className="text-lg font-semibold text-gray-900 px-2">필수 항목</legend>
+      <Card title="필수 항목">
         <div className="space-y-4">
           {/* Product Name */}
           <div>
@@ -171,11 +172,10 @@ export function ProductRegistrationForm({
             {errors.productName && <p className="text-red-600 text-sm mt-1">{errors.productName.message}</p>}
           </div>
         </div>
-      </fieldset>
+      </Card>
 
       {/* Optional Fields */}
-      <fieldset className="border border-gray-200 rounded-lg p-6 bg-white">
-        <legend className="text-lg font-semibold text-gray-900 px-2">선택 항목</legend>
+      <Card title="선택 항목">
         <div className="space-y-4">
           {/* Barcode ID */}
           <div>
@@ -376,7 +376,7 @@ export function ProductRegistrationForm({
             />
           </div>
         </div>
-      </fieldset>
+      </Card>
 
       {/* Image gallery (register mode = local buffer; uploaded after the product is created) */}
       <ProductImageGallery
@@ -388,13 +388,16 @@ export function ProductRegistrationForm({
 
       {/* Submit Button (sticky - 스크롤해도 하단에 고정) */}
       <div className="sticky bottom-0 -mb-6 bg-page border-t border-gray-200 p-4 -mx-6 px-6">
-        <button
+        <Button
           type="submit"
-          disabled={isLoading || isSubmitDisabled}
-          className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          size="lg"
+          className="w-full"
+          disabled={isSubmitDisabled}
+          isLoading={isLoading}
+          loadingText="등록 중..."
         >
-          {isLoading ? '등록 중...' : '상품 등록'}
-        </button>
+          상품 등록
+        </Button>
       </div>
     </form>
   );
