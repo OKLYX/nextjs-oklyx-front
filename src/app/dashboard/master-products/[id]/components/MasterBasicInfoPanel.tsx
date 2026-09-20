@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
@@ -8,6 +9,7 @@ import type { MasterProductResponse } from '@/domain/entities/MasterProductEntit
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import { Button } from '@/presentation/components/ui/Button';
 import { Input } from '@/presentation/components/ui/Input';
+import { ROUTES } from '@/config/routes';
 
 interface MasterBasicInfoPanelProps {
   master: MasterProductResponse; // initial values come from the parent (no getById here)
@@ -25,7 +27,8 @@ interface MasterBasicInfoPanelProps {
  * 저장 성공 후 `onSaved(patched)` 로만 통지한다(매트릭스 재조회 금지 — 이름 한 줄 저장에
  * 매트릭스 + 셀별 getGenerated N콜이 다시 도는 것을 막는다).
  *
- * ⚠️ 구성상품(BOM)은 생성 시 고정 — 여기서 추가/삭제하지 않는다(읽기 전용).
+ * ⚠️ 구성상품은 여기서 읽기 전용이다. 변경은 [구성상품 변경] → 전용 페이지(2609_64)에서 한다 —
+ * 구성과 옵션 수량은 서로를 검증하므로 한 요청으로 같이 저장돼야 한다.
  * ⚠️ `active=false` 는 soft delete 라 **끄는 방향에만** 확인 다이얼로그를 띄운다.
  */
 export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicInfoPanelProps) {
@@ -37,6 +40,7 @@ export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicIn
   const [saved, setSaved] = useState(false);
   // Deactivation confirm (soft delete). Only the on→off direction asks.
   const [confirmOff, setConfirmOff] = useState(false);
+  const router = useRouter();
 
   const startEdit = () => {
     setName(master.name);
@@ -116,9 +120,19 @@ export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicIn
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            구성상품 ({master.components.length}개)
-          </label>
+          {/* 구성상품이 보이는 자리가 곧 고치러 오는 자리다 — 진입 버튼을 목록 옆에 둔다. */}
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <label className="block text-xs font-medium text-gray-600">
+              구성상품 ({master.components.length}개)
+            </label>
+            <button
+              type="button"
+              onClick={() => router.push(ROUTES.MASTER_PRODUCT_COMPOSITION(master.id))}
+              className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+            >
+              구성상품 변경
+            </button>
+          </div>
           <div className="max-h-64 overflow-y-auto rounded border border-gray-200 bg-gray-50">
             {master.components.length === 0 ? (
               <p className="px-3 py-2 text-sm text-gray-500">구성상품이 없습니다.</p>
@@ -133,7 +147,7 @@ export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicIn
             )}
           </div>
           <p className="mt-1 text-[11px] text-gray-500">
-            생성 후에는 구성상품을 추가하거나 뺄 수 없습니다(고정).
+            구성상품을 바꾸려면 [구성상품 변경] 에서 옵션별 수량과 함께 저장하세요.
           </p>
         </div>
 
