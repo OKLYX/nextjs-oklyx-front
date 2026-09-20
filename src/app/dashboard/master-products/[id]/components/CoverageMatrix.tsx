@@ -1020,14 +1020,25 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           <div className="space-y-2 border-t border-gray-200 p-4">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
-              <button
-                type="button"
-                onClick={() => setApplyNamesOpen(true)}
-                disabled={options.length === 0 || isApplyingNames}
-                className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-              >
-                옵션명 일괄 적용
-              </button>
+              <div className="flex items-center gap-2">
+                {/* 2609_64: 구성상품 변경은 전용 페이지에서 한다 — 구성과 옵션 수량을 한 번에 저장해야
+                    서로를 검증하는 두 값이 동시에 바뀐다(여기 옵션 편집기는 현재 구성 기준으로만 동작). */}
+                <button
+                  type="button"
+                  onClick={() => router.push(ROUTES.MASTER_PRODUCT_COMPOSITION(masterId))}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  구성상품 변경
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApplyNamesOpen(true)}
+                  disabled={options.length === 0 || isApplyingNames}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  옵션명 일괄 적용
+                </button>
+              </div>
             </div>
             <p className="text-[11px] text-gray-500">
               옵션의 카테고리 필수속성은 저장된 마스터 값을 기준으로 상속 여부를 판단합니다. 위

@@ -6,6 +6,7 @@ import type {
   MasterProductRequest,
   MasterProductByComponents,
   MasterProductUpdateRequest,
+  MasterCompositionRequest,
   MasterOptionRequest,
   MasterOptionResponse,
   MasterCategoryRequest,
@@ -44,6 +45,11 @@ export class MasterProductUseCase {
 
   update(id: number, data: MasterProductUpdateRequest): Promise<MasterProductResponse> {
     return this.repository.update(id, data);
+  }
+
+  /** 구성상품 + 옵션 전체를 한 번에 교체 (2609_64). 요청에 없는 기존 옵션은 삭제된다. */
+  updateComposition(id: number, data: MasterCompositionRequest): Promise<MasterProductResponse> {
+    return this.repository.updateComposition(id, data);
   }
 
   remove(id: number): Promise<void> {
