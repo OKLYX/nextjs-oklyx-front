@@ -11,6 +11,7 @@ import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
 import { useClipboardStore } from '@/infrastructure/stores/clipboardStore';
 import type { ClipValues } from '@/domain/entities/ClipItem';
+import { ClipboardFillModal, CLIP_FIELD_LABELS, type ProductClip } from './ClipboardFillModal';
 
 interface ProductEditFormValues {
   productName: string;
@@ -46,9 +47,11 @@ export function ProductEditForm({
   const [isSaving, setIsSaving] = useState(false);
 
   const [clipNotice, setClipNotice] = useState('');
+  const [isFillOpen, setIsFillOpen] = useState(false);
   const clipItems = useClipboardStore((state) => state.items);
-  // 여러 개면 가장 최근(목록 앞)에 담은 물품으로 채운다.
-  const latestProductClip = clipItems.find((item) => item.kind === 'product');
+  // 값을 가진 항목만 채우기 대상이다(사진 한 장짜리 항목에는 채울 값이 없다).
+  // 목록 앞이 가장 최근에 담은 것 — 팝업의 기본 선택이 된다.
+  const productClips = clipItems.filter((item): item is ProductClip => item.kind === 'product');
 
   const {
     register,
@@ -74,36 +77,28 @@ export function ProductEditForm({
   const barcodeValue = watch('barcodeId');
   const formValues = watch();
 
-  // 🔴 빈 칸만 채운다 — 이미 값이 있는 필드는 건드리지 않는다(PLAN D1).
+  // 🔴 어느 물품에서·어느 항목을 채울지는 팝업이 고른다 — 여기서는 고른 것만 그대로 넣는다.
+  //    체크한 항목은 이미 값이 있어도 **덮어쓴다**(일부러 고른 것). 무엇을 잃는지는 팝업이
+  //    `현재 값 → 새 값` 으로 미리 보여준다.
   // 상품명·바코드는 대상이 아니다(`ClipValues` 에 아예 없다).
-  const handleFillFromClipboard = useCallback(() => {
-    if (!latestProductClip || latestProductClip.kind !== 'product') return;
-    const values = latestProductClip.values;
-    const filled: string[] = [];
-    const LABELS: Record<keyof ClipValues, string> = {
-      brand: '브랜드',
-      store: '구매처',
-      price: '가격',
-      netContent: '내용물 양',
-      netContentUnit: '단위',
-      packageWidth: '너비',
-      packageLength: '길이',
-      packageHeight: '높이',
-      description: '설명',
-    };
-    (Object.keys(LABELS) as (keyof ClipValues)[]).forEach((key) => {
-      const next = values[key];
-      if (next == null || next === '') return;
-      if ((formValues[key] ?? '') !== '') return;
-      setValue(key, next, { shouldDirty: true });
-      filled.push(LABELS[key]);
-    });
-    setClipNotice(
-      filled.length === 0
-        ? '채울 빈 칸이 없습니다.'
-        : `${filled.join('·')} 등 ${filled.length}개 항목을 채웠습니다.`,
-    );
-  }, [latestProductClip, formValues, setValue]);
+  const handleApplyFill = useCallback(
+    (values: ClipValues, keys: (keyof ClipValues)[]) => {
+      const filled: string[] = [];
+      keys.forEach((key) => {
+        const next = values[key];
+        if (next == null || next === '') return;
+        setValue(key, next, { shouldDirty: true });
+        filled.push(CLIP_FIELD_LABELS[key]);
+      });
+      setClipNotice(
+        filled.length === 0
+          ? '채운 항목이 없습니다.'
+          : `${filled.join('·')} ${filled.length}개 항목을 채웠습니다.`,
+      );
+      setIsFillOpen(false);
+    },
+    [setValue],
+  );
 
   const handleBarcodeBlur = useCallback(async () => {
     if (!barcodeValue || barcodeValue.trim() === '') {
@@ -165,9 +160,9 @@ export function ProductEditForm({
         <Button
           variant="secondary"
           size="sm"
-          onClick={handleFillFromClipboard}
-          disabled={!latestProductClip}
-          title={latestProductClip ? undefined : '담긴 상품 정보가 없습니다'}
+          onClick={() => setIsFillOpen(true)}
+          disabled={productClips.length === 0}
+          title={productClips.length > 0 ? undefined : '담긴 상품 정보가 없습니다'}
         >
           클립보드에서 채우기
         </Button>
@@ -353,6 +348,16 @@ export function ProductEditForm({
         useCase={imageUseCase}
         productName={product.productName}
       />
+
+      {/* ⚠️ 열려 있을 때만 렌더한다 — 닫을 때마다 물품/항목 선택이 초기화되어야 한다. */}
+      {isFillOpen && (
+        <ClipboardFillModal
+          clips={productClips}
+          currentValues={formValues}
+          onApply={handleApplyFill}
+          onClose={() => setIsFillOpen(false)}
+        />
+      )}
     </form>
   );
 }
