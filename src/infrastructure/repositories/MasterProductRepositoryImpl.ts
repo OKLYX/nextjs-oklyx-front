@@ -9,6 +9,7 @@ import type {
   MasterProductRequest,
   MasterProductByComponents,
   MasterProductUpdateRequest,
+  MasterCompositionRequest,
   MasterOptionRequest,
   MasterOptionResponse,
   MasterCategoryRequest,
@@ -65,6 +66,13 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
 
   async update(id: number, data: MasterProductUpdateRequest): Promise<MasterProductResponse> {
     const response = await axiosInstance.patch(`${base}/${id}`, data);
+    return response.data.data;
+  }
+
+  // 2609_64: 구성상품 + 옵션 전체 원자 교체. 서버는 저장이 커밋된 뒤 셀 자산 재생성까지 끝내고
+  // 응답하므로 채널이 많으면 몇 초 걸린다 — 호출부에서 버튼을 잠근다.
+  async updateComposition(id: number, data: MasterCompositionRequest): Promise<MasterProductResponse> {
+    const response = await axiosInstance.put(`${base}/${id}/composition`, data);
     return response.data.data;
   }
 

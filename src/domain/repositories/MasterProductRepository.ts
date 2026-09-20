@@ -5,6 +5,7 @@ import type {
   MasterProductRequest,
   MasterProductByComponents,
   MasterProductUpdateRequest,
+  MasterCompositionRequest,
   MasterOptionRequest,
   MasterOptionResponse,
   MasterCategoryRequest,
@@ -28,6 +29,9 @@ export interface MasterProductRepository {
   findByComponents(productIds: number[]): Promise<MasterProductByComponents[]>;
   create(data: MasterProductRequest): Promise<MasterProductResponse>;
   update(id: number, data: MasterProductUpdateRequest): Promise<MasterProductResponse>;
+  // 2609_64: 구성상품 집합 + 옵션 전체를 한 트랜잭션에서 교체한다. 요청에 없는 기존 옵션은 삭제된다.
+  // 일상적인 옵션 하나 수정은 여전히 addOption/updateOption/deleteOption 을 쓴다.
+  updateComposition(id: number, data: MasterCompositionRequest): Promise<MasterProductResponse>;
   remove(id: number): Promise<void>;
   uploadImage(id: number, file: File): Promise<MasterProductResponse>;
   addOption(id: number, data: MasterOptionRequest): Promise<MasterOptionResponse>;
