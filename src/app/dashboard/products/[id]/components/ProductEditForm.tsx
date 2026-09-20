@@ -9,6 +9,8 @@ import { ProductImageGallery } from './ProductImageGallery';
 import { Input } from '@/presentation/components/ui/Input';
 import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
+import { useClipboardStore } from '@/infrastructure/stores/clipboardStore';
+import type { ClipValues } from '@/domain/entities/ClipItem';
 
 interface ProductEditFormValues {
   productName: string;
@@ -43,10 +45,16 @@ export function ProductEditForm({
   const [isCheckingBarcode, setIsCheckingBarcode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [clipNotice, setClipNotice] = useState('');
+  const clipItems = useClipboardStore((state) => state.items);
+  // 여러 개면 가장 최근(목록 앞)에 담은 물품으로 채운다.
+  const latestProductClip = clipItems.find((item) => item.kind === 'product');
+
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
   } = useForm<ProductEditFormValues>({
     defaultValues: {
       productName: product.productName,
@@ -64,6 +72,38 @@ export function ProductEditForm({
   });
 
   const barcodeValue = watch('barcodeId');
+  const formValues = watch();
+
+  // 🔴 빈 칸만 채운다 — 이미 값이 있는 필드는 건드리지 않는다(PLAN D1).
+  // 상품명·바코드는 대상이 아니다(`ClipValues` 에 아예 없다).
+  const handleFillFromClipboard = useCallback(() => {
+    if (!latestProductClip || latestProductClip.kind !== 'product') return;
+    const values = latestProductClip.values;
+    const filled: string[] = [];
+    const LABELS: Record<keyof ClipValues, string> = {
+      brand: '브랜드',
+      store: '구매처',
+      price: '가격',
+      netContent: '내용물 양',
+      netContentUnit: '단위',
+      packageWidth: '너비',
+      packageLength: '길이',
+      packageHeight: '높이',
+      description: '설명',
+    };
+    (Object.keys(LABELS) as (keyof ClipValues)[]).forEach((key) => {
+      const next = values[key];
+      if (next == null || next === '') return;
+      if ((formValues[key] ?? '') !== '') return;
+      setValue(key, next, { shouldDirty: true });
+      filled.push(LABELS[key]);
+    });
+    setClipNotice(
+      filled.length === 0
+        ? '채울 빈 칸이 없습니다.'
+        : `${filled.join('·')} 등 ${filled.length}개 항목을 채웠습니다.`,
+    );
+  }, [latestProductClip, formValues, setValue]);
 
   const handleBarcodeBlur = useCallback(async () => {
     if (!barcodeValue || barcodeValue.trim() === '') {
@@ -121,6 +161,16 @@ export function ProductEditForm({
           오갈 때 버튼이 움직이지 않는다. `ui/Button` 사용(취소=secondary 가 왼쪽).
           ⚠️ 폼 맨 아래로 되돌리지 말 것(2026-09-20). */}
       <div className="flex items-center justify-end gap-2">
+        {clipNotice && <span className="text-sm text-gray-600">{clipNotice}</span>}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleFillFromClipboard}
+          disabled={!latestProductClip}
+          title={latestProductClip ? undefined : '담긴 상품 정보가 없습니다'}
+        >
+          클립보드에서 채우기
+        </Button>
         <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
           취소
         </Button>
@@ -298,7 +348,11 @@ export function ProductEditForm({
         </div>
       </Card>
 
-      <ProductImageGallery productId={product.id} useCase={imageUseCase} />
+      <ProductImageGallery
+        productId={product.id}
+        useCase={imageUseCase}
+        productName={product.productName}
+      />
     </form>
   );
 }

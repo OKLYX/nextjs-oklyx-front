@@ -21,6 +21,11 @@ export class ProductImageRepositoryImpl implements ProductImageRepository {
     return response.data.data;
   }
 
+  async copy(productId: number, sourceImageIds: number[]): Promise<ProductImage[]> {
+    const response = await axiosInstance.post(`${base(productId)}/copy`, { sourceImageIds });
+    return response.data.data;
+  }
+
   async replace(productId: number, imageId: number, file: File): Promise<ProductImage> {
     const formData = new FormData();
     formData.append('file', file);
