@@ -9,6 +9,8 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
 import { formatKrw } from '@/infrastructure/utils/money';
+import { useClipboardStore, newClipId } from '@/infrastructure/stores/clipboardStore';
+import type { ClipValues } from '@/domain/entities/ClipItem';
 
 interface ProductDetailViewProps {
   product: Product;
@@ -30,6 +32,50 @@ export function ProductDetailView({
   const router = useRouter();
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPicking, setIsPicking] = useState(false);
+  const [clipNotice, setClipNotice] = useState('');
+  const addClip = useClipboardStore((state) => state.add);
+
+  // 클립보드에 이 물품을 통째로 담는다 — 값은 스냅샷(문자열), 사진은 참조(productImageId).
+  // 🔴 상품명·바코드는 값으로 담지 않는다(바코드는 물품을 구분하는 값이라 복제하면 중복이 생긴다).
+  const handlePickProduct = useCallback(async () => {
+    setIsPicking(true);
+    setClipNotice('');
+    try {
+      const images = await imageUseCase.list(product.id);
+      const values: ClipValues = {};
+      // 🔴 폼(RHF)이 전부 string 이라 담을 때부터 문자열로 맞춘다. 빈 값은 담지 않는다.
+      const put = (key: keyof ClipValues, value: string | number | null | undefined) => {
+        const text = value == null ? '' : String(value).trim();
+        if (text !== '') values[key] = text;
+      };
+      put('brand', product.brand);
+      put('store', product.store);
+      put('price', product.price);
+      put('netContent', product.netContent);
+      put('netContentUnit', product.netContentUnit);
+      put('packageWidth', product.packageWidth);
+      put('packageLength', product.packageLength);
+      put('packageHeight', product.packageHeight);
+      put('description', product.description);
+      addClip({
+        clipId: newClipId(),
+        kind: 'product',
+        pickedAt: new Date().toISOString(),
+        productId: product.id,
+        productName: product.productName,
+        values,
+        imageRefs: [...images]
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map((img) => ({ productImageId: img.id, imageUrl: img.imageUrl })),
+      });
+      setClipNotice('클립보드에 담았습니다.');
+    } catch {
+      setClipNotice('클립보드에 담지 못했습니다.');
+    } finally {
+      setIsPicking(false);
+    }
+  }, [addClip, imageUseCase, product]);
 
   const handleDeleteConfirm = useCallback(async () => {
     setIsDeleting(true);
@@ -48,7 +94,11 @@ export function ProductDetailView({
         <Button variant="secondary" size="sm" onClick={() => router.push(backHref)}>
           ← 목록
         </Button>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {clipNotice && <span className="text-sm text-gray-600">{clipNotice}</span>}
+          <Button variant="secondary" onClick={handlePickProduct} disabled={isPicking}>
+            클립보드에 담기
+          </Button>
           <Button onClick={() => router.push(editHref)}>수정</Button>
           <Button variant="danger" onClick={() => setShowDeleteConfirmation(true)}>
             삭제
@@ -135,7 +185,11 @@ export function ProductDetailView({
       )}
 
       {/* Image gallery */}
-      <ProductImageGallery productId={product.id} useCase={imageUseCase} />
+      <ProductImageGallery
+        productId={product.id}
+        useCase={imageUseCase}
+        productName={product.productName}
+      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

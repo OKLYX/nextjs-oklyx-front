@@ -7,6 +7,10 @@ export interface ProductImageRepository {
   list(productId: number): Promise<ProductImage[]>;
   // Multipart: append each file as `files`. One POST adds all of them.
   add(productId: number, files: File[]): Promise<ProductImage[]>;
+  // Copy other products' gallery images into this product by reference — the file is shared,
+  // not re-uploaded (backend FEATURE_2609_62/01). Sources that no longer exist are skipped
+  // silently, so compare the returned length with the requested ids to detect a partial copy.
+  copy(productId: number, sourceImageIds: number[]): Promise<ProductImage[]>;
   // Replace one image in place (keeps the same image id).
   replace(productId: number, imageId: number, file: File): Promise<ProductImage>;
   // Reorder the gallery to exactly this ordered set of image ids.

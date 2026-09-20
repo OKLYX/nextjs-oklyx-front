@@ -7,6 +7,8 @@ import { Spinner } from '@/presentation/components/Spinner';
 import type { ProductImage } from '@/domain/entities/ProductImage';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { Card } from '@/presentation/components/ui/Card';
+import { CLIP_MIME, clipSourceImageIds, hasClipPayload, type ClipItem } from '@/domain/entities/ClipItem';
+import { newClipId } from '@/infrastructure/stores/clipboardStore';
 
 /**
  * 물품(상품)의 다중 이미지 갤러리. 단일 `ProductImageSection` 을 대체하며 물품
@@ -26,6 +28,15 @@ import { Card } from '@/presentation/components/ui/Card';
  *     boolean 하나로는 오버레이가 깜빡인다.
  *   - 오버레이는 `pointer-events-none` 필수. 드롭을 가로채면 업로드가 아예 안 된다.
  *   - 조회 모드(`isViewMode`)·업로드 중(`busy`)에는 받지 않는다.
+ *
+ * **클립보드(FEATURE_2609_62)**: 카드를 끌어 상단바 클립보드에 담고(`draggable`), 담아둔 항목을
+ *   이 드롭존에 놓아 **참조 복제**로 붙인다(`useCase.copy` — 파일을 다시 올리지 않는다).
+ *   - 드롭존은 파일(`Files`)과 클립(`application/x-oklyx-clip`) 두 종류를 구분해 받는다.
+ *   - 🔴 카드 안 `<img>` 에 `draggable={false}` 필수 — 없으면 브라우저가 이미지 자체를 끌어
+ *     카드의 `dragstart` 가 뜨지 않는다.
+ *   - 🔴 담을 때 싣는 `imageUrl` 은 **저장값**(`item.rawUrl` = `img.imageUrl`)이다. 렌더용 `item.url`
+ *     (`resolveThumbUrl` 통과값)을 실으면 백엔드가 되받는 값과 달라진다.
+ *   - 등록 모드(`productId == null`)는 서버 id 가 없어 **담지도 붙이지도 못한다**(안내 문구).
  *
  * **모드**:
  *   - 수정/상세(`productId != null`): 마운트 시 서버 조회, 각 연산 즉시 서버 반영(backend 39).
@@ -50,6 +61,7 @@ interface ProductImageGalleryProps {
   buffer?: File[]; // 등록 모드: 부모 보관 업로드 대기열(순서 = 대표 후보)
   onBufferChange?: (files: File[]) => void;
   isViewMode?: boolean; // true = 조회 전용(업로드/편집 숨김)
+  productName?: string; // 클립보드에 담을 때 목록에 보여줄 이름(부모 주입)
 }
 
 const ACCEPT = 'image/jpeg,image/png';
@@ -70,6 +82,8 @@ type GalleryItem = {
   imageId: number | null;
   downloadHref: string;
   downloadName: string;
+  // 저장값 그대로(수정 모드만). 클립보드에 담을 때 이 값을 싣는다 — `url` 은 렌더용이라 쓰면 안 된다.
+  rawUrl: string | null;
 };
 
 export function ProductImageGallery({
@@ -78,6 +92,7 @@ export function ProductImageGallery({
   buffer,
   onBufferChange,
   isViewMode = false,
+  productName,
 }: ProductImageGalleryProps) {
   const isEdit = productId != null;
 
@@ -136,6 +151,7 @@ export function ProductImageGallery({
         // S3 URL 은 교차 출처 → download 속성이 무시되므로 same-origin 프록시를 거친다.
         downloadHref: `/api/image-download?url=${encodeURIComponent(img.imageUrl)}`,
         downloadName: imageFileName(img.imageUrl),
+        rawUrl: img.imageUrl,
       }));
     }
     // Register mode: the object URL is same-origin (blob:), so it downloads directly.
@@ -145,6 +161,7 @@ export function ProductImageGallery({
       imageId: null,
       downloadHref: url,
       downloadName: bufferFiles?.[index]?.name ?? `product-image-${index + 1}`,
+      rawUrl: null,
     }));
   }, [isEdit, images, previews, bufferFiles]);
 
@@ -196,6 +213,42 @@ export function ProductImageGallery({
     await ingestFiles(selected);
   };
 
+  // ---- Paste from clipboard (FEATURE_2609_62) ----
+  // 담아둔 항목을 이 갤러리에 붙인다. 서버가 행만 복제하므로 파일을 다시 올리지 않는다.
+  // 🔴 백엔드는 사라진 원본을 조용히 건너뛰고 200 을 준다 → 개수 비교가 유일한 판단 근거다.
+  const pasteClip = useCallback(
+    async (clip: ClipItem) => {
+      setError('');
+      if (productId == null) {
+        setError('상품을 저장한 뒤에 붙여넣을 수 있습니다.');
+        return;
+      }
+      const sourceIds = clipSourceImageIds(clip);
+      if (sourceIds.length === 0) return;
+      const before = images.length;
+      setBusy(true);
+      try {
+        const next = await useCase.copy(productId, sourceIds);
+        setImages([...next].sort((a, b) => a.sortOrder - b.sortOrder));
+        const added = next.length - before;
+        if (added < sourceIds.length) {
+          setError(
+            `${sourceIds.length}장 중 ${Math.max(0, added)}장만 붙였습니다. 원본이 삭제된 사진은 빠집니다.`,
+          );
+        }
+      } catch (e: unknown) {
+        if (axios.isAxiosError(e) && e.response?.status === 400) {
+          setError('원본이 모두 삭제돼 붙일 수 없습니다.');
+        } else {
+          setError('이미지를 붙여넣지 못했습니다.');
+        }
+      } finally {
+        setBusy(false);
+      }
+    },
+    [productId, images.length, useCase],
+  );
+
   // ---- Drag & drop ----
   // dragenter/dragleave fire for every child element, so nesting depth is counted rather than
   // toggling a boolean — otherwise the overlay flickers off whenever the cursor crosses a card.
@@ -204,16 +257,19 @@ export function ProductImageGallery({
   const canDrop = !isViewMode && !busy;
   // Ignore drags that carry no file (text selections, images dragged from another page).
   const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes('Files');
+  // ⚠️ dragover 에서는 getData() 를 못 읽는다(보안 제약) → 종류 판단은 types 로만.
+  const hasClip = (e: React.DragEvent) => hasClipPayload(e.dataTransfer.types);
+  const accepts = (e: React.DragEvent) => hasFiles(e) || hasClip(e);
 
   const handleDragEnter = (e: React.DragEvent) => {
-    if (!canDrop || !hasFiles(e)) return;
+    if (!canDrop || !accepts(e)) return;
     e.preventDefault();
     dragDepth.current += 1;
     setIsDragOver(true);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    if (!canDrop || !hasFiles(e)) return;
+    if (!canDrop || !accepts(e)) return;
     // Required: without it the browser navigates to the dropped file instead of firing onDrop.
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
@@ -226,11 +282,40 @@ export function ProductImageGallery({
   };
 
   const handleDrop = async (e: React.DragEvent) => {
-    if (!canDrop || !hasFiles(e)) return;
+    if (!canDrop || !accepts(e)) return;
     e.preventDefault();
     dragDepth.current = 0;
     setIsDragOver(false);
+    if (hasClip(e)) {
+      const raw = e.dataTransfer.getData(CLIP_MIME);
+      if (!raw) return;
+      let clip: ClipItem;
+      try {
+        clip = JSON.parse(raw) as ClipItem;
+      } catch {
+        return;
+      }
+      await pasteClip(clip);
+      return;
+    }
     await ingestFiles(Array.from(e.dataTransfer.files));
+  };
+
+  // 갤러리 카드를 끌어 상단바 클립보드(또는 열린 말풍선)에 담는다.
+  // 담기는 읽기 동작이라 조회 모드에서도 허용한다 — 상세에서 담는 것이 기본 동선이다.
+  const handleCardDragStart = (e: React.DragEvent, item: GalleryItem) => {
+    if (item.imageId == null || item.rawUrl == null) return;
+    const clip = {
+      clipId: newClipId(),
+      kind: 'image' as const,
+      pickedAt: new Date().toISOString(),
+      productId: productId as number,
+      productName: productName ?? '이름 없는 물품',
+      productImageId: item.imageId,
+      imageUrl: item.rawUrl,
+    };
+    e.dataTransfer.setData(CLIP_MIME, JSON.stringify(clip));
+    e.dataTransfer.effectAllowed = 'copy';
   };
 
   // ---- Replace (both modes) ----
@@ -373,10 +458,21 @@ export function ProductImageGallery({
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
             {items.map((item, index) => (
-              <div key={item.key} className="rounded-lg border border-gray-200 p-2">
+              <div
+                key={item.key}
+                draggable={item.imageId != null}
+                onDragStart={(e) => handleCardDragStart(e, item)}
+                className="rounded-lg border border-gray-200 p-2"
+              >
                 <div className="relative mb-2 aspect-square overflow-hidden rounded bg-gray-100">
+                  {/* 🔴 draggable={false} 없으면 브라우저가 이미지를 끌어 카드 dragstart 가 안 뜬다. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={item.url} alt="상품 이미지" className="h-full w-full object-contain" />
+                  <img
+                    src={item.url}
+                    alt="상품 이미지"
+                    draggable={false}
+                    className="h-full w-full object-contain"
+                  />
                   {index === 0 && (
                     <span className="absolute left-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
                       대표
@@ -443,7 +539,7 @@ export function ProductImageGallery({
       {isDragOver && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-50/80">
           <p className="text-sm font-medium text-blue-700">
-            여기에 놓아 업로드 (JPEG/PNG · 20MB 이하)
+            여기에 놓기 — 사진 파일은 업로드(JPEG/PNG · 20MB 이하), 클립보드 항목은 붙여넣기
           </p>
         </div>
       )}
