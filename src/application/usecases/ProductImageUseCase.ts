@@ -15,6 +15,10 @@ export class ProductImageUseCase {
     return this.repository.add(productId, files);
   }
 
+  copy(productId: number, sourceImageIds: number[]): Promise<ProductImage[]> {
+    return this.repository.copy(productId, sourceImageIds);
+  }
+
   replace(productId: number, imageId: number, file: File): Promise<ProductImage> {
     return this.repository.replace(productId, imageId, file);
   }

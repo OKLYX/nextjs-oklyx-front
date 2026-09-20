@@ -6,6 +6,7 @@
  *
  * ⚠️ 0·null 이면 아무것도 그리지 않는다(빈 동그라미가 남으면 항상 뭔가 있는 것처럼 보인다).
  * ❌ 건수를 화면에서 세지 말 것 — `useAlertSummary` 가 단일 창구다.
+ *    ⚠️ 알림 배지에만 걸린 규칙이다. 클립보드(`ClipboardTray`)는 자기 store 길이(`items.length`)를 쓴다.
  */
 export function NavBadge({ count }: { count: number | null | undefined }) {
   if (!count) return null;

@@ -9,6 +9,7 @@ import { useThemeStore } from '@/infrastructure/stores/themeStore';
 import { AuthRepositoryImpl } from '@/infrastructure/repositories/AuthRepositoryImpl';
 import { ROUTES } from '@/config/routes';
 import { AlertBell } from './AlertBell';
+import { ClipboardTray } from './ClipboardTray';
 
 export function TopBar() {
   const router = useRouter();
@@ -44,6 +45,9 @@ export function TopBar() {
   return (
     <header className="flex items-center justify-end px-6 py-3 bg-white">
       <div className="flex items-center gap-3">
+        {/* 클립보드 (FEATURE_2609_62) — 담긴 개수는 ClipboardTray 가 clipboardStore 에서 직접 읽는다.
+            🔴 TopBar 에 클립보드 prop 을 추가하지 않는다. */}
+        <ClipboardTray />
         {/* 알림 종 (FEATURE_2609_51) — 숫자는 AlertBell 이 alertStore 에서 직접 읽는다.
             🔴 TopBar 에 알림 prop 을 추가하지 않는다. */}
         <AlertBell />
