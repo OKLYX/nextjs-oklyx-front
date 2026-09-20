@@ -6,6 +6,7 @@ import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { Spinner } from '@/presentation/components/Spinner';
 import type { ProductImage } from '@/domain/entities/ProductImage';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
+import { Card } from '@/presentation/components/ui/Card';
 
 /**
  * 물품(상품)의 다중 이미지 갤러리. 단일 `ProductImageSection` 을 대체하며 물품
@@ -261,9 +262,9 @@ export function ProductImageGallery({
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg p-6 bg-white">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">상품 이미지</h2>
+    <Card
+      title="상품 이미지"
+      action={
         <div className="flex items-center gap-3">
           {busy && <Spinner size={18} />}
           {!isViewMode && (
@@ -281,8 +282,8 @@ export function ProductImageGallery({
             </label>
           )}
         </div>
-      </div>
-
+      }
+    >
       {error && (
         <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       )}
@@ -373,6 +374,6 @@ export function ProductImageGallery({
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
