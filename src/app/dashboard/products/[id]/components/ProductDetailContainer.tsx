@@ -7,8 +7,10 @@ import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import { GetProductDetailUseCase } from '@/application/usecases/GetProductDetailUseCase';
 import { UpdateProductUseCase } from '@/application/usecases/UpdateProductUseCase';
 import { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
+import { BarcodeExtractionUseCase } from '@/application/usecases/BarcodeExtractionUseCase';
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
 import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
+import { BarcodeExtractionRepositoryImpl } from '@/infrastructure/repositories/BarcodeExtractionRepositoryImpl';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 import { ROUTES } from '@/config/routes';
 import { detailHrefWithReturn, listReturnHref } from '@/infrastructure/utils/listReturn';
@@ -54,6 +56,11 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
     []
   );
 
+  const barcodeUseCase = useMemo(
+    () => new BarcodeExtractionUseCase(new BarcodeExtractionRepositoryImpl()),
+    []
+  );
+
   const fetchProduct = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -81,6 +88,18 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
   useEffect(() => {
     fetchProduct();
   }, [fetchProduct]);
+
+  /**
+   * 사진에서 읽어낸 바코드를 화면 값에만 반영한다 (FEATURE_2609_65).
+   *
+   * 🔴 여기서 `fetchProduct()` 를 부르지 말 것. `fetchProduct` 는 `setIsLoading(true)` 를 하고
+   * 이 컨테이너는 `isLoading` 이면 화면 전체를 `StateBlock` 으로 바꾼다 → `ProductDetailView` 가
+   * 언마운트돼 **방금 띄운 결과 알림이 사라진다**(성공했을 때만 알림이 안 보이는 최악의 동작).
+   * 서버가 저장한 값은 응답에 이미 들어 있으니 그 값만 갈아 끼운다(`handleSave` 와 같은 방식).
+   */
+  const handleBarcodeExtracted = useCallback((barcode: string) => {
+    setProduct((prev) => (prev ? { ...prev, barcodeId: barcode } : prev));
+  }, []);
 
   const handleDelete = useCallback(async () => {
     await axiosInstance.delete(`/api/products/${id}`);
@@ -168,6 +187,8 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
         product={product}
         onDelete={handleDelete}
         imageUseCase={imageUseCase}
+        barcodeUseCase={barcodeUseCase}
+        onBarcodeExtracted={handleBarcodeExtracted}
         backHref={backHref}
         editHref={editHref}
       />
