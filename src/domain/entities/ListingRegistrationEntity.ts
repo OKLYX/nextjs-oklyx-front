@@ -278,6 +278,9 @@ export interface ImportPreviewResponse {
   categoryMatched: boolean;
   categoryWarning: string | null; // D15 문구. 그대로 출력한다(가공 금지)
   channelTags: string[];
+  // 2609_63/D11: true = 마스터 연결이 끊긴 기존 판매상품을 재사용한다(새 판매상품을 만들지 않는다).
+  // 주문·고객문의·정산 기록이 그대로 따라오므로 사용자에게 반드시 알린다.
+  reusesExistingListing: boolean;
   components: { productId: number; brand?: string; productName: string }[];
   options: {
     itemName: string;
