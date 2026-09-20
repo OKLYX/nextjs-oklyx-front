@@ -49,6 +49,9 @@ export function ProductTable({
     return dateString.substring(0, 10);
   };
 
+  // Older products were registered without a barcode; keep the column aligned.
+  const barcode = (product: Product): string => product.barcodeId || '-';
+
   // Representative image as a thumbnail; a product without one keeps the row
   // height stable with a placeholder box (same shape as the purchase list).
   const thumbnail = (product: Product) => {
@@ -122,6 +125,7 @@ export function ProductTable({
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">번호</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">이미지</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상품명</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">바코드</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">브랜드</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">가격</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">구매처</th>
@@ -139,6 +143,7 @@ export function ProductTable({
                 <td className="px-4 py-3 text-sm text-gray-900">{currentPage * pageSize + index + 1}</td>
                 <td className="px-4 py-3">{thumbnail(product)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.productName}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{barcode(product)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.brand}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{formatPrice(product.price)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.store}</td>
@@ -160,6 +165,7 @@ export function ProductTable({
               fields={[
                 { label: '이미지', value: thumbnail(product) },
                 { label: '상품명', value: product.productName },
+                { label: '바코드', value: barcode(product) },
                 { label: '브랜드', value: product.brand },
                 { label: '가격', value: formatPrice(product.price) },
                 { label: '구매처', value: product.store },

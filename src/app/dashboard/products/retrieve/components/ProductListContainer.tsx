@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { PageContainer } from '@/presentation/components/PageContainer';
-import { SearchBar } from './SearchBar';
+import { ProductSearchCard } from './ProductSearchCard';
 import { ProductTable } from './ProductTable';
 import { Pagination } from '@/presentation/components/Pagination';
 import { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
@@ -24,7 +24,8 @@ import {
  *
  * ⚠️ 조회 조건(page/q)은 URL 이 단일 진실원이다(`../productListQuery`). 같은 값을 `useState` 로
  * 이중 보관하지 말 것 — 상세로 갔다가 뒤로가기로 돌아오면 컨테이너가 다시 마운트되므로
- * 로컬 state 는 항상 첫 페이지로 초기화된다.
+ * 로컬 state 는 항상 첫 페이지로 초기화된다. (입력창의 `searchTerm` 은 **아직 커밋되지 않은**
+ * 글자라 조회 조건이 아니다 — [검색] 을 눌러야 URL 로 넘어간다.)
  *
  * ⚠️ 조건 변경은 `updateQuery` 하나로만 한다. `push` 가 아니라 `router.replace` 를 쓴다
  * (페이지를 넘길 때마다 뒤로가기 스택이 쌓이면 상세에서 한 번에 목록으로 못 돌아온다).
@@ -37,6 +38,10 @@ export function ProductListContainer() {
   const searchKey = searchParams.toString();
   const { page, search } = useMemo(() => parseQuery(new URLSearchParams(searchKey)), [searchKey]);
 
+  // 입력 중인 검색어는 로컬 state, 커밋된 검색어는 URL(`search`) — 마운트 시 한 번만 URL 에서
+  // 가져온다. URL→입력값 역동기화를 넣으면 뒤로가기로 돌아왔을 때 입력이 튄다.
+  const [searchTerm, setSearchTerm] = useState(search);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
@@ -48,9 +53,7 @@ export function ProductListContainer() {
     []
   );
 
-  // 최신 조회 조건을 ref 로 읽어 `updateQuery` 를 안정된 함수로 유지한다. 조건이 바뀔 때마다
-  // 새 함수가 되면 SearchBar 의 디바운스 이펙트가 페이지 이동 직후 다시 돌아 검색어만 담긴
-  // patch 를 커밋하고, 그것이 "검색 변경"으로 보여 page 가 0 으로 되돌아간다(= 페이지 이동 불가).
+  // 최신 조회 조건을 ref 로 읽어 `updateQuery` 를 page/search 변화와 무관한 안정된 함수로 유지한다.
   const queryRef = useRef<ProductListQuery>({ page, search });
   useEffect(() => {
     queryRef.current = { page, search };
@@ -108,8 +111,8 @@ export function ProductListContainer() {
   }, [useCase, router, page, search]);
 
   const handleSearch = useCallback(
-    (keyword: string) => updateQuery({ search: keyword }),
-    [updateQuery]
+    () => updateQuery({ search: searchTerm.trim() }),
+    [updateQuery, searchTerm]
   );
 
   const handlePageChange = useCallback(
@@ -118,11 +121,14 @@ export function ProductListContainer() {
   );
 
   return (
-    <PageContainer
-      title="상품 목록"
-      action={<span className="text-gray-600">총 {totalElements}개</span>}
-    >
-      <SearchBar initialValue={search} onSearch={handleSearch} />
+    <PageContainer title="상품 목록">
+      <ProductSearchCard
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
+        onSearch={handleSearch}
+        isLoading={isLoading}
+        resultCount={totalElements}
+      />
       <ProductTable
         products={products}
         listQuery={searchKey}
