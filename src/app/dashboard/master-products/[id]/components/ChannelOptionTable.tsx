@@ -1,10 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
-import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
-import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
-import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
 import type {
   MasterChannelOptionCell,
   MasterOptionResponse,
@@ -47,12 +44,17 @@ function indexOptions(cell: MasterChannelOptionCell | undefined) {
 }
 
 interface ChannelOptionTableProps {
-  masterId: number;
   /** 커버리지 매트릭스 행 — 열 라벨(판매자·플랫폼·계정)의 출처. */
   rows: MatrixRow[];
   masterOptions: MasterOptionResponse[];
-  /** 값이 바뀌면 다시 읽는다(옵션 수정·가격/재고 저장 후). */
-  reloadKey: number;
+  /**
+   * 채널 옵션 집계. **조회는 `CoverageMatrix` 가 한다** — 채널 행 아래 인라인 옵션 목록도 같은
+   * 응답을 쓰므로, 여기서 또 부르면 같은 것을 두 번 읽는다(D6).
+   * null = 미로드/조회 중.
+   */
+  cells: MasterChannelOptionCell[] | null;
+  /** 집계 조회 실패 메시지. 빈 문자열 = 실패 아님. */
+  error: string;
   /** [옵션 수정] — 「상품 기본 정보 > 옵션」의 그 옵션으로 보낸다. */
   onEditMasterOption: (masterOptionId: number) => void;
 }
@@ -68,41 +70,19 @@ interface ChannelOptionTableProps {
  * 재고·활성)은 지금처럼 매트릭스 행의 기존 액션·모달이 담당한다. 여기서 편집 지점을 늘리면 같은 값을
  * 두 곳에서 고치게 된다. 표가 하는 일은 셋뿐 — **보여주기 · 복사하기 · [옵션 수정] 으로 보내기.**
  *
- * ⚠️ 데이터는 `getChannelOptions` **한 번**이다(2609_61/D6). 셀마다 옵션을 조회하지 말 것.
+ * ⚠️ 데이터는 `getChannelOptions` **한 번**이다(2609_61/D6) — 그 호출의 주인은 `CoverageMatrix` 고
+ *    이 컴포넌트는 결과를 prop 으로 받는다. 여기서 다시 조회하지 말 것(채널 행 인라인 목록과 중복).
  * ⚠️ `channel-options` 가 내려준 셀 중 매트릭스에 행이 없는 것(계정이 지워진 셀)도 **버리지 않고**
  *    열 맨 뒤에 「계정 없음」으로 붙인다 — 잘못 매핑된 셀을 찾자고 만든 표라 그런 셀이 제일 중요하다.
  */
 export function ChannelOptionTable({
-  masterId,
   rows,
   masterOptions,
-  reloadKey,
+  cells,
+  error,
   onEditMasterOption,
 }: ChannelOptionTableProps) {
-  const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
-  const [cells, setCells] = useState<MasterChannelOptionCell[] | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const res = await useCase.getChannelOptions(masterId);
-      setCells(res.cells ?? []);
-    } catch (e: unknown) {
-      setCells(null);
-      setError(extractErrorMessage(e, '채널별 옵션을 불러오지 못했습니다.'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [useCase, masterId]);
-
-  useEffect(() => {
-    void (async () => {
-      await load();
-    })();
-  }, [load, reloadKey]);
+  const isLoading = cells == null && !error;
 
   // 열 = 매트릭스 순서 그대로, 그 뒤에 매트릭스에 행이 없는 셀(계정 삭제).
   const columns = useMemo<OptionColumn[]>(() => {

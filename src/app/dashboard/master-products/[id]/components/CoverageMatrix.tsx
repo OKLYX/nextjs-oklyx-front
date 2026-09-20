@@ -31,6 +31,7 @@ import type {
   MatrixCell,
   ListingMatrixResponse,
   MasterCategoryResponse,
+  MasterChannelOptionCell,
   MasterOptionResponse,
   MasterProductResponse,
 } from '@/domain/entities/MasterProductEntity';
@@ -41,6 +42,7 @@ import type {
   GeneratedProductResponse,
   ChannelSyncPreview,
   ChannelSyncChannel,
+  ListingOptionSummary,
 } from '@/domain/entities/ListingRegistrationEntity';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
@@ -276,8 +278,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [focusOption, setFocusOption] = useState<{ optionId: number; nonce: number } | undefined>(
     undefined,
   );
-  // 표 갱신 신호. 매트릭스 재조회(`load`)가 돌 때마다 올려 표의 값도 함께 새로 읽는다.
-  const [channelOptionReloadKey, setChannelOptionReloadKey] = useState(0);
+  // 2609_61: 마스터의 **모든** 셀 + 그 셀의 옵션. 한 번에 받아 두 곳이 나눠 쓴다 —
+  // 채널 행 아래 인라인 옵션 목록(`DisplayNameRow`)과 「채널별 옵션」 표(`ChannelOptionTable`).
+  // 🔴 셀마다 옵션을 조회하지 말 것(D6). null = 미로드/조회 중, `channelOptionError` = 실패.
+  const [channelOptionCells, setChannelOptionCells] = useState<MasterChannelOptionCell[] | null>(
+    null,
+  );
+  const [channelOptionError, setChannelOptionError] = useState('');
 
   // 2609_22: 쿠팡 상품 가져오기 대상 행(모달 mount). null = 닫힘.
   const [importTarget, setImportTarget] = useState<{
@@ -345,6 +352,25 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     setSyncPreview(await listingUseCase.getChannelSyncPreview(masterId));
   }, [listingUseCase, masterId, isAdmin]);
 
+  // 2609_61: 채널 옵션 집계(D6 — 셀 수와 무관하게 호출 1번).
+  // 🔴 `/api/admin/**` 이라 ADMIN 에서만 부른다(`fetchSyncPreview` 와 같은 이유).
+  // fire-and-forget — 매트릭스 렌더를 막지 않는다. 실패해도 표 본체는 그대로 그려진다.
+  const fetchChannelOptions = useCallback(async () => {
+    if (!isAdmin) {
+      setChannelOptionCells(null);
+      setChannelOptionError('');
+      return;
+    }
+    setChannelOptionError('');
+    try {
+      const res = await masterUseCase.getChannelOptions(masterId);
+      setChannelOptionCells(res.cells ?? []);
+    } catch (e: unknown) {
+      setChannelOptionCells(null);
+      setChannelOptionError(extractErrorMessage(e, '채널별 옵션을 불러오지 못했습니다.'));
+    }
+  }, [masterUseCase, masterId, isAdmin]);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     setError('');
@@ -362,14 +388,21 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       void fetchGenerated(m); // fire-and-forget; table draws immediately, previews fill in after
       void fetchPlaces(m); // ditto — the 배송 설정 warning on unregistered rows fills in after
       void fetchSyncPreview().catch(() => setSyncPreview(null)); // ditto — banner fills in after
-      // 2609_61: 옵션·가격·재고가 바뀌는 경로는 전부 이 재조회를 지나므로 표 갱신도 여기 한 곳에서.
-      setChannelOptionReloadKey((k) => k + 1);
+      // 2609_61: 옵션·가격·재고가 바뀌는 경로는 전부 이 재조회를 지나므로 채널 옵션 갱신도 여기 한 곳에서.
+      void fetchChannelOptions(); // ditto — 채널 행의 옵션 목록과 표가 뒤이어 채워진다
     } catch {
       setError('커버리지 매트릭스를 불러오지 못했습니다.');
     } finally {
       setIsLoading(false);
     }
-  }, [masterUseCase, masterId, fetchGenerated, fetchPlaces, fetchSyncPreview]);
+  }, [
+    masterUseCase,
+    masterId,
+    fetchGenerated,
+    fetchPlaces,
+    fetchSyncPreview,
+    fetchChannelOptions,
+  ]);
 
   useEffect(() => {
     void (async () => {
@@ -536,6 +569,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         master.sourceImageUrl ? '대표사진 있음' : '대표사진 없음'
       }`
     : undefined;
+  // 2609_61: 리스팅 id → 그 셀의 옵션. 채널 행 아래 인라인 목록이 이걸로 자기 옵션만 집는다.
+  const channelOptionsByListingId = useMemo(() => {
+    const map = new Map<number, ListingOptionSummary[]>();
+    for (const cell of channelOptionCells ?? []) map.set(cell.productListingId, cell.options);
+    return map;
+  }, [channelOptionCells]);
+
   // 2609_61 표 요약 = 옵션 수 · 채널 셀 수. ⚠️ 계정 수가 아니라 셀 수다(한 계정에 셀이 여럿일 수 있다).
   const channelCellCount = (matrix?.rows ?? []).reduce(
     (sum, row) => sum + (row.cells ?? (row.cell ? [row.cell] : [])).length,
@@ -1186,8 +1226,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     {/* 상품 ID (2609_61): 이 계정이 가진 **모든** 셀을 세로로 나열한다 — 한 계정이
                         같은 마스터로 쿠팡 페이지를 여러 개 가질 수 있어(2026-09-19 편입 가드 완화)
                         첫 셀만 보여주면 나머지 페이지가 화면에 없는 것처럼 된다.
-                        ⚠️ `cells` 가 없는 예전 응답에서도 칸이 비지 않도록 `cell` 로 폴백한다. */}
-                    <td className="px-4 py-3 align-top">
+                        ⚠️ `cells` 가 없는 예전 응답에서도 칸이 비지 않도록 `cell` 로 폴백한다.
+                        ⚠️ 세로 정렬은 판매자·플랫폼·계정·상태·판매가와 같은 가운데다 — 썸네일 열
+                        (96px)이 행을 늘려 놓아서, 이 칸만 위로 붙이면 눈에 띄게 어긋난다. */}
+                    <td className="px-4 py-3">
                       {(() => {
                         const cells = row.cells ?? (row.cell ? [row.cell] : []);
                         if (cells.length === 0) return <span className="text-gray-400">–</span>;
@@ -1399,6 +1441,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       name={row.cell.name}
                       registrationName={row.cell.registrationName}
                       tags={generated[row.cell.productListingId]?.tags ?? []}
+                      options={channelOptionsByListingId.get(row.cell.productListingId) ?? []}
+                      optionsLoading={channelOptionCells == null && !channelOptionError}
+                      onEditMasterOption={handleEditMasterOption}
                       onSaved={load}
                     />
                   )}
@@ -1422,10 +1467,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       {isAdmin && master && (
         <DetailSection title="채널별 옵션" summary={channelOptionSummary}>
           <ChannelOptionTable
-            masterId={masterId}
             rows={matrix?.rows ?? []}
             masterOptions={options}
-            reloadKey={channelOptionReloadKey}
+            cells={channelOptionCells}
+            error={channelOptionError}
             onEditMasterOption={handleEditMasterOption}
           />
         </DetailSection>
