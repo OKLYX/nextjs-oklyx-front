@@ -114,6 +114,23 @@ export function ProductEditForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl space-y-8">
+      {/* [취소][저장] 은 폼 **오른쪽 위**다 — 상세 화면의 [수정][삭제] 와 같은 자리라 수정 모드를
+          오갈 때 버튼이 움직이지 않는다. `ui/Button` 사용(취소=secondary 가 왼쪽).
+          ⚠️ 폼 맨 아래로 되돌리지 말 것(2026-09-20). */}
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
+          취소
+        </Button>
+        <Button
+          type="submit"
+          disabled={!!barcodeError}
+          isLoading={isSaving}
+          loadingText="저장 중..."
+        >
+          저장
+        </Button>
+      </div>
+
       <fieldset className="border border-gray-300 rounded-lg p-6 bg-gray-50">
         <legend className="text-lg font-semibold text-gray-900 px-2">필수 항목</legend>
         <div className="space-y-4">
@@ -287,23 +304,6 @@ export function ProductEditForm({
       </fieldset>
 
       <ProductImageGallery productId={product.id} useCase={imageUseCase} />
-
-      {/* 폼 하단 [취소][저장] — 다른 편집 화면(`MasterProductCreateForm` 등)과 같은 줄이다:
-          오른쪽 정렬 · 취소(secondary) 가 왼쪽 · `ui/Button`. 손으로 만든 버튼으로 되돌리지 말 것
-          (종전 `btn-primary`/`btn-secondary` 는 CSS 에 정의조차 없어 민짜 버튼으로 나왔다). */}
-      <div className="flex items-center justify-end gap-2 border-t border-gray-200 pt-6">
-        <Button variant="secondary" onClick={onCancel} disabled={isSaving}>
-          취소
-        </Button>
-        <Button
-          type="submit"
-          disabled={!!barcodeError}
-          isLoading={isSaving}
-          loadingText="저장 중..."
-        >
-          저장
-        </Button>
-      </div>
     </form>
   );
 }
