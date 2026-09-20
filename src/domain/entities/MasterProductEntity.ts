@@ -224,7 +224,13 @@ export interface MatrixRow {
   accountId: number;
   accountLabel: string;
   registered: boolean;
+  // 🔴 첫 셀만 담는다 — 썸네일·상세페이지·상태·판매가·액션 열이 전부 이 계약 위에 있다(2609_61/D5).
+  // 지우지 말 것. 계정에 셀이 둘 이상이어도 여기엔 첫 셀뿐이다.
   cell: MatrixCell | null;
+  // 이 계정의 **모든** 셀(백엔드는 이미 보내고 있다). 새로 만드는 열만 이것을 읽는다 —
+  // 한 계정이 같은 마스터로 쿠팡 페이지를 여러 개 가질 수 있다(2026-09-19 편입 가드 완화).
+  // ⚠️ optional — 예전 응답에는 없으므로 읽는 쪽에서 `cell` 폴백을 둔다.
+  cells?: MatrixCell[];
 }
 
 export interface ListingMatrixResponse {

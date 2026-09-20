@@ -70,6 +70,7 @@ import { MasterRegistrationSuffixPanel } from './MasterRegistrationSuffixPanel';
 import { MasterShippingOverridePanel } from './MasterShippingOverridePanel';
 import { CellActions } from './CellActions';
 import { ImportCoupangProductModal } from './ImportCoupangProductModal';
+import { CopyIdButton } from './CopyIdButton';
 import { DisplayNameRow } from './DisplayNameRow';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 
@@ -1069,6 +1070,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                 <th className="px-4 py-3">판매자</th>
                 <th className="px-4 py-3">플랫폼</th>
                 <th className="px-4 py-3">계정</th>
+                {/* 2609_61/D1: 「등록상품 ID」가 아니라 「상품 ID」 — 이 제품에서 "등록상품"은
+                    자동 생성되는 등록상품명을 가리킨다(판매상품 상세의 기존 레이블과 같은 말). */}
+                <th className="px-4 py-3">상품 ID</th>
                 <th className="px-4 py-3">상태</th>
                 <th className="px-4 py-3">판매가</th>
                 <th className="px-4 py-3">액션</th>
@@ -1148,6 +1152,38 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     <td className="px-4 py-3">{row.sellerName}</td>
                     <td className="px-4 py-3">{row.platform}</td>
                     <td className="px-4 py-3">{row.accountLabel}</td>
+                    {/* 상품 ID (2609_61): 이 계정이 가진 **모든** 셀을 세로로 나열한다 — 한 계정이
+                        같은 마스터로 쿠팡 페이지를 여러 개 가질 수 있어(2026-09-19 편입 가드 완화)
+                        첫 셀만 보여주면 나머지 페이지가 화면에 없는 것처럼 된다.
+                        ⚠️ `cells` 가 없는 예전 응답에서도 칸이 비지 않도록 `cell` 로 폴백한다. */}
+                    <td className="px-4 py-3 align-top">
+                      {(() => {
+                        const cells = row.cells ?? (row.cell ? [row.cell] : []);
+                        if (cells.length === 0) return <span className="text-gray-400">–</span>;
+                        return (
+                          <div className="space-y-0.5">
+                            {cells.map((c) => (
+                              <div key={c.productListingId} className="flex items-center gap-1">
+                                {c.platformProductId ? (
+                                  <>
+                                    <span className="font-mono text-xs tabular-nums text-gray-900">
+                                      {c.platformProductId}
+                                    </span>
+                                    <CopyIdButton value={c.platformProductId} />
+                                  </>
+                                ) : (
+                                  // 2609_61/D2: DRAFT 셀은 아직 마켓이 ID 를 주지 않았다 —
+                                  // 오류가 아니므로 경고색·아이콘을 쓰지 않는다.
+                                  <span className="text-gray-400" title="마켓 등록 후 부여">
+                                    –
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`rounded px-1.5 py-0.5 text-[10px] ${

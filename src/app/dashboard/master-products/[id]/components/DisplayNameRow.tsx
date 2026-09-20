@@ -21,7 +21,7 @@ interface DisplayNameRowProps {
  *
  * 커버리지 매트릭스의 등록된 채널 <tr> 바로 아래에 tbody 직속 <tr> 로 렌더된다
  * (CoverageMatrix 가 Fragment 로 채널 row + 이 row 를 함께 배치). 미등록 채널은 없음.
- * 체크박스 컬럼만큼 들여쓰기 위해 첫 <td> 는 비우고 나머지 8칸에 내용을 둔다.
+ * 체크박스 컬럼만큼 들여쓰기 위해 첫 <td> 는 비우고 나머지 9칸에 내용을 둔다.
  *
  * - 노출상품명: name 은 NOT NULL 이라 실질은 조회 + 수정(빈값 저장 불가).
  * - 등록상품명(67/68): 언제나 채널 활성옵션 기준 자동값 → 읽기 전용 표시(수정/배지 없음).
@@ -102,7 +102,7 @@ export function DisplayNameRow({
   return (
     <tr className="border-b-2 border-blue-100 bg-blue-50/60">
       <td className="px-4 py-2" aria-hidden />
-      <td colSpan={8} className="border-l-4 border-blue-400 px-4 py-2.5">
+      <td colSpan={9} className="border-l-4 border-blue-400 px-4 py-2.5">
         <div className="space-y-2">
           {/* 노출상품명 */}
           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
