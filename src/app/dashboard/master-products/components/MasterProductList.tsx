@@ -13,7 +13,7 @@ import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCas
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import { parseQuery, toApiParams, toSearchParams, type MasterListQuery } from '../masterListQuery';
-import { MasterProductToolbar } from './MasterProductToolbar';
+import { MasterProductSearchCard } from './MasterProductSearchCard';
 
 /**
  * 판매상품 마스터 목록(서버 페이징·정렬·검색) + **생성** 모달 진입점 (83B / 111).
@@ -24,7 +24,8 @@ import { MasterProductToolbar } from './MasterProductToolbar';
  *
  * ⚠️ 조회 조건(page/size/sort/q)의 단일 진실원은 **URL** 이다(`useSearchParams` 파생). 같은 값을
  * `useState` 로 이중 보관하지 말 것. 변경은 `updateQuery` 하나로만 하고 `router.replace` 를 쓴다
- * (`push` 는 정렬 한 번 바꿀 때마다 뒤로가기 스택을 오염시킨다).
+ * (`push` 는 정렬 한 번 바꿀 때마다 뒤로가기 스택을 오염시킨다). 입력창의 `searchTerm` 은 **아직
+ * 커밋되지 않은** 글자라 조회 조건이 아니다 — [검색] 을 눌러야 URL 로 넘어간다.
  *
  * ⚠️ 같은 URL 로 replace 하면 파생값이 그대로라 재조회 이펙트가 돌지 않는다 → URL 이 안 바뀌어도
  * 재조회해야 하는 경로(삭제 후, 기본 상태에서의 생성)는 `reloadTick` 을 올려 강제한다.
@@ -43,6 +44,10 @@ export function MasterProductList() {
   const searchKey = searchParams.toString();
   const query = useMemo(() => parseQuery(new URLSearchParams(searchKey)), [searchKey]);
   const { page, size, sort, q } = query;
+
+  // 입력 중인 검색어는 로컬 state, 커밋된 검색어는 URL(`q`) — 마운트 시 한 번만 URL 에서 가져온다.
+  // URL→입력값 역동기화를 넣지 말 것(뒤로가기로 돌아왔을 때 입력이 튄다).
+  const [searchTerm, setSearchTerm] = useState(q ?? '');
 
   const [masters, setMasters] = useState<MasterProductResponse[]>([]);
   const [totalElements, setTotalElements] = useState(0);
@@ -65,6 +70,11 @@ export function MasterProductList() {
     },
     [query, router],
   );
+
+  const handleSearch = useCallback(() => {
+    const next = searchTerm.trim();
+    updateQuery({ q: next ? next : undefined });
+  }, [searchTerm, updateQuery]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -126,11 +136,18 @@ export function MasterProductList() {
   }
 
   return (
-    <PageContainer
-      title="판매상품 마스터"
-      action={<span className="text-sm text-gray-600">총 {totalElements}개</span>}
-    >
-      <MasterProductToolbar query={query} onChange={updateQuery} />
+    <PageContainer title="판매상품 마스터">
+      <MasterProductSearchCard
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
+        onSearch={handleSearch}
+        size={size}
+        onSizeChange={(next) => updateQuery({ size: next })}
+        sort={sort}
+        onSortChange={(next) => updateQuery({ sort: next })}
+        isLoading={isLoading}
+        resultCount={totalElements}
+      />
 
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
