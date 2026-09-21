@@ -2,6 +2,7 @@ export interface CreateCarrierRateRequest {
   carrierId: number;
   type: string;
   cost: number;
-  effectiveDate: string;
+  // Optional: omitted means "from today" on create and "keep as is" on update.
+  effectiveDate?: string;
   isDefault: boolean;
 }
