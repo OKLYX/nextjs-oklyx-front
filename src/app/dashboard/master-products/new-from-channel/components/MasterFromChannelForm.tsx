@@ -101,6 +101,35 @@ const formatWon = (v: number | null | undefined) =>
 /** 옵션 식별 키. 미승인 옵션은 마켓 옵션 id 가 없어 itemName 으로 대신한다(서버 매칭 규칙과 동일). */
 const optionKey = (o: MasterFromChannelOption) => o.platformOptionId ?? o.itemName;
 
+/**
+ * 백엔드 문구를 가공하지 않고 그대로 쓰되, 사용자가 조치할 수 있는 것만 한 줄을 덧붙인다.
+ * 판정은 HTTP status + substring — 프론트에는 예외 클래스명이 오지 않는다.
+ * ⚠️ 문구는 백엔드 `DetachedCellPolicy` 소유다. 바꾸려면 그쪽을 먼저 본다.
+ */
+const lookupErrorMessage = (e: unknown): string => {
+  const status = (e as { response?: { status?: number } })?.response?.status;
+  const message = extractErrorMessage(e, '상품을 조회하지 못했습니다.');
+  if (status === 429) return '잠시 후 다시 시도하세요.';
+  if (status === 400 && message.includes('이미 다른 상품에 연결된')) {
+    // 2609_66: 떼어낸 셀은 이제 통과한다 → 이 400 은 "아직 붙어 있다"는 뜻뿐이다.
+    // 🔴 라벨은 화면에 있는 그대로 [마스터 연결 해제] 다(CellActions.tsx:407·526). 기존 모달의 같은 줄과도 맞춘다.
+    return `${message} 그 마스터에서 [마스터 연결 해제] 한 뒤 다시 시도하세요.`;
+  }
+  if (status === 400 && message.includes('다른 판매자의')) {
+    return `${message} 위에서 판매자를 바꿔 다시 조회하세요.`;
+  }
+  if (status === 400 && message.includes('계정')) {
+    return `${message} 판매자 관리에서 쿠팡 계정을 먼저 등록·활성화하세요.`;
+  }
+  if (status === 404) {
+    // 🔴 404 를 substring 으로 판정하지 말 것 — 백엔드가 영문으로 보낸다
+    // (`MarketplaceAccount not found with id: 7`) → '계정' 이 들어 있지 않아 기존 모달의 그 가지는 죽어 있다.
+    // 이 화면에서 404 를 던지는 것은 판매자·계정 둘뿐이라 문구 하나로 덮인다.
+    return '이 판매자의 쿠팡 계정을 찾을 수 없습니다. 판매자 관리에서 먼저 등록·활성화하세요.';
+  }
+  return message;
+};
+
 const isPositiveInt = (raw: string) => {
   const v = Number(raw);
   return raw.trim() !== '' && Number.isInteger(v) && v >= 1;
@@ -312,7 +341,7 @@ export function MasterFromChannelForm() {
         ),
       );
     } catch (e: unknown) {
-      setError(extractErrorMessage(e, '상품을 조회하지 못했습니다.'));
+      setError(lookupErrorMessage(e));
     } finally {
       setLooking(false);
     }
@@ -609,6 +638,17 @@ export function MasterFromChannelForm() {
                 {preview.categoryCode && ` · 쿠팡 카테고리 코드 ${preview.categoryCode}`}
               </span>
             </p>
+
+            {/* 2609_66/D6: 경고가 아니라 사실 안내라 카테고리 경고(amber)와 다른 색을 쓴다.
+                뒷문장은 실제 동작이다 — 재사용은 판매가·옵션명을 쿠팡 현재값(MANUAL_OVERRIDE)으로 넣는다. */}
+            {preview.reusesExistingListing && (
+              <p className="rounded bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                이 쿠팡 상품에는 마스터 연결이 끊긴 판매상품이 있습니다. 새로 만들지 않고 그 판매상품을 이
+                마스터에 붙입니다 — 주문·고객문의·정산 기록이 함께 따라옵니다. 판매가·옵션명은 쿠팡의 현재
+                값으로 들어오니, 이 마스터 기준으로 자동 계산하려면 만든 뒤 [가격 설정] → [기본값으로 변경]
+                을 누르세요.
+              </p>
+            )}
 
             {/* ④ 카테고리 */}
             {preview.categoryResolved ? (
