@@ -19,6 +19,9 @@ export function ProductRegistrationContainer() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageBuffer, setImageBuffer] = useState<File[]>([]);
+  // 참고 패널에서 담은 마켓 사진 URL(FEATURE_2609_67). 물품이 만들어진 뒤 서버가 내려받아 붙인다.
+  // 🔴 저장하지 않는다(localStorage·Zustand 금지) — 다음 물품에 새면 잘못된 사진이 붙는다.
+  const [pickedImageUrls, setPickedImageUrls] = useState<string[]>([]);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const useCase = useMemo(
@@ -57,6 +60,16 @@ export function ProductRegistrationContainer() {
           }
         }
 
+        // 순서: 파일 업로드 → URL 복제. 둘 다 뒤에 붙으므로 이 순서가 곧 갤러리 순서다.
+        if (pickedImageUrls.length > 0) {
+          try {
+            await imageUseCase.addFromUrls(product.id, pickedImageUrls);
+          } catch {
+            // 물품은 이미 만들어졌다 — 사진 실패는 막지 않고 알리기만 한다(위 이미지 처리와 같은 판단).
+            setError('상품은 등록되었으나 가져온 사진 일부를 붙이지 못했습니다.');
+          }
+        }
+
         setShowSuccessDialog(true);
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 401) {
@@ -77,11 +90,14 @@ export function ProductRegistrationContainer() {
         setIsLoading(false);
       }
     },
-    [useCase, imageUseCase, imageBuffer, router]
+    // 🔴 pickedImageUrls 가 빠지면 콜백이 최초의 빈 배열을 가둔 채 굳어, 담은 사진이 아무 에러 없이
+    //    안 올라간다.
+    [useCase, imageUseCase, imageBuffer, pickedImageUrls, router]
   );
 
   const handleSubmitSuccess = useCallback(() => {
     setImageBuffer([]);
+    setPickedImageUrls([]);
   }, []);
 
   const handleGoToList = useCallback(() => {
@@ -91,6 +107,8 @@ export function ProductRegistrationContainer() {
   const handleRegisterAnother = useCallback(() => {
     setShowSuccessDialog(false);
     setImageBuffer([]);
+    // 🔴 여기도 비운다 — 한 곳만 고치면 [계속 등록] 경로로 앞 물품의 사진이 다음 물품에 붙는다.
+    setPickedImageUrls([]);
     setError(null);
   }, []);
 
@@ -124,6 +142,8 @@ export function ProductRegistrationContainer() {
         onImageBufferChange={setImageBuffer}
         onCheckBarcode={handleCheckBarcode}
         onSubmitSuccess={handleSubmitSuccess}
+        pickedImageUrls={pickedImageUrls}
+        onPickedImageUrlsChange={setPickedImageUrls}
       />
       <SuccessDialog
         isOpen={showSuccessDialog}
