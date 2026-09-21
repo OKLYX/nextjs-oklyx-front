@@ -12,7 +12,7 @@ export class CarrierRateRepositoryImpl implements CarrierRateRepository {
     carrierId: number;
     type: string;
     cost: number;
-    effectiveDate: string;
+    effectiveDate?: string;
     isDefault: boolean;
   }): Promise<CarrierRate> {
     const response = await axiosInstance.post('/api/admin/carrier-rate', data);
@@ -25,7 +25,7 @@ export class CarrierRateRepositoryImpl implements CarrierRateRepository {
       carrierId: number;
       type: string;
       cost: number;
-      effectiveDate: string;
+      effectiveDate?: string;
       isDefault: boolean;
     }
   ): Promise<CarrierRate> {
