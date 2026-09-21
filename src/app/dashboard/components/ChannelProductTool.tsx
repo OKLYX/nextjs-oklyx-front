@@ -15,6 +15,9 @@ import type {
   ChannelProductSummary,
 } from '@/domain/entities/ChannelProductEntity';
 import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
+import { CLIP_MIME } from '@/domain/entities/ClipItem';
+import { newClipId } from '@/infrastructure/stores/clipboardStore';
+import { MarketImagePreviewModal } from './MarketImagePreviewModal';
 
 /**
  * 전역 도구 패널의 도구 1개 — **플랫폼 상품 조회**(FEATURE_2609_67 · 2609_68 에서 전역으로 옮김).
@@ -30,7 +33,10 @@ import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
  * ⚠️ 이 컴포넌트는 `<form>` 밖(전역 레이아웃)에 살지만, 버튼은 계속 `type="button"` 으로 두고
  *    검색 입력의 **Enter 가드**도 유지한다 — 어느 화면 위에 떠 있을지 알 수 없다.
  * ⚠️ 조회는 [조회] 를 누를 때만 나간다(타이핑 중 자동 검색 금지 — 쿠팡 호출 예산).
- * 🔴 사진은 여기서 **보이기만** 한다(담기 없음). 물품에 넣는 길은 드래그로 따로 만든다.
+ * 🔴 사진은 **끌어서** 물품에 넣는다(담기 체크박스 없음, 2609_68). 드롭 지점은 상단바 클립보드와
+ *    물품 이미지 등록 영역 두 곳이다. **누르면 확대**된다 — 브라우저가 클릭과 드래그를 가르므로
+ *    거리·시간을 재는 코드를 만들지 않는다.
+ * 🔴 마켓 URL 은 절대 주소다 — `resolveThumbUrl`·`getImageUrl` 을 태우면 404 가 난다.
  */
 
 /** 오늘 지원하는 플랫폼은 쿠팡 하나다 — select 를 만들지 않는다. */
@@ -108,6 +114,8 @@ export function ChannelProductTool() {
   const [candidates, setCandidates] = useState<ChannelProductSummary[] | null>(null);
   const [nextToken, setNextToken] = useState<string | null>(null);
   const [detail, setDetail] = useState<ChannelProductDetail | null>(null);
+  /** 확대해서 보는 사진 URL. null = 닫힘. */
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -205,16 +213,42 @@ export function ChannelProductTool() {
     </div>
   );
 
-  /** 사진 격자 — 🔴 보이기만 한다. 마켓 URL 은 절대 주소라 프록시를 타지 않는다. */
-  const imageGrid = (urls: string[]) => (
+  /**
+   * 사진 하나를 끌 때 실어 보내는 payload — 격자와 확대 창이 **같은 손**을 쓴다.
+   * 🔴 우리 서버 행이 아니라 마켓 URL 이므로 종류가 `market-image` 다(붙이는 경로가 다르다).
+   */
+  const startImageDrag = useCallback(
+    (e: React.DragEvent, url: string, productName: string, platformProductId: string) => {
+      const clip = {
+        clipId: newClipId(),
+        kind: 'market-image' as const,
+        pickedAt: new Date().toISOString(),
+        imageUrl: url,
+        platformProductId,
+        productName,
+      };
+      e.dataTransfer.setData(CLIP_MIME, JSON.stringify(clip));
+      e.dataTransfer.effectAllowed = 'copy';
+    },
+    [],
+  );
+
+  /** 사진 격자 — 끌면 담기고, 누르면 확대된다. 마켓 URL 은 절대 주소라 프록시를 타지 않는다. */
+  const imageGrid = (urls: string[], productName: string, platformProductId: string) => (
     <div className="grid grid-cols-3 gap-2">
       {urls.map((url) => (
-        <div key={url} className="overflow-hidden rounded border border-gray-200 p-1">
-          <div className="aspect-square overflow-hidden rounded bg-gray-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt="마켓 사진" className="h-full w-full object-contain" />
-          </div>
-        </div>
+        <button
+          key={url}
+          // 🔴 폼 밖이어도 유지 — 어느 화면 위에 떠 있을지 알 수 없다.
+          type="button"
+          draggable
+          onDragStart={(e) => startImageDrag(e, url, productName, platformProductId)}
+          onClick={() => setPreviewUrl(url)}
+          className="aspect-square overflow-hidden rounded border border-gray-200 bg-gray-100 hover:border-blue-400"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt="마켓 사진" className="h-full w-full object-contain" />
+        </button>
       ))}
     </div>
   );
@@ -392,7 +426,7 @@ export function ChannelProductTool() {
             {detail.thumbnailImages.length === 0 ? (
               <p className="text-xs text-gray-500">사진이 없습니다.</p>
             ) : (
-              imageGrid(detail.thumbnailImages)
+              imageGrid(detail.thumbnailImages, detail.productName ?? '', detail.platformProductId)
             )}
           </div>
           <div className="space-y-2">
@@ -401,7 +435,7 @@ export function ChannelProductTool() {
             {detail.detailImages.length === 0 ? (
               <p className="text-xs text-gray-500">사진이 없습니다.</p>
             ) : (
-              imageGrid(detail.detailImages)
+              imageGrid(detail.detailImages, detail.productName ?? '', detail.platformProductId)
             )}
           </div>
         </div>
@@ -412,6 +446,15 @@ export function ChannelProductTool() {
           판매자를 고르고 상품명 또는 상품 ID 로 [조회] 하면 마켓 값과 사진을 여기서 보면서 채울 수 있습니다.
         </p>
       )}
+
+      {/* 🔴 모달은 격자마다가 아니라 도구 전체에 하나다. */}
+      <MarketImagePreviewModal
+        url={previewUrl}
+        onClose={() => setPreviewUrl(null)}
+        onDragStart={(e, url) =>
+          startImageDrag(e, url, detail?.productName ?? '', detail?.platformProductId ?? '')
+        }
+      />
     </div>
   );
 }

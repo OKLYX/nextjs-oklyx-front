@@ -50,11 +50,25 @@ export function ProductRegistrationForm({
   onImageBufferChange,
   onCheckBarcode,
   onSubmitSuccess,
-  // 🔴 `pickedImageUrls` / `onPickedImageUrlsChange` 는 props 에 **남아 있다**(컨테이너가 소유하고
-  //    저장 직후 서버로 보낸다). 지금은 늘 빈 배열이라 폼이 읽을 일이 없어 꺼내 쓰지 않는다 —
-  //    사진을 끌어다 놓는 길이 생기면 그때 갤러리로 내려보낸다. 지웠다가 되살리지 말 것.
+  // 🔴 컨테이너가 소유한다 — 폼은 갤러리로 내려보내기만 하고, 저장 직후 서버로 보내는 것도 컨테이너다.
+  pickedImageUrls,
+  onPickedImageUrlsChange,
 }: ProductRegistrationFormProps) {
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
+
+  /** 도구 패널에서 끌어다 놓은 마켓 사진 — 같은 사진을 두 번 놓아도 한 장이다. */
+  const handleUrlDrop = useCallback(
+    (url: string) => {
+      if (pickedImageUrls.includes(url)) return;
+      onPickedImageUrlsChange([...pickedImageUrls, url]);
+    },
+    [pickedImageUrls, onPickedImageUrlsChange],
+  );
+
+  const handleUrlRemove = useCallback(
+    (url: string) => onPickedImageUrlsChange(pickedImageUrls.filter((u) => u !== url)),
+    [pickedImageUrls, onPickedImageUrlsChange],
+  );
   const [isCheckingBarcode, setIsCheckingBarcode] = useState(false);
   const [validatedBarcode, setValidatedBarcode] = useState<string | null>(null);
 
@@ -406,6 +420,9 @@ export function ProductRegistrationForm({
         useCase={imageUseCase}
         buffer={imageBuffer}
         onBufferChange={onImageBufferChange}
+        urlBuffer={pickedImageUrls}
+        onUrlDrop={handleUrlDrop}
+        onUrlRemove={handleUrlRemove}
       />
 
       {/* Submit Button (sticky - 스크롤해도 하단에 고정) */}

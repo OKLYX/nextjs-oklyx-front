@@ -38,6 +38,14 @@ import { newClipId } from '@/infrastructure/stores/clipboardStore';
  *     (`resolveThumbUrl` 통과값)을 실으면 백엔드가 되받는 값과 달라진다.
  *   - 등록 모드(`productId == null`)는 서버 id 가 없어 **담지도 붙이지도 못한다**(안내 문구).
  *
+ * **마켓 사진(FEATURE_2609_68)**: 전역 도구 패널에서 끌어온 사진(`kind: 'market-image'`)은 우리 행이
+ *   아니라 **남의 URL** 이라 붙이는 경로가 다르다 — `useCase.addFromUrls(productId, [url])`.
+ *   - 🔴 **등록 모드도 이것만은 받는다**: URL 은 저장 뒤에 서버가 내려받으면 되기 때문이다. 부모가 든
+ *     URL 대기열(`urlBuffer`)에 쌓이고 **그 자리에 미리보기로 바로 보인다**.
+ *   - 🔴 대기열 상한은 **10장**(백엔드 가드가 요청당 10장이고, 한 번에 보내는 곳이 여기뿐이다).
+ *   - 🔴 마켓 URL 행에는 [다운로드]·[대체]·◀▶ 를 달지 않는다(교차 출처라 `download` 가 먹지 않고,
+ *     순서는 파일 뒤 고정이다).
+ *
  * **모드**:
  *   - 수정/상세(`productId != null`): 마운트 시 서버 조회, 각 연산 즉시 서버 반영(backend 39).
  *   - 등록(`productId == null`): 서버 호출 없이 부모 보관 버퍼(`buffer`/`onBufferChange`)만
@@ -62,7 +70,13 @@ interface ProductImageGalleryProps {
   onBufferChange?: (files: File[]) => void;
   isViewMode?: boolean; // true = 조회 전용(업로드/편집 숨김)
   productName?: string; // 클립보드에 담을 때 목록에 보여줄 이름(부모 주입)
+  urlBuffer?: string[]; // 등록 모드: 부모가 든 마켓 URL 대기열(저장 직후 addFromUrls 로 나간다)
+  onUrlDrop?: (url: string) => void; // 등록 모드: 떨어뜨린 URL 하나를 부모에게
+  onUrlRemove?: (url: string) => void; // 등록 모드: 미리보기에서 X
 }
+
+// 🔴 백엔드 가드가 요청 하나에 10장이고, 한 번에 보내는 경로가 등록 화면뿐이라 여기에만 건다.
+const MAX_URL_BUFFER = 10;
 
 const ACCEPT = 'image/jpeg,image/png';
 const MAX_SIZE = 20 * 1024 * 1024;
@@ -84,6 +98,8 @@ type GalleryItem = {
   downloadName: string;
   // 저장값 그대로(수정 모드만). 클립보드에 담을 때 이 값을 싣는다 — `url` 은 렌더용이라 쓰면 안 된다.
   rawUrl: string | null;
+  // 등록 모드의 마켓 URL 행이면 그 URL(파일 행은 null). 이 행은 파일과 다루는 법이 다르다.
+  marketUrl: string | null;
 };
 
 export function ProductImageGallery({
@@ -93,6 +109,9 @@ export function ProductImageGallery({
   onBufferChange,
   isViewMode = false,
   productName,
+  urlBuffer,
+  onUrlDrop,
+  onUrlRemove,
 }: ProductImageGalleryProps) {
   const isEdit = productId != null;
 
@@ -152,18 +171,31 @@ export function ProductImageGallery({
         downloadHref: `/api/image-download?url=${encodeURIComponent(img.imageUrl)}`,
         downloadName: imageFileName(img.imageUrl),
         rawUrl: img.imageUrl,
+        marketUrl: null,
       }));
     }
     // Register mode: the object URL is same-origin (blob:), so it downloads directly.
-    return previews.map((url, index) => ({
+    const fileRows = previews.map((url, index) => ({
       key: `buf-${index}`,
       url,
       imageId: null,
       downloadHref: url,
       downloadName: bufferFiles?.[index]?.name ?? `product-image-${index + 1}`,
       rawUrl: null,
+      marketUrl: null,
     }));
-  }, [isEdit, images, previews, bufferFiles]);
+    // 🔴 파일이 앞, 마켓 URL 이 뒤 — 저장 순서(add → addFromUrls)와 같아야 갤러리 순서가 맞는다.
+    const urlRows = (urlBuffer ?? []).map((url) => ({
+      key: `url-${url}`,
+      url,
+      imageId: null,
+      downloadHref: url,
+      downloadName: '',
+      rawUrl: null,
+      marketUrl: url,
+    }));
+    return [...fileRows, ...urlRows];
+  }, [isEdit, images, previews, bufferFiles, urlBuffer]);
 
   // Keep only JPEG/PNG ≤ 20MB; surface a banner if anything was dropped.
   const filterValid = useCallback((files: File[]): File[] => {
@@ -219,6 +251,31 @@ export function ProductImageGallery({
   const pasteClip = useCallback(
     async (clip: ClipItem) => {
       setError('');
+      // 마켓 사진은 우리 행이 아니라 URL 이라 붙이는 경로가 다르다(등록 모드도 받는다).
+      if (clip.kind === 'market-image') {
+        if (productId == null) {
+          if ((urlBuffer ?? []).length >= MAX_URL_BUFFER) {
+            setError(`사진은 ${MAX_URL_BUFFER}장까지 넣을 수 있습니다.`);
+            return;
+          }
+          onUrlDrop?.(clip.imageUrl);
+          return;
+        }
+        setBusy(true);
+        try {
+          const next = await useCase.addFromUrls(productId, [clip.imageUrl]);
+          setImages([...next].sort((a, b) => a.sortOrder - b.sortOrder));
+        } catch (e: unknown) {
+          if (axios.isAxiosError(e) && e.response?.status === 400) {
+            setError('가져올 수 없는 사진입니다.');
+          } else {
+            setError('사진을 붙여넣지 못했습니다.');
+          }
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
       if (productId == null) {
         setError('상품을 저장한 뒤에 붙여넣을 수 있습니다.');
         return;
@@ -246,7 +303,7 @@ export function ProductImageGallery({
         setBusy(false);
       }
     },
-    [productId, images.length, useCase],
+    [productId, images.length, useCase, urlBuffer, onUrlDrop],
   );
 
   // ---- Drag & drop ----
@@ -354,6 +411,10 @@ export function ProductImageGallery({
   // ---- Delete (edit → 409 guard; register → local splice) ----
   const handleDelete = async (item: GalleryItem, index: number) => {
     setError('');
+    if (item.marketUrl != null) {
+      onUrlRemove?.(item.marketUrl);
+      return;
+    }
     if (!isEdit) {
       onBufferChange?.((bufferFiles ?? []).filter((_, i) => i !== index));
       return;
@@ -381,6 +442,8 @@ export function ProductImageGallery({
   const handleMove = async (index: number, dir: -1 | 1) => {
     const target = index + dir;
     if (target < 0 || target >= items.length) return;
+    // 마켓 URL 행은 파일 뒤 고정이라 순서를 바꾸지 않는다(버퍼 인덱스와 어긋난다).
+    if (items[index].marketUrl != null || items[target].marketUrl != null) return;
     setError('');
     if (!isEdit) {
       const next = [...(bufferFiles ?? [])];
@@ -480,54 +543,69 @@ export function ProductImageGallery({
                   )}
                 </div>
                 <div className="space-y-1">
-                  {!isViewMode && (
-                    <>
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleMove(index, -1)}
-                          disabled={busy || index === 0}
-                          aria-label="앞으로"
-                          className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
-                        >
-                          ◀
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleMove(index, 1)}
-                          disabled={busy || index === items.length - 1}
-                          aria-label="뒤로"
-                          className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
-                        >
-                          ▶
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => triggerReplace(item, index)}
-                        disabled={busy}
-                        className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                      >
-                        대체
-                      </button>
+                  {/* 마켓 URL 행: 지우기만 한다(대체·순서·다운로드는 이 행에 맞지 않는다). */}
+                  {item.marketUrl != null ? (
+                    !isViewMode && (
                       <button
                         type="button"
                         onClick={() => handleDelete(item, index)}
-                        disabled={busy}
-                        className="w-full rounded border border-red-300 px-1.5 py-0.5 text-[11px] text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        className="w-full rounded border border-red-300 px-1.5 py-0.5 text-[11px] text-red-600 hover:bg-red-50"
                       >
                         삭제
                       </button>
+                    )
+                  ) : (
+                    <>
+                      {!isViewMode && (
+                        <>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleMove(index, -1)}
+                              disabled={busy || index === 0}
+                              aria-label="앞으로"
+                              className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                            >
+                              ◀
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMove(index, 1)}
+                              disabled={busy || index === items.length - 1}
+                              aria-label="뒤로"
+                              className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                            >
+                              ▶
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => triggerReplace(item, index)}
+                            disabled={busy}
+                            className="w-full rounded border border-gray-300 px-1.5 py-0.5 text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            대체
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(item, index)}
+                            disabled={busy}
+                            className="w-full rounded border border-red-300 px-1.5 py-0.5 text-[11px] text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            삭제
+                          </button>
+                        </>
+                      )}
+                      {/* Read-only action: available in view mode too. */}
+                      <a
+                        href={item.downloadHref}
+                        download={item.downloadName}
+                        className="block w-full rounded border border-gray-300 px-1.5 py-0.5 text-center text-[11px] text-gray-700 hover:bg-gray-100"
+                      >
+                        다운로드
+                      </a>
                     </>
                   )}
-                  {/* Read-only action: available in view mode too. */}
-                  <a
-                    href={item.downloadHref}
-                    download={item.downloadName}
-                    className="block w-full rounded border border-gray-300 px-1.5 py-0.5 text-center text-[11px] text-gray-700 hover:bg-gray-100"
-                  >
-                    다운로드
-                  </a>
                 </div>
               </div>
             ))}
