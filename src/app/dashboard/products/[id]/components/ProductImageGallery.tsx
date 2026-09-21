@@ -9,6 +9,7 @@ import type { ProductImageUseCase } from '@/application/usecases/ProductImageUse
 import { Card } from '@/presentation/components/ui/Card';
 import { CLIP_MIME, clipSourceImageIds, hasClipPayload, type ClipItem } from '@/domain/entities/ClipItem';
 import { newClipId } from '@/infrastructure/stores/clipboardStore';
+import { ImageLightbox } from '@/presentation/components/ImageLightbox';
 
 /**
  * 물품(상품)의 다중 이미지 갤러리. 단일 `ProductImageSection` 을 대체하며 물품
@@ -37,6 +38,14 @@ import { newClipId } from '@/infrastructure/stores/clipboardStore';
  *   - 🔴 담을 때 싣는 `imageUrl` 은 **저장값**(`item.rawUrl` = `img.imageUrl`)이다. 렌더용 `item.url`
  *     (`resolveThumbUrl` 통과값)을 실으면 백엔드가 되받는 값과 달라진다.
  *   - 등록 모드(`productId == null`)는 서버 id 가 없어 **담지도 붙이지도 못한다**(안내 문구).
+ *   - 🔴 **자기 갤러리로 되돌아온 드롭은 무시한다**: 카드가 `draggable` 이라 사진을 끌어 스크롤하려다
+ *     이 드롭존에 놓으면 "자기 사진을 자기한테 붙여넣기" 가 돼 같은 사진이 한 장 더 생겼다.
+ *     `selfDragRef`(카드 `dragstart` 에서 켜고 `dragend` 에서 끈다)로 드롭 자체를 건너뛴다.
+ *   - 🔴 두 번째 그물: 클립보드 말풍선에서 끌어온 것이라도 **이미 이 갤러리에 있는 사진**(`imageUrl`
+ *     또는 `productImageId` 일치)은 붙이지 않는다 — 한 물품에 같은 사진이 두 장 있을 이유가 없다.
+ *
+ * **확대 보기**: 카드 사진을 누르면 공용 `ImageLightbox` 로 크게 본다(◀▶ · ← → · ESC · 원본 열기).
+ *   조회 모드에서도 열린다(읽기 동작). 자체 확대 팝업을 새로 만들지 말 것.
  *
  * **마켓 사진(FEATURE_2609_68)**: 전역 도구 패널에서 끌어온 사진(`kind: 'market-image'`)은 우리 행이
  *   아니라 **남의 URL** 이라 붙이는 경로가 다르다 — `useCase.addFromUrls(productId, [url])`.
@@ -254,6 +263,11 @@ export function ProductImageGallery({
       // 마켓 사진은 우리 행이 아니라 URL 이라 붙이는 경로가 다르다(등록 모드도 받는다).
       if (clip.kind === 'market-image') {
         if (productId == null) {
+          // 같은 마켓 URL 을 두 번 떨어뜨리면 대기열에 같은 사진이 두 장 쌓인다.
+          if ((urlBuffer ?? []).includes(clip.imageUrl)) {
+            setError('이미 담긴 사진입니다.');
+            return;
+          }
           if ((urlBuffer ?? []).length >= MAX_URL_BUFFER) {
             setError(`사진은 ${MAX_URL_BUFFER}장까지 넣을 수 있습니다.`);
             return;
@@ -280,17 +294,32 @@ export function ProductImageGallery({
         setError('상품을 저장한 뒤에 붙여넣을 수 있습니다.');
         return;
       }
-      const sourceIds = clipSourceImageIds(clip);
-      if (sourceIds.length === 0) return;
+      if (clipSourceImageIds(clip).length === 0) return;
+      // 🔴 이미 이 갤러리에 있는 사진은 뺀다 — 같은 사진이 두 장 생기던 경로다(자기 카드를 끌어
+      //    되놓거나, 이 물품에서 담아둔 항목을 같은 물품에 다시 붙이는 경우).
+      //    행 id 와 저장 URL 둘 다로 본다: 예전에 복제된 행은 id 가 달라도 URL 이 같다.
+      const refs =
+        clip.kind === 'image'
+          ? [{ productImageId: clip.productImageId, imageUrl: clip.imageUrl }]
+          : clip.imageRefs;
+      const ownedIds = new Set(images.map((img) => img.id));
+      const ownedUrls = new Set(images.map((img) => img.imageUrl));
+      const freshIds = refs
+        .filter((ref) => !ownedIds.has(ref.productImageId) && !ownedUrls.has(ref.imageUrl))
+        .map((ref) => ref.productImageId);
+      if (freshIds.length === 0) {
+        setError('이미 이 상품에 있는 사진입니다.');
+        return;
+      }
       const before = images.length;
       setBusy(true);
       try {
-        const next = await useCase.copy(productId, sourceIds);
+        const next = await useCase.copy(productId, freshIds);
         setImages([...next].sort((a, b) => a.sortOrder - b.sortOrder));
         const added = next.length - before;
-        if (added < sourceIds.length) {
+        if (added < freshIds.length) {
           setError(
-            `${sourceIds.length}장 중 ${Math.max(0, added)}장만 붙였습니다. 원본이 삭제된 사진은 빠집니다.`,
+            `${freshIds.length}장 중 ${Math.max(0, added)}장만 붙였습니다. 원본이 삭제된 사진은 빠집니다.`,
           );
         }
       } catch (e: unknown) {
@@ -303,7 +332,7 @@ export function ProductImageGallery({
         setBusy(false);
       }
     },
-    [productId, images.length, useCase, urlBuffer, onUrlDrop],
+    [productId, images, useCase, urlBuffer, onUrlDrop],
   );
 
   // ---- Drag & drop ----
@@ -311,12 +340,17 @@ export function ProductImageGallery({
   // toggling a boolean — otherwise the overlay flickers off whenever the cursor crosses a card.
   const dragDepth = useRef(0);
   const [isDragOver, setIsDragOver] = useState(false);
+  // 🔴 이 갤러리 카드에서 시작한 드래그인지. 사진을 끌어 스크롤하려다 같은 드롭존에 놓으면
+  //    "자기 사진 붙여넣기" 가 돼 같은 사진이 또 올라갔다 → 그 드롭은 통째로 무시한다.
+  //    `dragend` 는 drop 보다 뒤에 오므로 drop 시점에는 이 값이 아직 true 다.
+  const selfDragRef = useRef(false);
   const canDrop = !isViewMode && !busy;
   // Ignore drags that carry no file (text selections, images dragged from another page).
   const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes('Files');
   // ⚠️ dragover 에서는 getData() 를 못 읽는다(보안 제약) → 종류 판단은 types 로만.
   const hasClip = (e: React.DragEvent) => hasClipPayload(e.dataTransfer.types);
-  const accepts = (e: React.DragEvent) => hasFiles(e) || hasClip(e);
+  // 자기 카드에서 시작한 드래그면 받지 않는다(겹침 표시도 뜨지 않는다).
+  const accepts = (e: React.DragEvent) => !selfDragRef.current && (hasFiles(e) || hasClip(e));
 
   const handleDragEnter = (e: React.DragEvent) => {
     if (!canDrop || !accepts(e)) return;
@@ -362,6 +396,7 @@ export function ProductImageGallery({
   // 담기는 읽기 동작이라 조회 모드에서도 허용한다 — 상세에서 담는 것이 기본 동선이다.
   const handleCardDragStart = (e: React.DragEvent, item: GalleryItem) => {
     if (item.imageId == null || item.rawUrl == null) return;
+    selfDragRef.current = true; // 이 드래그가 끝날 때까지 자기 드롭존은 닫아 둔다.
     const clip = {
       clipId: newClipId(),
       kind: 'image' as const,
@@ -374,6 +409,16 @@ export function ProductImageGallery({
     e.dataTransfer.setData(CLIP_MIME, JSON.stringify(clip));
     e.dataTransfer.effectAllowed = 'copy';
   };
+
+  // 드롭 여부와 무관하게 드래그가 끝나면 자기 드롭존을 다시 연다(drop → dragend 순서).
+  const handleCardDragEnd = () => {
+    selfDragRef.current = false;
+    dragDepth.current = 0;
+    setIsDragOver(false);
+  };
+
+  // ---- 확대 보기 (공용 ImageLightbox) ----
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
 
   // ---- Replace (both modes) ----
   const triggerReplace = (item: GalleryItem, index: number) => {
@@ -525,6 +570,7 @@ export function ProductImageGallery({
                 key={item.key}
                 draggable={item.imageId != null}
                 onDragStart={(e) => handleCardDragStart(e, item)}
+                onDragEnd={handleCardDragEnd}
                 className="rounded-lg border border-gray-200 p-2"
               >
                 <div className="relative mb-2 aspect-square overflow-hidden rounded bg-gray-100">
@@ -534,7 +580,8 @@ export function ProductImageGallery({
                     src={item.url}
                     alt="상품 이미지"
                     draggable={false}
-                    className="h-full w-full object-contain"
+                    onClick={() => setZoomIndex(index)}
+                    className="h-full w-full cursor-zoom-in object-contain"
                   />
                   {index === 0 && (
                     <span className="absolute left-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
@@ -612,6 +659,13 @@ export function ProductImageGallery({
           </div>
         )}
       </Card>
+
+      <ImageLightbox
+        images={items.map((item) => ({ url: item.url, alt: productName ?? '상품 이미지' }))}
+        index={zoomIndex}
+        onIndexChange={setZoomIndex}
+        onClose={() => setZoomIndex(null)}
+      />
 
       {/* pointer-events-none 필수 — 이 층이 드롭을 먹으면 onDrop 이 안 뜬다. */}
       {isDragOver && (
