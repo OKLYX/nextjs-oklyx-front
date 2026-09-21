@@ -357,6 +357,8 @@ export interface MasterFromChannelPreview {
   /** D4-2: 고시는 품목군 단위라 옵션에 따라 갈리지 않는다(마스터에만). */
   notices: Record<string, string>;
   noticeGroup: string | null;
+  /** 2609_66: 연결이 끊긴 기존 판매상품을 재사용한다(새 셀을 만들지 않는다). */
+  reusesExistingListing: boolean;
 }
 
 /** 커밋 요청 = 마켓에 없는 정보만(D3). 가격·재고·옵션 id·옵션명·상태·태그는 보내지 않는다. */
