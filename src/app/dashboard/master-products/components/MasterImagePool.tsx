@@ -7,6 +7,7 @@ import { SOURCE_ZONE, type MasterPoolImage } from '@/domain/entities/DetailTempl
 import type { ProductImage } from '@/domain/entities/ProductImage';
 import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
+import { ImageLightbox } from '@/presentation/components/ImageLightbox';
 import { MasterImagePickerModal, type PickerImage } from './MasterImagePickerModal';
 import { MasterPoolManageModal } from './MasterPoolManageModal';
 
@@ -426,6 +427,11 @@ export function MasterImagePool({
     }
   };
 
+  // ---- 확대 보기 (공용 ImageLightbox) ----
+  // 썸네일이 작아 무슨 사진인지 구분이 안 되던 문제. 목록별로 형제 사진을 함께 넘겨 ◀▶ 로 넘긴다.
+  const [zoom, setZoom] = useState<{ urls: string[]; index: number } | null>(null);
+  const openZoom = (urls: string[], index: number) => setZoom({ urls, index });
+
   // ---- Drag / drop ----
   const [dragOverField, setDragOverField] = useState<string | null>(null);
   const handleDrop = (fieldKey: string, e: React.DragEvent) => {
@@ -551,19 +557,25 @@ export function MasterImagePool({
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {tokens.map((token) => {
-              const entry = entryByToken.get(token);
-              if (!entry) return null;
-              return (
+            {/* 확대 보기의 형제 목록 = 이 필드에 매핑된 사진들. 빠진 엔트리는 미리 걸러 순번을 맞춘다. */}
+            {tokens
+              .map((token) => entryByToken.get(token))
+              .filter((entry): entry is PoolEntry => entry != null)
+              .map((entry, i, mapped) => (
                 <div
-                  key={token}
+                  key={entry.token}
                   className="relative h-16 w-16 overflow-hidden rounded border border-gray-200 bg-gray-100"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={entry.url} alt="매핑 이미지" className="h-full w-full object-contain" />
+                  <img
+                    src={entry.url}
+                    alt="매핑 이미지"
+                    onClick={() => openZoom(mapped.map((m) => m.url), i)}
+                    className="h-full w-full cursor-zoom-in object-contain"
+                  />
                   <button
                     type="button"
-                    onClick={() => removeFromField(field.key, token)}
+                    onClick={() => removeFromField(field.key, entry.token)}
                     disabled={busy}
                     aria-label="매핑 해제"
                     className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center bg-red-600/90 text-[10px] text-white hover:bg-red-700 disabled:opacity-50"
@@ -571,8 +583,7 @@ export function MasterImagePool({
                     ✕
                   </button>
                 </div>
-              );
-            })}
+              ))}
           </div>
         )}
       </div>
@@ -582,7 +593,11 @@ export function MasterImagePool({
   // One pool thumbnail card. Deletion lives in the [이미지 관리] popup, not per-card.
   //  - `badge='fields'` (default): field-location chips (Active Image = 어디에 쓰이는지 관리 뷰).
   //  - `badge='inUse'`: single "사용중" badge only, like a product image card (마스터 이미지 풀 탭).
-  const renderPoolCard = (entry: PoolEntry, opts?: { badge?: 'fields' | 'inUse' }) => {
+  //  - `siblings`/`index`: 확대 보기에서 ◀▶ 로 넘길 같은 목록의 사진들(호출부가 넘긴다).
+  const renderPoolCard = (
+    entry: PoolEntry,
+    opts?: { badge?: 'fields' | 'inUse'; siblings?: string[]; index?: number },
+  ) => {
     const badgeMode = opts?.badge ?? 'fields';
     const badges = badgesForToken(entry.token);
     const inUse = badges.length > 0;
@@ -595,7 +610,12 @@ export function MasterImagePool({
       >
         <div className="relative aspect-square overflow-hidden rounded bg-gray-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={entry.url} alt="풀 이미지" className="h-full w-full object-contain" />
+          <img
+            src={entry.url}
+            alt="풀 이미지"
+            onClick={() => openZoom(opts?.siblings ?? [entry.url], opts?.index ?? 0)}
+            className="h-full w-full cursor-zoom-in object-contain"
+          />
           {badgeMode === 'inUse' && inUse && (
             <span className="absolute left-1 top-1 rounded bg-blue-600 px-1 py-0.5 text-[10px] text-white">
               사용중
@@ -625,7 +645,7 @@ export function MasterImagePool({
   };
 
   // One product-gallery image card (제품 이미지 탭). Drag → edit: auto-reference+map · create: buffer.
-  const renderProductImageCard = (pi: ProductImage) => {
+  const renderProductImageCard = (pi: ProductImage, siblings?: string[], index?: number) => {
     const ref = isEdit ? refByProductImageId.get(pi.id) : undefined;
     const inUse = isEdit
       ? ref != null && (ref.isSource || ref.assignedZones.length > 0)
@@ -645,7 +665,8 @@ export function MasterImagePool({
           <img
             src={resolveThumbUrl(pi.imageUrl)}
             alt="상품 이미지"
-            className="h-full w-full object-contain"
+            onClick={() => openZoom(siblings ?? [resolveThumbUrl(pi.imageUrl)], index ?? 0)}
+            className="h-full w-full cursor-zoom-in object-contain"
           />
         </div>
         {inUse && (
@@ -748,7 +769,13 @@ export function MasterImagePool({
                           <p className="text-[11px] text-gray-400">이미지 없음</p>
                         ) : (
                           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                            {section.images.map(renderProductImageCard)}
+                            {section.images.map((pi, i, all) =>
+                              renderProductImageCard(
+                                pi,
+                                all.map((x) => resolveThumbUrl(x.imageUrl)),
+                                i,
+                              ),
+                            )}
                           </div>
                         )}
                       </div>
@@ -761,7 +788,9 @@ export function MasterImagePool({
                 </p>
               ) : (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {masterEntries.map((e) => renderPoolCard(e, { badge: 'inUse' }))}
+                  {masterEntries.map((e, i, all) =>
+                    renderPoolCard(e, { badge: 'inUse', siblings: all.map((x) => x.url), index: i }),
+                  )}
                 </div>
               )}
             </div>
@@ -779,7 +808,9 @@ export function MasterImagePool({
                 </p>
               ) : (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {activeEntries.map((e) => renderPoolCard(e))}
+                  {activeEntries.map((e, i, all) =>
+                    renderPoolCard(e, { siblings: all.map((x) => x.url), index: i }),
+                  )}
                 </div>
               )}
             </div>
@@ -879,6 +910,13 @@ export function MasterImagePool({
           onClose={() => setManageOpen(false)}
         />
       )}
+
+      <ImageLightbox
+        images={(zoom?.urls ?? []).map((url) => ({ url }))}
+        index={zoom?.index ?? null}
+        onIndexChange={(i) => setZoom((z) => (z ? { ...z, index: i } : z))}
+        onClose={() => setZoom(null)}
+      />
     </div>
   );
 }
