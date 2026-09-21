@@ -16,6 +16,7 @@ import { NavBadge } from './NavBadge';
  *
  * **담는 법(둘 다 된다)**
  * - 물품 갤러리 사진을 끌어 **아이콘 위**에 놓기 (말풍선이 닫혀 있어도 받는다)
+ * - 전역 도구 패널의 **마켓 사진**을 끌어다 놓기 (2609_68 — 우리 행이 아니라 마켓 URL 이다)
  * - 말풍선을 연 채로 **말풍선 안**에 놓기
  * - 물품 상세의 [클립보드에 담기] 버튼(값 + 갤러리 전부)
  *
@@ -30,6 +31,7 @@ import { NavBadge } from './NavBadge';
  * 🔴 `TopBar` 에서 개수를 props 로 받지 않는다 — store 를 직접 읽는다(`AlertBell` 과 같은 규칙).
  * 🔴 `ui/Modal` 을 쓰지 않는다 — 상단바 드롭다운이다(z-40, 사이드바·모달 z-50 아래).
  * 🔴 썸네일은 `resolveThumbUrl(imageUrl)` 로 렌더한다. 대표 프록시 `getImageUrl` 금지.
+ *   ⚠️ **마켓 사진(`market-image`)만 예외** — 이미 절대 주소라 그대로 `<img src>` 에 넣는다.
  * ⚠️ `persist` 복원 ↔ SSR 첫 렌더 mismatch 를 피하려고 **마운트 전에는 배지를 그리지 않는다**.
  * ⚠️ `dragover` 에서는 `getData()` 를 읽을 수 없다 — 받을지 말지는 `dataTransfer.types` 로만 판단한다.
  */
@@ -112,12 +114,15 @@ export function ClipboardTray() {
   };
 
   const thumbOf = (item: ClipItem): string | null => {
+    // 마켓 사진은 절대 주소다 — 프록시를 태우면 404 가 난다.
+    if (item.kind === 'market-image') return item.imageUrl;
     if (item.kind === 'image') return resolveThumbUrl(item.imageUrl);
     const first = item.imageRefs[0];
     return first ? resolveThumbUrl(first.imageUrl) : null;
   };
 
   const summaryOf = (item: ClipItem): string => {
+    if (item.kind === 'market-image') return `마켓 · ${item.productName}`;
     if (item.kind === 'image') return '사진 1장';
     const valueCount = Object.values(item.values).filter((v) => v != null && v !== '').length;
     return `사진 ${item.imageRefs.length}장 · 값 ${valueCount}개`;
