@@ -14,28 +14,27 @@ import type {
   ChannelProductDetail,
   ChannelProductSummary,
 } from '@/domain/entities/ChannelProductEntity';
-import type { ProductRegistrationFormValues } from './ProductRegistrationForm';
+import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 
 /**
- * 참고 패널의 도구 1개 — **플랫폼 상품 조회**(FEATURE_2609_67).
+ * 전역 도구 패널의 도구 1개 — **플랫폼 상품 조회**(FEATURE_2609_67 · 2609_68 에서 전역으로 옮김).
  *
- * **용도**: 판매자의 마켓 상품을 이름 또는 상품 ID 로 찾아, 보면서 물품 등록 칸을 채우고
- *   사진을 담는다. 값은 전부 **사람이 버튼을 눌러야** 들어간다(자동 채우기 없음).
- * **파일**: src/app/dashboard/products/register/components/ChannelProductTool.tsx
+ * **용도**: 판매자의 마켓 상품을 이름 또는 상품 ID 로 찾아, 보면서 물품 등록 칸을 채운다.
+ *   값은 전부 **사람이 버튼을 눌러야** 들어간다(자동 채우기 없음).
+ * **파일**: src/app/dashboard/components/ChannelProductTool.tsx
+ * **쓰는 곳**: `dashboard/layout.tsx` 의 `ToolPanel` 본문 **한 곳뿐**이다 — 도구는 화면에 속하지 않는다.
  *
- * ⚠️ 이 컴포넌트는 `<form>` 안에서 그려진다:
- *  - 버튼은 전부 `type="button"`(공용 `ui/Button` 의 기본값도 `'button'`).
- *  - 🔴 검색 입력에는 **Enter 가드**가 있다. 없으면 Enter 가 폼을 암묵적으로 제출해 물품이 등록된다.
+ * **[채우기] 는 `toolPanelStore.fillTarget` 을 통해 나간다**: 값을 받을 화면(물품 등록 폼)이 마운트될
+ *   때 손을 내밀고, 없으면(`fillTarget == null`) **버튼 자체를 그리지 않는다**. 값 줄은 그대로 보인다.
+ *
+ * ⚠️ 이 컴포넌트는 `<form>` 밖(전역 레이아웃)에 살지만, 버튼은 계속 `type="button"` 으로 두고
+ *    검색 입력의 **Enter 가드**도 유지한다 — 어느 화면 위에 떠 있을지 알 수 없다.
  * ⚠️ 조회는 [조회] 를 누를 때만 나간다(타이핑 중 자동 검색 금지 — 쿠팡 호출 예산).
- * 🔴 담은 사진은 **저장 전까지 아래 갤러리에 뜨지 않는다**(갤러리는 파일 버퍼만 안다) —
- *    상단 `담은 사진 N장` 배지가 유일한 표시다.
+ * 🔴 사진은 여기서 **보이기만** 한다(담기 없음). 물품에 넣는 길은 드래그로 따로 만든다.
  */
 
 /** 오늘 지원하는 플랫폼은 쿠팡 하나다 — select 를 만들지 않는다. */
 const PLATFORM = 'COUPANG';
-
-/** 한 번에 담을 수 있는 사진 수. 🔴 백엔드가 10장을 넘으면 400 을 던진다. */
-const MAX_PICKED = 10;
 
 // 상태 enum → 화면 문구(enum 원문을 사용자에게 노출하지 않는다). 마스터 생성 화면과 같은 한 줄짜리
 // 표지만, 서로 import 하면 화면 간 결합이 생기므로 지역으로 둔다.
@@ -89,18 +88,10 @@ const lookupErrorMessage = (e: unknown): string => {
   return extractErrorMessage(e, '상품을 조회하지 못했습니다.');
 };
 
-interface ChannelProductToolProps {
-  /** 폼 칸에 값을 넣는다. 어느 칸을 채울지는 이 컴포넌트가 정한다(ClipboardFillModal 과 같은 책임 배치). */
-  onFill: (patch: Partial<ProductRegistrationFormValues>) => void;
-  pickedImageUrls: string[];
-  onPickedImageUrlsChange: (urls: string[]) => void;
-}
+export function ChannelProductTool() {
+  /** 값을 받을 화면이 마운트돼 있을 때만 값이 있다. 없으면 [채우기] 버튼을 그리지 않는다. */
+  const fillTarget = useToolPanelStore((s) => s.fillTarget);
 
-export function ChannelProductTool({
-  onFill,
-  pickedImageUrls,
-  onPickedImageUrlsChange,
-}: ChannelProductToolProps) {
   const channelUseCase = useMemo(
     () => new ChannelProductUseCase(new ChannelProductRepositoryImpl()),
     [],
@@ -193,80 +184,43 @@ export function ChannelProductTool({
     }
   }, [channelUseCase, loadingMore, nextToken, sellerId, trimmed]);
 
-  const togglePicked = (url: string) => {
-    if (pickedImageUrls.includes(url)) {
-      onPickedImageUrlsChange(pickedImageUrls.filter((u) => u !== url));
-      return;
-    }
-    if (pickedImageUrls.length >= MAX_PICKED) return;
-    onPickedImageUrlsChange([...pickedImageUrls, url]);
-  };
-
   const description = detail ? noticesToDescription(detail.notices) : '';
 
-  /** 채우기 한 줄 — 값이 없으면 버튼만 비활성으로 두고 줄은 그대로 보여준다. */
+  /**
+   * 채우기 한 줄 — 값이 없으면 버튼만 비활성으로 두고 줄은 그대로 보여준다.
+   * 🔴 받을 화면이 없으면(`fillTarget == null`) 버튼을 **아예 그리지 않는다**. 비활성으로 남겨두면
+   *    "왜 안 눌리지" 가 된다.
+   */
   const fillRow = (label: string, value: string | null, buttonLabel: string, onClick: () => void) => (
     <div className="flex items-start gap-2">
       <div className="min-w-0 flex-1">
         <p className="text-[11px] text-gray-500">{label}</p>
         <p className="break-words text-sm text-gray-900">{value || <span className="text-gray-400">(없음)</span>}</p>
       </div>
-      <Button size="sm" variant="secondary" disabled={!value} onClick={onClick}>
-        {buttonLabel}
-      </Button>
+      {fillTarget && (
+        <Button size="sm" variant="secondary" disabled={!value} onClick={onClick}>
+          {buttonLabel}
+        </Button>
+      )}
     </div>
   );
 
+  /** 사진 격자 — 🔴 보이기만 한다. 마켓 URL 은 절대 주소라 프록시를 타지 않는다. */
   const imageGrid = (urls: string[]) => (
     <div className="grid grid-cols-3 gap-2">
-      {urls.map((url) => {
-        const checked = pickedImageUrls.includes(url);
-        const full = !checked && pickedImageUrls.length >= MAX_PICKED;
-        return (
-          <label
-            key={url}
-            className={`block overflow-hidden rounded border p-1 ${
-              checked ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-            } ${full ? 'opacity-50' : 'cursor-pointer'}`}
-          >
-            <div className="aspect-square overflow-hidden rounded bg-gray-100">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="마켓 사진" className="h-full w-full object-contain" />
-            </div>
-            <span className="mt-1 flex items-center gap-1 text-[11px] text-gray-600">
-              <input
-                type="checkbox"
-                checked={checked}
-                disabled={full}
-                onChange={() => togglePicked(url)}
-                className="shrink-0"
-              />
-              담기
-            </span>
-          </label>
-        );
-      })}
+      {urls.map((url) => (
+        <div key={url} className="overflow-hidden rounded border border-gray-200 p-1">
+          <div className="aspect-square overflow-hidden rounded bg-gray-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="마켓 사진" className="h-full w-full object-contain" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 
   return (
     <div className="space-y-4">
-      {/* 담은 사진 — 저장 전까지 이 배지가 유일한 표시다 */}
-      <div className="flex items-center justify-between rounded bg-gray-50 px-2 py-1.5">
-        <span className="text-xs text-gray-700">담은 사진 {pickedImageUrls.length}장</span>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={pickedImageUrls.length === 0}
-          onClick={() => onPickedImageUrlsChange([])}
-        >
-          모두 비우기
-        </Button>
-      </div>
-      {pickedImageUrls.length >= MAX_PICKED && (
-        <p className="text-[11px] text-amber-700">한 번에 {MAX_PICKED}장까지 담을 수 있습니다.</p>
-      )}
-
       {/* ① 조회 줄 */}
       <div className="space-y-2">
         <select
@@ -376,16 +330,16 @@ export function ChannelProductTool({
           </p>
 
           {fillRow('상품명', detail.productName, '상품명 채우기', () =>
-            onFill({ productName: detail.productName ?? '' }),
+            fillTarget?.({ productName: detail.productName ?? '' }),
           )}
           {fillRow('브랜드', detail.brand, '브랜드 채우기', () =>
-            onFill({ brand: detail.brand ?? '' }),
+            fillTarget?.({ brand: detail.brand ?? '' }),
           )}
           {fillRow(
             `설명 (고시${detail.noticeGroup ? ` · ${detail.noticeGroup}` : ''})`,
             description,
             '설명 채우기',
-            () => onFill({ description }),
+            () => fillTarget?.({ description }),
           )}
 
           {/* 옵션 — 옵션명과 옵션 속성(용량)은 옵션마다 다르다 */}
@@ -394,7 +348,7 @@ export function ChannelProductTool({
             {detail.options.map((option, index) => (
               <div key={`${option.itemName ?? 'option'}-${index}`} className="space-y-2 rounded border border-gray-200 p-2">
                 {fillRow('옵션명', option.itemName, '이 이름으로', () =>
-                  onFill({ productName: option.itemName ?? '' }),
+                  fillTarget?.({ productName: option.itemName ?? '' }),
                 )}
                 <p className="text-[11px] text-gray-500">
                   판매가 {option.salePrice != null ? `${option.salePrice.toLocaleString()}원` : '-'} · 재고{' '}
@@ -411,17 +365,19 @@ export function ChannelProductTool({
                           <p className="text-[11px] text-gray-500">단위는 직접 고르세요</p>
                         )}
                       </div>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={fill.kind === 'none'}
-                        onClick={() => {
-                          if (fill.kind === 'none') return;
-                          onFill(fill.patch);
-                        }}
-                      >
-                        {fill.kind === 'withUnit' ? '양·단위 채우기' : '양만 채우기'}
-                      </Button>
+                      {fillTarget && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={fill.kind === 'none'}
+                          onClick={() => {
+                            if (fill.kind === 'none') return;
+                            fillTarget(fill.patch);
+                          }}
+                        >
+                          {fill.kind === 'withUnit' ? '양·단위 채우기' : '양만 채우기'}
+                        </Button>
+                      )}
                     </div>
                   );
                 })}

@@ -8,12 +8,12 @@ import { ProductImageGallery } from '@/app/dashboard/products/[id]/components/Pr
 import { Input } from '@/presentation/components/ui/Input';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
-import { ReferencePanel } from './ReferencePanel';
-import { ChannelProductTool } from './ChannelProductTool';
+import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 
 /**
- * 등록 폼의 칸 = 값 타입. 🔴 `export` 다 — 참고 패널의 [채우기] 가 이 타입의 `Partial` 을
- * patch 로 넘긴다(FEATURE_2609_67). 값은 전부 문자열이다(숫자 변환은 제출 시점에만).
+ * 등록 폼의 칸 = 값 타입. 🔴 `export` 다 — 폼 자신이 `useForm<…>` 에서 쓰고, 전역 도구 패널의
+ * [채우기] 가 같은 칸 이름을 patch 키로 넘긴다(FEATURE_2609_67 · 2609_68).
+ * 값은 전부 문자열이다(숫자 변환은 제출 시점에만).
  */
 export interface ProductRegistrationFormValues {
   productName: string;
@@ -37,7 +37,7 @@ interface ProductRegistrationFormProps {
   onImageBufferChange: (files: File[]) => void;
   onCheckBarcode: (barcodeId: string) => Promise<boolean>;
   onSubmitSuccess: () => void;
-  /** 참고 패널에서 담은 마켓 사진 URL. 컨테이너가 소유한다(`imageBuffer` 와 같은 모양). */
+  /** 전역 도구 패널에서 끌어다 놓은 마켓 사진 URL. 컨테이너가 소유한다(`imageBuffer` 와 같은 모양). */
   pickedImageUrls: string[];
   onPickedImageUrlsChange: (urls: string[]) => void;
 }
@@ -50,12 +50,11 @@ export function ProductRegistrationForm({
   onImageBufferChange,
   onCheckBarcode,
   onSubmitSuccess,
-  pickedImageUrls,
-  onPickedImageUrlsChange,
+  // 🔴 `pickedImageUrls` / `onPickedImageUrlsChange` 는 props 에 **남아 있다**(컨테이너가 소유하고
+  //    저장 직후 서버로 보낸다). 지금은 늘 빈 배열이라 폼이 읽을 일이 없어 꺼내 쓰지 않는다 —
+  //    사진을 끌어다 놓는 길이 생기면 그때 갤러리로 내려보낸다. 지웠다가 되살리지 말 것.
 }: ProductRegistrationFormProps) {
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
-  // 좁은 화면(lg 미만)에서 참고 패널이 폼을 덮고 있는지. 넓은 화면에선 쓰이지 않는다.
-  const [panelOpen, setPanelOpen] = useState(false);
   const [isCheckingBarcode, setIsCheckingBarcode] = useState(false);
   const [validatedBarcode, setValidatedBarcode] = useState<string | null>(null);
 
@@ -82,6 +81,21 @@ export function ProductRegistrationForm({
       description: '',
     },
   });
+
+  // 전역 도구 패널(FEATURE_2609_68)에 손을 내민다: 이 화면이 떠 있는 동안만 [채우기] 가 값을 넣는다.
+  const setFillTarget = useToolPanelStore((s) => s.setFillTarget);
+  useEffect(() => {
+    setFillTarget((patch) => {
+      // 🔴 patch 에 담긴 칸만 건드린다. 담긴 칸은 이미 값이 있어도 **덮어쓴다** — 일부러 그 버튼을
+      //    누른 것이다(선례: ProductEditForm 의 클립보드 채우기와 같은 판단).
+      //    "값이 있으면 건너뛰기" 가드를 새로 만들지 말 것.
+      Object.entries(patch).forEach(([key, value]) =>
+        setValue(key as never, value as never, { shouldDirty: true }),
+      );
+    });
+    // 🔴 나갈 때 반드시 지운다 — 남으면 죽은 폼에 setValue 한다.
+    return () => setFillTarget(null);
+  }, [setFillTarget, setValue]);
 
   const barcodeValue = watch('barcodeId');
 
@@ -168,267 +182,244 @@ export function ProductRegistrationForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-      {/* 왼쪽 = 폼, 오른쪽 = 참고 패널(FEATURE_2609_67). 패널은 좁은 화면에서도 폼 아래로 내려가지
-          않는다 — 덮는다(PLAN/D2). */}
-      <div className="flex items-start gap-6">
-        <div className="min-w-0 flex-1 space-y-6">
-          {/* Required Fields */}
-          <Card title="필수 항목">
-            <div className="space-y-4">
-              {/* Product Name */}
-              <div>
-                <label htmlFor="productName" className="block text-sm font-medium text-gray-900 mb-1">
-                  상품명
-                </label>
-                <Input
-                  id="productName"
-                  type="text"
-                  placeholder="상품명을 입력해주세요"
-                  disabled={isLoading}
-                  {...register('productName')}
-                />
-                {errors.productName && <p className="text-red-600 text-sm mt-1">{errors.productName.message}</p>}
-              </div>
-            </div>
-          </Card>
-
-          {/* Optional Fields */}
-          <Card title="선택 항목">
-            <div className="space-y-4">
-              {/* Barcode ID */}
-              <div>
-                <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
-                  바코드 ID
-                </label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      id="barcodeId"
-                      type="text"
-                      placeholder="바코드 ID를 입력해주세요 (선택)"
-                      {...register('barcodeId')}
-                      disabled={validatedBarcode !== null}
-                    />
-                  </div>
-                  {validatedBarcode !== null ? (
-                    <button
-                      type="button"
-                      onClick={handleResetBarcode}
-                      className="px-4 py-2 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors"
-                    >
-                      초기화
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleCheckBarcode}
-                      disabled={!barcodeValue || barcodeValue.trim() === '' || isCheckingBarcode}
-                      className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                      {isCheckingBarcode ? '확인 중...' : '중복 확인'}
-                    </button>
-                  )}
-                </div>
-                {barcodeError && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-red-600 text-sm flex-1">{barcodeError}</p>
-                    <button
-                      type="button"
-                      onClick={() => setBarcodeError(null)}
-                      className="text-red-600 hover:text-red-700 text-lg font-bold"
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
-                {errors.barcodeId && <p className="text-red-600 text-sm mt-1">{errors.barcodeId.message}</p>}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="brand" className="block text-sm font-medium text-gray-900 mb-1">
-                    브랜드
-                  </label>
-                  <Input
-                    id="brand"
-                    type="text"
-                    placeholder="브랜드명을 입력해주세요"
-                    disabled={isLoading}
-                    {...register('brand')}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="price" className="block text-sm font-medium text-gray-900 mb-1">
-                    가격
-                  </label>
-                  <Input
-                    id="price"
-                    type="text"
-                    inputMode="decimal"
-                    pattern="[0-9]+([.][0-9]+)?"
-                    placeholder="0"
-                    disabled={isLoading}
-                    {...register('price')}
-                  />
-                  {errors.price && <p className="text-red-600 text-sm mt-1">{errors.price.message}</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="store" className="block text-sm font-medium text-gray-900 mb-1">
-                    구매처
-                  </label>
-                  <select
-                    id="store"
-                    disabled={isLoading}
-                    {...register('store')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="">구매처 선택</option>
-                    <option value="이마트">이마트</option>
-                    <option value="코스트코">코스트코</option>
-                    <option value="노브랜드">노브랜드</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
-                    단위
-                  </label>
-                  <select
-                    id="netContentUnit"
-                    disabled={isLoading}
-                    {...register('netContentUnit')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="">단위 선택</option>
-                    <option value="G">g</option>
-                    <option value="KG">kg</option>
-                    <option value="L">l</option>
-                    <option value="ML">ml</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
-                    높이
-                  </label>
-                  <Input
-                    id="packageHeight"
-                    type="text"
-                    placeholder="예: 160mm"
-                    disabled={isLoading}
-                    {...register('packageHeight')}
-                  />
-                  {errors.packageHeight && <p className="text-red-600 text-sm mt-1">{errors.packageHeight.message}</p>}
-                </div>
-
-                <div>
-                  <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
-                    길이
-                  </label>
-                  <Input
-                    id="packageLength"
-                    type="text"
-                    placeholder="예: 75mm"
-                    disabled={isLoading}
-                    {...register('packageLength')}
-                  />
-                  {errors.packageLength && <p className="text-red-600 text-sm mt-1">{errors.packageLength.message}</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
-                    너비
-                  </label>
-                  <Input
-                    id="packageWidth"
-                    type="text"
-                    placeholder="예: 8.9mm"
-                    disabled={isLoading}
-                    {...register('packageWidth')}
-                  />
-                  {errors.packageWidth && <p className="text-red-600 text-sm mt-1">{errors.packageWidth.message}</p>}
-                </div>
-
-                <div>
-                  <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
-                    내용물 양
-                  </label>
-                  <Input
-                    id="netContent"
-                    type="text"
-                    inputMode="decimal"
-                    pattern="[0-9]+([.][0-9]+)?"
-                    placeholder="0"
-                    disabled={isLoading}
-                    {...register('netContent')}
-                  />
-                  {errors.netContent && <p className="text-red-600 text-sm mt-1">{errors.netContent.message}</p>}
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
-                  설명
-                </label>
-                <textarea
-                  id="description"
-                  placeholder="상품 설명을 입력해주세요"
-                  rows={4}
-                  disabled={isLoading}
-                  {...register('description')}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* Image gallery (register mode = local buffer; uploaded after the product is created) */}
-          <ProductImageGallery
-            productId={null}
-            useCase={imageUseCase}
-            buffer={imageBuffer}
-            onBufferChange={onImageBufferChange}
-          />
-
-          {/* Submit Button (sticky - 스크롤해도 하단에 고정) */}
-          {/* 🔴 제출 바는 **왼쪽 칼럼 안에** 남는다(2칼럼 바깥으로 빼면 패널 아래까지 가로질러 패널이
-              잘린다). 음수 마진은 왼쪽만 — 오른쪽까지 -mx-6 이면 gap-6 을 먹어 패널에 닿는다. */}
-          <div className="sticky bottom-0 -mb-6 bg-page border-t border-gray-200 py-4 -ml-6 pl-6 pr-4">
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full"
-              disabled={isSubmitDisabled}
-              isLoading={isLoading}
-              loadingText="등록 중..."
-            >
-              상품 등록
-            </Button>
+      {/* Required Fields */}
+      <Card title="필수 항목">
+        <div className="space-y-4">
+          {/* Product Name */}
+          <div>
+            <label htmlFor="productName" className="block text-sm font-medium text-gray-900 mb-1">
+              상품명
+            </label>
+            <Input
+              id="productName"
+              type="text"
+              placeholder="상품명을 입력해주세요"
+              disabled={isLoading}
+              {...register('productName')}
+            />
+            {errors.productName && <p className="text-red-600 text-sm mt-1">{errors.productName.message}</p>}
           </div>
         </div>
+      </Card>
 
-        <ReferencePanel open={panelOpen} onOpenChange={setPanelOpen}>
-          <ChannelProductTool
-            onFill={(patch) => {
-              // 🔴 patch 에 담긴 칸만 건드린다. 담긴 칸은 이미 값이 있어도 **덮어쓴다** — 일부러 그
-              //    버튼을 누른 것이다(선례: ProductEditForm 의 클립보드 채우기와 같은 판단).
-              //    "값이 있으면 건너뛰기" 가드를 새로 만들지 말 것.
-              (Object.entries(patch) as [keyof ProductRegistrationFormValues, string][]).forEach(
-                ([key, value]) => setValue(key as never, value as never, { shouldDirty: true }),
-              );
-            }}
-            pickedImageUrls={pickedImageUrls}
-            onPickedImageUrlsChange={onPickedImageUrlsChange}
-          />
-        </ReferencePanel>
+      {/* Optional Fields */}
+      <Card title="선택 항목">
+        <div className="space-y-4">
+          {/* Barcode ID */}
+          <div>
+            <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
+              바코드 ID
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  id="barcodeId"
+                  type="text"
+                  placeholder="바코드 ID를 입력해주세요 (선택)"
+                  {...register('barcodeId')}
+                  disabled={validatedBarcode !== null}
+                />
+              </div>
+              {validatedBarcode !== null ? (
+                <button
+                  type="button"
+                  onClick={handleResetBarcode}
+                  className="px-4 py-2 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  초기화
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCheckBarcode}
+                  disabled={!barcodeValue || barcodeValue.trim() === '' || isCheckingBarcode}
+                  className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isCheckingBarcode ? '확인 중...' : '중복 확인'}
+                </button>
+              )}
+            </div>
+            {barcodeError && (
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-red-600 text-sm flex-1">{barcodeError}</p>
+                <button
+                  type="button"
+                  onClick={() => setBarcodeError(null)}
+                  className="text-red-600 hover:text-red-700 text-lg font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            {errors.barcodeId && <p className="text-red-600 text-sm mt-1">{errors.barcodeId.message}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="brand" className="block text-sm font-medium text-gray-900 mb-1">
+                브랜드
+              </label>
+              <Input
+                id="brand"
+                type="text"
+                placeholder="브랜드명을 입력해주세요"
+                disabled={isLoading}
+                {...register('brand')}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="price" className="block text-sm font-medium text-gray-900 mb-1">
+                가격
+              </label>
+              <Input
+                id="price"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
+                placeholder="0"
+                disabled={isLoading}
+                {...register('price')}
+              />
+              {errors.price && <p className="text-red-600 text-sm mt-1">{errors.price.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="store" className="block text-sm font-medium text-gray-900 mb-1">
+                구매처
+              </label>
+              <select
+                id="store"
+                disabled={isLoading}
+                {...register('store')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">구매처 선택</option>
+                <option value="이마트">이마트</option>
+                <option value="코스트코">코스트코</option>
+                <option value="노브랜드">노브랜드</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
+                단위
+              </label>
+              <select
+                id="netContentUnit"
+                disabled={isLoading}
+                {...register('netContentUnit')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">단위 선택</option>
+                <option value="G">g</option>
+                <option value="KG">kg</option>
+                <option value="L">l</option>
+                <option value="ML">ml</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
+                높이
+              </label>
+              <Input
+                id="packageHeight"
+                type="text"
+                placeholder="예: 160mm"
+                disabled={isLoading}
+                {...register('packageHeight')}
+              />
+              {errors.packageHeight && <p className="text-red-600 text-sm mt-1">{errors.packageHeight.message}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
+                길이
+              </label>
+              <Input
+                id="packageLength"
+                type="text"
+                placeholder="예: 75mm"
+                disabled={isLoading}
+                {...register('packageLength')}
+              />
+              {errors.packageLength && <p className="text-red-600 text-sm mt-1">{errors.packageLength.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
+                너비
+              </label>
+              <Input
+                id="packageWidth"
+                type="text"
+                placeholder="예: 8.9mm"
+                disabled={isLoading}
+                {...register('packageWidth')}
+              />
+              {errors.packageWidth && <p className="text-red-600 text-sm mt-1">{errors.packageWidth.message}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
+                내용물 양
+              </label>
+              <Input
+                id="netContent"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
+                placeholder="0"
+                disabled={isLoading}
+                {...register('netContent')}
+              />
+              {errors.netContent && <p className="text-red-600 text-sm mt-1">{errors.netContent.message}</p>}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
+              설명
+            </label>
+            <textarea
+              id="description"
+              placeholder="상품 설명을 입력해주세요"
+              rows={4}
+              disabled={isLoading}
+              {...register('description')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Image gallery (register mode = local buffer; uploaded after the product is created) */}
+      <ProductImageGallery
+        productId={null}
+        useCase={imageUseCase}
+        buffer={imageBuffer}
+        onBufferChange={onImageBufferChange}
+      />
+
+      {/* Submit Button (sticky - 스크롤해도 하단에 고정) */}
+      <div className="sticky bottom-0 -mb-6 bg-page border-t border-gray-200 p-4 -mx-6 px-6">
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={isSubmitDisabled}
+          isLoading={isLoading}
+          loadingText="등록 중..."
+        >
+          상품 등록
+        </Button>
       </div>
     </form>
   );
