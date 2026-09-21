@@ -13,11 +13,18 @@ const carrierRateSchema = z.object({
   carrierId: z.string().min(1, '택배사를 선택하세요'),
   type: z.string().min(1, '타입을 입력하세요').max(50, '50자 이내'),
   cost: z.string().refine((val) => !Number.isNaN(parseFloat(val)) && parseFloat(val) > 0, '비용은 양수여야 합니다'),
-  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD 형식'),
+  effectiveDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD 형식')
+    .or(z.literal('')),
   isDefault: z.boolean(),
 });
 
 type CarrierRateFormData = z.infer<typeof carrierRateSchema>;
+
+// Local calendar date as YYYY-MM-DD. `toISOString()` is UTC and would show
+// yesterday in Korea before 09:00.
+const todayLocal = () => new Date().toLocaleDateString('sv-SE');
 
 interface CarrierRateFormProps {
   isLoading: boolean;
@@ -69,7 +76,9 @@ export function CarrierRateForm({
       carrierId: initialData?.carrierId ?? '',
       type: initialData?.type ?? '',
       cost: initialData?.cost ?? '',
-      effectiveDate: initialData?.effectiveDate ?? '',
+      // Create prefills today; edit keeps the stored date so a past rate
+      // does not get its start date pushed forward.
+      effectiveDate: initialData?.effectiveDate ?? todayLocal(),
       isDefault: initialData?.isDefault ?? false,
     },
   });
@@ -89,10 +98,14 @@ export function CarrierRateForm({
   const onFormSubmit = handleSubmit(async (formData) => {
     setRequestError('');
     try {
+      const { effectiveDate, ...rest } = formData;
       await onSubmit({
-        ...formData,
+        ...rest,
         carrierId: parseInt(formData.carrierId, 10),
         cost: parseFloat(formData.cost),
+        // Omit the key when cleared: the server fills today on create and keeps
+        // the existing date on update. An empty string would fail LocalDate parsing.
+        ...(effectiveDate ? { effectiveDate } : {}),
       });
       reset();
     } catch {
@@ -202,7 +215,7 @@ export function CarrierRateForm({
 
       <div>
         <label htmlFor="effectiveDate" className="block text-sm font-medium mb-1">
-          유효일 (YYYY-MM-DD) *
+          가격 적용
         </label>
         <Controller
           name="effectiveDate"

@@ -42,7 +42,7 @@ export function CarrierRateTable({
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">배송사</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">타입</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">비용</th>
-            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">유효일</th>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">가격 적용</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">기본값</th>
           </tr>
         </thead>
