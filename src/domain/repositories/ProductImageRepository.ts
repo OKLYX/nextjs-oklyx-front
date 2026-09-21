@@ -11,6 +11,10 @@ export interface ProductImageRepository {
   // not re-uploaded (backend FEATURE_2609_62/01). Sources that no longer exist are skipped
   // silently, so compare the returned length with the requested ids to detect a partial copy.
   copy(productId: number, sourceImageIds: number[]): Promise<ProductImage[]>;
+  // Download marketplace image URLs into this product's gallery (FEATURE_2609_67/D5). The server
+  // fetches each URL and stores the bytes in our storage — the marketplace URL is NOT saved.
+  // Only https `*.coupangcdn.com` URLs are allowed and at most 10 per call (backend 400 otherwise).
+  addFromUrls(productId: number, urls: string[]): Promise<ProductImage[]>;
   // Replace one image in place (keeps the same image id).
   replace(productId: number, imageId: number, file: File): Promise<ProductImage>;
   // Reorder the gallery to exactly this ordered set of image ids.
