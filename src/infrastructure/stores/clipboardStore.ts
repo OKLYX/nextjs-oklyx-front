@@ -12,9 +12,10 @@ import type { ClipItem } from '@/domain/entities/ClipItem';
  * **필수 규칙**
  * - 담기·붙이기의 **창구는 이 store 하나**다. 화면이 자기 목록을 따로 들고 있지 않는다.
  * - 새로 담은 것이 **앞**에 온다. 최대 `MAX_ITEMS`(30) 개 — 넘으면 뒤에서 잘린다.
- * - 같은 `productImageId` 를 또 담으면 **무시**한다(중복 없음).
+ * - 같은 `productImageId` 를 또 담으면 **무시**한다(중복 없음). 마켓 사진은 같은 `imageUrl` 이면 무시한다.
  * - `kind: 'product'` 는 같은 `productId` 의 옛 항목을 **지우고 새로 담는다**(값 스냅샷이 최신이어야 한다).
  * - 이미지는 **참조**다(`productImageId`). 파일을 다시 올리지 않는다 — 붙일 때 서버가 행만 복제한다.
+ * - `kind: 'market-image'`(2609_68)는 우리 행이 아니라 **마켓 URL** 이다 — 붙일 때 서버가 내려받는다.
  *
  * **사용 예제**
  * ```ts
@@ -51,6 +52,14 @@ export const useClipboardStore = create<ClipboardStore>()(
       items: [],
       add: (item) =>
         set((state) => {
+          if (item.kind === 'market-image') {
+            // 마켓 사진: 같은 URL 을 또 끌어와도 늘어나지 않는다.
+            const duplicated = state.items.some(
+              (existing) => existing.kind === 'market-image' && existing.imageUrl === item.imageUrl,
+            );
+            if (duplicated) return state;
+            return { items: [item, ...state.items].slice(0, MAX_ITEMS) };
+          }
           if (item.kind === 'image') {
             // 같은 사진을 또 담아도 늘어나지 않는다.
             const duplicated = state.items.some(
