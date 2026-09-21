@@ -3,6 +3,8 @@
 import { Card } from '@/presentation/components/ui/Card';
 import { BOX_KIND_LABEL } from '@/domain/entities/PackageEntity';
 import type { BoxKind } from '@/domain/entities/PackageEntity';
+import { PACKAGE_SORT_OPTIONS } from './packageSort';
+import type { PackageSort } from './packageSort';
 
 /** 유형 칩 — `null` = 전체. 클릭은 **로컬 필터**라 요청을 만들지 않는다 */
 const KIND_CHIPS: { kind: BoxKind | null; label: string }[] = [
@@ -14,7 +16,8 @@ const KIND_CHIPS: { kind: BoxKind | null; label: string }[] = [
 interface PackageSearchCardProps {
   searchPackage: string;
   onSearchChange: (value: string) => void;
-  onSearch: () => void;
+  sort: PackageSort;
+  onSortChange: (sort: PackageSort) => void;
   isLoading: boolean;
   resultCount: number;
   onAddClick: () => void;
@@ -26,7 +29,8 @@ interface PackageSearchCardProps {
 export function PackageSearchCard({
   searchPackage,
   onSearchChange,
-  onSearch,
+  sort,
+  onSortChange,
   isLoading,
   resultCount,
   onAddClick,
@@ -46,14 +50,19 @@ export function PackageSearchCard({
             aria-label="패키지 타입으로 검색"
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
           />
-          <button
-            onClick={onSearch}
+          <select
+            value={sort}
+            onChange={(e) => onSortChange(e.target.value as PackageSort)}
             disabled={isLoading}
-            aria-label={isLoading ? '검색 진행 중' : '상자비 검색 버튼'}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium transition-colors whitespace-nowrap"
+            aria-label="정렬"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
           >
-            {isLoading ? '검색중...' : '검색'}
-          </button>
+            {PACKAGE_SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
         <button
           onClick={onAddClick}
@@ -84,7 +93,7 @@ export function PackageSearchCard({
         })}
       </div>
       <p className="text-sm text-gray-600" role="status" aria-live="polite">
-        검색 결과: {resultCount}건
+        총 {resultCount}건
       </p>
     </Card>
   );

@@ -22,7 +22,6 @@ export interface Package {
   widthCm: number;
   lengthCm: number;
   heightCm: number;
-  effectiveDate: string;
   isDefault: boolean;
   /** 구매 / 재활용. 옛 응답에는 없을 수 있어 `boxKindOf` 로 읽는다 */
   boxKind?: BoxKind;

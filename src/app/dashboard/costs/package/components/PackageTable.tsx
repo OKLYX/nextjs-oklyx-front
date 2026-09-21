@@ -7,16 +7,20 @@ import { BoxShape, boxScale, maxBoxExtentCm } from '@/presentation/components/Bo
 import { formatPackageSize, sizeIsUnset } from './packageSize';
 
 interface PackageTableProps {
+  /** 이 페이지에 그릴 줄 */
   packages: Package[];
+  /**
+   * 배율 기준이 되는 목록(= 페이지를 자르기 전 걸러진 전체).
+   * 🔴 **필수다.** 선택 prop 으로 두고 `?? packages` 로 흘리면 안 넘겨도 컴파일이 통과해
+   * 화면에서만 조용히 틀린다 — 같은 상자가 페이지마다 다른 크기로 그려진다.
+   */
+  referenceScopePackages: Package[];
+  /** 검색어·유형 칩이 걸려 있는가 (빈 상태 문구가 갈린다) */
+  hasFilter: boolean;
   isLoading: boolean;
   error: string;
-  hasSearched: boolean;
   selectedId?: number;
   onRowClick?: (pkg: Package) => void;
-}
-
-function formatDate(date: string | null | undefined): string {
-  return date ? date : '없음';
 }
 
 function formatCost(cost: number | null | undefined): string {
@@ -31,14 +35,16 @@ const BOX_CELL_PX = 88;
 
 export function PackageTable({
   packages,
+  referenceScopePackages,
+  hasFilter,
   isLoading,
   error,
-  hasSearched,
   selectedId,
   onRowClick,
 }: PackageTableProps) {
-  // 목록 안에서 대소가 보이도록 가장 큰 상자를 기준으로 삼는다
-  const referenceCm = maxBoxExtentCm(packages);
+  // 목록 안에서 대소가 보이도록 가장 큰 상자를 기준으로 삼는다.
+  // 🔴 기준은 자른 페이지가 아니라 걸러진 전체 — 페이지마다 잣대가 달라지면 안 된다
+  const referenceCm = maxBoxExtentCm(referenceScopePackages);
 
   const errorBanner = error ? (
     <div
@@ -53,11 +59,9 @@ export function PackageTable({
     <>
       {errorBanner}
       <TableCard
-        isLoading={isLoading && hasSearched}
+        isLoading={isLoading}
         isEmpty={packages.length === 0}
-        emptyMessage={
-          hasSearched ? '조회 결과가 없습니다.' : '검색 버튼을 클릭하여 상자비 정보를 조회해주세요.'
-        }
+        emptyMessage={hasFilter ? '조회 결과가 없습니다.' : '등록된 상자가 없습니다.'}
       >
         <table className="w-full" role="grid" aria-label="상자비 목록">
           <thead className="bg-gray-100 border-b border-gray-200">
@@ -67,7 +71,6 @@ export function PackageTable({
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">유형</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">사이즈</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">비용</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">유효일</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">기본값</th>
             </tr>
           </thead>
@@ -135,7 +138,6 @@ export function PackageTable({
                   {formatPackageSize(pkg)}
                 </td>
                 <td className="px-6 py-3 text-sm text-gray-900">{formatCost(pkg.cost)}</td>
-                <td className="px-6 py-3 text-sm text-gray-900">{formatDate(pkg.effectiveDate)}</td>
                 <td className="px-6 py-3 text-sm">
                   {pkg.isDefault ? (
                     <span className="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
