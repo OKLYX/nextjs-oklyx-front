@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { TopBar } from './components/TopBar';
 import { Navbar } from './components/Navbar';
+import { ToolRail } from './components/ToolRail';
+import { ToolPanel } from './components/ToolPanel';
+import { ChannelProductTool } from './components/ChannelProductTool';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
+import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 import { useAlertSummaryPolling } from '@/presentation/hooks/useAlertSummaryPolling';
@@ -41,6 +45,8 @@ export default function DashboardLayout({
   const setSidebarOpen = useNavigationStore((state) => state.setSidebarOpen);
   const toggleSidebar = useNavigationStore((state) => state.toggleSidebar);
   const closeSidebar = useNavigationStore((state) => state.closeSidebar);
+  // 오른쪽 도구 패널(FEATURE_2609_68). 열려 있으면 넓은 화면에서 본문을 그만큼 밀어낸다.
+  const openTool = useToolPanelStore((state) => state.openTool);
 
   // Session restore: validate the session against the server and refresh the
   // access token on dashboard entry (a page reload may have expired the 30-min
@@ -141,11 +147,15 @@ export default function DashboardLayout({
 
       {/* Right column: top bar over the content area, then the page content
           below. Desktop padding tracks the rail — pl-16 collapsed, pl-56 when
-          pinned (push). Mobile has no rail, so pl-0 (drawer overlays). */}
+          pinned (push). Mobile has no rail, so pl-0 (drawer overlays).
+          오른쪽은 도구 툴바(w-12 = 3rem)가 늘 자리를 차지하고(pr-12), 패널은 lg 이상일 때만
+          본문을 민다(lg:pr-[31rem] = 패널 28rem + 툴바 3rem). 🔴 패딩을 `main` 이 아니라 이 div 에
+          거는 이유: main 에만 걸면 위의 상단바 행이 패딩을 못 받아 [Logout]·테마 스위치가 레일
+          밑에 깔려 눌리지 않는다. */}
       <div
-        className={`flex flex-1 flex-col min-w-0 transition-[padding] duration-200 ${
+        className={`flex flex-1 flex-col min-w-0 transition-[padding] duration-200 pr-12 ${
           isMobile ? 'pl-0' : isSidebarOpen ? 'pl-56' : 'pl-16'
-        }`}
+        } ${openTool ? 'lg:pr-[31rem]' : ''}`}
       >
         <div className="flex items-stretch bg-white">
           {/* Sidebar toggle — the only one. Lives at the top bar's far left on
@@ -179,6 +189,12 @@ export default function DashboardLayout({
         </div>
         <main className="flex-1 p-4 md:p-6 min-w-0 overflow-x-auto">{children}</main>
       </div>
+
+      {/* 전역 도구(FEATURE_2609_68). 🔴 도구는 화면에 속하지 않는다 — 레이아웃이 직접 그린다. */}
+      <ToolPanel>
+        <ChannelProductTool />
+      </ToolPanel>
+      <ToolRail />
     </div>
   );
 }
