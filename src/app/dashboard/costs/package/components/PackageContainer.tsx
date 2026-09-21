@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import type { BoxKind, Package } from '@/domain/entities/PackageEntity';
 import { boxKindOf } from '@/domain/entities/PackageEntity';
@@ -12,6 +12,12 @@ import { PackageSearchCard } from './PackageSearchCard';
 import { PackageTable } from './PackageTable';
 import { PackageInputModal } from './PackageInputModal';
 import { PackageDetailsModal } from './PackageDetailsModal';
+import { Pagination } from '@/presentation/components/Pagination';
+import { DEFAULT_PACKAGE_SORT, comparePackages } from './packageSort';
+import type { PackageSort } from './packageSort';
+
+/** 한 페이지 줄 수. 행마다 88px 상자 그림이 들어가 20줄은 너무 길다(PLAN 2609_56 D6) */
+const PAGE_SIZE = 10;
 
 export function PackageContainer() {
   const [searchPackage, setSearchPackage] = useState('');
@@ -21,7 +27,8 @@ export function PackageContainer() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [sort, setSort] = useState<PackageSort>(DEFAULT_PACKAGE_SORT);
   const [selectedPackageId, setSelectedPackageId] = useState<number | undefined>();
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [isSubmittingInput, setIsSubmittingInput] = useState(false);
@@ -35,10 +42,9 @@ export function PackageContainer() {
     return new PackageUseCase(repository);
   }, []);
 
-  const handleSearch = async () => {
+  const loadPackages = useCallback(async () => {
     setError('');
     setIsLoading(true);
-    setHasSearched(true);
 
     try {
       const data = await packageUseCase.getPackages();
@@ -54,13 +60,62 @@ export function PackageContainer() {
     } finally {
       setIsLoading(false);
     }
+  }, [packageUseCase]);
+
+  // 들어가면 바로 목록을 부른다(PLAN 2609_56 D1). packageUseCase 참조가 고정이라 1회만 돈다.
+  // ⚠️ 이펙트 본문에서 곧바로 setState 를 부르면 프로젝트 lint(`react-hooks/set-state-in-effect`)가
+  // 막는다 — 조회를 useCallback 으로 감싸 effect 는 호출만 한다.
+  useEffect(() => {
+    void (async () => {
+      await loadPackages();
+    })();
+  }, [loadPackages]);
+
+  const filteredPackages = useMemo(
+    () =>
+      packages.filter(
+        (pkg) =>
+          pkg.type.toLowerCase().includes(searchPackage.toLowerCase()) &&
+          (kindFilter === null || boxKindOf(pkg) === kindFilter)
+      ),
+    [packages, searchPackage, kindFilter]
+  );
+
+  // 🔴 [...] 로 복사한다. sort() 는 원본을 뒤집는다 — packages state 를 직접 정렬하면
+  //    다음 렌더의 입력이 이미 바뀌어 있다.
+  const sortedPackages = useMemo(
+    () => [...filteredPackages].sort((a, b) => comparePackages(a, b, sort)),
+    [filteredPackages, sort]
+  );
+
+  const totalPages = Math.ceil(sortedPackages.length / PAGE_SIZE);
+
+  // 목록이 줄어 지금 페이지가 사라지면 마지막 페이지를 보여준다(결과 0건이면 0페이지).
+  // ⚠️ 이펙트에서 setCurrentPage 로 되돌리는 방식은 프로젝트 lint(`react-hooks/set-state-in-effect`)가
+  // 막는다 — 렌더 때 값을 깎아 쓴다.
+  const safePage = Math.min(currentPage, Math.max(0, totalPages - 1));
+  const pagedPackages = sortedPackages.slice(
+    safePage * PAGE_SIZE,
+    safePage * PAGE_SIZE + PAGE_SIZE
+  );
+
+  // 검색어·칩이 걸려 있는가. 빈 상태 문구가 갈린다
+  const hasFilter = searchPackage.trim() !== '' || kindFilter !== null;
+
+  const handleSearchChange = (value: string) => {
+    setSearchPackage(value);
+    setCurrentPage(0);
   };
 
-  const filteredPackages = packages.filter(
-    (pkg) =>
-      pkg.type.toLowerCase().includes(searchPackage.toLowerCase()) &&
-      (kindFilter === null || boxKindOf(pkg) === kindFilter)
-  );
+  const handleKindFilterChange = (kind: BoxKind | null) => {
+    setKindFilter(kind);
+    setCurrentPage(0);
+  };
+
+  const handleSortChange = (next: PackageSort) => {
+    setSort(next);
+    setCurrentPage(0);
+  };
 
   const handleAddClick = () => {
     setIsInputModalOpen(true);
@@ -71,7 +126,7 @@ export function PackageContainer() {
     try {
       await packageUseCase.createPackage(data);
       setIsInputModalOpen(false);
-      await handleSearch();
+      await loadPackages();
     } catch (err) {
       throw err;
     } finally {
@@ -103,7 +158,7 @@ export function PackageContainer() {
       }
       await packageUseCase.updatePackage(selectedPackage.id, data);
       handleCloseDetailsModal();
-      await handleSearch();
+      await loadPackages();
     } catch (err) {
       throw err;
     } finally {
@@ -122,7 +177,7 @@ export function PackageContainer() {
     try {
       await packageUseCase.deletePackage(selectedPackage.id);
       handleCloseDetailsModal();
-      await handleSearch();
+      await loadPackages();
     } catch (err) {
       throw err;
     } finally {
@@ -134,23 +189,34 @@ export function PackageContainer() {
     <PageContainer title="상자비">
         <PackageSearchCard
           searchPackage={searchPackage}
-          onSearchChange={setSearchPackage}
-          onSearch={handleSearch}
+          onSearchChange={handleSearchChange}
+          sort={sort}
+          onSortChange={handleSortChange}
           isLoading={isLoading}
-          resultCount={filteredPackages.length}
+          resultCount={sortedPackages.length}
           onAddClick={handleAddClick}
           kindFilter={kindFilter}
-          onKindFilterChange={setKindFilter}
+          onKindFilterChange={handleKindFilterChange}
         />
 
         <PackageTable
-          packages={filteredPackages}
+          packages={pagedPackages}
+          referenceScopePackages={sortedPackages}
+          hasFilter={hasFilter}
           isLoading={isLoading}
           error={error}
-          hasSearched={hasSearched}
           selectedId={selectedPackageId}
           onRowClick={handleRowClick}
         />
+
+        {/* 🔴 TableCard 가 빈 목록일 때 children 을 안 그려서 페이지 UI 는 표 카드 바깥이다(D7) */}
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={safePage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        )}
 
         <PackageInputModal
           isOpen={isInputModalOpen}

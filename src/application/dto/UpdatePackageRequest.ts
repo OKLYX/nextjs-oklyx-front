@@ -6,7 +6,6 @@ export interface UpdatePackageRequest {
   widthCm: number;
   lengthCm: number;
   heightCm: number;
-  effectiveDate: string;
   isDefault: boolean;
   /** 구매 / 재활용 (PLAN 2609_40 D20). 이미지는 이 요청에 없다 — 전용 업로드가 소유한다 */
   boxKind: BoxKind;

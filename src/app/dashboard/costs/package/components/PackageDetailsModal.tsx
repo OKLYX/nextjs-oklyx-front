@@ -38,7 +38,6 @@ const packageSchema = z
       .min(0.1, '0.1cm 이상 입력하세요')
       .max(999.9, '999.9cm 이하로 입력하세요')
       .refine((v) => Number(v.toFixed(1)) === v, '소수점 첫째 자리까지 입력하세요'),
-    effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD 형식'),
     isDefault: z.boolean(),
   })
   .refine((v) => v.boxKind === 'RECYCLED' || v.cost > 0, {
@@ -103,7 +102,6 @@ export function PackageDetailsModal({
       widthCm: 0,
       lengthCm: 0,
       heightCm: 0,
-      effectiveDate: '',
       isDefault: false,
     },
   });
@@ -117,7 +115,6 @@ export function PackageDetailsModal({
         widthCm: pkg.widthCm,
         lengthCm: pkg.lengthCm,
         heightCm: pkg.heightCm,
-        effectiveDate: pkg.effectiveDate,
         isDefault: pkg.isDefault,
       });
     }
@@ -153,7 +150,6 @@ export function PackageDetailsModal({
         widthCm: data.widthCm,
         lengthCm: data.lengthCm,
         heightCm: data.heightCm,
-        effectiveDate: data.effectiveDate,
         isDefault: data.isDefault,
       };
       await onSubmit(updateData, imageFile);
@@ -449,27 +445,6 @@ export function PackageDetailsModal({
           />
           {errors.cost && (
             <p className="mt-1 text-xs text-red-600">{errors.cost.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            유효일
-          </label>
-          <Controller
-            name="effectiveDate"
-            control={control}
-            render={({ field }) => (
-              <input
-                {...field}
-                type="date"
-                disabled={isSubmitting || isLoading}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              />
-            )}
-          />
-          {errors.effectiveDate && (
-            <p className="mt-1 text-xs text-red-600">{errors.effectiveDate.message}</p>
           )}
         </div>
 
