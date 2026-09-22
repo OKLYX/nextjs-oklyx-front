@@ -37,6 +37,8 @@ export interface SyncTarget {
   lastSyncAt: string | null;
   lastOrderSyncAt: string | null;
   lastCancelSyncAt: string | null;
+  /** 클레임 적재+추적이 끝난 마지막 회차 (FEATURE_2609_70 / D16) — 반품/교환 화면의 「마지막 동기화」. */
+  lastClaimSyncAt: string | null;
   lastSyncError: string | null;
 }
 

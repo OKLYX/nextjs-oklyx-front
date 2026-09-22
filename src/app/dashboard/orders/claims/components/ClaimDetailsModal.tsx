@@ -9,6 +9,7 @@ import {
 } from '@/domain/entities/ClaimEntity';
 import type { Claim } from '@/domain/entities/ClaimEntity';
 import { ClaimActionPanel } from './ClaimActionPanel';
+import { LocalRecordBadge } from './LocalRecordBadge';
 import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
@@ -69,6 +70,27 @@ export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetails
   const typeLabel = CLAIM_TYPE_LABEL[claim.claimType];
   const collect = invoiceText(claim.collectCarrierCode, claim.collectInvoiceNo);
 
+  /**
+   * 회수종류가 빈 문자열 = 마켓이 "고객이 직접 보냈거나 회수할 물건이 없다"고 답한 건(2609_70 D3).
+   * 서버도 그런 건에는 회수송장 액션을 주지 않으므로, 화면은 `-` 대신 그 사실을 적는다 —
+   * 그러지 않으면 영영 처리되지 않을 줄을 사용자가 계속 들여다본다.
+   *
+   * 🔴 `''` 와 `null` 을 같게 다루지 말 것: `null` 은 아직 안 읽은 기존 행이다(다음 동기화가 채운다).
+   */
+  const nothingToCollect =
+    !isExchange && claim.collectInvoiceNo == null && claim.returnDeliveryType === '';
+
+  const collectValue = nothingToCollect ? (
+    <span className="text-gray-500">고객이 직접 보낸 건이라 넣을 송장이 없습니다</span>
+  ) : (
+    <>
+      {collect}
+      {claim.collectInvoiceSource === 'LOCAL' && (
+        <LocalRecordBadge title="쿠팡에는 반영되지 않았습니다" />
+      )}
+    </>
+  );
+
   return (
     <Modal
       isOpen
@@ -116,7 +138,7 @@ export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetails
               {/* 회수상태는 교환에만 있다(05). 이 한 줄이 있어야 "왜 재발송 버튼이 없나"가 화면에서
                   설명된다 — 반품 상세에는 그리지 않는다(항상 null 이라 `-` 만 늘어난다). */}
               <Row label="회수상태" value={collectStatusText(claim.collectStatus)} />
-              <Row label="회수송장" value={collect} />
+              <Row label="회수송장" value={collectValue} />
             </Section>
             {/* Rendered even while empty: "not reshipped yet" and "no reshipment concept"
                 are different facts. 반품비 is dropped instead — it is always null for 교환. */}
@@ -139,7 +161,7 @@ export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetails
                   : '-'
               }
             />
-            <Row label="회수송장" value={collect} />
+            <Row label="회수송장" value={collectValue} />
           </Section>
         )}
 
