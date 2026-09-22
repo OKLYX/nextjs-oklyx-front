@@ -12,10 +12,11 @@
  * - 조회·로딩·에러 상태는 이 컴포넌트가 만들지 않는다 — 부모(컨테이너)가 usecase 로 받아 props 로 준다.
  * - **카드는 하나, 표도 하나다.** 마스터 상품은 표 안의 **묶음 머리줄**이고 그 아래가 판매 채널 줄이다.
  *   마스터만 글줄로 띄우고 채널만 표로 만들지 않는다(2026-09-23).
- * - 🔴 **옵션 줄을 그대로 나열하지 않는다.** 서버는 셀 **옵션** 단위로 주지만 화면은 `listingId` 로 묶어
- *   **판매 채널(셀) 한 줄**로 접고, 그 줄의 「구성 수량」 칸이 옵션별 수량을 대신한다(2026-09-23).
- * - 🔴 **판매 채널은 마스터 상품 아래에 넣는다.** 채널은 마스터를 통해서만 이 물품과 이어지므로
- *   `masterProductId` 로 묶는다 — 나란한 두 목록으로 두지 않는다(2026-09-23).
+ * - 🔴 **판매 채널은 `master.channels` 로 그린다.** `usage.listingOptions`(옵션 FK 를 타고 내려온 목록)를
+ *   쓰면 FK 가 비어 있는 셀 — 쿠팡 ID 로 편입했거나 FK 승격 전에 만들어진 셀 — 이 통째로 빠져
+ *   **같은 마스터를 여러 채널에서 파는데 한 채널만 보인다**(2026-09-23 실제 발생).
+ * - 🔴 **옵션 줄을 나열하지 않는다.** 마스터 옵션의 수량은 채널마다 같으므로 채널 줄의 「구성 수량」이
+ *   그 자리를 대신한다.
  * - 쓰이는 곳 0 → `compact` 는 아무것도 렌더하지 않고(null), 상세 화면은 한 줄 안내만 남긴다.
  * - 이동 링크는 **상세 화면으로 보낸다.** 목록으로 보내면 사용자가 거기서 다시 찾아야 한다(2026-09-23).
  *
@@ -35,7 +36,7 @@ import { Fragment } from 'react';
 import Link from 'next/link';
 import type {
   ProductUsage,
-  ProductUsageListingOption,
+  ProductUsageChannel,
   ProductUsageMasterRef,
 } from '@/domain/entities/ProductUsage';
 import { Card } from '@/presentation/components/ui/Card';
@@ -61,71 +62,10 @@ export interface ProductUsageSectionProps {
   compact?: boolean;
 }
 
-/** 옵션 줄을 접어 만든 판매 채널 한 줄. */
-interface UsageChannel {
-  key: string;
-  listingId: number | null;
-  listingName: string | null;
-  masterProductId: number | null;
-  accountAlias: string | null;
-  platform: string;
-  status: string | null;
-  /** 이 채널의 옵션마다 이 물품이 몇 개 들어가는지. 「구성 수량」 칸의 재료다. */
-  options: { name: string; quantity: number | null }[];
-}
-
-/**
- * 셀 **옵션** 목록 → **판매 채널(셀)** 목록.
- *
- * 🔴 옵션을 줄줄이 나열하는 대신 채널 한 줄로 접고, 옵션별 수량은 그 줄의 「구성 수량」에 모은다(2026-09-23).
- * 🔴 셀 id 가 없는 옛 줄은 **뭉치지 않는다** — 뭉치면 서로 다른 채널이 한 줄로 합쳐진다.
- */
-function collapseToChannels(options: ProductUsageListingOption[]): UsageChannel[] {
-  const byKey = new Map<string, UsageChannel>();
-  for (const option of options) {
-    const key = option.listingId == null ? `option:${option.id}` : `listing:${option.listingId}`;
-    const existing = byKey.get(key);
-    if (existing) {
-      existing.options.push({ name: option.name, quantity: option.quantity });
-      continue;
-    }
-    byKey.set(key, {
-      key,
-      listingId: option.listingId,
-      listingName: option.listingName,
-      masterProductId: option.masterProductId,
-      accountAlias: option.accountAlias,
-      platform: option.platform,
-      status: option.status,
-      options: [{ name: option.name, quantity: option.quantity }],
-    });
-  }
-  return [...byKey.values()];
-}
-
 /** 「6개입 ×6 · 12개입 ×12」. 옵션이 없으면 `-` */
-function quantityText(options: { name: string; quantity: number | null }[]): string {
-  if (options.length === 0) return '-';
-  return options.map((option) => `${option.name} ×${option.quantity ?? '-'}`).join(' · ');
-}
-
-/** 채널이 하나도 없는 마스터용 — 마스터가 아는 옵션별 수량을 대신 보여준다. */
-function masterQuantityText(master: ProductUsageMasterRef): string {
-  return quantityText(
-    master.optionQuantities.map((q) => ({ name: q.optionName, quantity: q.quantity }))
-  );
-}
-
-/**
- * 판매 상품 상세 주소.
- *
- * 🔴 서버가 셀 id 를 함께 주기 전에는 목록으로만 보낼 수 있었다(2026-09-23 해결).
- * 옛 데이터라 셀 id 가 없으면 그때만 목록으로 떨어뜨린다.
- */
-function listingHref(listingId: number | null): string {
-  return listingId == null
-    ? ROUTES.SALES_PRODUCTS_RETRIEVE
-    : ROUTES.SALES_PRODUCTS_RETRIEVE_DETAILS(listingId);
+function quantityText(master: ProductUsageMasterRef): string {
+  if (master.optionQuantities.length === 0) return '-';
+  return master.optionQuantities.map((q) => `${q.optionName} ×${q.quantity ?? '-'}`).join(' · ');
 }
 
 function statusText(status: string | null): string {
@@ -141,22 +81,8 @@ export function ProductUsageSection({
   compact = false,
 }: ProductUsageSectionProps) {
   const masters = usage?.masterProducts ?? [];
-  const options = usage?.listingOptions ?? [];
-  // 서버는 셀 옵션 단위로 준다 — 화면은 채널(셀) 단위로 접고, 다시 마스터 아래로 넣는다.
-  const channels = collapseToChannels(options);
-  const masterIds = new Set(masters.map((master) => master.id));
-  const channelsByMaster = new Map<number, UsageChannel[]>();
-  const orphanChannels: UsageChannel[] = [];
-  for (const channel of channels) {
-    if (channel.masterProductId == null || !masterIds.has(channel.masterProductId)) {
-      orphanChannels.push(channel);
-      continue;
-    }
-    const bucket = channelsByMaster.get(channel.masterProductId);
-    if (bucket) bucket.push(channel);
-    else channelsByMaster.set(channel.masterProductId, [channel]);
-  }
-  const hasLinks = masters.length > 0 || channels.length > 0;
+  const channelCount = masters.reduce((sum, master) => sum + (master.channels?.length ?? 0), 0);
+  const hasLinks = masters.length > 0 || (usage?.listingOptions.length ?? 0) > 0;
   const textSize = compact ? 'text-xs' : 'text-sm';
 
   if (isLoading) {
@@ -193,7 +119,7 @@ export function ProductUsageSection({
       action={
         hasLinks && !compact ? (
           <span className="text-sm text-gray-600">
-            마스터 상품 {masters.length}개 · 판매 채널 {channels.length}개
+            마스터 상품 {masters.length}개 · 판매 채널 {channelCount}개
           </span>
         ) : undefined
       }
@@ -212,7 +138,7 @@ export function ProductUsageSection({
       )}
 
       {/* 좁은 폭(병합 화면)에서는 표 대신 쌓아 올린다. 표가 최소 폭 736px 라 2단에 들어가지 않는다. */}
-      {hasLinks &&
+      {masters.length > 0 &&
         (compact ? (
           <div className="space-y-3">
             {masters.map((master) => (
@@ -226,18 +152,9 @@ export function ProductUsageSection({
                     마스터 상품 상세정보 →
                   </Link>
                 </div>
-                <CompactChannelList
-                  channels={channelsByMaster.get(master.id) ?? []}
-                  emptyText={`판매 채널 없음 · ${masterQuantityText(master)}`}
-                />
+                <CompactChannelList master={master} />
               </div>
             ))}
-            {orphanChannels.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-gray-500">마스터를 알 수 없는 판매 채널</p>
-                <CompactChannelList channels={orphanChannels} emptyText="" />
-              </div>
-            )}
           </div>
         ) : (
           <div className="list-table-scroll">
@@ -253,10 +170,10 @@ export function ProductUsageSection({
               </thead>
               <tbody>
                 {masters.map((master) => {
-                  const rows = channelsByMaster.get(master.id) ?? [];
+                  const channels = master.channels ?? [];
                   return (
                     <Fragment key={master.id}>
-                      {/* 마스터 = 묶음 머리줄. 아래 줄들이 이 마스터를 통해 올라간 채널이다. */}
+                      {/* 마스터 = 묶음 머리줄. 아래 줄들이 이 마스터가 올라가 있는 판매 채널이다. */}
                       <tr className="border-b border-gray-200 bg-gray-50">
                         <td colSpan={5} className="px-4 py-2">
                           <div className="flex items-center justify-between gap-3">
@@ -270,31 +187,24 @@ export function ProductUsageSection({
                           </div>
                         </td>
                       </tr>
-                      {rows.length === 0 ? (
+                      {channels.length === 0 ? (
                         <tr className="border-b border-gray-100">
                           <td colSpan={5} className="px-4 py-2 text-gray-400">
-                            판매 채널 없음 · {masterQuantityText(master)}
+                            판매 채널 없음 · {quantityText(master)}
                           </td>
                         </tr>
                       ) : (
-                        rows.map((channel) => <ChannelRow key={channel.key} channel={channel} />)
+                        channels.map((channel) => (
+                          <ChannelRow
+                            key={channel.listingId}
+                            channel={channel}
+                            quantity={quantityText(master)}
+                          />
+                        ))
                       )}
                     </Fragment>
                   );
                 })}
-                {orphanChannels.length > 0 && (
-                  <Fragment>
-                    {/* 서버 계약상 나올 수 없지만, 나오면 숨기지 않고 드러낸다. */}
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      <td colSpan={5} className="px-4 py-2 font-semibold text-gray-900">
-                        마스터를 알 수 없는 판매 채널
-                      </td>
-                    </tr>
-                    {orphanChannels.map((channel) => (
-                      <ChannelRow key={channel.key} channel={channel} />
-                    ))}
-                  </Fragment>
-                )}
               </tbody>
             </table>
           </div>
@@ -304,7 +214,7 @@ export function ProductUsageSection({
 }
 
 /** 판매 채널 한 줄(표). */
-function ChannelRow({ channel }: { channel: UsageChannel }) {
+function ChannelRow({ channel, quantity }: { channel: ProductUsageChannel; quantity: string }) {
   return (
     <tr className="border-b border-gray-100 last:border-b-0">
       <td className="px-4 py-2">
@@ -315,11 +225,11 @@ function ChannelRow({ channel }: { channel: UsageChannel }) {
       <td className="px-4 py-2 font-medium text-gray-900">
         {channel.listingName ?? '(이름 없음)'}
       </td>
-      <td className="px-4 py-2 text-gray-700">{quantityText(channel.options)}</td>
+      <td className="px-4 py-2 text-gray-700">{quantity}</td>
       <td className="px-4 py-2 text-gray-700">{statusText(channel.status)}</td>
       <td className="px-4 py-2 text-right">
         <Link
-          href={listingHref(channel.listingId)}
+          href={ROUTES.SALES_PRODUCTS_RETRIEVE_DETAILS(channel.listingId)}
           className="shrink-0 text-blue-600 hover:underline"
         >
           판매 상품 상세정보 →
@@ -330,32 +240,28 @@ function ChannelRow({ channel }: { channel: UsageChannel }) {
 }
 
 /** 병합 화면(좁은 폭)용 판매 채널 목록. */
-function CompactChannelList({
-  channels,
-  emptyText,
-}: {
-  channels: UsageChannel[];
-  emptyText: string;
-}) {
+function CompactChannelList({ master }: { master: ProductUsageMasterRef }) {
+  const channels = master.channels ?? [];
+  const quantity = quantityText(master);
+
   if (channels.length === 0) {
-    return emptyText ? <p className="mt-1 text-xs text-gray-400">{emptyText}</p> : null;
+    return <p className="mt-1 text-xs text-gray-400">판매 채널 없음 · {quantity}</p>;
   }
 
   return (
     <ul className="mt-1 divide-y divide-gray-100 border-t border-gray-100">
       {channels.map((channel) => (
-        <li key={channel.key} className="flex items-start justify-between gap-2 py-2">
+        <li key={channel.listingId} className="flex items-start justify-between gap-2 py-2">
           <div className="min-w-0">
             <p className="truncate text-xs font-medium text-gray-900">
               {channel.listingName ?? '(이름 없음)'}
             </p>
             <p className="text-xs text-gray-500">
-              {channel.accountAlias ?? channel.platform} · {quantityText(channel.options)} ·{' '}
-              {statusText(channel.status)}
+              {channel.accountAlias ?? channel.platform} · {quantity} · {statusText(channel.status)}
             </p>
           </div>
           <Link
-            href={listingHref(channel.listingId)}
+            href={ROUTES.SALES_PRODUCTS_RETRIEVE_DETAILS(channel.listingId)}
             className="shrink-0 text-xs text-blue-600 hover:underline"
           >
             판매 상품 상세정보 →
