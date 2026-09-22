@@ -6,7 +6,8 @@
  * 🔴 두 갈래(`masterProducts` · `listingOptions`)는 **삭제를 막는 연결**이고 자동으로 옮겨지지 않는다.
  * 🔴 **끊는 곳은 마스터 상품 화면 한 군데다**(2609_71 이후 셀 구성품 사본이 사라졌다) — `listingOptions` 는
  * 마스터를 통해 이 물품이 흘러간 **파급 범위**이고, 비어 있지 않으면 `masterProducts` 도 반드시 비어 있지 않다.
- * 🔴 화면은 이 목록을 옵션 줄로 나열하지 않고 `listingId` 로 묶어 **판매 채널 한 줄**로 접는다(2026-09-23).
+ * 🔴 화면은 이 목록을 그리지 않는다 — 판매 채널은 `masterProducts[].channels` 가 준다(2026-09-23).
+ * 여기는 삭제를 막는 근거(`deletable`·`blockers`)의 출처로만 남는다.
  * 🔴 `history` 는 참고 건수일 뿐 삭제를 막지 않는다 — 막으면 한 번이라도 사고 움직이고 보낸 물품은
  * 영영 지울 수 없다.
  * 🔴 `blockers` 는 서버가 만든 명사구다. 프론트가 **한 글자도 고치지 않는다**(꼬리 문구만 붙인다).
@@ -17,11 +18,29 @@ export interface ProductUsageOptionQty {
   quantity: number | null;
 }
 
+/** 마스터가 올라가 있는 판매 채널(셀) 한 줄. */
+export interface ProductUsageChannel {
+  listingId: number;
+  listingName: string | null;
+  marketplaceAccountId: number | null;
+  accountAlias: string | null;
+  platform: string;
+  status: string | null;
+}
+
 export interface ProductUsageMasterRef {
   id: number;
   name: string;
   /** 마스터 구성품의 수량 벡터. 독립된 연결이 아니라 마스터 아래 참고 값이다. */
   optionQuantities: ProductUsageOptionQty[];
+  /**
+   * 이 마스터에 붙어 있는 판매 채널 **전부**.
+   *
+   * 🔴 `listingOptions` 와 다르다 — 그쪽은 옵션 FK 를 타고 내려온 것이라 FK 가 비어 있는 셀
+   * (쿠팡 ID 로 편입했거나 FK 승격 전에 만들어진 셀)이 통째로 빠진다. 화면이 묻는 것은
+   * "이 물품이 어디서 팔리나" 이므로 **이 목록**을 그린다(2026-09-23).
+   */
+  channels: ProductUsageChannel[];
 }
 
 export interface ProductUsageListingOption {
