@@ -11,6 +11,8 @@ import { detailHrefWithReturn } from '@/infrastructure/utils/listReturn';
 import { ROUTES } from '@/config/routes';
 import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import { parseQuery, toApiParams, toSearchParams, type MasterListQuery } from '../masterListQuery';
 import { MasterProductSearchCard } from './MasterProductSearchCard';
@@ -21,6 +23,8 @@ import { MasterProductSearchCard } from './MasterProductSearchCard';
  *
  * ⚠️ 행 액션은 [삭제] 하나뿐이다 — 행 클릭이 상세로 이동하고 **수정은 전부 상세 페이지**에서 한다
  * (편집 지점 단일화). [상세]·[수정] 버튼을 다시 추가하지 말 것.
+ * ⚠️ [삭제]는 **하드 삭제**다(2609_72) — 옵션·구성·사진·마켓 미등록 채널이 함께 사라진다.
+ *    마켓에 올린 채널이 남아 있으면 서버가 409 로 막고, 그 문구를 그대로 배너에 띄운다.
  *
  * ⚠️ 조회 조건(page/size/sort/q)의 단일 진실원은 **URL** 이다(`useSearchParams` 파생). 같은 값을
  * `useState` 로 이중 보관하지 말 것. 변경은 `updateQuery` 하나로만 하고 `router.replace` 를 쓴다
@@ -56,6 +60,8 @@ export function MasterProductList() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  // 확인창 대상. null = 닫힘. busyId 는 기존 것(행 버튼 비활성)을 그대로 쓴다.
+  const [deleteTarget, setDeleteTarget] = useState<MasterProductResponse | null>(null);
 
 
   /**
@@ -108,20 +114,24 @@ export function MasterProductList() {
   /** 삭제 후: URL 은 그대로 두고 현재 페이지만 재조회. */
   const reloadCurrent = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
-  const handleDelete = async (m: MasterProductResponse) => {
-    if (!confirm(`마스터 "${m.name}" 을(를) 삭제하시겠습니까?`)) return;
+  const handleDelete = async () => {
+    const target = deleteTarget;
+    if (!target) return;
     setError('');
-    setBusyId(m.id);
+    setBusyId(target.id);
     try {
-      await useCase.remove(m.id);
+      await useCase.remove(target.id);
+      setDeleteTarget(null);
       // 마지막 항목을 지워 현재 페이지가 비면 이전 페이지로(로컬 state 가 아니라 URL 로 이동).
       if (masters.length === 1 && page > 0) {
         updateQuery({ page: page - 1 });
       } else {
         reloadCurrent();
       }
-    } catch {
-      setError('삭제에 실패했습니다.');
+    } catch (e) {
+      // 실패 이유는 배너가 말한다 — 창을 띄운 채 겹치지 않는다.
+      setDeleteTarget(null);
+      setError(extractErrorMessage(e, '삭제에 실패했습니다.'));
     } finally {
       setBusyId(null);
     }
@@ -162,7 +172,6 @@ export function MasterProductList() {
               <tr className="text-left text-sm text-gray-600">
                 <th className="px-4 py-3">사진</th>
                 <th className="px-4 py-3">이름</th>
-                <th className="px-4 py-3">상태</th>
                 <th className="px-4 py-3">구성상품</th>
                 <th className="px-4 py-3">옵션</th>
                 <th className="px-4 py-3">액션</th>
@@ -171,7 +180,7 @@ export function MasterProductList() {
             <tbody>
               {masters.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500">
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500">
                     {q ? '검색 결과가 없습니다.' : '등록된 판매상품 마스터가 없습니다.'}
                   </td>
                 </tr>
@@ -203,22 +212,13 @@ export function MasterProductList() {
                       </div>
                     </td>
                     <td className="px-4 py-3 font-medium">{m.name}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] ${
-                          m.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                        }`}
-                      >
-                        {m.active ? '활성' : '비활성'}
-                      </span>
-                    </td>
                     <td className="px-4 py-3">{m.components.length}</td>
                     <td className="px-4 py-3">{m.options.length}</td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => handleDelete(m)}
+                          onClick={() => setDeleteTarget(m)}
                           disabled={busyId === m.id}
                           className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                         >
@@ -241,6 +241,35 @@ export function MasterProductList() {
           onPageChange={(next) => updateQuery({ page: next })}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        title="마스터 삭제"
+        confirmText="삭제"
+        isDangerous
+        isLoading={busyId !== null && busyId === deleteTarget?.id}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+        message={
+          <div className="space-y-2 text-left">
+            <p>
+              <span className="font-medium">{deleteTarget?.name}</span> 을(를) 삭제합니다.
+              <span className="text-red-600"> 되돌릴 수 없습니다.</span>
+            </p>
+            <ul className="list-disc pl-5 text-sm text-gray-600">
+              <li>
+                옵션 {deleteTarget?.options.length}개 · 구성상품 {deleteTarget?.components.length}개와
+                사진이 함께 삭제됩니다
+              </li>
+              <li>마켓에 올리지 않은 채널은 함께 삭제됩니다</li>
+              <li>마켓에 올린 채널이 있으면 삭제되지 않습니다 — 먼저 [연결 해제] 하세요</li>
+              <li>
+                연결 해제한 판매상품이 이 마스터의 사진을 쓰고 있었다면 상세 이미지가 깨질 수 있습니다
+              </li>
+            </ul>
+          </div>
+        }
+      />
     </PageContainer>
   );
 }

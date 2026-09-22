@@ -41,7 +41,6 @@ export interface MasterOptionResponse {
 export interface MasterProductResponse {
   id: number;
   name: string;
-  active: boolean;
   sourceImageUrl: string | null;
   fieldValues: Record<string, string>;
   defaultDeliveryId: number | null; // default carrier for the price engine
@@ -65,13 +64,10 @@ export interface MasterProductResponse {
  *
  * 마스터의 정체성은 구성상품 조합이다 — 수량 차이(1개 / 5개 묶음)는 **같은 마스터의 옵션**이지
  * 새 마스터가 아니다. 생성 화면이 "이미 있습니다" 안내와 이동 링크를 만들 수 있을 만큼만 담는다.
- *
- * ⚠️ `active: false`(삭제된 마스터)도 내려온다 — 목록에 안 보여서 또 만드는 것을 막기 위함.
  */
 export interface MasterProductByComponents {
   id: number;
   name: string;
-  active: boolean;
   optionCount: number;
 }
 
@@ -111,7 +107,6 @@ export interface MasterProductRequest {
 export interface MasterProductUpdateRequest {
   name?: string;
   fieldValues?: Record<string, string>;
-  active?: boolean;
   componentProductIds?: number[];
   defaultDeliveryId?: number; // omit = keep existing (backend PATCH null = keep)
   defaultPackageId?: number;

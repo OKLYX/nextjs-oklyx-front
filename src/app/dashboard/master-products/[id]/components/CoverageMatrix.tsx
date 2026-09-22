@@ -560,10 +560,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const metaFilledCount =
     Object.values(masterAttrValues).filter((v) => v.trim() !== '').length +
     Object.values(masterNoticeValues).filter((v) => v.trim() !== '').length;
-  // 그룹 요약 = 이름·상태 + 카테고리 + 필수속성 수 + 옵션 수 + 대표사진 유무(접힌 채로 그룹 안 다섯
+  // 그룹 요약 = 이름 + 카테고리 + 필수속성 수 + 옵션 수 + 대표사진 유무(접힌 채로 그룹 안 다섯
   // 블록 상태를 읽게). ⚠️ 위 세 파생값은 여기서 즉시 읽히므로 반드시 basicSummary **앞**에 둔다.
   const basicSummary = master
-    ? `${master.name}${master.active ? '' : ' · 비활성'} · ${categorySummary} · 필수속성 ${
+    ? `${master.name} · ${categorySummary} · 필수속성 ${
         metaFilledCount
       }개 · 옵션 ${options.length}개 · ${
         master.sourceImageUrl ? '대표사진 있음' : '대표사진 없음'
