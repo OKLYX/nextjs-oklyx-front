@@ -1,6 +1,6 @@
 import type { ProductListingRepository } from '@/domain/repositories/ProductListingRepository';
-import type { ProductListing, ProductListingOption, ProductListingProduct, ListingMasterPreview, ListingMasterCreateRequest, ListingMasterCreateResult } from '@/domain/entities/ProductListingEntity';
-import type { CreateProductListingRequest, UpdateProductListingRequest, CreateProductListingOptionRequest, CreateProductListingProductRequest } from '@/application/dto/ProductListingDTOs';
+import type { ProductListing, ProductListingOption } from '@/domain/entities/ProductListingEntity';
+import type { UpdateProductListingRequest } from '@/application/dto/ProductListingDTOs';
 
 export class ProductListingUseCase {
   constructor(private repository: ProductListingRepository) {}
@@ -13,11 +13,6 @@ export class ProductListingUseCase {
     return this.repository.getProductListingsByPlatform(platform, page, size, masterLinked);
   }
 
-  /** @deprecated 2609_24 로 legacy 등록 화면이 사라져 호출자가 없다. 마스터 → 채널 추가/가져오기를 쓴다. */
-  async create(request: CreateProductListingRequest): Promise<ProductListing> {
-    return this.repository.createProductListing(request);
-  }
-
   async update(id: number, request: UpdateProductListingRequest): Promise<ProductListing> {
     return this.repository.updateProductListing(id, request);
   }
@@ -28,24 +23,5 @@ export class ProductListingUseCase {
 
   async getOptions(listingId: number): Promise<ProductListingOption[]> {
     return this.repository.getProductListingOptions(listingId);
-  }
-
-  async addOption(request: CreateProductListingOptionRequest): Promise<ProductListingOption> {
-    return this.repository.addProductListingOption(request);
-  }
-
-  async addProduct(request: CreateProductListingProductRequest): Promise<ProductListingProduct> {
-    return this.repository.addProductListingProduct(request);
-  }
-
-  async previewMaster(listingId: number): Promise<ListingMasterPreview> {
-    return this.repository.previewMasterFromListing(listingId);
-  }
-
-  async createMaster(
-    listingId: number,
-    request: ListingMasterCreateRequest
-  ): Promise<ListingMasterCreateResult> {
-    return this.repository.createMasterFromListing(listingId, request);
   }
 }
