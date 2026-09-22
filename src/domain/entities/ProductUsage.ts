@@ -35,6 +35,8 @@ export interface ProductUsageListingOption {
   listingId: number | null;
   /** 판매 상품 이름. 옵션명만으로는 어느 상품인지 알 수 없어 함께 보여준다. */
   listingName: string | null;
+  /** 이 옵션이 매달린 마스터 상품 id — 화면이 판매 채널을 마스터 아래로 넣는 근거다(2026-09-23). */
+  masterProductId: number | null;
   marketplaceAccountId: number | null;
   accountAlias: string | null;
   platform: string;
