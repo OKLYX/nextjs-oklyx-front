@@ -10,7 +10,8 @@
  * - 물품 상세(02)와 중복 병합 화면(04)이 **같은 컴포넌트를 쓴다.** 병합 화면은 좌우에 하나씩 놓으므로
  *   `compact` 를 켜서 좁은 폭에 맞춘다. 같은 화면을 다시 만들지 않는다.
  * - 조회·로딩·에러 상태는 이 컴포넌트가 만들지 않는다 — 부모(컨테이너)가 usecase 로 받아 props 로 준다.
- * - 연결이 하나도 없으면 **아무것도 렌더하지 않는다**(null). 빈 섹션을 남기지 않는다.
+ * - **카드는 하나다.** 요약·마스터 상품·판매 옵션을 각각 카드로 쪼개지 않는다(2026-09-23).
+ * - 연결 0 → `compact` 는 아무것도 렌더하지 않고(null), 상세 화면은 `연결 없음` 한 줄만 남긴다.
  *
  * **사용 예제**
  * ```tsx
@@ -20,6 +21,8 @@
  *
  * ⚠️ 여기는 「끊으러 갈 곳」을 보여주는 화면이지 이관 대상 목록이 아니다. 연결 해제 기능을 넣지 않는다
  *    (마스터 상품 화면 · 셀 화면의 일이다).
+ * ❌ 연결이 있다는 사실을 **빨간 경고로 칠하지 않는다.** 연결은 정상 상태다 — 빨강은 사용자가 무언가를
+ *    눌러서 실제로 실패했을 때만 쓴다(2026-09-23).
  */
 
 import Link from 'next/link';
@@ -54,10 +57,15 @@ export function ProductUsageSection({
   onRetry,
   compact = false,
 }: ProductUsageSectionProps) {
+  const masters = usage?.masterProducts ?? [];
+  const options = usage?.listingOptions ?? [];
+  const hasLinks = masters.length > 0 || options.length > 0;
+  const textSize = compact ? 'text-xs' : 'text-sm';
+
   if (isLoading) {
     return (
-      <Card padded={false}>
-        <div className="space-y-3 p-6">
+      <Card title={compact ? undefined : '연결'}>
+        <div className="space-y-3">
           <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
           <div className="h-4 w-full animate-pulse rounded bg-gray-100" />
           <div className="h-4 w-2/3 animate-pulse rounded bg-gray-100" />
@@ -79,24 +87,39 @@ export function ProductUsageSection({
     );
   }
 
-  const masters = usage?.masterProducts ?? [];
-  const options = usage?.listingOptions ?? [];
-
-  // 연결 0 → 섹션 자체를 숨긴다.
-  if (masters.length === 0 && options.length === 0) return null;
-
-  const textSize = compact ? 'text-xs' : 'text-sm';
+  // 병합 화면(좌우 2단)은 빈 칸을 남기지 않는다. 상세 화면은 「연결 없음」을 보여준다.
+  if (!hasLinks && compact) return null;
 
   return (
-    <div className={compact ? 'space-y-3' : 'space-y-6'}>
-      <div className={`rounded-lg bg-amber-50 px-4 py-3 text-amber-800 ${textSize}`}>
-        <p>삭제하려면 아래 연결을 먼저 끊어야 합니다.</p>
-        <p>마스터에서 빼도 판매 옵션 구성은 따로 남습니다 — 둘 다 정리해 주세요.</p>
-      </div>
+    <Card
+      title={compact ? undefined : '연결'}
+      action={
+        hasLinks && !compact ? (
+          <span className="text-sm text-gray-600">
+            마스터 상품 {masters.length}개 · 판매 옵션 {options.length}개
+          </span>
+        ) : undefined
+      }
+      className="space-y-4"
+    >
+      {!hasLinks && (
+        <p className="text-sm text-gray-500">연결 없음 — 이 물품은 아직 아무 곳에도 쓰이지 않습니다.</p>
+      )}
+
+      {/* 연결이 있다는 사실 자체는 정상이다 — 회색 안내 한 줄로만 알린다.
+          병합 화면(compact)은 부모 카드가 같은 안내를 이미 띄우므로 생략한다. */}
+      {hasLinks && !compact && (
+        <p className={`text-gray-600 ${textSize}`}>
+          삭제하려면 아래 연결을 먼저 끊어주세요. 마스터에서 빼도 판매 옵션 구성은 따로 남습니다.
+        </p>
+      )}
 
       {masters.length > 0 && (
-        <Card title={`마스터 상품 ${masters.length}개`}>
-          <ul className="space-y-4">
+        <section>
+          <h3 className={`mb-2 font-semibold text-gray-900 ${compact ? 'text-xs' : 'text-sm'}`}>
+            마스터 상품 {masters.length}개
+          </h3>
+          <ul className="space-y-3">
             {masters.map((master) => (
               <li key={master.id} className="border-b border-gray-100 pb-3 last:border-b-0 last:pb-0">
                 <div className="flex items-center justify-between gap-3">
@@ -122,15 +145,18 @@ export function ProductUsageSection({
               </li>
             ))}
           </ul>
-        </Card>
+        </section>
       )}
 
       {options.length > 0 && (
-        <Card title={`판매 옵션 ${options.length}개`} padded={!compact}>
+        <section>
+          <h3 className={`mb-2 font-semibold text-gray-900 ${compact ? 'text-xs' : 'text-sm'}`}>
+            판매 옵션 {options.length}개
+          </h3>
           {compact ? (
             <ul className="divide-y divide-gray-100">
               {options.map((option) => (
-                <li key={option.id} className="flex items-start justify-between gap-2 px-4 py-2">
+                <li key={option.id} className="flex items-start justify-between gap-2 py-2">
                   <div className="min-w-0">
                     <p className="truncate text-xs font-medium text-gray-900">{option.name}</p>
                     <p className="text-xs text-gray-500">
@@ -188,8 +214,8 @@ export function ProductUsageSection({
               </table>
             </div>
           )}
-        </Card>
+        </section>
       )}
-    </div>
+    </Card>
   );
 }
