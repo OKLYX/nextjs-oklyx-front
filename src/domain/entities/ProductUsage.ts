@@ -26,6 +26,13 @@ export interface ProductUsageListingOption {
   /** 채널 셀 옵션(`ProductListingOption`) id — 셀(listing) id 가 아니다. */
   id: number;
   name: string;
+  /**
+   * 이 옵션이 속한 판매 상품(셀) id. 🔴 화면이 판매 상품 상세로 바로 가는 근거다 —
+   * 이 값이 없던 시절에는 목록으로만 보낼 수 있었다(2026-09-23).
+   */
+  listingId: number | null;
+  /** 판매 상품 이름. 옵션명만으로는 어느 상품인지 알 수 없어 함께 보여준다. */
+  listingName: string | null;
   marketplaceAccountId: number | null;
   accountAlias: string | null;
   platform: string;
