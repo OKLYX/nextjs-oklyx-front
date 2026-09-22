@@ -22,8 +22,8 @@ import { MasterCompositionForm } from './MasterCompositionForm';
  * 진입은 마스터 상세의 「옵션 (수량조합)」 헤더 [구성상품 변경] 버튼 하나다.
  *
  * ⚠️ 팝업이 아니라 페이지다(PLAN/D9) — 구성상품 검색·선택 + 옵션 × 구성상품 수량 격자는 긴 작업이다.
- * ⚠️ 비활성(삭제된) 마스터도 열려야 한다(PLAN/D11). `active === false` 로 막지 말 것 —
- *    잘못 만들어 지워둔 마스터의 구성을 고치는 것이 이 화면이 생긴 이유다.
+ * ⚠️ 비활성 개념은 없어졌다(2609_72) — 삭제는 목록의 [삭제] 하나이고, 남아 있는 마스터는 전부
+ *    열린다. `active` 로 진입을 막는 코드를 다시 넣지 말 것.
  */
 export function MasterCompositionContainer({ id }: { id: string }) {
   const router = useRouter();
@@ -77,12 +77,6 @@ export function MasterCompositionContainer({ id }: { id: string }) {
         </div>
 
         {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-
-        {master && !master.active && (
-          <p className="mb-4 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            비활성(삭제됨) 마스터입니다.
-          </p>
-        )}
 
         {isLoading ? (
           <div className="flex min-h-40 items-center justify-center">
