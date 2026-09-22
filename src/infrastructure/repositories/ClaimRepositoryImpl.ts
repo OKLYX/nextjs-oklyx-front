@@ -6,6 +6,7 @@ import type {
   Claim,
   ClaimActionPayload,
   ClaimActionResult,
+  ClaimSyncResult,
 } from '@/domain/entities/ClaimEntity';
 
 export class ClaimRepositoryImpl implements ClaimRepository {
@@ -32,6 +33,12 @@ export class ClaimRepositoryImpl implements ClaimRepository {
   // in `data`, so callers read `error.response.data.data`, not a 200 body.
   async executeAction(claimId: number, payload: ClaimActionPayload): Promise<ClaimActionResult> {
     const response = await axiosInstance.post(`/api/admin/claims/${claimId}/actions`, payload);
+    return response.data.data;
+  }
+
+  // 적재(읽어와 저장)라 조회 경로에 있다 — 주문·문의 동기화와 같은 자리다(액션만 /api/admin).
+  async syncClaims(accountId: number): Promise<ClaimSyncResult> {
+    const response = await axiosInstance.post('/api/claims/sync', null, { params: { accountId } });
     return response.data.data;
   }
 }

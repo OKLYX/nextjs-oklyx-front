@@ -24,6 +24,21 @@ export interface Claim {
   returnShippingCharge: number | null;
   collectInvoiceNo: string | null;
   collectCarrierCode: string | null;
+  /**
+   * 회수송장의 출처 (FEATURE_2609_70 / D12). `PLATFORM` = 동기화가 마켓에서 읽어온 값,
+   * `LOCAL` = 마켓이 거절해 우리 장부에만 남긴 값, `null` = 출처를 모르는 기존 행.
+   * 🔴 `null` 과 `PLATFORM` 은 화면에서 아무 표시도 하지 않는다 — 정상이 시끄러우면 이상한 것을 못 본다.
+   */
+  collectInvoiceSource: 'PLATFORM' | 'LOCAL' | null;
+  /**
+   * 회수종류 **원문**(`수기관리` · `전담택배` · `연동택배` · `''`). 반품에만 채워진다.
+   *
+   * 🔴 이 값으로 버튼을 켜고 끄지 않는다 — 무엇을 누를 수 있는지는 서버가 `availableActions` 로 이미
+   * 판정했다(2609_21 D1). 화면은 `''`(고객이 직접 발송·회수 대상 없음)일 때 안내 문구를 그리는 데에만 쓴다.
+   * 🔴 `''` 와 `null` 을 같게 다루지 말 것: `null` 은 아직 안 읽은 기존 행이고(다음 동기화가 채운다),
+   * `''` 는 마켓이 "회수할 물건 없음"이라고 답한 것이다. `?? ''` 로 뭉개면 옛 행 전부에 안내가 뜬다.
+   */
+  returnDeliveryType: string | null;
   collectStatus?: string | null;     // exchange only — raw platform value (05). Optional: an older
                                      // server response has no such field at all (undefined).
   reshipInvoiceNo: string | null;    // exchange only — reshipment (seller → customer) invoice
@@ -45,6 +60,9 @@ export interface Claim {
 /** Action identifiers — echoed back to the server verbatim. 교환 4값은 06 이 쓴다(D14). */
 export type ClaimActionCode =
   | 'RETURN_RECEIVE_CONFIRM' | 'RETURN_APPROVE' | 'RETURN_COLLECT_INVOICE'
+  // 우리 장부에만 남은 회수송장을 그대로 다시 보낸다(2609_70 D7~D9). `requires: 'NONE'` 이라 화면은
+  // 송장을 다시 입력받지 않는다 — 서버가 저장된 값을 싣는다.
+  | 'RETURN_COLLECT_INVOICE_RESEND'
   | 'EXCHANGE_RECEIVE_CONFIRM' | 'EXCHANGE_REJECT'
   | 'EXCHANGE_RESHIP_INVOICE' | 'EXCHANGE_COLLECT_INVOICE';
 
@@ -88,9 +106,13 @@ export interface ClaimActionPayload {
 }
 
 /**
- * Action result. `succeeded` is always `true` on a 200 — a marketplace rejection arrives as 502
- * with this same shape in `data` — so never branch on it. It exists so web, mobile and the audit
- * table read one contract.
+ * Action result. A marketplace rejection normally arrives as 502 with this same shape in `data`,
+ * so never branch on `succeeded`. It exists so web, mobile and the audit table read one contract.
+ *
+ * 🔴 **회수송장만 예외다**(FEATURE_2609_70 / D6): 마켓이 거절해도 우리 장부에는 값을 기록하므로
+ * **HTTP 200 + `localRecordOnly: true`** 로 온다(`succeeded` 는 `false`). 화면은 `succeeded` 가 아니라
+ * `localRecordOnly` 로 분기한다 — 어느 액션에서 그 값이 오는지는 서버가 정한다(2609_21 D1).
+ *
  * ⚠️ `resultMessage` is the marketplace's raw text (D15): show it, never translate or summarise it.
  */
 export interface ClaimActionResult {
@@ -99,6 +121,20 @@ export interface ClaimActionResult {
   succeeded: boolean;
   resultCode: string | null;
   resultMessage: string | null;
+  /** true = 마켓이 거절해 우리 기록에만 저장했다. 회수송장 2액션에서만 true 가 될 수 있다. */
+  localRecordOnly: boolean;
+}
+
+/**
+ * 반품·교환만 다시 가져오기 결과 (POST /api/claims/sync). 채널 1개분이다.
+ *
+ * 🔴 건수가 없다 — 클레임 적재 경로가 세는 것은 조회한 페이지 수뿐이라 「신규 N건」을 만들 수 없다
+ * (FEATURE_2609_70 / D16). `skipped` 는 같은 채널이 이미 동기화 중이라 건너뛴 회차이며 실패가 아니다.
+ */
+export interface ClaimSyncResult {
+  accountId: number;
+  skipped: boolean;
+  syncedAt: string;
 }
 
 export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {
