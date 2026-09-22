@@ -12,6 +12,7 @@ import { ProductUsageSection } from './ProductUsageSection';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
+import { ROUTES } from '@/config/routes';
 import { formatKrw } from '@/infrastructure/utils/money';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { useClipboardStore, newClipId } from '@/infrastructure/stores/clipboardStore';
@@ -180,6 +181,10 @@ export function ProductDetailView({
           </Button>
           <Button variant="secondary" onClick={handleExtractClick} disabled={isExtracting}>
             {isExtracting ? '추출 중…' : '바코드 추출'}
+          </Button>
+          {/* 중복 병합 (FEATURE_2609_69 / B) — 같은 물건이 두 번 등록된 경우 이 물품을 한쪽에 놓고 시작한다 */}
+          <Button variant="secondary" onClick={() => router.push(ROUTES.PRODUCT_MERGE(product.id))}>
+            중복 병합
           </Button>
           <Button onClick={() => router.push(editHref)}>수정</Button>
           {/* 🔴 삭제 버튼은 이 하나뿐이다. 연결 섹션 옆에 두 번째 삭제 버튼을 만들지 않는다. */}
