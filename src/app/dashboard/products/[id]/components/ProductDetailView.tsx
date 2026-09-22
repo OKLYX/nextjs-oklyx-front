@@ -21,11 +21,11 @@ import { barcodeResultText } from '@/infrastructure/utils/barcodeExtraction';
 
 interface ProductDetailViewProps {
   product: Product;
-  /** 사용처 (FEATURE_2609_69 / A). 아직 안 실렸거나 실패하면 null */
+  /** 판매 채널 현황 (FEATURE_2609_69 / A). 아직 안 실렸거나 실패하면 null */
   usage: ProductUsage | null;
   usageLoading: boolean;
   usageError: string | null;
-  /** 사용처 재조회 — 「다시 시도」와 삭제 거부(409) 후에 부른다 */
+  /** 판매 채널 재조회 — 「다시 시도」와 삭제 거부(409) 후에 부른다 */
   onReloadUsage: () => void;
   onDelete: () => Promise<void>;
   imageUseCase: ProductImageUseCase;
@@ -143,7 +143,7 @@ export function ProductDetailView({
    * 삭제 (FEATURE_2609_69 / A).
    *
    * 🔴 서버 가드가 최종 판정이다 — 화면이 [삭제]를 열어줬어도 그새 쓰이기 시작했으면 409 가 온다.
-   * 그때는 **서버 문구를 그대로** 보여주고 사용처를 다시 싣는다.
+   * 그때는 **서버 문구를 그대로** 보여주고 판매 채널을 다시 싣는다.
    */
   const handleDeleteConfirm = useCallback(async () => {
     setIsDeleting(true);
@@ -159,10 +159,10 @@ export function ProductDetailView({
     }
   }, [onDelete, router, backHref, onReloadUsage]);
 
-  // 사용처가 아직 안 실렸으면 누르지 못하게 둔다. 실패(usage === null + usageError)면 서버 가드에 맡긴다.
+  // 판매 채널이 아직 안 실렸으면 누르지 못하게 둔다. 실패(usage === null + usageError)면 서버 가드에 맡긴다.
   const deleteBlocked = usage !== null && !usage.deletable;
   // 🔴 어딘가에 쓰이고 있다는 사실은 **경고가 아니다**. 빨간 배너로 상주시키지 않고 [삭제] 버튼 툴팁으로만
-  // 알린다(2026-09-23). 사유 문구는 사용처 카드가 회색 안내로 이어 받는다.
+  // 알린다(2026-09-23). 사유 문구는 판매 채널 카드가 회색 안내로 이어 받는다.
   const deleteBlockedTitle = deleteBlocked && usage ? deleteBlockedReason(usage.blockers) : undefined;
 
   // 🔴 값이 비어도 목록에서 빼지 않는다 — 빈 칸이 보여야 무엇을 더 채워야 하는지 알 수 있다(2026-09-23).
@@ -199,7 +199,7 @@ export function ProductDetailView({
             중복 병합
           </Button>
           <Button onClick={() => router.push(editHref)}>수정</Button>
-          {/* 🔴 삭제 버튼은 이 하나뿐이다. 사용처 섹션 옆에 두 번째 삭제 버튼을 만들지 않는다. */}
+          {/* 🔴 삭제 버튼은 이 하나뿐이다. 판매 채널 섹션 옆에 두 번째 삭제 버튼을 만들지 않는다. */}
           <Button
             variant="danger"
             disabled={usageLoading || deleteBlocked}
@@ -246,7 +246,7 @@ export function ProductDetailView({
         </Card>
       )}
 
-      {/* 사용처 — 마스터 상품 / 판매 옵션. 04(병합 화면)가 같은 컴포넌트를 좌우로 쓴다 */}
+      {/* 판매 채널 — 마스터 상품 / 판매 채널. 04(병합 화면)가 같은 컴포넌트를 좌우로 쓴다 */}
       <ProductUsageSection
         usage={usage}
         isLoading={usageLoading}
