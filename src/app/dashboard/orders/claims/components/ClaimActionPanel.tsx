@@ -65,6 +65,11 @@ const INVOICE_HINT: Partial<Record<ClaimAction['action'], string>> = {
 };
 
 const SUCCESS_MESSAGE = '처리 요청을 보냈습니다. 다음 동기화 후 상태가 갱신됩니다.';
+/**
+ * 마켓이 회수송장을 거절해 우리 장부에만 기록한 회차(2609_70 D6) — HTTP 200 으로 온다.
+ * 실패가 아니라 "절반만 됐다" 라서 안내 톤이고, 마켓 원문을 함께 보여준다(그 문구가 다음 수정의 단서다).
+ */
+const LOCAL_RECORD_MESSAGE = '쿠팡에는 반영되지 않았습니다. 회수송장은 우리 기록에만 저장했습니다.';
 const CONFLICT_MESSAGE = '이미 처리된 접수입니다.';
 const FORBIDDEN_MESSAGE = '이 작업은 관리자만 할 수 있습니다.';
 /**
@@ -79,8 +84,11 @@ const RESHIP_EARLY_MESSAGE =
 const EMPTY_FORM = { deliveryCompanyCode: '', invoiceNumber: '' };
 
 type Banner =
-  // notice = 사용자가 잘못한 게 아닌 400(재발송 송장의 '아직 이름') — 붉은 에러로 던지지 않는다.
-  | { kind: 'success' | 'notice'; message: string }
+  // notice = 사용자가 잘못한 게 아닌 결과 — 붉은 에러로 던지지 않는다.
+  //   ① 재발송 송장의 '아직' 400  ② 마켓 거절 후 로컬 기록(2609_70 D6)
+  // ②는 마켓 원문을 함께 보여줘야 하므로 `raw` 를 에러와 같은 자리에 둔다.
+  | { kind: 'success'; message: string }
+  | { kind: 'notice'; message: string; raw?: ClaimActionResult | null }
   | { kind: 'error'; message: string; raw?: ClaimActionResult | null };
 
 export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps) {
@@ -166,8 +174,14 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
     try {
       setIsSending(true);
       setBanner(null);
-      await claimUseCase.executeAction(claim.id, payload);
-      setBanner({ kind: 'success', message: SUCCESS_MESSAGE });
+      const result = await claimUseCase.executeAction(claim.id, payload);
+      // 🔴 `option.action` 이 아니라 `localRecordOnly` 로만 분기한다 — 어느 액션에서 그 값이 오는지는
+      // 서버가 정한다(2609_21 D1). `succeeded` 로도 분기하지 않는다(로컬 기록 회차는 false 다).
+      setBanner(
+        result.localRecordOnly
+          ? { kind: 'notice', message: LOCAL_RECORD_MESSAGE, raw: result }
+          : { kind: 'success', message: SUCCESS_MESSAGE }
+      );
       setOpenAction(null);
       setForm(EMPTY_FORM);
       await refresh();
@@ -360,10 +374,22 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
           }`}
         >
           <p>{banner.message}</p>
-          {banner.kind === 'error' && banner.raw && (
+          {/* 마켓 원문은 빨강·주황 양쪽에서 보여준다 — 거절 문구가 이 기능을 고치는 단서라
+              화면에 안 나오면 사용자가 옮겨 적을 수 없다(2609_70 §검증 3). */}
+          {banner.kind !== 'success' && banner.raw && (
             <details className="mt-2">
-              <summary className="cursor-pointer text-red-700">쿠팡 응답 보기</summary>
-              <p className="mt-1 break-all text-red-900">
+              <summary
+                className={`cursor-pointer ${
+                  banner.kind === 'notice' ? 'text-amber-700' : 'text-red-700'
+                }`}
+              >
+                쿠팡 응답 보기
+              </summary>
+              <p
+                className={`mt-1 break-all ${
+                  banner.kind === 'notice' ? 'text-amber-900' : 'text-red-900'
+                }`}
+              >
                 {banner.raw.resultCode ?? '-'} {banner.raw.resultMessage ?? ''}
               </p>
             </details>

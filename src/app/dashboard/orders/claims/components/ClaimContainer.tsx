@@ -5,8 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { ClaimRepositoryImpl } from '@/infrastructure/repositories/ClaimRepositoryImpl';
 import { ClaimUseCase } from '@/application/usecases/ClaimUseCase';
+import { OrderRepositoryImpl } from '@/infrastructure/repositories/OrderRepositoryImpl';
+import { OrderUseCase } from '@/application/usecases/OrderUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
+import { useOrderSync } from '@/presentation/hooks/useOrderSync';
+import { SyncProgressModal } from '@/app/dashboard/orders/components/SyncProgressModal';
+import type { SyncTarget } from '@/application/dto/OrderDTOs';
+import { formatRelativeTime } from '@/domain/entities/DateTimeFormat';
 import {
   CLAIM_TYPE_LABEL,
   EXCHANGE_STATUS_FILTERS,
@@ -25,6 +31,14 @@ import { ClaimDetailsModal } from './ClaimDetailsModal';
 
 const PAGE_SIZE = 20;
 
+/** 조회에 실제로 반영된 조건 — 동기화 후 재조회가 화면의 pending 값이 아니라 이 값으로 돈다. */
+interface AppliedQuery {
+  type: ClaimType;
+  sellerId: number | '';
+  period: string;
+  keyword: string;
+}
+
 // Status chip selected on entry and after a tab switch. 접수 is what needs handling first, so it
 // is the landing filter instead of 전체. Must stay a value present in BOTH
 // RETURN_STATUS_FILTERS and EXCHANGE_STATUS_FILTERS.
@@ -39,10 +53,15 @@ export function ClaimContainer() {
   const deepLinkType = searchParams.get('type');
 
   const claimUseCase = useMemo(() => new ClaimUseCase(new ClaimRepositoryImpl()), []);
+  const orderUseCase = useMemo(() => new OrderUseCase(new OrderRepositoryImpl()), []);
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [selectedSellerId, setSelectedSellerId] = useState<number | ''>('');
+  // 동기화 대상 = 판매자 필터가 걸린 채널들. 채널 드롭다운은 만들지 않는다 — 클레임 목록에 채널 축이 없다.
+  const [syncTargets, setSyncTargets] = useState<SyncTarget[]>([]);
+  // 건너뛴 채널 수(D15) — 성공처럼 보이면 안 되므로 목록 위에 한 줄로 남긴다.
+  const [skippedChannels, setSkippedChannels] = useState(0);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -64,11 +83,15 @@ export function ClaimContainer() {
   // 최초 조회에만 쓰는 값 — URL 이 정리돼도(모달 닫기) 재조회가 돌지 않게 ref 로 고정한다.
   const initialClaimTypeRef = useRef<ClaimType>(initialClaimType);
 
+  const appliedQueryRef = useRef<AppliedQuery | null>(null);
+
   // null = do not label months with data — claims have no "months with data" API.
   const periodOptions = useMemo(() => buildPeriodOptions(null), []);
 
   const fetchClaims = useCallback(
-    async (type: ClaimType, sellerId: number | '', period: string, keyword: string) => {
+    async (query: AppliedQuery) => {
+      const { type, sellerId, period, keyword } = query;
+      appliedQueryRef.current = query;
       try {
         setIsLoading(true);
         setError('');
@@ -108,12 +131,33 @@ export function ClaimContainer() {
     loadSellers();
   }, [sellerUseCase]);
 
+  /**
+   * 동기화 대상 = `OrderUseCase.getSyncTargets()` (주문내역·고객문의와 같은 원천).
+   * 판매자 필터를 바꾸면 다시 싣는다 — 그 판매자의 채널만 돌기 위해서다(채널 선택 UI 는 없다).
+   * 실패는 비차단이다: 목록 조회는 그대로 돌고 [동기화] 버튼만 사유와 함께 비활성된다.
+   */
+  useEffect(() => {
+    const loadSyncTargets = async () => {
+      try {
+        setSyncTargets(await orderUseCase.getSyncTargets(selectedSellerId || undefined));
+      } catch {
+        setSyncTargets([]);
+      }
+    };
+    void loadSyncTargets();
+  }, [orderUseCase, selectedSellerId]);
+
   // On first entry: load the default window without requiring a search click.
   // Inline async IIFE — the project's lint (react-hooks/set-state-in-effect) rejects a
   // synchronous setState in an effect body.
   useEffect(() => {
     void (async () => {
-      await fetchClaims(initialClaimTypeRef.current, '', RECENT_PERIOD, '');
+      await fetchClaims({
+        type: initialClaimTypeRef.current,
+        sellerId: '',
+        period: RECENT_PERIOD,
+        keyword: '',
+      });
     })();
   }, [fetchClaims]);
 
@@ -129,6 +173,65 @@ export function ClaimContainer() {
       }
     })();
   }, [deepLinkClaimId, claimUseCase]);
+
+  /**
+   * 동기화가 끝난 뒤 목록 재조회 — 마지막으로 **조회에 반영된** 조건 그대로다.
+   * 그 사이 사용자가 만진 pending 값(판매자·기간·검색어)을 쓰면 다른 조회가 되어 화면이 말없이 바뀐다.
+   */
+  const refetchAfterSync = useCallback(async () => {
+    const query = appliedQueryRef.current;
+    if (query) await fetchClaims(query);
+  }, [fetchClaims]);
+
+  // 채널 루프·진행 모달·취소·채널별 실패 격리는 주문내역과 같은 훅을 쓴다(복사 금지).
+  // 부르는 엔드포인트만 다르므로 표준 동기화(runSync)가 아니라 범용 러너(runChannels)를 빌린다.
+  const {
+    isSyncing, syncChannels, syncCursor, syncCanceled, syncModalOpen,
+    runChannels, failedTargets, cancelSync, closeSyncModal, stopSyncing,
+  } = useOrderSync({ onAfterSync: refetchAfterSync });
+
+  const runClaimSync = useCallback(async (targets: SyncTarget[]) => {
+    if (targets.length === 0) {
+      setError('가져올 채널이 없습니다.');
+      return;
+    }
+    setError('');
+    setSkippedChannels(0);
+    // 러너는 채널 상태만 찍는다 — 건너뛴 채널 수는 이 클로저가 센다(공용 훅을 고치지 않는다).
+    let skipped = 0;
+    await runChannels(targets, async (target) => {
+      const result = await claimUseCase.syncClaims(target.accountId);
+      if (result.skipped) skipped += 1;
+      return result.skipped ? 'skipped' : 'success';
+    });
+    setSkippedChannels(skipped);
+    // 루프 직후 스피너를 푼다(문의 화면과 같은 자세) — 목록 재조회는 이어서 돈다.
+    stopSyncing();
+    await refetchAfterSync();
+  }, [runChannels, stopSyncing, refetchAfterSync, claimUseCase]);
+
+  // 판매자 필터가 걸려 있으면 그 판매자의 채널만, 아니면 전체를 돈다(대상 목록이 이미 그렇게 실린다).
+  const handleSync = () => {
+    void runClaimSync(syncTargets);
+  };
+
+  const handleRetryFailed = () => {
+    void runClaimSync(failedTargets);
+  };
+
+  /**
+   * 「마지막 동기화」 — 서버가 채널별로 낙인한 시각 중 가장 최근 값이다(D16).
+   * 값이 모두 오프셋 없는 같은 형식이라 사전순 = 시간순이다.
+   */
+  const lastClaimSyncedAt = useMemo(
+    () =>
+      syncTargets
+        .map((target) => target.lastClaimSyncAt)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1) ?? null,
+    [syncTargets]
+  );
 
   /**
    * 모달을 닫으면 URL 도 정리한다 — 딥링크 파라미터를 남기면 새로고침마다 모달이 다시 열리고,
@@ -173,7 +276,12 @@ export function ClaimContainer() {
   );
 
   const handleSearch = () => {
-    void fetchClaims(claimType, selectedSellerId, selectedPeriod, searchTerm);
+    void fetchClaims({
+      type: claimType,
+      sellerId: selectedSellerId,
+      period: selectedPeriod,
+      keyword: searchTerm,
+    });
   };
 
   // Seller/period/keyword carry over — following one order context across both tabs is natural.
@@ -188,7 +296,12 @@ export function ClaimContainer() {
     setSelectedStatus(DEFAULT_STATUS);
     setCurrentPage(0);
     setSelectedClaim(null);
-    void fetchClaims(next, selectedSellerId, selectedPeriod, searchTerm);
+    void fetchClaims({
+      type: next,
+      sellerId: selectedSellerId,
+      period: selectedPeriod,
+      keyword: searchTerm,
+    });
   };
 
   // Chip changes reset to page 1 — filtering from page 3 would show a blank list.
@@ -222,7 +335,15 @@ export function ClaimContainer() {
       : `해당 기간에 ${typeLabel} 내역이 없습니다.`;
 
   return (
-    <PageContainer title="반품/교환">
+    <PageContainer
+      title="반품/교환"
+      action={
+        <p className="text-sm text-gray-500 whitespace-nowrap">
+          마지막 동기화:{' '}
+          <span className="font-medium text-gray-700">{formatRelativeTime(lastClaimSyncedAt)}</span>
+        </p>
+      }
+    >
       <ClaimTypeTabs value={claimType} onChange={handleTypeChange} disabled={isLoading} />
 
       <ClaimSearchCard
@@ -235,7 +356,10 @@ export function ClaimContainer() {
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
         onSearch={handleSearch}
+        onSync={handleSync}
         isLoading={isLoading}
+        isSyncing={isSyncing}
+        syncDisabledReason={syncTargets.length === 0 ? '가져올 채널이 없습니다' : undefined}
         resultCount={visible.length}
       />
 
@@ -246,6 +370,13 @@ export function ClaimContainer() {
         counts={statusCounts}
         totalCount={claims.length}
       />
+
+      {/* 건너뛴 채널은 성공처럼 보이면 안 된다 — 진행 모달이 세는 수와 같은 사실을 한 줄로 남긴다. */}
+      {skippedChannels > 0 && (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+          {skippedChannels}개 채널은 이미 동기화 중이라 건너뛰었습니다.
+        </p>
+      )}
 
       <ClaimTable
         claimType={claimType}
@@ -266,6 +397,17 @@ export function ClaimContainer() {
         claim={selectedClaim}
         onClose={handleCloseModal}
         onActionDone={handleActionDone}
+      />
+
+      <SyncProgressModal
+        open={syncModalOpen}
+        channels={syncChannels}
+        doneCount={syncCursor}
+        isRunning={isSyncing}
+        canceled={syncCanceled}
+        onCancel={cancelSync}
+        onRetryFailed={handleRetryFailed}
+        onClose={closeSyncModal}
       />
     </PageContainer>
   );

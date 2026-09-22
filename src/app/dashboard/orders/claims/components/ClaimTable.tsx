@@ -3,6 +3,7 @@
 import { CLAIM_STATUS_LABEL, faultTypeText } from '@/domain/entities/ClaimEntity';
 import type { Claim, ClaimType } from '@/domain/entities/ClaimEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { LocalRecordBadge } from './LocalRecordBadge';
 
 interface ClaimTableProps {
   // Only 교환 has a 재발송송장 column
@@ -123,7 +124,11 @@ export function ClaimTable({
                   {CLAIM_STATUS_LABEL[claim.status]}
                 </span>
               </td>
-              <td className="px-6 py-3 text-sm text-gray-700">{claim.collectInvoiceNo ?? '-'}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                {claim.collectInvoiceNo ?? '-'}
+                {/* 마켓에 반영되지 않은 값만 표시한다 — `null`(기존 행)·`PLATFORM` 은 조용히 둔다. */}
+                {claim.collectInvoiceSource === 'LOCAL' && <LocalRecordBadge />}
+              </td>
               {claimType === 'EXCHANGE' && (
                 <td className="px-6 py-3 text-sm text-gray-700">{claim.reshipInvoiceNo ?? '-'}</td>
               )}
