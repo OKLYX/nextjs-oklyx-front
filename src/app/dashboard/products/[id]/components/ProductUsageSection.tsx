@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 물품 연결 현황 — 마스터 상품 / 판매 옵션 두 갈래 (FEATURE_2609_69 / A).
+ * 물품 사용처 — 마스터 상품 / 판매 옵션 두 갈래 (FEATURE_2609_69 / A).
  *
  * **용도**: "이 물품이 어디에 쓰이는지" 를 보여주고, 삭제하려면 어디로 가서 끊어야 하는지 안내한다.
  * **파일**: src/app/dashboard/products/[id]/components/ProductUsageSection.tsx
@@ -11,7 +11,8 @@
  *   `compact` 를 켜서 좁은 폭에 맞춘다. 같은 화면을 다시 만들지 않는다.
  * - 조회·로딩·에러 상태는 이 컴포넌트가 만들지 않는다 — 부모(컨테이너)가 usecase 로 받아 props 로 준다.
  * - **카드는 하나다.** 요약·마스터 상품·판매 옵션을 각각 카드로 쪼개지 않는다(2026-09-23).
- * - 연결 0 → `compact` 는 아무것도 렌더하지 않고(null), 상세 화면은 `연결 없음` 한 줄만 남긴다.
+ * - 사용처 0 → `compact` 는 아무것도 렌더하지 않고(null), 상세 화면은 `사용처 없음` 한 줄만 남긴다.
+ * - 이동 링크는 **상세 화면으로 보낸다.** 목록으로 보내면 사용자가 거기서 다시 찾아야 한다(2026-09-23).
  *
  * **사용 예제**
  * ```tsx
@@ -21,7 +22,7 @@
  *
  * ⚠️ 여기는 「끊으러 갈 곳」을 보여주는 화면이지 이관 대상 목록이 아니다. 연결 해제 기능을 넣지 않는다
  *    (마스터 상품 화면 · 셀 화면의 일이다).
- * ❌ 연결이 있다는 사실을 **빨간 경고로 칠하지 않는다.** 연결은 정상 상태다 — 빨강은 사용자가 무언가를
+ * ❌ 쓰이고 있다는 사실을 **빨간 경고로 칠하지 않는다.** 쓰이는 건 정상 상태다 — 빨강은 사용자가 무언가를
  *    눌러서 실제로 실패했을 때만 쓴다(2026-09-23).
  */
 
@@ -50,6 +51,18 @@ export interface ProductUsageSectionProps {
   compact?: boolean;
 }
 
+/**
+ * 판매 상품 상세 주소.
+ *
+ * 🔴 서버가 셀 id 를 함께 주기 전에는 목록으로만 보낼 수 있었다(2026-09-23 해결).
+ * 옛 데이터라 셀 id 가 없으면 그때만 목록으로 떨어뜨린다.
+ */
+function listingHref(listingId: number | null): string {
+  return listingId == null
+    ? ROUTES.SALES_PRODUCTS_RETRIEVE
+    : ROUTES.SALES_PRODUCTS_RETRIEVE_DETAILS(listingId);
+}
+
 export function ProductUsageSection({
   usage,
   isLoading,
@@ -64,7 +77,7 @@ export function ProductUsageSection({
 
   if (isLoading) {
     return (
-      <Card title={compact ? undefined : '연결'}>
+      <Card title={compact ? undefined : '사용처'}>
         <div className="space-y-3">
           <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
           <div className="h-4 w-full animate-pulse rounded bg-gray-100" />
@@ -77,7 +90,7 @@ export function ProductUsageSection({
   if (error) {
     return (
       <Card padded={false}>
-        <StateBlock variant="error" message="연결 현황을 불러오지 못했습니다." />
+        <StateBlock variant="error" message="사용처를 불러오지 못했습니다." />
         <div className="flex justify-center pb-6">
           <Button variant="secondary" size="sm" onClick={onRetry}>
             다시 시도
@@ -87,12 +100,12 @@ export function ProductUsageSection({
     );
   }
 
-  // 병합 화면(좌우 2단)은 빈 칸을 남기지 않는다. 상세 화면은 「연결 없음」을 보여준다.
+  // 병합 화면(좌우 2단)은 빈 칸을 남기지 않는다. 상세 화면은 「사용처 없음」을 보여준다.
   if (!hasLinks && compact) return null;
 
   return (
     <Card
-      title={compact ? undefined : '연결'}
+      title={compact ? undefined : '사용처'}
       action={
         hasLinks && !compact ? (
           <span className="text-sm text-gray-600">
@@ -103,14 +116,14 @@ export function ProductUsageSection({
       className="space-y-4"
     >
       {!hasLinks && (
-        <p className="text-sm text-gray-500">연결 없음 — 이 물품은 아직 아무 곳에도 쓰이지 않습니다.</p>
+        <p className="text-sm text-gray-500">사용처 없음 — 이 물품은 아직 아무 곳에도 쓰이지 않습니다.</p>
       )}
 
-      {/* 연결이 있다는 사실 자체는 정상이다 — 회색 안내 한 줄로만 알린다.
+      {/* 쓰이고 있다는 사실 자체는 정상이다 — 회색 안내 한 줄로만 알린다.
           병합 화면(compact)은 부모 카드가 같은 안내를 이미 띄우므로 생략한다. */}
       {hasLinks && !compact && (
         <p className={`text-gray-600 ${textSize}`}>
-          삭제하려면 아래 연결을 먼저 끊어주세요. 마스터에서 빼도 판매 옵션 구성은 따로 남습니다.
+          삭제하려면 아래 사용처에서 이 물품을 먼저 빼주세요. 마스터에서 빼도 판매 옵션 구성은 따로 남습니다.
         </p>
       )}
 
@@ -130,7 +143,7 @@ export function ProductUsageSection({
                     href={ROUTES.MASTER_PRODUCT_DETAIL(master.id)}
                     className={`shrink-0 text-blue-600 hover:underline ${textSize}`}
                   >
-                    마스터로 이동 →
+                    마스터 상품 상세정보 →
                   </Link>
                 </div>
                 {/* 옵션 수량은 독립된 연결이 아니라 마스터 구성품의 수량이라 마스터 아래 접어서 보여준다. */}
@@ -158,17 +171,20 @@ export function ProductUsageSection({
               {options.map((option) => (
                 <li key={option.id} className="flex items-start justify-between gap-2 py-2">
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-medium text-gray-900">{option.name}</p>
+                    <p className="truncate text-xs font-medium text-gray-900">
+                      {option.listingName ?? '(이름 없음)'}
+                    </p>
                     <p className="text-xs text-gray-500">
-                      {option.accountAlias ?? option.platform} · ×{option.quantity ?? '-'} ·{' '}
+                      {option.name} · {option.accountAlias ?? option.platform} · ×
+                      {option.quantity ?? '-'} ·{' '}
                       {option.status ? (STATUS_LABEL[option.status] ?? option.status) : '-'}
                     </p>
                   </div>
                   <Link
-                    href={ROUTES.SALES_PRODUCTS_RETRIEVE}
+                    href={listingHref(option.listingId)}
                     className="shrink-0 text-xs text-blue-600 hover:underline"
                   >
-                    셀로 이동 →
+                    판매 상품 상세정보 →
                   </Link>
                 </li>
               ))}
@@ -179,6 +195,7 @@ export function ProductUsageSection({
                 <thead className="border-b border-gray-200 bg-gray-100">
                   <tr className="text-left text-gray-600">
                     <th className="px-4 py-3">계정</th>
+                    <th className="px-4 py-3">판매 상품</th>
                     <th className="px-4 py-3">옵션명</th>
                     <th className="px-4 py-3">구성 수량</th>
                     <th className="px-4 py-3">상태</th>
@@ -193,19 +210,20 @@ export function ProductUsageSection({
                           {option.accountAlias ?? option.platform}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{option.name}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900">
+                        {option.listingName ?? '(이름 없음)'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">{option.name}</td>
                       <td className="px-4 py-3 text-gray-700">×{option.quantity ?? '-'}</td>
                       <td className="px-4 py-3 text-gray-700">
                         {option.status ? (STATUS_LABEL[option.status] ?? option.status) : '-'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {/* ⚠️ 서버가 주는 값은 **셀 옵션 id** 라 셀 단건으로 바로 갈 수 없다
-                            (옵션 id → 셀 id 를 되찾는 API 가 없다). 판매상품 목록으로 보낸다. */}
                         <Link
-                          href={ROUTES.SALES_PRODUCTS_RETRIEVE}
-                          className="text-blue-600 hover:underline"
+                          href={listingHref(option.listingId)}
+                          className="shrink-0 text-blue-600 hover:underline"
                         >
-                          셀로 이동 →
+                          판매 상품 상세정보 →
                         </Link>
                       </td>
                     </tr>

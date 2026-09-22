@@ -21,11 +21,11 @@ import { barcodeResultText } from '@/infrastructure/utils/barcodeExtraction';
 
 interface ProductDetailViewProps {
   product: Product;
-  /** 연결 현황 (FEATURE_2609_69 / A). 아직 안 실렸거나 실패하면 null */
+  /** 사용처 (FEATURE_2609_69 / A). 아직 안 실렸거나 실패하면 null */
   usage: ProductUsage | null;
   usageLoading: boolean;
   usageError: string | null;
-  /** 연결 현황 재조회 — 「다시 시도」와 삭제 거부(409) 후에 부른다 */
+  /** 사용처 재조회 — 「다시 시도」와 삭제 거부(409) 후에 부른다 */
   onReloadUsage: () => void;
   onDelete: () => Promise<void>;
   imageUseCase: ProductImageUseCase;
@@ -142,8 +142,8 @@ export function ProductDetailView({
   /**
    * 삭제 (FEATURE_2609_69 / A).
    *
-   * 🔴 서버 가드가 최종 판정이다 — 화면이 [삭제]를 열어줬어도 그새 연결이 생겼으면 409 가 온다.
-   * 그때는 **서버 문구를 그대로** 보여주고 연결 현황을 다시 싣는다.
+   * 🔴 서버 가드가 최종 판정이다 — 화면이 [삭제]를 열어줬어도 그새 쓰이기 시작했으면 409 가 온다.
+   * 그때는 **서버 문구를 그대로** 보여주고 사용처를 다시 싣는다.
    */
   const handleDeleteConfirm = useCallback(async () => {
     setIsDeleting(true);
@@ -159,11 +159,25 @@ export function ProductDetailView({
     }
   }, [onDelete, router, backHref, onReloadUsage]);
 
-  // 연결 현황이 아직 안 실렸으면 누르지 못하게 둔다. 실패(usage === null + usageError)면 서버 가드에 맡긴다.
+  // 사용처가 아직 안 실렸으면 누르지 못하게 둔다. 실패(usage === null + usageError)면 서버 가드에 맡긴다.
   const deleteBlocked = usage !== null && !usage.deletable;
-  // 🔴 연결돼 있다는 사실은 **경고가 아니다**. 빨간 배너로 상주시키지 않고 [삭제] 버튼 툴팁으로만 알린다
-  // (2026-09-23). 사유 문구는 연결 카드가 회색 안내로 이어 받는다.
+  // 🔴 어딘가에 쓰이고 있다는 사실은 **경고가 아니다**. 빨간 배너로 상주시키지 않고 [삭제] 버튼 툴팁으로만
+  // 알린다(2026-09-23). 사유 문구는 사용처 카드가 회색 안내로 이어 받는다.
   const deleteBlockedTitle = deleteBlocked && usage ? deleteBlockedReason(usage.blockers) : undefined;
+
+  // 🔴 값이 비어도 목록에서 빼지 않는다 — 빈 칸이 보여야 무엇을 더 채워야 하는지 알 수 있다(2026-09-23).
+  const infoFields: { label: string; value: string | null }[] = [
+    { label: '바코드 ID', value: product.barcodeId ?? null },
+    { label: '브랜드', value: product.brand ?? null },
+    { label: '가격', value: product.price == null ? null : formatKrw(product.price) },
+    { label: '구매처', value: product.store ?? null },
+    { label: '내용물 양', value: product.netContent ?? null },
+    { label: '단위', value: product.netContentUnit ?? null },
+    { label: '높이', value: product.packageHeight ?? null },
+    { label: '길이', value: product.packageLength ?? null },
+    { label: '너비', value: product.packageWidth ?? null },
+  ];
+  const missingFields = infoFields.filter((field) => !field.value?.trim());
 
   return (
     <div className="space-y-6">
@@ -185,7 +199,7 @@ export function ProductDetailView({
             중복 병합
           </Button>
           <Button onClick={() => router.push(editHref)}>수정</Button>
-          {/* 🔴 삭제 버튼은 이 하나뿐이다. 연결 섹션 옆에 두 번째 삭제 버튼을 만들지 않는다. */}
+          {/* 🔴 삭제 버튼은 이 하나뿐이다. 사용처 섹션 옆에 두 번째 삭제 버튼을 만들지 않는다. */}
           <Button
             variant="danger"
             disabled={usageLoading || deleteBlocked}
@@ -197,26 +211,30 @@ export function ProductDetailView({
         </div>
       </div>
 
-      {/* 🔴 빨강은 **눌러서 실패했을 때만** 쓴다. 연결이 있다는 이유로 상주하던 빨간 배너는 없앴다
+      {/* 🔴 빨강은 **눌러서 실패했을 때만** 쓴다. 쓰이고 있다는 이유로 상주하던 빨간 배너는 없앴다
           (2026-09-23) — 정상 상태를 사고처럼 보이게 만들고 있었다. */}
       {deleteError && (
         <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</div>
       )}
 
-      {/* 상품 정보 — 🔴 카드 하나다. 좌우 2단 카드로 다시 쪼개지 않는다(2026-09-23). */}
-      <Card title="상품 정보">
+      {/* 상품 정보 — 🔴 카드 하나다. 좌우 2단 카드로 다시 쪼개지 않는다(2026-09-23).
+          🔴 값이 없는 항목도 「미입력」로 **항상 보여준다** — 숨기면 무엇을 더 채워야 하는지 알 수 없다. */}
+      <Card
+        title="상품 정보"
+        action={
+          missingFields.length > 0 ? (
+            <span className="text-sm text-gray-500">
+              미입력 {missingFields.length}개 — [수정]에서 채울 수 있습니다
+            </span>
+          ) : undefined
+        }
+      >
         <div className="space-y-4">
           <Field label="상품명" value={product.productName} />
           <div className="grid grid-cols-2 gap-x-8 gap-y-4 md:grid-cols-4">
-            {product.barcodeId && <Field label="바코드 ID" value={product.barcodeId} />}
-            {product.brand && <Field label="브랜드" value={product.brand} />}
-            {product.price != null && <Field label="가격" value={formatKrw(product.price)} />}
-            {product.store && <Field label="구매처" value={product.store} />}
-            {product.netContent && <Field label="내용물 양" value={product.netContent} />}
-            {product.netContentUnit && <Field label="단위" value={product.netContentUnit} />}
-            {product.packageHeight && <Field label="높이" value={product.packageHeight} />}
-            {product.packageLength && <Field label="길이" value={product.packageLength} />}
-            {product.packageWidth && <Field label="너비" value={product.packageWidth} />}
+            {infoFields.map((field) => (
+              <Field key={field.label} label={field.label} value={field.value} />
+            ))}
           </div>
         </div>
       </Card>
@@ -228,7 +246,7 @@ export function ProductDetailView({
         </Card>
       )}
 
-      {/* 연결 현황 — 마스터 상품 / 판매 옵션. 04(병합 화면)가 같은 컴포넌트를 좌우로 쓴다 */}
+      {/* 사용처 — 마스터 상품 / 판매 옵션. 04(병합 화면)가 같은 컴포넌트를 좌우로 쓴다 */}
       <ProductUsageSection
         usage={usage}
         isLoading={usageLoading}
@@ -291,12 +309,15 @@ function countText(count: number | undefined, unit: string): string {
   return `${count}${unit}`;
 }
 
-/** 상품 정보 한 칸 — 라벨(작은 회색) + 값(굵게) */
-function Field({ label, value }: { label: string; value: string }) {
+/** 상품 정보 한 칸 — 라벨(작은 회색) + 값(굵게). 값이 비면 「미입력」을 흐리게 보여준다. */
+function Field({ label, value }: { label: string; value: string | null | undefined }) {
+  const filled = value != null && value.trim() !== '';
   return (
     <div>
       <p className="text-sm text-gray-600">{label}</p>
-      <p className="text-lg font-semibold text-gray-900">{value}</p>
+      <p className={`text-lg font-semibold ${filled ? 'text-gray-900' : 'text-gray-300'}`}>
+        {filled ? value : '미입력'}
+      </p>
     </div>
   );
 }
