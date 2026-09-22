@@ -7,6 +7,8 @@ export const ROUTES = {
   PRODUCTS_REGISTER: '/dashboard/products/register',
   PRODUCT_DETAIL: (id: number | string) => `/dashboard/products/${id}`,
   PRODUCT_EDIT: (id: number | string) => `/dashboard/products/${id}?mode=edit`,
+  /** 중복 물품 병합 (FEATURE_2609_69 / B). 팝업이 아니라 페이지다 — 긴 작업이라 페이지로 뺐다 */
+  PRODUCT_MERGE: (id: number | string) => `/dashboard/products/${id}/merge`,
   STOCK_IN_OUT: '/dashboard/stock/in-out',
   STOCK_OUTBOUND: '/dashboard/stock/outbound',
   STOCK_PACKING: '/dashboard/stock/packing',
