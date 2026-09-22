@@ -161,11 +161,9 @@ export function ProductDetailView({
 
   // 연결 현황이 아직 안 실렸으면 누르지 못하게 둔다. 실패(usage === null + usageError)면 서버 가드에 맡긴다.
   const deleteBlocked = usage !== null && !usage.deletable;
-  const summary = usage
-    ? `마스터 ${usage.masterProducts.length} · 판매 옵션 ${usage.listingOptions.length}`
-    : '-';
-  const hasLinks =
-    usage !== null && (usage.masterProducts.length > 0 || usage.listingOptions.length > 0);
+  // 🔴 연결돼 있다는 사실은 **경고가 아니다**. 빨간 배너로 상주시키지 않고 [삭제] 버튼 툴팁으로만 알린다
+  // (2026-09-23). 사유 문구는 연결 카드가 회색 안내로 이어 받는다.
+  const deleteBlockedTitle = deleteBlocked && usage ? deleteBlockedReason(usage.blockers) : undefined;
 
   return (
     <div className="space-y-6">
@@ -191,6 +189,7 @@ export function ProductDetailView({
           <Button
             variant="danger"
             disabled={usageLoading || deleteBlocked}
+            title={deleteBlockedTitle}
             onClick={() => setShowDeleteConfirmation(true)}
           >
             삭제
@@ -198,95 +197,29 @@ export function ProductDetailView({
         </div>
       </div>
 
-      {/* 삭제가 막힌 사유 · 삭제 실패 문구. 🔴 둘 다 서버 문구 그대로 쓴다 */}
-      {(deleteBlocked || deleteError) && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-          {deleteError || (usage ? deleteBlockedReason(usage.blockers) : '')}
-        </div>
+      {/* 🔴 빨강은 **눌러서 실패했을 때만** 쓴다. 연결이 있다는 이유로 상주하던 빨간 배너는 없앴다
+          (2026-09-23) — 정상 상태를 사고처럼 보이게 만들고 있었다. */}
+      {deleteError && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</div>
       )}
 
-      {/* 연결 요약 (FEATURE_2609_69 / A) */}
-      <Card>
-        <p className="text-sm text-gray-600">연결</p>
-        {hasLinks ? (
-          <p className="text-lg font-semibold text-gray-900">{summary}</p>
-        ) : (
-          <p className="text-lg font-semibold text-gray-400">
-            {usageLoading || usageError ? summary : '연결 없음'}
-          </p>
-        )}
+      {/* 상품 정보 — 🔴 카드 하나다. 좌우 2단 카드로 다시 쪼개지 않는다(2026-09-23). */}
+      <Card title="상품 정보">
+        <div className="space-y-4">
+          <Field label="상품명" value={product.productName} />
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 md:grid-cols-4">
+            {product.barcodeId && <Field label="바코드 ID" value={product.barcodeId} />}
+            {product.brand && <Field label="브랜드" value={product.brand} />}
+            {product.price != null && <Field label="가격" value={formatKrw(product.price)} />}
+            {product.store && <Field label="구매처" value={product.store} />}
+            {product.netContent && <Field label="내용물 양" value={product.netContent} />}
+            {product.netContentUnit && <Field label="단위" value={product.netContentUnit} />}
+            {product.packageHeight && <Field label="높이" value={product.packageHeight} />}
+            {product.packageLength && <Field label="길이" value={product.packageLength} />}
+            {product.packageWidth && <Field label="너비" value={product.packageWidth} />}
+          </div>
+        </div>
       </Card>
-
-      {/* Product Details */}
-      <div className="grid grid-cols-2 gap-6">
-        <Card>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-600">상품명</p>
-              <p className="text-lg font-semibold text-gray-900">{product.productName}</p>
-            </div>
-            {product.barcodeId && (
-              <div>
-                <p className="text-sm text-gray-600">바코드 ID</p>
-                <p className="text-lg font-semibold text-gray-900">{product.barcodeId}</p>
-              </div>
-            )}
-            {product.brand && (
-              <div>
-                <p className="text-sm text-gray-600">브랜드</p>
-                <p className="text-lg font-semibold text-gray-900">{product.brand}</p>
-              </div>
-            )}
-            {product.price && (
-              <div>
-                <p className="text-sm text-gray-600">가격</p>
-                <p className="text-lg font-semibold text-gray-900">{formatKrw(product.price)}</p>
-              </div>
-            )}
-            {product.store && (
-              <div>
-                <p className="text-sm text-gray-600">구매처</p>
-                <p className="text-lg font-semibold text-gray-900">{product.store}</p>
-              </div>
-            )}
-            {product.netContentUnit && (
-              <div>
-                <p className="text-sm text-gray-600">단위</p>
-                <p className="text-lg font-semibold text-gray-900">{product.netContentUnit}</p>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        <Card>
-          <div className="space-y-4">
-            {product.packageHeight && (
-              <div>
-                <p className="text-sm text-gray-600">높이</p>
-                <p className="text-lg font-semibold text-gray-900">{product.packageHeight}</p>
-              </div>
-            )}
-            {product.packageLength && (
-              <div>
-                <p className="text-sm text-gray-600">길이</p>
-                <p className="text-lg font-semibold text-gray-900">{product.packageLength}</p>
-              </div>
-            )}
-            {product.packageWidth && (
-              <div>
-                <p className="text-sm text-gray-600">너비</p>
-                <p className="text-lg font-semibold text-gray-900">{product.packageWidth}</p>
-              </div>
-            )}
-            {product.netContent && (
-              <div>
-                <p className="text-sm text-gray-600">내용물 양</p>
-                <p className="text-lg font-semibold text-gray-900">{product.netContent}</p>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
 
       {/* Description */}
       {product.description && (
@@ -356,6 +289,16 @@ export function ProductDetailView({
 function countText(count: number | undefined, unit: string): string {
   if (count == null || count === 0) return '-';
   return `${count}${unit}`;
+}
+
+/** 상품 정보 한 칸 — 라벨(작은 회색) + 값(굵게) */
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-sm text-gray-600">{label}</p>
+      <p className="text-lg font-semibold text-gray-900">{value}</p>
+    </div>
+  );
 }
 
 function RecordRow({ label, value }: { label: string; value: string }) {
