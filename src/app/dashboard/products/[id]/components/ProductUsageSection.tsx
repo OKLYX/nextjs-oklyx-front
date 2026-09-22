@@ -13,6 +13,8 @@
  * - **카드는 하나다.** 요약·마스터 상품·판매 채널을 각각 카드로 쪼개지 않는다(2026-09-23).
  * - 🔴 **옵션 줄을 그대로 나열하지 않는다.** 서버는 셀 **옵션** 단위로 주지만 화면은 `listingId` 로 묶어
  *   **판매 채널(셀) 한 줄**로 접는다 — 옵션별 수량은 위 마스터 상품 줄에 이미 있다(2026-09-23).
+ * - 🔴 **판매 채널은 마스터 상품 아래에 넣는다.** 채널은 마스터를 통해서만 이 물품과 이어지므로
+ *   `masterProductId` 로 묶어 그 마스터 줄 밑에 보여준다 — 나란한 두 목록으로 두지 않는다(2026-09-23).
  * - 쓰이는 곳 0 → `compact` 는 아무것도 렌더하지 않고(null), 상세 화면은 한 줄 안내만 남긴다.
  * - 이동 링크는 **상세 화면으로 보낸다.** 목록으로 보내면 사용자가 거기서 다시 찾아야 한다(2026-09-23).
  *
@@ -58,6 +60,7 @@ interface UsageChannel {
   key: string;
   listingId: number | null;
   listingName: string | null;
+  masterProductId: number | null;
   accountAlias: string | null;
   platform: string;
   status: string | null;
@@ -78,12 +81,90 @@ function collapseToChannels(options: ProductUsageListingOption[]): UsageChannel[
       key,
       listingId: option.listingId,
       listingName: option.listingName,
+      masterProductId: option.masterProductId,
       accountAlias: option.accountAlias,
       platform: option.platform,
       status: option.status,
     });
   }
   return [...byKey.values()];
+}
+
+/**
+ * 한 마스터에 매달린 판매 채널 목록.
+ *
+ * 🔴 옵션 줄이 아니라 **채널 한 줄**이다 — 옵션별 수량은 바로 위 마스터 줄에 이미 있다(2026-09-23).
+ */
+function ChannelList({ channels, compact }: { channels: UsageChannel[]; compact: boolean }) {
+  if (channels.length === 0) {
+    return <p className="mt-2 text-sm text-gray-400">판매 채널 없음</p>;
+  }
+
+  if (compact) {
+    return (
+      <ul className="mt-2 divide-y divide-gray-100 border-t border-gray-100">
+        {channels.map((channel) => (
+          <li key={channel.key} className="flex items-start justify-between gap-2 py-2">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-gray-900">
+                {channel.listingName ?? '(이름 없음)'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {channel.accountAlias ?? channel.platform} ·{' '}
+                {channel.status ? (STATUS_LABEL[channel.status] ?? channel.status) : '-'}
+              </p>
+            </div>
+            <Link
+              href={listingHref(channel.listingId)}
+              className="shrink-0 text-xs text-blue-600 hover:underline"
+            >
+              판매 상품 상세정보 →
+            </Link>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="list-table-scroll mt-2">
+      <table className="text-sm">
+        <thead className="border-b border-gray-200 bg-gray-100">
+          <tr className="text-left text-gray-600">
+            <th className="px-4 py-2">계정</th>
+            <th className="px-4 py-2">판매 상품</th>
+            <th className="px-4 py-2">상태</th>
+            <th className="px-4 py-2" />
+          </tr>
+        </thead>
+        <tbody>
+          {channels.map((channel) => (
+            <tr key={channel.key} className="border-b border-gray-100 last:border-b-0">
+              <td className="px-4 py-2">
+                <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+                  {channel.accountAlias ?? channel.platform}
+                </span>
+              </td>
+              <td className="px-4 py-2 font-medium text-gray-900">
+                {channel.listingName ?? '(이름 없음)'}
+              </td>
+              <td className="px-4 py-2 text-gray-700">
+                {channel.status ? (STATUS_LABEL[channel.status] ?? channel.status) : '-'}
+              </td>
+              <td className="px-4 py-2 text-right">
+                <Link
+                  href={listingHref(channel.listingId)}
+                  className="shrink-0 text-blue-600 hover:underline"
+                >
+                  판매 상품 상세정보 →
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 /**
@@ -107,8 +188,20 @@ export function ProductUsageSection({
 }: ProductUsageSectionProps) {
   const masters = usage?.masterProducts ?? [];
   const options = usage?.listingOptions ?? [];
-  // 서버는 셀 옵션 단위로 준다 — 화면은 채널(셀) 단위로 접는다.
+  // 서버는 셀 옵션 단위로 준다 — 화면은 채널(셀) 단위로 접고, 다시 마스터 아래로 넣는다.
   const channels = collapseToChannels(options);
+  const masterIds = new Set(masters.map((master) => master.id));
+  const channelsByMaster = new Map<number, UsageChannel[]>();
+  const orphanChannels: UsageChannel[] = [];
+  for (const channel of channels) {
+    if (channel.masterProductId == null || !masterIds.has(channel.masterProductId)) {
+      orphanChannels.push(channel);
+      continue;
+    }
+    const bucket = channelsByMaster.get(channel.masterProductId);
+    if (bucket) bucket.push(channel);
+    else channelsByMaster.set(channel.masterProductId, [channel]);
+  }
   const hasLinks = masters.length > 0 || channels.length > 0;
   const textSize = compact ? 'text-xs' : 'text-sm';
 
@@ -169,9 +262,9 @@ export function ProductUsageSection({
           <h3 className={`mb-2 font-semibold text-gray-900 ${compact ? 'text-xs' : 'text-sm'}`}>
             마스터 상품 {masters.length}개
           </h3>
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {masters.map((master) => (
-              <li key={master.id} className="border-b border-gray-100 pb-3 last:border-b-0 last:pb-0">
+              <li key={master.id} className="border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
                 <div className="flex items-center justify-between gap-3">
                   <span className={`font-medium text-gray-900 ${compact ? 'text-sm' : 'text-base'}`}>
                     {master.name}
@@ -192,78 +285,21 @@ export function ProductUsageSection({
                       .join(' · ')}
                   </p>
                 )}
+                {/* 이 마스터가 올라가 있는 판매 채널. 마스터 없이 채널만 따로 나열하지 않는다(2026-09-23). */}
+                <ChannelList channels={channelsByMaster.get(master.id) ?? []} compact={compact} />
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {channels.length > 0 && (
+      {/* 어느 마스터에도 매달리지 않은 채널. 서버 계약상 나올 수 없지만, 나오면 숨기지 않고 드러낸다. */}
+      {orphanChannels.length > 0 && (
         <section>
           <h3 className={`mb-2 font-semibold text-gray-900 ${compact ? 'text-xs' : 'text-sm'}`}>
-            판매 채널 {channels.length}개
+            마스터를 알 수 없는 판매 채널 {orphanChannels.length}개
           </h3>
-          {compact ? (
-            <ul className="divide-y divide-gray-100">
-              {channels.map((channel) => (
-                <li key={channel.key} className="flex items-start justify-between gap-2 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-medium text-gray-900">
-                      {channel.listingName ?? '(이름 없음)'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {channel.accountAlias ?? channel.platform} ·{' '}
-                      {channel.status ? (STATUS_LABEL[channel.status] ?? channel.status) : '-'}
-                    </p>
-                  </div>
-                  <Link
-                    href={listingHref(channel.listingId)}
-                    className="shrink-0 text-xs text-blue-600 hover:underline"
-                  >
-                    판매 상품 상세정보 →
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="list-table-scroll">
-              <table className="text-sm">
-                <thead className="border-b border-gray-200 bg-gray-100">
-                  <tr className="text-left text-gray-600">
-                    <th className="px-4 py-3">계정</th>
-                    <th className="px-4 py-3">판매 상품</th>
-                    <th className="px-4 py-3">상태</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {channels.map((channel) => (
-                    <tr key={channel.key} className="border-b border-gray-100 last:border-b-0">
-                      <td className="px-4 py-3">
-                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
-                          {channel.accountAlias ?? channel.platform}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {channel.listingName ?? '(이름 없음)'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {channel.status ? (STATUS_LABEL[channel.status] ?? channel.status) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link
-                          href={listingHref(channel.listingId)}
-                          className="shrink-0 text-blue-600 hover:underline"
-                        >
-                          판매 상품 상세정보 →
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <ChannelList channels={orphanChannels} compact={compact} />
         </section>
       )}
     </Card>
