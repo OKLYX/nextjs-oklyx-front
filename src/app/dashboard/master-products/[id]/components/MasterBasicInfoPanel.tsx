@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/presentation/components/Spinner';
-import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
@@ -18,33 +17,30 @@ interface MasterBasicInfoPanelProps {
 }
 
 /**
- * 마스터 기본 정보(이름·활성) 인라인 편집 패널 + 구성상품 읽기 전용 목록 (마스터 상세).
+ * 마스터 기본 정보(이름) 인라인 편집 패널 + 구성상품 읽기 전용 목록 (마스터 상세).
  * File: src/app/dashboard/master-products/[id]/components/MasterBasicInfoPanel.tsx
  *
  * 초기값은 부모가 내려준 `master` 를 쓴다(패널이 `getById` 를 다시 부르지 않는다).
- * 저장은 **자기 필드만** PATCH(`{ name, active }`) — 백엔드 PATCH 는 null=기존 유지라
+ * 저장은 **자기 필드만** PATCH(`{ name }`) — 백엔드 PATCH 는 null=기존 유지라
  * 다른 필드를 함께 보내면 같은 화면의 다른 섹션 편집을 덮어쓴다.
  * 저장 성공 후 `onSaved(patched)` 로만 통지한다(매트릭스 재조회 금지 — 이름 한 줄 저장에
  * 매트릭스 + 셀별 getGenerated N콜이 다시 도는 것을 막는다).
  *
  * ⚠️ 구성상품은 여기서 읽기 전용이다. 변경은 [구성상품 변경] → 전용 페이지(2609_64)에서 한다 —
  * 구성과 옵션 수량은 서로를 검증하므로 한 요청으로 같이 저장돼야 한다.
- * ⚠️ `active=false` 는 soft delete 라 **끄는 방향에만** 확인 다이얼로그를 띄운다.
+ * ⚠️ 마스터를 치우는 길은 목록의 [삭제](하드 삭제, 2609_72) 하나다 — 비활성 토글은 없앴다
+ * (같은 일을 하는 버튼이 둘이었고, 비활성은 목록에서 사라져 되돌릴 길이 화면에 없었다).
  */
 export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicInfoPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(master.name);
-  const [active, setActive] = useState(master.active);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
-  // Deactivation confirm (soft delete). Only the on→off direction asks.
-  const [confirmOff, setConfirmOff] = useState(false);
   const router = useRouter();
 
   const startEdit = () => {
     setName(master.name);
-    setActive(master.active);
     setError('');
     setSaved(false);
     setIsEditing(true);
@@ -55,19 +51,12 @@ export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicIn
     setError('');
   };
 
-  // Cancelling the dialog leaves `active` untouched → the checkbox stays checked.
-  const handleActiveChange = (next: boolean) => {
-    setSaved(false);
-    if (next) setActive(true);
-    else setConfirmOff(true);
-  };
-
   const handleSave = async () => {
     try {
       setIsSaving(true);
       setError('');
       setSaved(false);
-      const patched = await useCase.update(master.id, { name: name.trim(), active });
+      const patched = await useCase.update(master.id, { name: name.trim() });
       setIsEditing(false);
       setSaved(true);
       // Transient confirmation — auto-dismiss (project has no toast system).
@@ -99,23 +88,6 @@ export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicIn
             />
           ) : (
             <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-800">{master.name}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">활성 (active)</label>
-          {isEditing ? (
-            <label className="flex items-center gap-2 text-sm text-gray-900">
-              <input
-                type="checkbox"
-                checked={active}
-                onChange={(e) => handleActiveChange(e.target.checked)}
-                disabled={isSaving}
-              />
-              활성
-            </label>
-          ) : (
-            <p className="text-sm text-gray-800">{master.active ? '활성' : '비활성'}</p>
           )}
         </div>
 
@@ -183,19 +155,6 @@ export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicIn
           </button>
         )}
       </div>
-
-      <ConfirmDialog
-        isOpen={confirmOff}
-        title="마스터 비활성화"
-        message="비활성화하면 목록에서 숨겨집니다. 계속하시겠습니까?"
-        confirmText="비활성화"
-        isDangerous
-        onConfirm={() => {
-          setActive(false);
-          setConfirmOff(false);
-        }}
-        onCancel={() => setConfirmOff(false)}
-      />
     </div>
   );
 }

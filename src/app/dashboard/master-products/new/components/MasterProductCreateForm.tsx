@@ -937,14 +937,14 @@ export function MasterProductCreateForm({
                         {m.name}
                       </a>
                       <span className="ml-1 text-amber-800">
-                        (옵션 {m.optionCount}개{m.active ? '' : ' · 삭제된 마스터'})
+                        (옵션 {m.optionCount}개)
                       </span>
                     </li>
                   ))}
                 </ul>
                 <p className="mt-2 text-[11px] text-amber-800">
                   수량만 다른 상품(예: 1개 / 5개 묶음)은 새 마스터가 아니라 위 마스터의 옵션으로
-                  만듭니다. 삭제된 마스터라면 상세에서 다시 사용하도록 되돌릴 수 있습니다.
+                  만듭니다.
                 </p>
               </div>
             )}
