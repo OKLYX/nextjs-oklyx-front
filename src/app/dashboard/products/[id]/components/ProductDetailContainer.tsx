@@ -5,17 +5,21 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import { GetProductDetailUseCase } from '@/application/usecases/GetProductDetailUseCase';
+import { GetProductUsageUseCase } from '@/application/usecases/GetProductUsageUseCase';
 import { UpdateProductUseCase } from '@/application/usecases/UpdateProductUseCase';
 import { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { BarcodeExtractionUseCase } from '@/application/usecases/BarcodeExtractionUseCase';
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
+import { ProductUsageRepositoryImpl } from '@/infrastructure/repositories/ProductUsageRepositoryImpl';
 import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
 import { BarcodeExtractionRepositoryImpl } from '@/infrastructure/repositories/BarcodeExtractionRepositoryImpl';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 import { ROUTES } from '@/config/routes';
 import { detailHrefWithReturn, listReturnHref } from '@/infrastructure/utils/listReturn';
 import type { Product } from '@/domain/entities/Product';
+import type { ProductUsage } from '@/domain/entities/ProductUsage';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
@@ -32,6 +36,10 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 연결 현황은 상세 본문과 **따로** 싣는다 — 실패해도 상세는 그대로 보여야 한다(FEATURE_2609_69 / A).
+  const [usage, setUsage] = useState<ProductUsage | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+  const [usageError, setUsageError] = useState<string | null>(null);
 
   const isEditMode = searchParams.get('mode') === 'edit';
 
@@ -43,6 +51,11 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
 
   const getUseCase = useMemo(
     () => new GetProductDetailUseCase(new ProductRepositoryImpl()),
+    []
+  );
+
+  const usageUseCase = useMemo(
+    () => new GetProductUsageUseCase(new ProductUsageRepositoryImpl()),
     []
   );
 
@@ -88,6 +101,32 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
   useEffect(() => {
     fetchProduct();
   }, [fetchProduct]);
+
+  /**
+   * 연결 현황 조회 (FEATURE_2609_69 / A).
+   *
+   * 🔴 삭제가 거부됐을 때(409) 다시 부른다 — 그새 연결이 생겼을 수 있다.
+   * 🔴 실패해도 `error` 를 건드리지 않는다. 상세 본문은 그대로 보여야 한다.
+   */
+  const loadUsage = useCallback(async () => {
+    setUsageLoading(true);
+    setUsageError(null);
+    try {
+      setUsage(await usageUseCase.execute(id));
+    } catch (err) {
+      setUsage(null);
+      setUsageError(extractErrorMessage(err, '연결 현황을 불러오지 못했습니다.'));
+    } finally {
+      setUsageLoading(false);
+    }
+  }, [id, usageUseCase]);
+
+  // 프로젝트 표준 회피책 — 이펙트 본문에서 곧바로 setState 하면 lint `set-state-in-effect`(error) 다.
+  useEffect(() => {
+    void (async () => {
+      await loadUsage();
+    })();
+  }, [loadUsage]);
 
   /**
    * 사진에서 읽어낸 바코드를 화면 값에만 반영한다 (FEATURE_2609_65).
@@ -185,6 +224,10 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
     <PageContainer title="상품 상세">
       <ProductDetailView
         product={product}
+        usage={usage}
+        usageLoading={usageLoading}
+        usageError={usageError}
+        onReloadUsage={loadUsage}
         onDelete={handleDelete}
         imageUseCase={imageUseCase}
         barcodeUseCase={barcodeUseCase}

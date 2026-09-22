@@ -3,19 +3,29 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Product } from '@/domain/entities/Product';
+import type { ProductUsage } from '@/domain/entities/ProductUsage';
+import { deleteBlockedReason } from '@/domain/entities/ProductUsage';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import type { BarcodeExtractionUseCase } from '@/application/usecases/BarcodeExtractionUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
+import { ProductUsageSection } from './ProductUsageSection';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
 import { formatKrw } from '@/infrastructure/utils/money';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { useClipboardStore, newClipId } from '@/infrastructure/stores/clipboardStore';
 import type { ClipValues } from '@/domain/entities/ClipItem';
 import { barcodeResultText } from '@/infrastructure/utils/barcodeExtraction';
 
 interface ProductDetailViewProps {
   product: Product;
+  /** 연결 현황 (FEATURE_2609_69 / A). 아직 안 실렸거나 실패하면 null */
+  usage: ProductUsage | null;
+  usageLoading: boolean;
+  usageError: string | null;
+  /** 연결 현황 재조회 — 「다시 시도」와 삭제 거부(409) 후에 부른다 */
+  onReloadUsage: () => void;
   onDelete: () => Promise<void>;
   imageUseCase: ProductImageUseCase;
   barcodeUseCase: BarcodeExtractionUseCase;
@@ -29,6 +39,10 @@ interface ProductDetailViewProps {
 
 export function ProductDetailView({
   product,
+  usage,
+  usageLoading,
+  usageError,
+  onReloadUsage,
   onDelete,
   imageUseCase,
   barcodeUseCase,
@@ -39,6 +53,7 @@ export function ProductDetailView({
   const router = useRouter();
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [isPicking, setIsPicking] = useState(false);
   const [clipNotice, setClipNotice] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
@@ -123,16 +138,33 @@ export function ProductDetailView({
     runExtract(false);
   }, [product.barcodeId, runExtract]);
 
+  /**
+   * 삭제 (FEATURE_2609_69 / A).
+   *
+   * 🔴 서버 가드가 최종 판정이다 — 화면이 [삭제]를 열어줬어도 그새 연결이 생겼으면 409 가 온다.
+   * 그때는 **서버 문구를 그대로** 보여주고 연결 현황을 다시 싣는다.
+   */
   const handleDeleteConfirm = useCallback(async () => {
     setIsDeleting(true);
+    setDeleteError('');
     try {
       await onDelete();
       router.push(backHref);
-    } catch {
+    } catch (err) {
       setIsDeleting(false);
       setShowDeleteConfirmation(false);
+      setDeleteError(extractErrorMessage(err, '삭제하지 못했습니다.'));
+      onReloadUsage();
     }
-  }, [onDelete, router, backHref]);
+  }, [onDelete, router, backHref, onReloadUsage]);
+
+  // 연결 현황이 아직 안 실렸으면 누르지 못하게 둔다. 실패(usage === null + usageError)면 서버 가드에 맡긴다.
+  const deleteBlocked = usage !== null && !usage.deletable;
+  const summary = usage
+    ? `마스터 ${usage.masterProducts.length} · 판매 옵션 ${usage.listingOptions.length}`
+    : '-';
+  const hasLinks =
+    usage !== null && (usage.masterProducts.length > 0 || usage.listingOptions.length > 0);
 
   return (
     <div className="space-y-6">
@@ -150,11 +182,35 @@ export function ProductDetailView({
             {isExtracting ? '추출 중…' : '바코드 추출'}
           </Button>
           <Button onClick={() => router.push(editHref)}>수정</Button>
-          <Button variant="danger" onClick={() => setShowDeleteConfirmation(true)}>
+          {/* 🔴 삭제 버튼은 이 하나뿐이다. 연결 섹션 옆에 두 번째 삭제 버튼을 만들지 않는다. */}
+          <Button
+            variant="danger"
+            disabled={usageLoading || deleteBlocked}
+            onClick={() => setShowDeleteConfirmation(true)}
+          >
             삭제
           </Button>
         </div>
       </div>
+
+      {/* 삭제가 막힌 사유 · 삭제 실패 문구. 🔴 둘 다 서버 문구 그대로 쓴다 */}
+      {(deleteBlocked || deleteError) && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          {deleteError || (usage ? deleteBlockedReason(usage.blockers) : '')}
+        </div>
+      )}
+
+      {/* 연결 요약 (FEATURE_2609_69 / A) */}
+      <Card>
+        <p className="text-sm text-gray-600">연결</p>
+        {hasLinks ? (
+          <p className="text-lg font-semibold text-gray-900">{summary}</p>
+        ) : (
+          <p className="text-lg font-semibold text-gray-400">
+            {usageLoading || usageError ? summary : '연결 없음'}
+          </p>
+        )}
+      </Card>
 
       {/* Product Details */}
       <div className="grid grid-cols-2 gap-6">
@@ -234,6 +290,29 @@ export function ProductDetailView({
         </Card>
       )}
 
+      {/* 연결 현황 — 마스터 상품 / 판매 옵션. 04(병합 화면)가 같은 컴포넌트를 좌우로 쓴다 */}
+      <ProductUsageSection
+        usage={usage}
+        isLoading={usageLoading}
+        error={usageError}
+        onRetry={onReloadUsage}
+      />
+
+      {/* 기록 — 병합할 때 어느 쪽이 실제로 쓰이는지 보는 값이다.
+          🔴 「최근 매입 날짜」는 넣지 않는다. 어느 응답에도 그 값이 없다(건수만 있다). */}
+      <Card title="기록">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm md:grid-cols-4">
+          <RecordRow label="등록일" value={product.createdDate?.substring(0, 10) ?? '-'} />
+          <RecordRow label="최종 수정" value={product.modifiedDate?.substring(0, 10) ?? '-'} />
+          <RecordRow label="재고 이동" value={countText(usage?.history.stockMovements, '건')} />
+          <RecordRow label="매입 이력" value={countText(usage?.history.purchaseRecords, '건')} />
+          <RecordRow label="발송 내역" value={countText(usage?.history.shipmentItems, '건')} />
+          <RecordRow label="사진" value={countText(usage?.history.images, '장')} />
+          <RecordRow label="구매목록" value={countText(usage?.history.shoppingListItems, '건')} />
+          <RecordRow label="가격 이력" value={countText(usage?.history.priceChangeLogs, '건')} />
+        </div>
+      </Card>
+
       {/* Image gallery */}
       <ProductImageGallery
         productId={product.id}
@@ -252,17 +331,33 @@ export function ProductDetailView({
         onCancel={() => setShowOverwriteConfirm(false)}
       />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation Dialog
+          🔴 삭제는 soft delete 다 — 「되돌릴 수 없습니다」는 사실이 아니었다(FEATURE_2609_69 / A). */}
       <ConfirmDialog
         isOpen={showDeleteConfirmation}
-        title="상품 삭제"
-        message="이 상품을 삭제할까요? 되돌릴 수 없습니다."
+        title="물품 삭제"
+        message="이 물품을 삭제하면 목록에서 숨겨집니다. 지난 기록은 그대로 남습니다."
         confirmText="삭제"
         isDangerous
         isLoading={isDeleting}
         onConfirm={handleDeleteConfirm}
         onCancel={() => setShowDeleteConfirmation(false)}
       />
+    </div>
+  );
+}
+
+/** 기록 건수 한 줄. 아직 안 실렸거나 0 이면 `-` */
+function countText(count: number | undefined, unit: string): string {
+  if (count == null || count === 0) return '-';
+  return `${count}${unit}`;
+}
+
+function RecordRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="text-gray-600">{label}</span>
+      <span className="font-medium text-gray-900">{value}</span>
     </div>
   );
 }
