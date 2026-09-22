@@ -1,16 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/ProductListingRepositoryImpl';
 import { ProductListingUseCase } from '@/application/usecases/ProductListingUseCase';
-import { useAuthStore } from '@/infrastructure/stores/authStore';
-import { ROUTES } from '@/config/routes';
 import type { ProductListing } from '@/domain/entities/ProductListingEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { ProductListingSearchCard } from './ProductListingSearchCard';
 import { ProductListingTable } from './ProductListingTable';
-import { CreateMasterFromListingModal } from './CreateMasterFromListingModal';
 
 export function ProductListingContainer() {
   const [searchPlatform, setSearchPlatform] = useState('');
@@ -23,16 +19,6 @@ export function ProductListingContainer() {
   const [expandedListingId, setExpandedListingId] = useState<number | null>(null);
   // 2609_22/D24: 마스터 미연결 셀만 보기(기본 false).
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
-  const [masterModalListing, setMasterModalListing] = useState<ProductListing | null>(null);
-  // 토스트 시스템이 없으므로 CoverageMatrix 와 같은 배너 패턴을 쓴다.
-  const [banner, setBanner] = useState<{ text: string; tone: 'green' | 'amber'; masterProductId?: number } | null>(
-    null,
-  );
-  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // 생성 엔드포인트가 /api/admin/** 이라 비-ADMIN 은 403 → 버튼 자체를 렌더하지 않는다.
-  const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === 'ADMIN';
 
   const productListingUseCase = useMemo(() => {
     const repository = new ProductListingRepositoryImpl();
@@ -65,19 +51,6 @@ export function ProductListingContainer() {
     },
     [productListingUseCase],
   );
-
-  // 언마운트 후 setState 방지.
-  useEffect(() => {
-    return () => {
-      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
-    };
-  }, []);
-
-  const showBanner = useCallback((next: { text: string; tone: 'green' | 'amber'; masterProductId?: number }) => {
-    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
-    setBanner(next);
-    bannerTimerRef.current = setTimeout(() => setBanner(null), 8000);
-  }, []);
 
   // 페이지 진입 시 검색 상태와 스크롤 위치 복원
   useEffect(() => {
@@ -199,12 +172,6 @@ export function ProductListingContainer() {
     sessionStorage.setItem('sales-products-retrieve-state', JSON.stringify(state));
   };
 
-  const handleMasterCreated = (masterProductId: number) => {
-    showBanner({ text: '마스터가 생성되었습니다.', tone: 'green', masterProductId });
-    // 생성된 셀은 연결됨으로 바뀌므로(미연결 필터에서는 사라진다) 현재 페이지를 다시 읽는다.
-    void fetchPage(searchPlatform, currentPage, unlinkedOnly);
-  };
-
   return (
     <PageContainer title="판매상품 조회">
       <ProductListingSearchCard
@@ -217,26 +184,6 @@ export function ProductListingContainer() {
           onUnlinkedOnlyChange={handleUnlinkedOnlyChange}
         />
 
-        {banner && (
-          <div
-            className={`rounded-lg border px-4 py-3 text-sm ${
-              banner.tone === 'green'
-                ? 'border-green-200 bg-green-50 text-green-700'
-                : 'border-amber-200 bg-amber-50 text-amber-700'
-            }`}
-          >
-            {banner.text}
-            {banner.masterProductId != null && (
-              <Link
-                href={ROUTES.MASTER_PRODUCT_DETAIL(banner.masterProductId)}
-                className="ml-2 underline hover:no-underline"
-              >
-                마스터 상세로 이동
-              </Link>
-            )}
-          </div>
-        )}
-
         <ProductListingTable
           listings={listings}
           isLoading={isLoading}
@@ -245,8 +192,6 @@ export function ProductListingContainer() {
           expandedListingId={expandedListingId}
           onRowClick={handleRowClick}
           onSaveState={handleSaveStateBeforeNavigation}
-          onCreateMaster={setMasterModalListing}
-          canCreateMaster={isAdmin}
         />
 
         {hasSearched && listings.length > 0 && totalPages > 1 && (
@@ -284,13 +229,6 @@ export function ProductListingContainer() {
           </div>
         )}
 
-        {masterModalListing && (
-          <CreateMasterFromListingModal
-            listing={masterModalListing}
-            onClose={() => setMasterModalListing(null)}
-            onDone={handleMasterCreated}
-          />
-        )}
     </PageContainer>
   );
 }

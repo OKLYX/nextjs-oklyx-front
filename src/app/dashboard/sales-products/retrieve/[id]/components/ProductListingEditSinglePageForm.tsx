@@ -1,17 +1,16 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/ProductListingRepositoryImpl';
 import { ProductListingUseCase } from '@/application/usecases/ProductListingUseCase';
-import { getImageUrl } from '@/infrastructure/utils/imageUrl';
 import type { UpdateProductListingRequest, UpdateProductListingOptionRequest } from '@/application/dto/ProductListingDTOs';
 import type { ProductListing, ProductListingOption } from '@/domain/entities/ProductListingEntity';
 import type { Product } from '@/domain/entities/Product';
 import { ROUTES } from '@/config/routes';
-import { Modal } from '@/presentation/components/ui/Modal';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 
 const PLATFORMS = ['COUPANG', 'GMARKET', 'AUCTION', 'SMARTSTORE'];
 
@@ -48,9 +47,62 @@ interface CommissionRateData {
   categoryId: number | null;
 }
 
+/**
+ * 2609_71/D8: `products` 는 **읽기 전용 표시용**이다. 정본은 마스터(`master_product_option_item`)이고
+ * 서버 응답을 그대로 담아 두기만 한다 — 화면에서 고칠 수 없고 저장 payload 에도 넣지 않는다.
+ */
 interface OptionWithProducts {
   option: ProductListingOption;
   products: Array<{ productId: number; productName: string; quantity: number }>;
+}
+
+/**
+ * 옵션 구성품 **읽기 전용** 표시 (2609_71/D8).
+ *
+ * 이 화면에서는 구성품을 고를 수 없다 — 정본은 마스터의 옵션별 구성품(`master_product_option_item`)이고
+ * 서버가 마스터를 타고 채워 내려준다.
+ *
+ * ⚠️ 마스터가 없는 셀은 구성품을 **알 방법이 없다**. 빈 표로 두면 구성품이 0개인 것처럼 보이므로
+ * 전용 문구를 띄운다(PLAN D3).
+ */
+function OptionComponentsReadOnly({
+  products,
+  masterProductId,
+}: {
+  products: Array<{ productId: number; productName: string; quantity: number }>;
+  masterProductId?: number | null;
+}) {
+  if (masterProductId == null) {
+    return (
+      <div className="p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+        연결된 마스터가 없어 구성품을 알 수 없습니다.
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-3 bg-white rounded border border-gray-200 space-y-2">
+      {products.length > 0 ? (
+        products.map((product) => (
+          <div key={product.productId} className="flex justify-between items-center text-sm">
+            <p className="font-medium text-gray-900">{product.productName}</p>
+            <p className="text-gray-600">수량: {product.quantity}</p>
+          </div>
+        ))
+      ) : (
+        <p className="text-sm text-gray-600">등록된 구성품이 없습니다.</p>
+      )}
+      <p className="text-xs text-gray-500 pt-1 border-t border-gray-100">
+        구성품은 마스터에서 관리합니다.{' '}
+        <Link
+          href={ROUTES.MASTER_PRODUCT_DETAIL(masterProductId)}
+          className="text-blue-600 underline hover:no-underline"
+        >
+          마스터 상세
+        </Link>
+      </p>
+    </div>
+  );
 }
 
 interface ProductListingEditSinglePageFormProps {
@@ -65,7 +117,6 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
 
   const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [allCommissionRates, setAllCommissionRates] = useState<CommissionRateData[]>([]);
   const [sellers, setSellers] = useState<Seller[]>([]);
@@ -82,19 +133,12 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [productListingName, setProductListingName] = useState('');
 
-  // Section 2: 상품 (여러 개) 및 카테고리
+  // Section 2: 플랫폼 상품 ID 및 카테고리
   const [platformProductId, setPlatformProductId] = useState('');
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [productModalSearchQuery, setProductModalSearchQuery] = useState('');
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
-  /** 상품 검색 팝업 닫기 — 검색어·결과까지 함께 비운다(다음에 열 때 이전 검색이 남지 않게). */
-  const closeProductModal = () => {
-    setIsProductModalOpen(false);
-    setProductModalSearchQuery('');
-    setSearchProducts([]);
-  };
+  // 2609_71/D8: 구성품에 등장하는 물품의 원가 캐시(마진 계산 전용). 고르는 목록이 아니다.
+  const [componentProducts, setComponentProducts] = useState<Product[]>([]);
 
   // Section 3: 배송사, carrier rate, 패키지
   const [selectedCarrier, setSelectedCarrier] = useState('');
@@ -108,14 +152,12 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
   const [newOptionPrice, setNewOptionPrice] = useState('');
   const [newOptionMarginRate, setNewOptionMarginRate] = useState('');
   const [newOptionPlatformId, setNewOptionPlatformId] = useState('');
-  const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   const [isOptionFormOpen, setIsOptionFormOpen] = useState(false);
   const [editingOptionId, setEditingOptionId] = useState<number | null>(null);
-
-  // Real-time product search
-  const [searchProducts, setSearchProducts] = useState<Product[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // 2609_71/D8: 편집 중인 옵션의 구성품(읽기 전용). 마진 계산에만 쓴다 — 새 옵션은 비어 있다.
+  const [editingOptionProducts, setEditingOptionProducts] = useState<
+    Array<{ productId: number; productName: string; quantity: number }>
+  >([]);
 
   const useCase = useMemo(() => {
     const repository = new ProductListingRepositoryImpl();
@@ -171,43 +213,6 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
     }
   }, [selectedCarrierRateId, carrierRates]);
 
-  const filteredProductsForModal = useMemo(() => {
-    const selectedIds = new Set(selectedProducts.map((p) => p.id));
-    return searchProducts.filter((p) => !selectedIds.has(p.id));
-  }, [searchProducts, selectedProducts]);
-
-  const handleProductSearch = async (query: string) => {
-    setProductModalSearchQuery(query);
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (!query.trim()) {
-      setSearchProducts([]);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const response = await axiosInstance.get('/api/products', {
-          params: {
-            search: query.trim(),
-            page: 0,
-            size: 50,
-          },
-        });
-        setSearchProducts((response.data.data?.content || []) as Product[]);
-      } catch (err) {
-        setSearchProducts([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-  };
-
   // 기존 listing 데이터 로드 + 참조 데이터 로드
   useEffect(() => {
     const fetchData = async () => {
@@ -223,6 +228,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
           // 🔴 판매가 계산용 상자 후보 = 구매 상자만(PLAN 2609_40 D21). 재활용 상자는 비용 0 이라
           // 후보에 섞이면 원가 0 으로 판매가가 계산된다.
           axiosInstance.get('/api/admin/package', { params: { boxKind: 'PURCHASED' } }),
+          // 2609_71/D8: 물품을 고르기 위한 목록이 아니다 — 구성품의 원가를 마진 계산에 쓰려고 읽는다.
           axiosInstance.get('/api/products'),
           axiosInstance.get('/api/admin/commission-rate'),
           axiosInstance.get('/api/admin/category'),
@@ -238,7 +244,6 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
 
         setCarrierRates(carrierRateData);
         setPackages(packagesData);
-        setProducts(productsData);
         setCategories(categoryData);
         setAllCommissionRates(commissionData);
         setSellers(sellersData);
@@ -264,7 +269,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
           }));
           setOptionsData(optionsWithProducts);
 
-          // 옵션 편집 폼에 보여줄 상품 목록 구성 (모든 옵션의 구성상품 합집합, productId 기준 중복 제거)
+          // 구성품에 등장하는 물품의 합집합(productId 기준 중복 제거).
           // 가격은 로드된 products 목록에서 조회 (마진 계산용); 미조회 시 최소 형태로 폴백
           const productMap = new Map<number, Product>();
           listing.options.forEach((opt: ProductListingOption) =>
@@ -275,7 +280,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
               }
             })
           );
-          setSelectedProducts(Array.from(productMap.values()));
+          setComponentProducts(Array.from(productMap.values()));
         }
 
         if (commissionData.length > 0) {
@@ -298,24 +303,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
     if (listingId) {
       fetchData();
     }
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
   }, [listingId]);
-
-  const handleSelectProduct = (product: Product) => {
-    if (selectedProducts.some((p) => p.id === product.id)) {
-      setError('이미 선택된 상품입니다');
-      return;
-    }
-    setSelectedProducts([...selectedProducts, product]);
-    setIsProductModalOpen(false);
-    setProductModalSearchQuery('');
-    setError('');
-  };
 
   const calculateMargin = (sellingPrice: number, optionProducts: Array<{ productId: number; quantity: number }>): number => {
     if (!selectedCarrierRateId || !selectedPackageId) return 0;
@@ -328,7 +316,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
 
     let totalProductCost = 0;
     for (const optProduct of optionProducts) {
-      const product = selectedProducts.find((p) => p.id === optProduct.productId);
+      const product = componentProducts.find((p) => p.id === optProduct.productId);
       if (product?.price) {
         totalProductCost += product.price * optProduct.quantity;
       }
@@ -347,7 +335,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
     setNewOptionPrice('');
     setNewOptionMarginRate('');
     setNewOptionPlatformId('');
-    setProductQuantities({});
+    setEditingOptionProducts([]);
     setEditingOptionId(null);
   };
 
@@ -357,40 +345,20 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
       return;
     }
 
-    if (selectedProducts.length === 0) {
-      setError('최소 1개 이상의 상품을 선택해주세요');
-      return;
-    }
-
-    // 체크된 상품만 포함 (raw productId 키, 수량 적용)
-    const selectedProdQuantities: Array<{ productId: number; productName: string; quantity: number }> = [];
-    selectedProducts.forEach((product) => {
-      if (productQuantities[product.id] === undefined) return;
-      selectedProdQuantities.push({
-        productId: product.id,
-        productName: product.productName,
-        quantity: productQuantities[product.id] || 1,
-      });
-    });
-
-    if (selectedProdQuantities.length === 0) {
-      setError('최소 1개 이상의 상품을 선택해주세요');
-      return;
-    }
-
+    // 2609_71/D8: 구성품은 마스터가 정한다 — 여기서는 고르지도, 바꾸지도 않는다.
     if (editingOptionId) {
-      // 기존 옵션 수정
+      // 기존 옵션 수정 (구성품은 서버가 내려준 값 그대로 유지)
       setOptionsData(
         optionsData.map((item) => {
           if (item.option.id === editingOptionId) {
             return {
+              ...item,
               option: {
                 ...item.option,
                 optionName: newOptionName,
                 sellingPrice: parseFloat(newOptionPrice),
                 platformOptionId: newOptionPlatformId || undefined,
               },
-              products: selectedProdQuantities,
             };
           }
           return item;
@@ -408,7 +376,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
         productListingId: 0,
       };
 
-      setOptionsData([...optionsData, { option: newOption, products: selectedProdQuantities }]);
+      setOptionsData([...optionsData, { option: newOption, products: [] }]);
       setSuccessMessage(`옵션 "${newOptionName}"이 추가되었습니다`);
     }
 
@@ -422,12 +390,8 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
     setNewOptionName(option.optionName);
     setNewOptionPrice(String(option.sellingPrice));
     setNewOptionPlatformId(option.platformOptionId || '');
-
-    const quantities: Record<number, number> = {};
-    products.forEach((p) => {
-      quantities[p.productId] = p.quantity;
-    });
-    setProductQuantities(quantities);
+    // 읽기 전용 — 마진 계산에만 쓴다.
+    setEditingOptionProducts(products);
   };
 
   const handleCancelEdit = () => {
@@ -438,16 +402,8 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
   const calculateMarginPreview = (sellingPrice: number): number => {
     if (sellingPrice == null || !selectedCarrierRateId || !selectedPackageId) return 0;
 
-    const selectedProdQuantities: Array<{ productId: number; quantity: number }> = [];
-    selectedProducts.forEach((product) => {
-      if (productQuantities[product.id] === undefined) return;
-      selectedProdQuantities.push({
-        productId: product.id,
-        quantity: productQuantities[product.id] || 1,
-      });
-    });
-
-    if (selectedProdQuantities.length === 0) return 0;
+    // 2609_71/D8: 구성품은 마스터가 정한 값(읽기 전용)이다. 없으면 원가를 알 수 없어 0 을 돌려준다.
+    if (editingOptionProducts.length === 0) return 0;
 
     const selectedCarrierRate = carrierRates.find((cr) => cr.id === selectedCarrierRateId);
     const selectedPkg = packages.find((p) => p.id === selectedPackageId);
@@ -456,8 +412,8 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
     const packageCost = selectedPkg?.cost || 0;
 
     let totalProductCost = 0;
-    for (const optProduct of selectedProdQuantities) {
-      const product = selectedProducts.find((p) => p.id === optProduct.productId);
+    for (const optProduct of editingOptionProducts) {
+      const product = componentProducts.find((p) => p.id === optProduct.productId);
       if (product?.price) {
         totalProductCost += product.price * optProduct.quantity;
       }
@@ -474,16 +430,8 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
   const calculateSellingPriceFromMarginRate = (marginRate: number): number => {
     if (!selectedCarrierRateId || !selectedPackageId) return 0;
 
-    const selectedProdQuantities: Array<{ productId: number; quantity: number }> = [];
-    selectedProducts.forEach((product) => {
-      if (productQuantities[product.id] === undefined) return;
-      selectedProdQuantities.push({
-        productId: product.id,
-        quantity: productQuantities[product.id] || 1,
-      });
-    });
-
-    if (selectedProdQuantities.length === 0) return 0;
+    // 구성품(=원가)을 모르면 판매가를 역산할 수 없다.
+    if (editingOptionProducts.length === 0) return 0;
 
     const selectedCarrierRate = carrierRates.find((cr) => cr.id === selectedCarrierRateId);
     const selectedPkg = packages.find((p) => p.id === selectedPackageId);
@@ -492,8 +440,8 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
     const packageCost = selectedPkg?.cost || 0;
 
     let totalProductCost = 0;
-    for (const optProduct of selectedProdQuantities) {
-      const product = selectedProducts.find((p) => p.id === optProduct.productId);
+    for (const optProduct of editingOptionProducts) {
+      const product = componentProducts.find((p) => p.id === optProduct.productId);
       if (product?.price) {
         totalProductCost += product.price * optProduct.quantity;
       }
@@ -514,29 +462,9 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
     setOptionsData(optionsData.filter((item) => item.option.id !== optionId));
   };
 
-  const removeProductFromOption = (optionId: number, productIndex: number) => {
-    setOptionsData(
-      optionsData.map((item) => {
-        if (item.option.id === optionId) {
-          return {
-            ...item,
-            products: item.products.filter((_, i) => i !== productIndex),
-          };
-        }
-        return item;
-      })
-    );
-  };
-
   const handleFinalSubmit = async () => {
     if (!selectedPlatform || !productListingName.trim() || !platformProductId || !selectedCategory || !selectedCarrierRateId || !selectedPackageId || optionsData.length === 0) {
       setError('모든 섹션을 완료해주세요');
-      return;
-    }
-
-    const allOptionsHaveProducts = optionsData.every((item) => item.products.length > 0);
-    if (!allOptionsHaveProducts) {
-      setError('모든 옵션에 최소 1개 이상의 상품을 추가해주세요');
       return;
     }
 
@@ -544,15 +472,12 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
     setError('');
     try {
       // options을 UpdateProductListingOptionRequest[] 형태로 변환
+      // 2609_71/D8: 구성품(`products`)은 보내지 않는다 — 마스터가 정본이다.
       const options: UpdateProductListingOptionRequest[] = optionsData.map((optionData) => ({
         id: typeof optionData.option.id === 'number' && optionData.option.id > 1000000 ? undefined : optionData.option.id,
         optionName: optionData.option.optionName,
         sellingPrice: optionData.option.sellingPrice,
         platformOptionId: optionData.option.platformOptionId || undefined,
-        products: optionData.products.map((product) => ({
-          productId: product.productId,
-          quantity: product.quantity,
-        })),
       }));
 
       const updateRequest: UpdateProductListingRequest = {
@@ -577,10 +502,10 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
       const error = err as { response?: { status: number } } & Error;
       if (error?.response?.status === 409) {
         setError('이미 등록된 상품 ID입니다');
-      } else if (error instanceof Error) {
-        setError(error.message);
       } else {
-        setError('수정에 실패했습니다');
+        // 2609_22/D32: 마스터에 연결된 셀은 400 +「마스터 상세에서 수정하세요」가 내려온다.
+        // 서버 문구를 그대로 띄운다(axios 의 "Request failed with status code 400" 로 덮지 않는다).
+        setError(extractErrorMessage(err, '수정에 실패했습니다'));
       }
       setIsSubmitting(false);
     }
@@ -615,7 +540,8 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
     );
   }
 
-  const isAllComplete = selectedPlatform && productListingName.trim() && platformProductId && selectedCategory && selectedCarrierRateId && selectedPackageId && optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0);
+  // 2609_71/D8: 구성품 유무는 더 이상 저장 조건이 아니다(마스터 책임).
+  const isAllComplete = selectedPlatform && productListingName.trim() && platformProductId && selectedCategory && selectedCarrierRateId && selectedPackageId && optionsData.length > 0;
 
   return (
     <div className="w-full max-w-4xl py-8">
@@ -796,8 +722,8 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
       {/* Section 4: 옵션 관리 */}
       <div className="mb-8 p-6 border border-gray-200 rounded-lg">
         <div className="flex items-center gap-3 mb-6 pb-3 border-b">
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0) ? 'bg-green-600' : 'bg-gray-400'}`}>
-            {optionsData.length > 0 && optionsData.every((opt) => opt.products.length > 0) ? '✓' : '4'}
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${optionsData.length > 0 ? 'bg-green-600' : 'bg-gray-400'}`}>
+            {optionsData.length > 0 ? '✓' : '4'}
           </div>
           <h2 className="text-lg font-bold">옵션 관리</h2>
         </div>
@@ -821,52 +747,11 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">물품 수량 *</label>
-                    <div className="space-y-2 p-2 border border-gray-300 rounded bg-white max-h-48 overflow-y-auto">
-                      {selectedProducts.length > 0 ? (
-                        selectedProducts.map((product) => (
-                          <div key={product.id} className="flex items-center gap-2">
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-900">{product.productName}</p>
-                              {product.price && <p className="text-xs text-gray-500">₩{Math.round(product.price).toLocaleString()}</p>}
-                            </div>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={productQuantities[product.id] !== undefined}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setProductQuantities({
-                                      ...productQuantities,
-                                      [product.id]: productQuantities[product.id] || 1,
-                                    });
-                                  } else {
-                                    const newQuantities = { ...productQuantities };
-                                    delete newQuantities[product.id];
-                                    setProductQuantities(newQuantities);
-                                  }
-                                }}
-                                className="rounded"
-                              />
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={productQuantities[product.id] || 1}
-                              onChange={(e) => {
-                                setProductQuantities({
-                                  ...productQuantities,
-                                  [product.id]: parseInt(e.target.value) || 1,
-                                });
-                              }}
-                              className="w-16 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-gray-600">선택된 상품이 없습니다</p>
-                      )}
-                    </div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">구성품</label>
+                    <OptionComponentsReadOnly
+                      products={editingOptionProducts}
+                      masterProductId={existingListing?.masterProductId}
+                    />
                   </div>
 
                   <div>
@@ -894,9 +779,9 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                     const marginColor = margin > 0 ? 'text-green-600' : 'text-red-600';
                     const selectedCarrierRate = carrierRates.find((cr) => cr.id === selectedCarrierRateId);
                     const selectedPkg = packages.find((p) => p.id === selectedPackageId);
-                    const totalProductCost = selectedProducts.reduce((sum, product) => {
-                      if (productQuantities[product.id] === undefined) return sum;
-                      return sum + (product.price ? product.price * (productQuantities[product.id] || 1) : 0);
+                    const totalProductCost = editingOptionProducts.reduce((sum, line) => {
+                      const product = componentProducts.find((cp) => cp.id === line.productId);
+                      return sum + (product?.price ? product.price * line.quantity : 0);
                     }, 0);
                     const commissionFee = sellingPrice * commissionRate * 1.1;
                     return (
@@ -987,18 +872,13 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                     </div>
                   </div>
 
-                  {item.products.length > 0 && (
-                    <div className="mb-3 p-3 bg-white rounded border border-gray-200 space-y-2">
-                      {item.products.map((product, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-sm">
-                          <div>
-                            <p className="font-medium">{product.productName}</p>
-                            <p className="text-gray-600">수량: {product.quantity}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="mb-3">
+                    <p className="text-xs font-semibold text-gray-700 mb-1">구성품</p>
+                    <OptionComponentsReadOnly
+                      products={item.products}
+                      masterProductId={existingListing?.masterProductId}
+                    />
+                  </div>
 
                   {(() => {
                     const margin = calculateMargin(item.option.sellingPrice, item.products);
@@ -1019,7 +899,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                             ₩
                             {item.products
                               .reduce((sum, p) => {
-                                const product = selectedProducts.find((sp) => sp.id === p.productId);
+                                const product = componentProducts.find((cp) => cp.id === p.productId);
                                 return sum + (product?.price ? product.price * p.quantity : 0);
                               }, 0)
                               .toLocaleString()}
@@ -1071,52 +951,11 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">물품 수량 *</label>
-                <div className="space-y-2 p-2 border border-gray-300 rounded bg-white max-h-48 overflow-y-auto">
-                  {selectedProducts.length > 0 ? (
-                    selectedProducts.map((product) => (
-                      <div key={product.id} className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-900">{product.productName}</p>
-                          {product.price && <p className="text-xs text-gray-500">₩{Math.round(product.price).toLocaleString()}</p>}
-                        </div>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={productQuantities[product.id] !== undefined}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setProductQuantities({
-                                  ...productQuantities,
-                                  [product.id]: productQuantities[product.id] || 1,
-                                });
-                              } else {
-                                const newQuantities = { ...productQuantities };
-                                delete newQuantities[product.id];
-                                setProductQuantities(newQuantities);
-                              }
-                            }}
-                            className="rounded"
-                          />
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={productQuantities[product.id] || 1}
-                          onChange={(e) => {
-                            setProductQuantities({
-                              ...productQuantities,
-                              [product.id]: parseInt(e.target.value) || 1,
-                            });
-                          }}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-gray-500 py-2">선택된 상품이 없습니다</p>
-                  )}
-                </div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">구성품</label>
+                <OptionComponentsReadOnly
+                  products={editingOptionProducts}
+                  masterProductId={existingListing?.masterProductId}
+                />
               </div>
 
               <div>
@@ -1143,9 +982,9 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                   const marginColor = margin > 0 ? 'text-green-600' : 'text-red-600';
                   const selectedCarrierRate = carrierRates.find((cr) => cr.id === selectedCarrierRateId);
                   const selectedPkg = packages.find((p) => p.id === selectedPackageId);
-                  const totalProductCost = selectedProducts.reduce((sum, product) => {
-                    if (productQuantities[product.id] === undefined) return sum;
-                    return sum + (product.price ? product.price * (productQuantities[product.id] || 1) : 0);
+                  const totalProductCost = editingOptionProducts.reduce((sum, line) => {
+                    const product = componentProducts.find((cp) => cp.id === line.productId);
+                    return sum + (product?.price ? product.price * line.quantity : 0);
                   }, 0);
                   const commissionFee = sellingPrice * commissionRate * 1.1;
 
@@ -1270,69 +1109,6 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
         </div>
       </div>
 
-      {/* Product Search Modal */}
-      {isProductModalOpen && (
-        <Modal isOpen onClose={closeProductModal} title="상품 검색" fullHeight>
-
-            <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-              <input
-                type="text"
-                placeholder="상품명으로 검색..."
-                value={productModalSearchQuery}
-                onChange={(e) => handleProductSearch(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                autoFocus
-              />
-              {isSearching && <p className="text-xs text-gray-500 mt-2">검색 중...</p>}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6">
-              {isSearching ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-gray-600">검색 중...</div>
-                </div>
-              ) : filteredProductsForModal.length > 0 ? (
-                <div className="space-y-3">
-                  {filteredProductsForModal.map((product) => {
-                    const imageUrl = getImageUrl(product.imageUrl, product.id);
-                    return (
-                      <button
-                        key={product.id}
-                        type="button"
-                        onClick={() => handleSelectProduct(product)}
-                        className="w-full text-left p-3 border border-gray-200 rounded-lg transition-colors hover:bg-blue-50 hover:border-blue-300 flex gap-3"
-                      >
-                        <div className="flex-shrink-0 w-20 h-20 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
-                          {imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={product.productName}
-                              className="w-full h-full object-cover"
-                              onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
-                            />
-                          ) : (
-                            <p className="text-gray-400 text-xs text-center px-2">No Image</p>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0 flex flex-col justify-between">
-                          <div>
-                            <p className="text-xs text-gray-500">ID: {product.id}</p>
-                            <p className="font-medium text-gray-900 mt-1 break-words">{product.productName}</p>
-                          </div>
-                          {product.price && <p className="text-sm text-blue-600 font-semibold">₩{Math.round(product.price).toLocaleString()}</p>}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : productModalSearchQuery.trim() ? (
-                <p className="text-sm text-gray-600 text-center py-8">검색 결과가 없습니다</p>
-              ) : (
-                <p className="text-sm text-gray-600 text-center py-8">상품을 검색해주세요</p>
-              )}
-            </div>
-        </Modal>
-      )}
     </div>
   );
 }

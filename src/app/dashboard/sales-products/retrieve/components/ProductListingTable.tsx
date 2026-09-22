@@ -15,10 +15,6 @@ interface ProductListingTableProps {
   expandedListingId: number | null;
   onRowClick: (id: number) => void;
   onSaveState?: () => void;
-  // 2609_22/D24: 미연결 행의 [마스터 생성] 버튼에만 배선한다.
-  onCreateMaster: (listing: ProductListing) => void;
-  // = isAdmin. false 면 버튼 자체를 렌더하지 않는다(생성 엔드포인트가 /api/admin/**).
-  canCreateMaster: boolean;
 }
 
 export function ProductListingTable({
@@ -29,8 +25,6 @@ export function ProductListingTable({
   expandedListingId,
   onRowClick,
   onSaveState,
-  onCreateMaster,
-  canCreateMaster,
 }: ProductListingTableProps) {
   const router = useRouter();
 
@@ -121,6 +115,7 @@ export function ProductListingTable({
                   {listing.packageType || '-'}
                 </td>
                 {/* 행 이동은 각 td onClick 이 담당한다 — 이 td 에는 onClick 을 붙이지 않는다. */}
+                {/* 2609_71/D9: 셀 → 마스터 승격 경로는 사라졌다. 떼어낸 셀은 「쿠팡 ID 로 마스터 만들기」가 담당한다. */}
                 <td className="px-6 py-3 text-sm text-gray-700">
                   {listing.masterProductId ? (
                     <Link
@@ -130,16 +125,8 @@ export function ProductListingTable({
                     >
                       연결됨
                     </Link>
-                  ) : canCreateMaster ? (
-                    <button
-                      type="button"
-                      onClick={() => onCreateMaster(listing)}
-                      className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
-                    >
-                      마스터 생성
-                    </button>
                   ) : (
-                    '-'
+                    <span className="text-gray-500">미연결</span>
                   )}
                 </td>
               </tr>
