@@ -9,6 +9,7 @@ import { ProductImageGallery } from './ProductImageGallery';
 import { Input } from '@/presentation/components/ui/Input';
 import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { useClipboardStore } from '@/infrastructure/stores/clipboardStore';
 import type { ClipValues } from '@/domain/entities/ClipItem';
 import { ClipboardFillModal, CLIP_FIELD_LABELS, type ProductClip } from './ClipboardFillModal';
@@ -45,6 +46,8 @@ export function ProductEditForm({
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const [isCheckingBarcode, setIsCheckingBarcode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  // 저장 실패는 **폼 안에서** 끝난다 — 페이지 전체를 에러 화면으로 바꾸지 않는다(입력값이 날아간다).
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [clipNotice, setClipNotice] = useState('');
   const [isFillOpen, setIsFillOpen] = useState(false);
@@ -56,6 +59,7 @@ export function ProductEditForm({
   const {
     register,
     handleSubmit,
+    formState: { errors },
     watch,
     setValue,
   } = useForm<ProductEditFormValues>({
@@ -131,6 +135,7 @@ export function ProductEditForm({
   const handleFormSubmit = useCallback(
     async (data: ProductEditFormValues) => {
       setIsSaving(true);
+      setSaveError(null);
       try {
         // 치수·내용물 양은 서버에서 문자열이다 → 입력한 글자를 그대로 보낸다.
         // 빈칸은 `null` 이 아니라 `''` 로 보내야 실제로 지워진다(서버의 `null` = 필드 미전송).
@@ -143,7 +148,9 @@ export function ProductEditForm({
           netContent: data.netContent.trim(),
         };
         await onSave(payload);
-      } catch {
+      } catch (err) {
+        // 인라인 배너로만 알린다. 백엔드 사유(바코드 중복 등)를 그대로 보여준다.
+        setSaveError(extractErrorMessage(err, '저장에 실패했습니다. 잠시 후 다시 시도해주세요.'));
         setIsSaving(false);
       }
     },
@@ -152,6 +159,20 @@ export function ProductEditForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+      {saveError && (
+        <div className="flex items-start justify-between gap-2 rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-red-700 text-sm">{saveError}</p>
+          <button
+            type="button"
+            onClick={() => setSaveError(null)}
+            className="text-red-600 hover:text-red-700 text-lg font-bold leading-none"
+            aria-label="닫기"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* [취소][저장] 은 폼 **오른쪽 위**다 — 상세 화면의 [수정][삭제] 와 같은 자리라 수정 모드를
           오갈 때 버튼이 움직이지 않는다. `ui/Button` 사용(취소=secondary 가 왼쪽).
           ⚠️ 폼 맨 아래로 되돌리지 말 것(2026-09-20). */}
@@ -260,9 +281,18 @@ export function ProductEditForm({
               <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
                 단위
               </label>
+              {/* 내용물 양을 적었으면 단위를 함께 골라야 한다(서버가 400 으로 거절한다).
+                  ⚠️ 반대(단위만 고르고 양은 빈칸)는 서버가 막지 않으므로 여기서도 막지 않는다.
+                  🔴 이 물품이 원래 단위가 없었더라도 수정 화면은 빈 단위로 시작하므로,
+                     양만 입력하는 경로가 여기서 걸린다. */}
               <select
                 id="netContentUnit"
-                {...register('netContentUnit')}
+                {...register('netContentUnit', {
+                  validate: (value, values) =>
+                    values.netContent.trim() !== '' && !value.trim()
+                      ? '내용물 양을 입력하면 단위를 함께 선택해주세요'
+                      : true,
+                })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">단위 선택</option>
@@ -271,6 +301,9 @@ export function ProductEditForm({
                 <option value="L">l</option>
                 <option value="ML">ml</option>
               </select>
+              {errors.netContentUnit && (
+                <p className="text-red-600 text-sm mt-1">{errors.netContentUnit.message}</p>
+              )}
             </div>
           </div>
 
@@ -323,7 +356,7 @@ export function ProductEditForm({
                 inputMode="decimal"
                 pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
-                {...register('netContent')}
+                {...register('netContent', { deps: ['netContentUnit'] })}
               />
             </div>
           </div>

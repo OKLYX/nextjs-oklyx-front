@@ -11,6 +11,7 @@ import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/Produc
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
 import { ROUTES } from '@/config/routes';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ProductRegistrationForm } from './ProductRegistrationForm';
 import { SuccessDialog } from './SuccessDialog';
 
@@ -78,13 +79,8 @@ export function ProductRegistrationContainer() {
           throw err;
         }
 
-        let errorMessage = '상품 등록에 실패했습니다';
-        if (axios.isAxiosError(err)) {
-          errorMessage = (err.response?.data as any)?.message || err.message;
-        } else if (err instanceof Error) {
-          errorMessage = err.message;
-        }
-        setError(errorMessage);
+        // 백엔드 사유(단위 누락·바코드 중복 등)를 그대로 배너에 띄운다.
+        setError(extractErrorMessage(err, '상품 등록에 실패했습니다'));
         throw err;
       } finally {
         setIsLoading(false);
