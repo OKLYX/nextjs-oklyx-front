@@ -31,17 +31,18 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * 백엔드 메시지를 가공하지 않고 그대로 쓰되, 사용자가 조치할 수 있는 3가지만 한 줄을 덧붙인다.
+ * 백엔드 메시지를 가공하지 않고 그대로 쓰되, 사용자가 조치할 수 있는 것만 한 줄을 덧붙인다.
  * 판정은 HTTP status + 메시지 substring 으로만 한다 — 프론트에는 예외 클래스명이 오지 않는다.
- * ⚠️ 중복 채널만 409 다(그 외 가드는 400).
+ *
+ * ⚠️ 종전에 있던 409 `이미 등록된 채널` 가지는 **제거했다**(2026-09-23). 2026-09-19 온보딩에서
+ * 편입 경로의 "계정당 상품페이지 1개" 가드가 풀려(`CoupangListingImportServiceImpl`) 이 경로는
+ * 409 를 낼 수 없다 — 그 예외를 던지는 곳은 신규 등록(`ChannelAddServiceImpl`) 하나뿐이다.
+ * 남겨 두면 "기존 셀을 지우세요" 라는 **틀린 안내**가 된다.
  */
 const importErrorMessage = (e: unknown): string => {
   const status = (e as { response?: { status?: number } })?.response?.status;
   const message = extractErrorMessage(e, '가져오기에 실패했습니다.');
   if (status === 429) return '잠시 후 다시 시도하세요.';
-  if (status === 409 && message.includes('이미 등록된 채널')) {
-    return `${message} 이미 이 판매자·플랫폼 셀이 있습니다. 기존 셀을 지우거나 다른 마스터를 선택하세요.`;
-  }
   if (status === 400 && message.includes('이미 다른 상품에 연결된')) {
     // 2609_63: 이 400 은 여전히 발생한다(연결된 셀은 재사용 대상이 아니다) — 조치 방법만 덧붙인다.
     return `${message} 그 마스터에서 [마스터 연결 해제] 한 뒤 다시 시도하세요.`;
