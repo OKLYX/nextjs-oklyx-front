@@ -35,7 +35,7 @@ import type { ClipItem, ClipValues } from '@/domain/entities/ClipItem';
  * ```
  *
  * 🔴 썸네일은 `resolveThumbUrl(imageUrl)` 로 렌더한다. 대표 프록시 `getImageUrl` 금지
- *   (`ClipboardTray` 와 같은 규칙).
+ *   (`ClipboardTool` 과 같은 규칙).
  * ⚠️ 물품을 바꾸면 체크 상태도 그 물품 기준으로 **다시 잡는다** — 이전 물품 기준으로 고른
  *   체크가 남으면 "담긴 값 없음" 항목이 체크된 채로 보인다.
  * ⚠️ 물품을 바꿀 때 `useEffect` 로 체크를 갱신하지 말 것 — 이 저장소 lint 규칙

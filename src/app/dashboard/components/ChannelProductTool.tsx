@@ -25,7 +25,7 @@ import { MarketImagePreviewModal } from './MarketImagePreviewModal';
  * **용도**: 판매자의 마켓 상품을 이름 또는 상품 ID 로 찾아, 보면서 물품 등록 칸을 채운다.
  *   값은 전부 **사람이 버튼을 눌러야** 들어간다(자동 채우기 없음).
  * **파일**: src/app/dashboard/components/ChannelProductTool.tsx
- * **쓰는 곳**: `dashboard/layout.tsx` 의 `ToolPanel` 본문 **한 곳뿐**이다 — 도구는 화면에 속하지 않는다.
+ * **엮는 곳**: `toolRegistry.tsx` **한 곳뿐**이다(`ToolPanel` 본문) — 도구는 화면에 속하지 않는다.
  *
  * **[채우기] 는 `toolPanelStore.fillTarget` 을 통해 나간다**: 값을 받을 화면(물품 등록 폼)이 마운트될
  *   때 손을 내밀고, 없으면(`fillTarget == null`) **버튼 자체를 그리지 않는다**. 값 줄은 그대로 보인다.
@@ -33,7 +33,7 @@ import { MarketImagePreviewModal } from './MarketImagePreviewModal';
  * ⚠️ 이 컴포넌트는 `<form>` 밖(전역 레이아웃)에 살지만, 버튼은 계속 `type="button"` 으로 두고
  *    검색 입력의 **Enter 가드**도 유지한다 — 어느 화면 위에 떠 있을지 알 수 없다.
  * ⚠️ 조회는 [조회] 를 누를 때만 나간다(타이핑 중 자동 검색 금지 — 쿠팡 호출 예산).
- * 🔴 사진은 **끌어서** 물품에 넣는다(담기 체크박스 없음, 2609_68). 드롭 지점은 상단바 클립보드와
+ * 🔴 사진은 **끌어서** 물품에 넣는다(담기 체크박스 없음, 2609_68). 드롭 지점은 툴바의 클립보드와
  *    물품 이미지 등록 영역 두 곳이다. **누르면 확대**된다 — 브라우저가 클릭과 드래그를 가르므로
  *    거리·시간을 재는 코드를 만들지 않는다.
  * 🔴 마켓 URL 은 절대 주소다 — `resolveThumbUrl`·`getImageUrl` 을 태우면 404 가 난다.

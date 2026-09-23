@@ -30,7 +30,7 @@ import { ImageLightbox } from '@/presentation/components/ImageLightbox';
  *   - 오버레이는 `pointer-events-none` 필수. 드롭을 가로채면 업로드가 아예 안 된다.
  *   - 조회 모드(`isViewMode`)·업로드 중(`busy`)에는 받지 않는다.
  *
- * **클립보드(FEATURE_2609_62)**: 카드를 끌어 상단바 클립보드에 담고(`draggable`), 담아둔 항목을
+ * **클립보드(FEATURE_2609_62)**: 카드를 끌어 오른쪽 툴바의 클립보드에 담고(`draggable`), 담아둔 항목을
  *   이 드롭존에 놓아 **참조 복제**로 붙인다(`useCase.copy` — 파일을 다시 올리지 않는다).
  *   - 드롭존은 파일(`Files`)과 클립(`application/x-oklyx-clip`) 두 종류를 구분해 받는다.
  *   - 🔴 카드 안 `<img>` 에 `draggable={false}` 필수 — 없으면 브라우저가 이미지 자체를 끌어
@@ -392,7 +392,7 @@ export function ProductImageGallery({
     await ingestFiles(Array.from(e.dataTransfer.files));
   };
 
-  // 갤러리 카드를 끌어 상단바 클립보드(또는 열린 말풍선)에 담는다.
+  // 갤러리 카드를 끌어 툴바의 클립보드 아이콘(또는 열린 클립보드 패널)에 담는다.
   // 담기는 읽기 동작이라 조회 모드에서도 허용한다 — 상세에서 담는 것이 기본 동선이다.
   const handleCardDragStart = (e: React.DragEvent, item: GalleryItem) => {
     if (item.imageId == null || item.rawUrl == null) return;
