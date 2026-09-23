@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
@@ -161,46 +161,11 @@ const STATUS_LABEL: Record<ListingStatus, string> = {
  */
 const rowCellsOf = (row: MatrixRow): MatrixCell[] => row.cells ?? (row.cell ? [row.cell] : []);
 
-/** 셀 하나를 가리키는 화면 꼬리표. 미전송 셀은 마켓 ID 가 없으므로 상태 문구로 대신한다. */
-const cellTag = (cell: MatrixCell): string => cell.platformProductId ?? '미전송';
-
 /**
- * 계정 행의 **셀별 세로 스택**. 썸네일·상세페이지·상태·판매가·액션 열이 모두 이걸로 그려져
- * 「상품 ID」 열과 **같은 순서·같은 줄 수**를 유지한다(열끼리 짝이 맞는다).
- *
- * - 셀이 0개(미등록 행): `–`
- * - 셀이 1개(대부분의 마스터): 래퍼 없이 내용만 → **기존 화면과 시각적으로 동일**하다.
- * - 셀이 2개 이상: 점선 구분 + 그 셀의 상품 ID 꼬리표를 붙인다 — 꼬리표가 없으면 어느 줄이
- *   어느 쿠팡 페이지인지 알 수 없다(2609_63 이 해제·삭제 버튼에서 쓴 것과 같은 장치).
- *
- * ❌ `rowSpan` 으로 셀마다 `<tr>` 을 쪼개지 말 것 — 체크박스 열(계정 단위 일괄 등록)과
- *    `DisplayNameRow` 서브행이 계정 행 사이에 끼어 계산이 깨진다.
+ * 셀 하나를 가리키는 **모달·확인창용** 꼬리표. 미전송 셀은 마켓 ID 가 없으므로 상태 문구로 대신한다.
+ * ⚠️ 표 안에서는 쓰지 않는다 — 셀마다 행이 하나씩이라 「상품 ID」 열이 이미 알려준다(2026-09-23).
  */
-function CellStack({
-  cells,
-  children,
-}: {
-  cells: MatrixCell[];
-  children: (cell: MatrixCell) => ReactNode;
-}) {
-  if (cells.length === 0) return <span className="text-gray-400">–</span>;
-  if (cells.length === 1) return <>{children(cells[0])}</>;
-  return (
-    <div className="space-y-2">
-      {cells.map((c, i) => (
-        <div
-          key={c.productListingId}
-          className={i > 0 ? 'border-t border-dashed border-gray-200 pt-2' : undefined}
-        >
-          <div className="mb-0.5 font-mono text-[10px] tabular-nums text-gray-400">
-            {cellTag(c)}
-          </div>
-          {children(c)}
-        </div>
-      ))}
-    </div>
-  );
-}
+const cellTag = (cell: MatrixCell): string => cell.platformProductId ?? '미전송';
 
 export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const router = useRouter();
@@ -1313,366 +1278,392 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
             </thead>
             <tbody>
               {matrix.rows.map((row) => {
-                // 🔴 매트릭스 본문 전체가 **이 목록 하나**를 본다 — 썸네일·상세페이지·상태·판매가·
-                // 액션·서브행이 모두 셀마다 하나씩 그려지고, 「상품 ID」 열과 줄 수·순서가 같다.
-                // (종전엔 상품 ID 열과 해제·삭제 버튼만 셀을 전부 나열했고 나머지는 첫 셀뿐이었다.)
+                // 🔴 **등록상품(셀) 하나 = 표의 행 하나**(2026-09-23). 열마다 값을 하나씩만 그리므로
+                // 썸네일·상세·상품 ID·상태·판매가·액션이 가로로 자연히 짝이 맞는다. 종전의
+                // 「계정당 <tr> 하나 + 칸 안 세로 스택」은 칸마다 따로 쌓여 가로줄이 전부 어긋났고
+                // (사용자 확인 2026-09-23), 액션 칸이 버튼 여러 벌로 행 높이를 지배했다.
+                // ❌ `rowSpan` 으로 계정 열을 묶지 말 것 — `DisplayNameRow` 가 tbody 직속
+                //    `<tr colSpan>` 으로 셀 행 사이에 끼어 계산이 깨진다. 대신 계정 열(체크박스·
+                //    판매자·플랫폼·계정)은 **첫 셀 행에만** 그리고 이어지는 행에서는 비운다.
                 const rowCells = rowCellsOf(row);
                 const multiCell = rowCells.length > 1;
                 // 채널 라벨: 셀이 여럿이면 어느 쿠팡 페이지인지 꼬리표를 붙인다(모달 제목·확인창 공용).
+                // ⚠️ 표 **밖**(모달)에는 행 문맥이 없어서 여기 꼬리표는 남긴다 — 표 안의 셀 꼬리표는
+                //    상품 ID 열과 중복이라 없앴다.
                 const cellLabel = (c: MatrixCell) =>
                   `${row.sellerName} · ${row.platform}${multiCell ? ` · ${cellTag(c)}` : ''}`;
+                // 셀이 없는 계정(미등록 등)도 **지금 그대로 한 줄**이다 — 렌더 경로를 하나로 두려고
+                // 빈 셀 하나로 취급한다(셀 관련 칸은 `–`).
+                const units: (MatrixCell | null)[] = rowCells.length > 0 ? rowCells : [null];
                 return (
                   <Fragment key={row.accountId}>
-                  <tr
-                    className="border-b border-gray-100 text-sm text-gray-900"
-                  >
-                    <td className="px-4 py-3">
-                      {isAdmin && !row.registered ? (
-                        <input
-                          type="checkbox"
-                          checked={selected.has(row.accountId) && !isShippingBlocked(row.accountId)}
-                          onChange={() => toggleOne(row.accountId)}
-                          disabled={busy || isShippingBlocked(row.accountId)}
-                          title={
-                            isShippingBlocked(row.accountId)
-                              ? SHIPPING_BLOCK_REASON
-                              : undefined
-                          }
-                        />
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <CellStack cells={rowCells}>
-                        {(cell) => {
-                          const gen = generated[cell.productListingId];
-                          if (gen === undefined) {
-                            return genLoading ? (
-                              <Spinner size={14} />
-                            ) : (
-                              <span className="text-gray-400">–</span>
-                            );
-                          }
-                          const url = gen?.thumbnailUrl;
-                          if (!url) return <span className="text-gray-400">–</span>;
-                          const resolved = resolveThumbUrl(url);
-                          return (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={resolved}
-                              alt={`${row.sellerName} 썸네일`}
-                              onClick={() => openPreview(gen, cellLabel(cell), 'image')}
-                              className="h-24 w-24 cursor-pointer rounded border border-gray-200 object-contain hover:opacity-80"
-                            />
-                          );
-                        }}
-                      </CellStack>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <CellStack cells={rowCells}>
-                        {(cell) => {
-                          const gen = generated[cell.productListingId];
-                          if (gen === undefined) {
-                            return genLoading ? (
-                              <Spinner size={14} />
-                            ) : (
-                              <span className="text-gray-400">–</span>
-                            );
-                          }
-                          const html = gen?.detailHtml;
-                          if (!html) return <span className="text-xs text-gray-400">미생성</span>;
-                          return (
-                            <DetailHtmlThumb
-                              html={html}
-                              width={96}
-                              height={96}
-                              onClick={() => openPreview(gen, cellLabel(cell), 'detail')}
-                            />
-                          );
-                        }}
-                      </CellStack>
-                    </td>
-                    <td className="px-4 py-3">{row.sellerName}</td>
-                    <td className="px-4 py-3">{row.platform}</td>
-                    <td className="px-4 py-3">{row.accountLabel}</td>
-                    {/* 상품 ID (2609_61): 이 계정이 가진 **모든** 셀을 세로로 나열한다 — 한 계정이
-                        같은 마스터로 쿠팡 페이지를 여러 개 가질 수 있어(2026-09-19 편입 가드 완화)
-                        첫 셀만 보여주면 나머지 페이지가 화면에 없는 것처럼 된다.
-                        이 열이 셀 **순서의 기준**이고, 다른 셀 열(썸네일·상세·상태·판매가·액션)은
-                        같은 `rowCells` 를 같은 순서로 그린다.
-                        ⚠️ 세로 정렬은 판매자·플랫폼·계정·상태·판매가와 같은 가운데다 — 썸네일 열
-                        (96px)이 행을 늘려 놓아서, 이 칸만 위로 붙이면 눈에 띄게 어긋난다. */}
-                    <td className="px-4 py-3">
-                      {(() => {
-                        if (rowCells.length === 0) return <span className="text-gray-400">–</span>;
-                        return (
-                          <div className="space-y-0.5">
-                            {rowCells.map((c) => (
-                              <div key={c.productListingId} className="flex items-center gap-1">
-                                {c.platformProductId ? (
-                                  <>
-                                    <span className="font-mono text-xs tabular-nums text-gray-900">
-                                      {c.platformProductId}
-                                    </span>
-                                    <CopyIdButton value={c.platformProductId} />
-                                  </>
-                                ) : (
-                                  // 2609_61/D2: DRAFT 셀은 아직 마켓이 ID 를 주지 않았다 —
-                                  // 오류가 아니므로 경고색·아이콘을 쓰지 않는다.
-                                  <span className="text-gray-400" title="마켓 등록 후 부여">
-                                    –
+                    {units.map((cell, cellIndex) => {
+                      const isFirstCell = cellIndex === 0;
+                      const gen = cell ? generated[cell.productListingId] : undefined;
+                      return (
+                        <Fragment key={cell ? cell.productListingId : `empty-${row.accountId}`}>
+                          {/* 계정 묶음 표시(rowSpan 대체): 계정이 바뀌는 첫 행만 진한 윗선,
+                              이어지는 셀 행은 연한 선 + 옅은 바탕이라 「같은 계정의 다른 등록상품」
+                              으로 읽힌다. 서브행(DisplayNameRow)의 파란 아랫선이 사이에 끼므로
+                              선 굵기만으로는 약하다 — 바탕색이 실제로 묶어 준다.
+                              ⚠️ 셀이 1개인 계정에는 이어지는 행이 없어 바탕색이 발화하지 않는다
+                                 (대부분의 마스터 = 기존 화면 그대로). */}
+                          <tr
+                            className={`text-sm text-gray-900 ${
+                              isFirstCell
+                                ? 'border-t-2 border-gray-300'
+                                : 'border-t border-gray-100 bg-gray-50'
+                            }`}
+                          >
+                            <td className="px-4 py-3">
+                              {/* 체크박스 일괄 등록은 **계정 단위**라 첫 행에만 둔다. */}
+                              {isFirstCell && isAdmin && !row.registered ? (
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    selected.has(row.accountId) && !isShippingBlocked(row.accountId)
+                                  }
+                                  onChange={() => toggleOne(row.accountId)}
+                                  disabled={busy || isShippingBlocked(row.accountId)}
+                                  title={
+                                    isShippingBlocked(row.accountId)
+                                      ? SHIPPING_BLOCK_REASON
+                                      : undefined
+                                  }
+                                />
+                              ) : null}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              {(() => {
+                                if (!cell) return <span className="text-gray-400">–</span>;
+                                if (gen === undefined) {
+                                  return genLoading ? (
+                                    <Spinner size={14} />
+                                  ) : (
+                                    <span className="text-gray-400">–</span>
+                                  );
+                                }
+                                const url = gen?.thumbnailUrl;
+                                if (!url) return <span className="text-gray-400">–</span>;
+                                const resolved = resolveThumbUrl(url);
+                                return (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={resolved}
+                                    alt={`${row.sellerName} 썸네일`}
+                                    onClick={() => openPreview(gen, cellLabel(cell), 'image')}
+                                    className="h-24 w-24 cursor-pointer rounded border border-gray-200 object-contain hover:opacity-80"
+                                  />
+                                );
+                              })()}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              {(() => {
+                                if (!cell) return <span className="text-gray-400">–</span>;
+                                if (gen === undefined) {
+                                  return genLoading ? (
+                                    <Spinner size={14} />
+                                  ) : (
+                                    <span className="text-gray-400">–</span>
+                                  );
+                                }
+                                const html = gen?.detailHtml;
+                                if (!html)
+                                  return <span className="text-xs text-gray-400">미생성</span>;
+                                return (
+                                  <DetailHtmlThumb
+                                    html={html}
+                                    width={96}
+                                    height={96}
+                                    onClick={() => openPreview(gen, cellLabel(cell), 'detail')}
+                                  />
+                                );
+                              })()}
+                            </td>
+                            {/* 계정 정보는 첫 셀 행에만 — 이어지는 행은 비워 한 계정임을 보인다. */}
+                            <td className="px-4 py-3">{isFirstCell ? row.sellerName : null}</td>
+                            <td className="px-4 py-3">{isFirstCell ? row.platform : null}</td>
+                            <td className="px-4 py-3">{isFirstCell ? row.accountLabel : null}</td>
+                            {/* 상품 ID (2609_61): 이 행이 가리키는 셀 하나의 마켓 상품 ID.
+                                「등록상품 ID」가 아니라 「상품 ID」 — 이 제품에서 "등록상품"은
+                                자동 생성되는 등록상품명을 가리킨다. */}
+                            <td className="px-4 py-3">
+                              {cell?.platformProductId ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-xs tabular-nums text-gray-900">
+                                    {cell.platformProductId}
                                   </span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-4 py-3">
-                      {/* 상태·채널 카테고리 배지는 **셀마다 다르다** — 같은 계정이라도 한 쿠팡
-                          페이지는 판매중, 다른 하나는 미전송일 수 있다. 미등록 행(셀 0개)만 계정
-                          단위 「미등록」 배지를 쓴다. */}
-                      {rowCells.length === 0 ? (
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[10px] ${
-                            row.registered
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-gray-100 text-gray-500'
-                          }`}
-                        >
-                          {row.registered ? STATUS_LABEL[cellStatus(null)] : '미등록'}
-                        </span>
-                      ) : (
-                        <CellStack cells={rowCells}>
-                          {(cell) => (
-                            <>
-                              <span
-                                className={`rounded px-1.5 py-0.5 text-[10px] ${
-                                  cell.platformProductId
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-amber-100 text-amber-700'
-                                }`}
-                              >
-                                {STATUS_LABEL[cellStatus(cell)]}
-                              </span>
-                              {/* 2609_45/D8: 이 채널이 마켓에 올라가 있는 자기 카테고리를 쓰고 있다는 사실 표시.
-                                  ⚠️ 오류가 아니라 정상 상태이므로 경고색(빨강)을 쓰지 않는다. 판정은 서버가 내린
-                                  usesOwnCategory 하나뿐 — 코드 유무·이름 비교로 다시 판단하지 말 것(D10-1). */}
-                              {cell.usesOwnCategory && (
-                                <div
-                                  className="mt-1 flex flex-wrap items-center gap-1"
-                                  title={OWN_CATEGORY_HINT}
+                                  <CopyIdButton value={cell.platformProductId} />
+                                </div>
+                              ) : (
+                                // 2609_61/D2: DRAFT 셀은 아직 마켓이 ID 를 주지 않았다 —
+                                // 오류가 아니므로 경고색·아이콘을 쓰지 않는다.
+                                <span
+                                  className="text-gray-400"
+                                  title={cell ? '마켓 등록 후 부여' : undefined}
                                 >
-                                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
-                                    채널 카테고리
+                                  –
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {/* 상태·채널 카테고리 배지는 **셀마다 다르다** — 같은 계정이라도 한 쿠팡
+                                  페이지는 판매중, 다른 하나는 미전송일 수 있다. 셀이 없는 행만 계정
+                                  단위 「미등록」 배지를 쓴다. */}
+                              {!cell ? (
+                                <span
+                                  className={`rounded px-1.5 py-0.5 text-[10px] ${
+                                    row.registered
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  {row.registered ? STATUS_LABEL[cellStatus(null)] : '미등록'}
+                                </span>
+                              ) : (
+                                <>
+                                  <span
+                                    className={`rounded px-1.5 py-0.5 text-[10px] ${
+                                      cell.platformProductId
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-amber-100 text-amber-700'
+                                    }`}
+                                  >
+                                    {STATUS_LABEL[cellStatus(cell)]}
                                   </span>
-                                  {(cell.categoryName ?? cell.categoryCode) && (
-                                    <span className="text-[10px] text-gray-600">
-                                      {cell.categoryName ?? cell.categoryCode}
-                                    </span>
+                                  {/* 2609_45/D8: 이 채널이 마켓에 올라가 있는 자기 카테고리를 쓰고 있다는 사실 표시.
+                                      ⚠️ 오류가 아니라 정상 상태이므로 경고색(빨강)을 쓰지 않는다. 판정은 서버가 내린
+                                      usesOwnCategory 하나뿐 — 코드 유무·이름 비교로 다시 판단하지 말 것(D10-1). */}
+                                  {cell.usesOwnCategory && (
+                                    <div
+                                      className="mt-1 flex flex-wrap items-center gap-1"
+                                      title={OWN_CATEGORY_HINT}
+                                    >
+                                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+                                        채널 카테고리
+                                      </span>
+                                      {(cell.categoryName ?? cell.categoryCode) && (
+                                        <span className="text-[10px] text-gray-600">
+                                          {cell.categoryName ?? cell.categoryCode}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {(() => {
+                                if (!cell) return <span className="text-gray-400">–</span>;
+                                // Prefer per-option prices (a master can have many options with
+                                // distinct prices); fall back to the single representative price.
+                                const prices = gen?.optionPrices ?? [];
+                                if (prices.length === 0) {
+                                  return cell.sellingPrice != null ? (
+                                    <>{formatWon(cell.sellingPrice)}</>
+                                  ) : (
+                                    <span className="text-gray-400">–</span>
+                                  );
+                                }
+                                // Inline per-option active toggle (43): checkbox = market inclusion, unchecked =
+                                // greyed. Non-admins see a plain read-only list (no checkbox).
+                                const listingId = cell.productListingId;
+                                return (
+                                  <div className="space-y-0.5">
+                                    {prices.map((p) => {
+                                      const active = p.active !== false;
+                                      // On the market and still on -> can't be turned off (87 returns 400).
+                                      const lockedOff = p.onMarket === true && active;
+                                      // Prefer the name the backend sends with each price. Fall back to the
+                                      // master option lookup (legacy responses), then the raw id.
+                                      const name = p.optionName
+                                        ?? options.find((o) => o.id === p.optionId)?.name
+                                        ?? `옵션 #${p.optionId}`;
+                                      // 재고 표시(103/D5): 실효값 = 채널 override ?? 마스터 상한(백엔드 SSOT).
+                                      // 상속이면 회색 — "이 채널만 다르다" 가 눈에 보여야 한다. 편집은
+                                      // [재고 설정] 모달 전용(여기엔 입력 컨트롤을 두지 않는다).
+                                      const inherited = p.stockQuantity == null;
+                                      const label = (
+                                        <span className={active ? '' : 'text-gray-400'}>
+                                          <span className={active ? 'text-gray-500' : ''}>{name}: </span>
+                                          {formatWon(p.sellingPrice)}
+                                          {/* 2609_19: 자동계산가가 아니라 사람이 정한 값이라는 표식.
+                                              재고의 '상속=회색' 과는 다른 규칙이다(판매가엔 상속이 없다). */}
+                                          {p.priceSource === 'MANUAL_OVERRIDE' && (
+                                            <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700">
+                                              수동
+                                            </span>
+                                          )}
+                                          <span
+                                            className={
+                                              active && !inherited ? 'ml-1' : 'ml-1 text-gray-400'
+                                            }
+                                          >
+                                            재고 {p.stockQuantity ?? p.maxStock}
+                                          </span>
+                                        </span>
+                                      );
+                                      return isAdmin ? (
+                                        <label
+                                          key={p.optionId}
+                                          className="flex items-center gap-1.5 whitespace-nowrap text-xs"
+                                          // Tooltip lives on the label: a disabled input doesn't fire the
+                                          // hover events browsers need to show `title`.
+                                          title={
+                                            lockedOff
+                                              ? `${MARKET_OPTION_LOCK_REASON} 판매를 멈추려면 쿠팡 WING 에서 처리하세요.`
+                                              : undefined
+                                          }
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={active}
+                                            disabled={optionBusyId === listingId || lockedOff}
+                                            onChange={() => handleToggleOption(listingId, p.optionId)}
+                                          />
+                                          {label}
+                                          {lockedOff && <span className="text-gray-400">🔒</span>}
+                                        </label>
+                                      ) : (
+                                        <div key={p.optionId} className="whitespace-nowrap text-xs">
+                                          {label}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            <td className="px-4 py-3">
+                              {!isAdmin ? (
+                                <span className="text-xs text-gray-400">–</span>
+                              ) : (
+                                <div className="space-y-1">
+                                  {/* 셀을 지목하지 않는 계정 단위 액션 — **첫 셀 행 맨 위**에만 둔다. */}
+                                  {isFirstCell && (
+                                    <>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {/* 🔴 [등록] = 채널 셀 **생성**이라 미등록 행 전용이다. 등록된 행에 노출하면
+                                            ChannelAddServiceImpl 의 계정당 1셀 가드에 걸려 409 다 — 신규 등록에서
+                                            두 번 만드는 것은 쿠팡에 중복 상품을 만드는 일이라 의미가 정반대다. */}
+                                        {(!row.registered || rowCells.length === 0) && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRowAdd(row.accountId, row.sellerId, row.platform)
+                                            }
+                                            disabled={busy || isShippingBlocked(row.accountId)}
+                                            title={
+                                              isShippingBlocked(row.accountId)
+                                                ? SHIPPING_BLOCK_REASON
+                                                : undefined
+                                            }
+                                            className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                                          >
+                                            {rowBusyId === row.accountId ? (
+                                              <Spinner size={12} label="등록 중" />
+                                            ) : (
+                                              '등록'
+                                            )}
+                                          </button>
+                                        )}
+                                        {/* 2609_22: 이미 마켓에 올라간 상품을 이 셀로 편입한다. 다른 플랫폼은 백엔드가
+                                            미지원이므로 버튼 자체를 노출하지 않는다. ⚠️ isShippingBlocked 가드는 걸지
+                                            않는다 — 이미 팔고 있는 상품이라 출고지 미설정이어도 가져올 수 있다.
+                                            🔴 **등록된 행에도 그린다**(2026-09-19 편입 가드 완화 대응). 한 계정이 같은
+                                            마스터로 쿠팡 페이지를 여러 개 가질 수 있는데(실측 139건) 이 버튼이 미등록
+                                            분기 안에만 있어서 첫 편입 뒤 두 번째 상품을 넣을 입구가 사라졌다.
+                                            🔴 **셀 행이 여럿이어도 계정당 하나다** — 이 버튼은 셀을 지목하지 않는다.
+                                            넘기는 값은 {sellerId, platform} 뿐이고 어느 셀에 넣을지는 사용자가 입력한
+                                            쿠팡 상품 ID 로 백엔드가 정한다(없으면 새 셀, 연결이 끊긴 셀이면 그 행 재사용).
+                                            productListingId 를 받는 다른 액션과 다르다. */}
+                                        {row.platform === 'COUPANG' && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setImportTarget({
+                                                sellerId: row.sellerId,
+                                                platform: row.platform,
+                                                sellerName: row.sellerName,
+                                              })
+                                            }
+                                            disabled={busy}
+                                            className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                                          >
+                                            {/* 이미 셀이 있는 행에서 "가져오기"는 기존 셀을 덮어쓰는 것처럼 읽힌다. */}
+                                            {row.registered && rowCells.length > 0
+                                              ? '쿠팡 상품 추가'
+                                              : '가져오기'}
+                                          </button>
+                                        )}
+                                      </div>
+                                      {(!row.registered || rowCells.length === 0) &&
+                                        isShippingBlocked(row.accountId) && (
+                                          <p
+                                            className="text-[11px] text-amber-700"
+                                            title={SHIPPING_BLOCK_REASON}
+                                          >
+                                            배송 설정 필요
+                                          </p>
+                                        )}
+                                    </>
+                                  )}
+                                  {/* 🔴 액션은 **그 행(셀) 한 벌**이다 — [재생성]·[수정 요청]·[배송 설정]·
+                                      [가격/재고/옵션명]·[승인 새로고침]은 전부 productListingId 를 지목하므로,
+                                      첫 셀에만 달면 두 번째 쿠팡 페이지는 손댈 창구가 없다.
+                                      ⚠️ `cells` 로는 **자기 셀 하나만** 넘긴다 — CellActions 가 해제·삭제
+                                      버튼을 그 목록만큼 그리므로, 전체를 넘기면 셀 수의 제곱만큼 버튼이 선다. */}
+                                  {row.registered && cell && (
+                                    <CellActions
+                                      masterId={masterId}
+                                      listing={{
+                                        id: cell.productListingId,
+                                        status: cellStatus(cell),
+                                      }}
+                                      options={options}
+                                      onReload={load}
+                                      accountId={row.accountId}
+                                      platform={row.platform}
+                                      channelLabel={cellLabel(cell)}
+                                      shippingOverride={gen?.shippingOverride}
+                                      shippingReady={gen?.shippingReady}
+                                      shippingUseCase={shippingUseCase}
+                                      onShippingSaved={(updated) =>
+                                        handleShippingSaved(cell.productListingId, updated)
+                                      }
+                                      usesOwnCategory={cell.usesOwnCategory === true}
+                                      channelCategoryLabel={
+                                        cell.categoryName ?? cell.categoryCode ?? null
+                                      }
+                                      masterCategoryName={matrix.masterCategoryName ?? null}
+                                      cells={[cell]}
+                                      onCellRemoved={handleCellRemoved}
+                                    />
                                   )}
                                 </div>
                               )}
-                            </>
-                          )}
-                        </CellStack>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <CellStack cells={rowCells}>
-                        {(cell) => {
-                        // Prefer per-option prices (a master can have many options with
-                        // distinct prices); fall back to the single representative price.
-                        const prices = generated[cell.productListingId]?.optionPrices ?? [];
-                        if (prices.length === 0) {
-                          return cell.sellingPrice != null ? (
-                            <>{formatWon(cell.sellingPrice)}</>
-                          ) : (
-                            <span className="text-gray-400">–</span>
-                          );
-                        }
-                        // Inline per-option active toggle (43): checkbox = market inclusion, unchecked =
-                        // greyed. Non-admins see a plain read-only list (no checkbox).
-                        const listingId = cell.productListingId;
-                        return (
-                          <div className="space-y-0.5">
-                            {prices.map((p) => {
-                              const active = p.active !== false;
-                              // On the market and still on -> can't be turned off (87 returns 400).
-                              const lockedOff = p.onMarket === true && active;
-                              // Prefer the name the backend sends with each price. Fall back to the
-                              // master option lookup (legacy responses), then the raw id.
-                              const name = p.optionName
-                                ?? options.find((o) => o.id === p.optionId)?.name
-                                ?? `옵션 #${p.optionId}`;
-                              // 재고 표시(103/D5): 실효값 = 채널 override ?? 마스터 상한(백엔드 SSOT).
-                              // 상속이면 회색 — "이 채널만 다르다" 가 눈에 보여야 한다. 편집은
-                              // [재고 설정] 모달 전용(여기엔 입력 컨트롤을 두지 않는다).
-                              const inherited = p.stockQuantity == null;
-                              const label = (
-                                <span className={active ? '' : 'text-gray-400'}>
-                                  <span className={active ? 'text-gray-500' : ''}>{name}: </span>
-                                  {formatWon(p.sellingPrice)}
-                                  {/* 2609_19: 자동계산가가 아니라 사람이 정한 값이라는 표식.
-                                      재고의 '상속=회색' 과는 다른 규칙이다(판매가엔 상속이 없다). */}
-                                  {p.priceSource === 'MANUAL_OVERRIDE' && (
-                                    <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700">
-                                      수동
-                                    </span>
-                                  )}
-                                  <span
-                                    className={
-                                      active && !inherited ? 'ml-1' : 'ml-1 text-gray-400'
-                                    }
-                                  >
-                                    재고 {p.stockQuantity ?? p.maxStock}
-                                  </span>
-                                </span>
-                              );
-                              return isAdmin ? (
-                                <label
-                                  key={p.optionId}
-                                  className="flex items-center gap-1.5 whitespace-nowrap text-xs"
-                                  // Tooltip lives on the label: a disabled input doesn't fire the
-                                  // hover events browsers need to show `title`.
-                                  title={
-                                    lockedOff
-                                      ? `${MARKET_OPTION_LOCK_REASON} 판매를 멈추려면 쿠팡 WING 에서 처리하세요.`
-                                      : undefined
-                                  }
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={active}
-                                    disabled={optionBusyId === listingId || lockedOff}
-                                    onChange={() => handleToggleOption(listingId, p.optionId)}
-                                  />
-                                  {label}
-                                  {lockedOff && <span className="text-gray-400">🔒</span>}
-                                </label>
-                              ) : (
-                                <div key={p.optionId} className="whitespace-nowrap text-xs">
-                                  {label}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                        }}
-                      </CellStack>
-                    </td>
-                    <td className="px-4 py-3">
-                      {!isAdmin ? (
-                        <span className="text-xs text-gray-400">–</span>
-                      ) : (
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap gap-1.5">
-                          {/* 🔴 [등록] = 채널 셀 **생성**이라 미등록 행 전용이다. 등록된 행에 노출하면
-                              ChannelAddServiceImpl 의 계정당 1셀 가드에 걸려 409 다 — 신규 등록에서
-                              두 번 만드는 것은 쿠팡에 중복 상품을 만드는 일이라 의미가 정반대다. */}
-                          {(!row.registered || rowCells.length === 0) && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleRowAdd(row.accountId, row.sellerId, row.platform)
+                            </td>
+                          </tr>
+                          {/* 서브행은 **자기 셀 행 바로 아래**에 온다 — 노출상품명·등록상품명·태그·옵션
+                              목록은 전부 셀(ProductListing) 단위 값이다. 어느 셀인지는 바로 위 행의
+                              상품 ID 열이 알려주므로 꼬리표를 따로 붙이지 않는다. */}
+                          {isAdmin && row.registered && cell && (
+                            <DisplayNameRow
+                              listingId={cell.productListingId}
+                              name={cell.name}
+                              registrationName={cell.registrationName}
+                              tags={gen?.tags ?? []}
+                              options={
+                                channelOptionsByListingId.get(cell.productListingId) ?? []
                               }
-                              disabled={busy || isShippingBlocked(row.accountId)}
-                              title={isShippingBlocked(row.accountId) ? SHIPPING_BLOCK_REASON : undefined}
-                              className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                            >
-                              {rowBusyId === row.accountId ? <Spinner size={12} label="등록 중" /> : '등록'}
-                            </button>
-                          )}
-                          {/* 2609_22: 이미 마켓에 올라간 상품을 이 셀로 편입한다. 다른 플랫폼은 백엔드가
-                              미지원이므로 버튼 자체를 노출하지 않는다. ⚠️ isShippingBlocked 가드는 걸지
-                              않는다 — 이미 팔고 있는 상품이라 출고지 미설정이어도 가져올 수 있다.
-                              🔴 **등록된 행에도 그린다**(2026-09-19 편입 가드 완화 대응). 한 계정이 같은
-                              마스터로 쿠팡 페이지를 여러 개 가질 수 있는데(실측 139건) 이 버튼이 미등록
-                              분기 안에만 있어서 첫 편입 뒤 두 번째 상품을 넣을 입구가 사라졌다.
-                              🔴 **"계정당 첫 셀만 그린다" 부채와 충돌하지 않는다** — 이 버튼은 셀을
-                              지목하지 않는다. 넘기는 값은 {sellerId, platform} 뿐이고 어느 셀에 넣을지는
-                              사용자가 입력한 쿠팡 상품 ID 로 백엔드가 정한다(없으면 새 셀, 연결이 끊긴
-                              셀이면 그 행 재사용). productListingId 를 받는 다른 액션과 다르다 —
-                              첫 셀 계약을 이유로 되돌리지 말 것. */}
-                          {row.platform === 'COUPANG' && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setImportTarget({
-                                  sellerId: row.sellerId,
-                                  platform: row.platform,
-                                  sellerName: row.sellerName,
-                                })
-                              }
-                              disabled={busy}
-                              className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                            >
-                              {/* 이미 셀이 있는 행에서 "가져오기"는 기존 셀을 덮어쓰는 것처럼 읽힌다. */}
-                              {row.registered && rowCells.length > 0 ? '쿠팡 상품 추가' : '가져오기'}
-                            </button>
-                          )}
-                          </div>
-                          {(!row.registered || rowCells.length === 0) &&
-                            isShippingBlocked(row.accountId) && (
-                            <p className="text-[11px] text-amber-700" title={SHIPPING_BLOCK_REASON}>
-                              배송 설정 필요
-                            </p>
-                          )}
-                          {/* 🔴 액션은 **셀마다 한 벌**이다 — [재생성]·[수정 요청]·[배송 설정]·
-                              [가격/재고/옵션명]·[승인 새로고침]은 전부 productListingId 를 지목하므로,
-                              첫 셀에만 달면 두 번째 쿠팡 페이지는 손댈 창구가 없다.
-                              ⚠️ `cells` 로는 **자기 셀 하나만** 넘긴다 — CellActions 가 해제·삭제
-                              버튼을 그 목록만큼 그리므로, 전체를 넘기면 셀 수의 제곱만큼 버튼이 선다.
-                              어느 셀인지는 CellStack 의 상품 ID 꼬리표가 알려준다. */}
-                          {row.registered && rowCells.map((cell) => (
-                            <CellActions
-                              key={cell.productListingId}
-                              masterId={masterId}
-                              listing={{
-                                id: cell.productListingId,
-                                status: cellStatus(cell),
-                              }}
-                              options={options}
-                              onReload={load}
-                              accountId={row.accountId}
-                              platform={row.platform}
-                              channelLabel={cellLabel(cell)}
-                              shippingOverride={generated[cell.productListingId]?.shippingOverride}
-                              shippingReady={generated[cell.productListingId]?.shippingReady}
-                              shippingUseCase={shippingUseCase}
-                              onShippingSaved={(updated) =>
-                                handleShippingSaved(cell.productListingId, updated)
-                              }
-                              usesOwnCategory={cell.usesOwnCategory === true}
-                              channelCategoryLabel={cell.categoryName ?? cell.categoryCode ?? null}
-                              masterCategoryName={matrix.masterCategoryName ?? null}
-                              cells={[cell]}
-                              onCellRemoved={handleCellRemoved}
+                              optionsLoading={channelOptionCells == null && !channelOptionError}
+                              onEditMasterOption={handleEditMasterOption}
+                              onSaved={load}
                             />
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                  {/* 서브행도 **셀마다 하나씩** — 노출상품명·등록상품명·태그·옵션 목록은 전부
-                      셀(ProductListing) 단위 값이다. 셀이 여럿이면 어느 페이지의 것인지 알 수
-                      있도록 헤더에 상품 ID 꼬리표를 붙인다. */}
-                  {isAdmin &&
-                    row.registered &&
-                    rowCells.map((cell) => (
-                      <DisplayNameRow
-                        key={cell.productListingId}
-                        listingId={cell.productListingId}
-                        cellTag={multiCell ? cellTag(cell) : null}
-                        name={cell.name}
-                        registrationName={cell.registrationName}
-                        tags={generated[cell.productListingId]?.tags ?? []}
-                        options={channelOptionsByListingId.get(cell.productListingId) ?? []}
-                        optionsLoading={channelOptionCells == null && !channelOptionError}
-                        onEditMasterOption={handleEditMasterOption}
-                        onSaved={load}
-                      />
-                    ))}
+                          )}
+                        </Fragment>
+                      );
+                    })}
                   </Fragment>
                 );
               })}

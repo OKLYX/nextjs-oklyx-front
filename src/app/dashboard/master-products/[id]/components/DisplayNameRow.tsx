@@ -16,13 +16,6 @@ const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 interface DisplayNameRowProps {
   listingId: number;
-  /**
-   * 이 서브행이 어느 셀의 것인지 알려주는 꼬리표(그 셀의 상품 ID, 미전송이면 `미전송`).
-   * 한 계정이 쿠팡 상품페이지를 여러 개 가지면 서브행도 그만큼 연달아 서므로, 꼬리표가 없으면
-   * 어느 페이지의 노출상품명·태그를 고치는지 알 수 없다. 셀이 하나뿐이면 `null` = 표시 안 함
-   * (기존 화면 그대로).
-   */
-  cellTag?: string | null;
   name: string;
   // Registration name (등록상품명, 67/68): always auto-computed, read-only. Always present.
   registrationName: string;
@@ -43,9 +36,11 @@ interface DisplayNameRowProps {
  * 채널(리스팅) 인라인 편집 sub-row: 노출상품명(=ProductListing.name) + 채널 raw 태그.
  * File: src/app/dashboard/master-products/[id]/components/DisplayNameRow.tsx
  *
- * 커버리지 매트릭스의 등록된 채널 <tr> 바로 아래에 tbody 직속 <tr> 로 렌더된다
- * (CoverageMatrix 가 Fragment 로 채널 row + 이 row 를 함께 배치). 미등록 채널은 없음.
+ * 커버리지 매트릭스의 **그 셀 행 바로 아래**에 tbody 직속 <tr> 로 렌더된다
+ * (CoverageMatrix 가 Fragment 로 셀 row + 이 row 를 함께 배치). 미등록 채널은 없음.
  * 체크박스 컬럼만큼 들여쓰기 위해 첫 <td> 는 비우고 나머지 9칸에 내용을 둔다.
+ * ⚠️ 어느 셀의 서브행인지는 **바로 위 행의 「상품 ID」 열**이 알려준다 — 2026-09-23 에 매트릭스가
+ *    셀마다 <tr> 을 하나씩 갖게 되면서 셀 꼬리표(cellTag) prop 은 중복이라 제거했다.
  *
  * - 노출상품명: name 은 NOT NULL 이라 실질은 조회 + 수정(빈값 저장 불가).
  * - 등록상품명(67/68): 언제나 채널 활성옵션 기준 자동값 → 읽기 전용 표시(수정/배지 없음).
@@ -61,7 +56,6 @@ interface DisplayNameRowProps {
  */
 export function DisplayNameRow({
   listingId,
-  cellTag = null,
   name,
   registrationName,
   tags,
@@ -137,12 +131,6 @@ export function DisplayNameRow({
         <div className="space-y-2">
           {/* 노출상품명 */}
           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
-            {/* 셀이 여럿일 때만 붙는 꼬리표 — 매트릭스 본문 각 열의 꼬리표와 같은 값이다. */}
-            {cellTag && (
-              <span className="shrink-0 font-mono text-[10px] tabular-nums text-gray-500">
-                {cellTag}
-              </span>
-            )}
             <span className="shrink-0 rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
               노출상품명
             </span>
