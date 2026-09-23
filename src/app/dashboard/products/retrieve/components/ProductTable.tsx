@@ -55,6 +55,23 @@ export function ProductTable({
   // Older products were registered without a barcode; keep the column aligned.
   const barcode = (product: Product): string => product.barcodeId || '-';
 
+  // 연결된 판매채널 수. 🔴 `undefined`(백엔드가 아직 안 내려주는 환경) 는 `-`, 0 은 `0` —
+  // 「모른다」와 「없다」를 같은 글자로 쓰면 값이 안 보이는 이유를 구분할 수 없다.
+  const channelCount = (product: Product) =>
+    product.channelCount === undefined || product.channelCount === null ? (
+      <span className="text-gray-400">-</span>
+    ) : product.channelCount === 0 ? (
+      <span className="text-gray-400">0</span>
+    ) : (
+      <span className="text-gray-900">{product.channelCount}</span>
+    );
+
+  // oclyx 내부 물품 id. 마켓의 「상품 ID」와 헷갈리지 않게 화면 용어는 「물품ID」.
+  // 행 번호(순번)와 나란히 서므로 숫자 폭을 고정해 시각적으로 구분한다.
+  const productId = (product: Product) => (
+    <span className="font-mono text-gray-600 tabular-nums">{product.id}</span>
+  );
+
   // Representative image as a thumbnail; a product without one keeps the row
   // height stable with a placeholder box (same shape as the purchase list).
   const thumbnail = (product: Product) => {
@@ -140,12 +157,14 @@ export function ProductTable({
                 />
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">번호</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">물품ID</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">이미지</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상품명</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">바코드</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">브랜드</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">가격</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">구매처</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">판매채널</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상태</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">등록일</th>
             </tr>
@@ -168,12 +187,14 @@ export function ProductTable({
                   />
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-900">{currentPage * pageSize + index + 1}</td>
+                <td className="px-4 py-3 text-sm">{productId(product)}</td>
                 <td className="px-4 py-3">{thumbnail(product)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.productName}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{barcode(product)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.brand}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{formatKrw(product.price)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.store}</td>
+                <td className="px-4 py-3 text-sm">{channelCount(product)}</td>
                 <td className="px-4 py-3 text-sm">{statusChip(product.active)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{formatDate(product.createdDate)}</td>
               </tr>
@@ -192,11 +213,13 @@ export function ProductTable({
               onClick={() => openDetail(product.id)}
               fields={[
                 { label: '이미지', value: thumbnail(product) },
+                { label: '물품ID', value: productId(product) },
                 { label: '상품명', value: product.productName },
                 { label: '바코드', value: barcode(product) },
                 { label: '브랜드', value: product.brand },
                 { label: '가격', value: formatKrw(product.price) },
                 { label: '구매처', value: product.store },
+                { label: '판매채널', value: channelCount(product) },
                 { label: '상태', value: statusChip(product.active) },
                 { label: '등록일', value: formatDate(product.createdDate) },
               ]}
