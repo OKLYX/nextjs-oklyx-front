@@ -25,7 +25,7 @@ import type { ClipItem } from '@/domain/entities/ClipItem';
  * ```
  *
  * ⚠️ **하이드레이션**: `persist` 가 복원한 목록은 서버가 그린 HTML(빈 목록)과 달라 첫 렌더에서
- *   mismatch 가 난다. 개수를 화면에 그리는 쪽(`ClipboardTray` 의 배지)은 `mounted` 가 된 뒤에만 그린다.
+ *   mismatch 가 난다. 개수를 화면에 그리는 쪽(`ClipboardRailSlot` 의 배지)은 `mounted` 가 된 뒤에만 그린다.
  * ❌ 여기에 서버 호출을 넣지 말 것 — 붙이는 것은 `ProductImageUseCase.copy` 가 한다.
  * ❌ 물품 등록(저장 전) 화면에서 담지 말 것 — 아직 서버 id 가 없다.
  */

@@ -6,8 +6,8 @@ import { create } from 'zustand';
  * **용도**: 오른쪽 세로 툴바(`ToolRail`)에서 고른 도구가 무엇인지, 패널(`ToolPanel`)이 열려 있는지를
  *   한 곳에서 들고 있다. 경로가 바뀌어도 열린 채로 따라온다.
  * **파일**: src/infrastructure/stores/toolPanelStore.ts
- * **쓰는 곳**: `dashboard/layout.tsx` · `ToolRail` · `ToolPanel` · 도구 컴포넌트(`ChannelProductTool`) ·
- *   손을 내미는 화면(`ProductRegistrationForm`).
+ * **쓰는 곳**: `dashboard/layout.tsx` · `ToolRail` · `ToolPanel` · `toolRegistry` · 도구
+ *   컴포넌트(`ChannelProductTool` · `ClipboardTool`) · 손을 내미는 화면(`ProductRegistrationForm`).
  *
  * **`fillTarget` 이 있는 이유**: 도구가 화면 밖(전역 레이아웃)에 살기 때문에 폼의 `setValue` 를 직접
  *   부를 수 없다. 값을 받겠다는 화면이 마운트될 때 콜백 하나를 등록하고, 언마운트하면 지운다.
@@ -37,8 +37,11 @@ import { create } from 'zustand';
  * ❌ `navigationStore` 에 끼워 넣지 말 것 — 그쪽은 `persist` 라 도구 상태까지 굳는다.
  */
 
-/** 도구 키. 🔴 지금은 하나다 — 레지스트리·플러그인 추상화를 만들지 않는다. */
-type ToolKey = 'channel-product';
+/**
+ * 도구 키. 🔴 목록(이름·아이콘·본문)은 `dashboard/components/toolRegistry.tsx` 한 곳에 있다 —
+ * 키를 더하면 거기도 한 줄 더한다. 플러그인·동적 로딩으로 키우지 말 것.
+ */
+export type ToolKey = 'channel-product' | 'clipboard';
 
 type FillTarget = ((patch: Record<string, string>) => void) | null;
 
