@@ -66,6 +66,12 @@ export function ProductTable({
       <span className="text-gray-900">{product.channelCount}</span>
     );
 
+  // oclyx 내부 물품 id. 마켓의 「상품 ID」와 헷갈리지 않게 화면 용어는 「물품ID」.
+  // 행 번호(순번)와 나란히 서므로 숫자 폭을 고정해 시각적으로 구분한다.
+  const productId = (product: Product) => (
+    <span className="font-mono text-gray-600 tabular-nums">{product.id}</span>
+  );
+
   // Representative image as a thumbnail; a product without one keeps the row
   // height stable with a placeholder box (same shape as the purchase list).
   const thumbnail = (product: Product) => {
@@ -151,6 +157,7 @@ export function ProductTable({
                 />
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">번호</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">물품ID</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">이미지</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상품명</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">바코드</th>
@@ -180,6 +187,7 @@ export function ProductTable({
                   />
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-900">{currentPage * pageSize + index + 1}</td>
+                <td className="px-4 py-3 text-sm">{productId(product)}</td>
                 <td className="px-4 py-3">{thumbnail(product)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.productName}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{barcode(product)}</td>
@@ -205,6 +213,7 @@ export function ProductTable({
               onClick={() => openDetail(product.id)}
               fields={[
                 { label: '이미지', value: thumbnail(product) },
+                { label: '물품ID', value: productId(product) },
                 { label: '상품명', value: product.productName },
                 { label: '바코드', value: barcode(product) },
                 { label: '브랜드', value: product.brand },
