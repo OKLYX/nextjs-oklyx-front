@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
@@ -29,6 +29,7 @@ import { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase'
 import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
 import type {
   MatrixCell,
+  MatrixRow,
   ListingMatrixResponse,
   MasterCategoryResponse,
   MasterChannelOptionCell,
@@ -149,6 +150,58 @@ const STATUS_LABEL: Record<ListingStatus, string> = {
   SUSPENDED: '판매 중지',
 };
 
+/**
+ * 한 계정 행이 가진 **모든** 채널 셀. 매트릭스의 모든 조회·표시는 이 목록 하나만 본다.
+ *
+ * 🔴 한 계정(판매자×플랫폼)이 같은 마스터로 쿠팡 상품페이지를 여러 개 가질 수 있다
+ * (2026-09-19 편입 가드 완화, 실측 139건). 첫 셀(`row.cell`)만 보면 두 번째 페이지의 썸네일·
+ * 상태·판매가·액션이 화면에 아예 없는 것처럼 된다.
+ * ⚠️ `cells` 는 optional 이므로(프론트가 백엔드보다 먼저 배포될 수 있다) 첫 셀 호환 필드로 폴백한다.
+ * ⚠️ `row.cell` 은 백엔드 계약이라 타입·응답에서 지우지 않는다 — 화면 로직만 이 함수를 지난다.
+ */
+const rowCellsOf = (row: MatrixRow): MatrixCell[] => row.cells ?? (row.cell ? [row.cell] : []);
+
+/** 셀 하나를 가리키는 화면 꼬리표. 미전송 셀은 마켓 ID 가 없으므로 상태 문구로 대신한다. */
+const cellTag = (cell: MatrixCell): string => cell.platformProductId ?? '미전송';
+
+/**
+ * 계정 행의 **셀별 세로 스택**. 썸네일·상세페이지·상태·판매가·액션 열이 모두 이걸로 그려져
+ * 「상품 ID」 열과 **같은 순서·같은 줄 수**를 유지한다(열끼리 짝이 맞는다).
+ *
+ * - 셀이 0개(미등록 행): `–`
+ * - 셀이 1개(대부분의 마스터): 래퍼 없이 내용만 → **기존 화면과 시각적으로 동일**하다.
+ * - 셀이 2개 이상: 점선 구분 + 그 셀의 상품 ID 꼬리표를 붙인다 — 꼬리표가 없으면 어느 줄이
+ *   어느 쿠팡 페이지인지 알 수 없다(2609_63 이 해제·삭제 버튼에서 쓴 것과 같은 장치).
+ *
+ * ❌ `rowSpan` 으로 셀마다 `<tr>` 을 쪼개지 말 것 — 체크박스 열(계정 단위 일괄 등록)과
+ *    `DisplayNameRow` 서브행이 계정 행 사이에 끼어 계산이 깨진다.
+ */
+function CellStack({
+  cells,
+  children,
+}: {
+  cells: MatrixCell[];
+  children: (cell: MatrixCell) => ReactNode;
+}) {
+  if (cells.length === 0) return <span className="text-gray-400">–</span>;
+  if (cells.length === 1) return <>{children(cells[0])}</>;
+  return (
+    <div className="space-y-2">
+      {cells.map((c, i) => (
+        <div
+          key={c.productListingId}
+          className={i > 0 ? 'border-t border-dashed border-gray-200 pt-2' : undefined}
+        >
+          <div className="mb-0.5 font-mono text-[10px] tabular-nums text-gray-400">
+            {cellTag(c)}
+          </div>
+          {children(c)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
@@ -235,17 +288,18 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [placesUnset, setPlacesUnset] = useState<Record<number, boolean>>({});
   const [preview, setPreview] = useState<ChannelPreviewData | null>(null);
 
-  // Open the tabbed preview modal for a channel, on the given initial tab.
+  // Open the tabbed preview modal for a channel cell, on the given initial tab.
+  // ⚠️ `title` 은 호출부가 만든다 — 한 계정에 셀이 여럿이면 판매자·플랫폼만으로는 어느 쿠팡
+  // 페이지의 미리보기인지 구분되지 않아 그 셀의 상품 ID 를 붙여야 한다.
   const openPreview = (
     gen: GeneratedProductResponse | null,
-    sellerName: string,
-    platform: string,
+    title: string,
     initialTab: 'image' | 'detail',
   ) => {
     setPreview({
       imageSrc: gen?.thumbnailUrl ? resolveThumbUrl(gen.thumbnailUrl) : null,
       html: gen?.detailHtml ?? null,
-      title: `${sellerName} · ${platform}`,
+      title,
       initialTab,
     });
   };
@@ -307,9 +361,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // Fetch per-channel generated assets (thumbnail + detail HTML) in one call each,
   // N calls total, without blocking the table render. Each failure is absorbed as
   // null so one bad channel never stalls the rest.
+  // 🔴 계정이 아니라 **셀** 단위로 돈다 — 종전엔 첫 셀 id 만 모아서, 두 번째 셀은 썸네일·상세·
+  // 판매가(옵션가)·태그·배송설정·shippingReady 가 애초에 조회되지 않았다(렌더를 고쳐도 빈칸).
+  // `generated` 는 listingId 키라 per-cell 로 그대로 동작한다.
   const fetchGenerated = useCallback(
     async (m: ListingMatrixResponse) => {
-      const registered = m.rows.filter((r) => r.cell).map((r) => r.cell!.productListingId);
+      const registered = m.rows.flatMap((r) => rowCellsOf(r)).map((c) => c.productListingId);
       setGenLoading(true);
       const entries = await Promise.all(
         registered.map(async (lid) => {
@@ -331,7 +388,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // backend's shippingReady, so they are skipped. Fire-and-forget; each failure is simply unknown.
   const fetchPlaces = useCallback(
     async (m: ListingMatrixResponse) => {
-      const accountIds = m.rows.filter((r) => !r.registered || !r.cell).map((r) => r.accountId);
+      const accountIds = m.rows
+        .filter((r) => !r.registered || rowCellsOf(r).length === 0)
+        .map((r) => r.accountId);
       const entries = await Promise.all(
         accountIds.map(async (accountId) => {
           try {
@@ -548,16 +607,19 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // `override` (81) lets the panel tell which channels hold their own settings and so would not
   // receive a master save. ⚠️ `generated` must stay in the deps — it fills in after the table renders,
   // and without it every channel would stay `undefined` (= unknown) and the hint could never appear.
+  // 🔴 계정당 첫 셀이 아니라 **모든 셀**이다 — 빠진 셀은 [전 채널 강제 적용] 목록에 없어서
+  // 배송 설정이 조용히 반영되지 않는다. 셀이 여럿인 계정은 라벨에 그 셀의 상품 ID 를 붙인다.
   const forceApplyChannels = useMemo(
     () =>
-      (matrix?.rows ?? [])
-        .filter((r) => r.cell)
-        .map((r) => ({
-          listingId: r.cell!.productListingId,
-          label: `${r.sellerName} · ${r.platform}`,
+      (matrix?.rows ?? []).flatMap((r) => {
+        const cells = rowCellsOf(r);
+        return cells.map((c) => ({
+          listingId: c.productListingId,
+          label: `${r.sellerName} · ${r.platform}${cells.length > 1 ? ` · ${cellTag(c)}` : ''}`,
           // undefined = not loaded yet / fetch failed → excluded from the hint (never over-report).
-          override: generated[r.cell!.productListingId]?.shippingOverride,
-        })),
+          override: generated[c.productListingId]?.shippingOverride,
+        }));
+      }),
     [matrix, generated],
   );
   // Collapsed-section summaries (83A): one line of current value per section, drawn from the master
@@ -586,7 +648,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   // 2609_61 표 요약 = 옵션 수 · 채널 셀 수. ⚠️ 계정 수가 아니라 셀 수다(한 계정에 셀이 여럿일 수 있다).
   const channelCellCount = (matrix?.rows ?? []).reduce(
-    (sum, row) => sum + (row.cells ?? (row.cell ? [row.cell] : [])).length,
+    (sum, row) => sum + rowCellsOf(row).length,
     0,
   );
   const channelOptionSummary = `옵션 ${options.length}개 · 채널 ${channelCellCount}개`;
@@ -809,13 +871,23 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       });
       // Registration name is auto-recomputed from the active option set (67/68). Patch just
       // this cell's registrationName from the response — no full reload (avoids thumbnail re-flash).
+      // ⚠️ `cell`(첫 셀 호환 필드)과 `cells`(전 셀)를 **함께** 갱신한다 — 화면은 `cells` 를 그리고
+      // 백엔드 계약인 `cell` 은 그대로 두므로, 하나만 고치면 둘이 어긋난다.
       if (res.registrationName != null) {
+        const patchCell = (c: MatrixCell): MatrixCell =>
+          c.productListingId === listingId
+            ? { ...c, registrationName: res.registrationName! }
+            : c;
         setMatrix((prev) =>
           prev && {
             ...prev,
             rows: prev.rows.map((r) =>
-              r.cell?.productListingId === listingId
-                ? { ...r, cell: { ...r.cell, registrationName: res.registrationName! } }
+              rowCellsOf(r).some((c) => c.productListingId === listingId)
+                ? {
+                    ...r,
+                    cell: r.cell ? patchCell(r.cell) : r.cell,
+                    cells: r.cells ? r.cells.map(patchCell) : r.cells,
+                  }
                 : r,
             ),
           },
@@ -1241,11 +1313,14 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
             </thead>
             <tbody>
               {matrix.rows.map((row) => {
-                const badge = !row.registered ? '미등록' : STATUS_LABEL[cellStatus(row.cell)];
-                // 2609_63/D10-1: 상품 ID 열과 액션 열(해제·삭제 버튼)이 **같은 목록**을 봐야
-                // ID 줄 수와 버튼 수가 어긋나지 않는다. ⚠️ `row.cell`(첫 셀) 계약은 그대로다
-                // (2609_61/D5 — 썸네일·상태·판매가·나머지 액션이 전부 그 위에 있다).
-                const rowCells = row.cells ?? (row.cell ? [row.cell] : []);
+                // 🔴 매트릭스 본문 전체가 **이 목록 하나**를 본다 — 썸네일·상세페이지·상태·판매가·
+                // 액션·서브행이 모두 셀마다 하나씩 그려지고, 「상품 ID」 열과 줄 수·순서가 같다.
+                // (종전엔 상품 ID 열과 해제·삭제 버튼만 셀을 전부 나열했고 나머지는 첫 셀뿐이었다.)
+                const rowCells = rowCellsOf(row);
+                const multiCell = rowCells.length > 1;
+                // 채널 라벨: 셀이 여럿이면 어느 쿠팡 페이지인지 꼬리표를 붙인다(모달 제목·확인창 공용).
+                const cellLabel = (c: MatrixCell) =>
+                  `${row.sellerName} · ${row.platform}${multiCell ? ` · ${cellTag(c)}` : ''}`;
                 return (
                   <Fragment key={row.accountId}>
                   <tr
@@ -1267,52 +1342,54 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       ) : null}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      {(() => {
-                        if (!row.cell) return <span className="text-gray-400">–</span>;
-                        const gen = generated[row.cell.productListingId];
-                        if (gen === undefined) {
-                          return genLoading ? (
-                            <Spinner size={14} />
-                          ) : (
-                            <span className="text-gray-400">–</span>
+                      <CellStack cells={rowCells}>
+                        {(cell) => {
+                          const gen = generated[cell.productListingId];
+                          if (gen === undefined) {
+                            return genLoading ? (
+                              <Spinner size={14} />
+                            ) : (
+                              <span className="text-gray-400">–</span>
+                            );
+                          }
+                          const url = gen?.thumbnailUrl;
+                          if (!url) return <span className="text-gray-400">–</span>;
+                          const resolved = resolveThumbUrl(url);
+                          return (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={resolved}
+                              alt={`${row.sellerName} 썸네일`}
+                              onClick={() => openPreview(gen, cellLabel(cell), 'image')}
+                              className="h-24 w-24 cursor-pointer rounded border border-gray-200 object-contain hover:opacity-80"
+                            />
                           );
-                        }
-                        const url = gen?.thumbnailUrl;
-                        if (!url) return <span className="text-gray-400">–</span>;
-                        const resolved = resolveThumbUrl(url);
-                        return (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={resolved}
-                            alt={`${row.sellerName} 썸네일`}
-                            onClick={() => openPreview(gen, row.sellerName, row.platform, 'image')}
-                            className="h-24 w-24 cursor-pointer rounded border border-gray-200 object-contain hover:opacity-80"
-                          />
-                        );
-                      })()}
+                        }}
+                      </CellStack>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      {(() => {
-                        if (!row.cell) return <span className="text-gray-400">–</span>;
-                        const gen = generated[row.cell.productListingId];
-                        if (gen === undefined) {
-                          return genLoading ? (
-                            <Spinner size={14} />
-                          ) : (
-                            <span className="text-gray-400">–</span>
+                      <CellStack cells={rowCells}>
+                        {(cell) => {
+                          const gen = generated[cell.productListingId];
+                          if (gen === undefined) {
+                            return genLoading ? (
+                              <Spinner size={14} />
+                            ) : (
+                              <span className="text-gray-400">–</span>
+                            );
+                          }
+                          const html = gen?.detailHtml;
+                          if (!html) return <span className="text-xs text-gray-400">미생성</span>;
+                          return (
+                            <DetailHtmlThumb
+                              html={html}
+                              width={96}
+                              height={96}
+                              onClick={() => openPreview(gen, cellLabel(cell), 'detail')}
+                            />
                           );
-                        }
-                        const html = gen?.detailHtml;
-                        if (!html) return <span className="text-xs text-gray-400">미생성</span>;
-                        return (
-                          <DetailHtmlThumb
-                            html={html}
-                            width={96}
-                            height={96}
-                            onClick={() => openPreview(gen, row.sellerName, row.platform, 'detail')}
-                          />
-                        );
-                      })()}
+                        }}
+                      </CellStack>
                     </td>
                     <td className="px-4 py-3">{row.sellerName}</td>
                     <td className="px-4 py-3">{row.platform}</td>
@@ -1320,7 +1397,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     {/* 상품 ID (2609_61): 이 계정이 가진 **모든** 셀을 세로로 나열한다 — 한 계정이
                         같은 마스터로 쿠팡 페이지를 여러 개 가질 수 있어(2026-09-19 편입 가드 완화)
                         첫 셀만 보여주면 나머지 페이지가 화면에 없는 것처럼 된다.
-                        ⚠️ `cells` 가 없는 예전 응답에서도 칸이 비지 않도록 `cell` 로 폴백한다.
+                        이 열이 셀 **순서의 기준**이고, 다른 셀 열(썸네일·상세·상태·판매가·액션)은
+                        같은 `rowCells` 를 같은 순서로 그린다.
                         ⚠️ 세로 정렬은 판매자·플랫폼·계정·상태·판매가와 같은 가운데다 — 썸네일 열
                         (96px)이 행을 늘려 놓아서, 이 칸만 위로 붙이면 눈에 띄게 어긋난다. */}
                     <td className="px-4 py-3">
@@ -1351,49 +1429,71 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       })()}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] ${
-                          !row.registered
-                            ? 'bg-gray-100 text-gray-500'
-                            : row.cell?.platformProductId
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {badge}
-                      </span>
-                      {/* 2609_45/D8: 이 채널이 마켓에 올라가 있는 자기 카테고리를 쓰고 있다는 사실 표시.
-                          ⚠️ 오류가 아니라 정상 상태이므로 경고색(빨강)을 쓰지 않는다. 판정은 서버가 내린
-                          usesOwnCategory 하나뿐 — 코드 유무·이름 비교로 다시 판단하지 말 것(D10-1). */}
-                      {row.cell?.usesOwnCategory && (
-                        <div className="mt-1 flex flex-wrap items-center gap-1" title={OWN_CATEGORY_HINT}>
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
-                            채널 카테고리
-                          </span>
-                          {(row.cell.categoryName ?? row.cell.categoryCode) && (
-                            <span className="text-[10px] text-gray-600">
-                              {row.cell.categoryName ?? row.cell.categoryCode}
-                            </span>
+                      {/* 상태·채널 카테고리 배지는 **셀마다 다르다** — 같은 계정이라도 한 쿠팡
+                          페이지는 판매중, 다른 하나는 미전송일 수 있다. 미등록 행(셀 0개)만 계정
+                          단위 「미등록」 배지를 쓴다. */}
+                      {rowCells.length === 0 ? (
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] ${
+                            row.registered
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}
+                        >
+                          {row.registered ? STATUS_LABEL[cellStatus(null)] : '미등록'}
+                        </span>
+                      ) : (
+                        <CellStack cells={rowCells}>
+                          {(cell) => (
+                            <>
+                              <span
+                                className={`rounded px-1.5 py-0.5 text-[10px] ${
+                                  cell.platformProductId
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-amber-100 text-amber-700'
+                                }`}
+                              >
+                                {STATUS_LABEL[cellStatus(cell)]}
+                              </span>
+                              {/* 2609_45/D8: 이 채널이 마켓에 올라가 있는 자기 카테고리를 쓰고 있다는 사실 표시.
+                                  ⚠️ 오류가 아니라 정상 상태이므로 경고색(빨강)을 쓰지 않는다. 판정은 서버가 내린
+                                  usesOwnCategory 하나뿐 — 코드 유무·이름 비교로 다시 판단하지 말 것(D10-1). */}
+                              {cell.usesOwnCategory && (
+                                <div
+                                  className="mt-1 flex flex-wrap items-center gap-1"
+                                  title={OWN_CATEGORY_HINT}
+                                >
+                                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+                                    채널 카테고리
+                                  </span>
+                                  {(cell.categoryName ?? cell.categoryCode) && (
+                                    <span className="text-[10px] text-gray-600">
+                                      {cell.categoryName ?? cell.categoryCode}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </>
                           )}
-                        </div>
+                        </CellStack>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {(() => {
-                        if (!row.cell) return <span className="text-gray-400">–</span>;
+                      <CellStack cells={rowCells}>
+                        {(cell) => {
                         // Prefer per-option prices (a master can have many options with
                         // distinct prices); fall back to the single representative price.
-                        const prices = generated[row.cell.productListingId]?.optionPrices ?? [];
+                        const prices = generated[cell.productListingId]?.optionPrices ?? [];
                         if (prices.length === 0) {
-                          return row.cell.sellingPrice != null ? (
-                            formatWon(row.cell.sellingPrice)
+                          return cell.sellingPrice != null ? (
+                            <>{formatWon(cell.sellingPrice)}</>
                           ) : (
                             <span className="text-gray-400">–</span>
                           );
                         }
                         // Inline per-option active toggle (43): checkbox = market inclusion, unchecked =
                         // greyed. Non-admins see a plain read-only list (no checkbox).
-                        const listingId = row.cell.productListingId;
+                        const listingId = cell.productListingId;
                         return (
                           <div className="space-y-0.5">
                             {prices.map((p) => {
@@ -1458,7 +1558,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             })}
                           </div>
                         );
-                      })()}
+                        }}
+                      </CellStack>
                     </td>
                     <td className="px-4 py-3">
                       {!isAdmin ? (
@@ -1469,7 +1570,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           {/* 🔴 [등록] = 채널 셀 **생성**이라 미등록 행 전용이다. 등록된 행에 노출하면
                               ChannelAddServiceImpl 의 계정당 1셀 가드에 걸려 409 다 — 신규 등록에서
                               두 번 만드는 것은 쿠팡에 중복 상품을 만드는 일이라 의미가 정반대다. */}
-                          {(!row.registered || !row.cell) && (
+                          {(!row.registered || rowCells.length === 0) && (
                             <button
                               type="button"
                               onClick={() =>
@@ -1507,56 +1608,71 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                               className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                             >
                               {/* 이미 셀이 있는 행에서 "가져오기"는 기존 셀을 덮어쓰는 것처럼 읽힌다. */}
-                              {row.registered && row.cell ? '쿠팡 상품 추가' : '가져오기'}
+                              {row.registered && rowCells.length > 0 ? '쿠팡 상품 추가' : '가져오기'}
                             </button>
                           )}
                           </div>
-                          {(!row.registered || !row.cell) && isShippingBlocked(row.accountId) && (
+                          {(!row.registered || rowCells.length === 0) &&
+                            isShippingBlocked(row.accountId) && (
                             <p className="text-[11px] text-amber-700" title={SHIPPING_BLOCK_REASON}>
                               배송 설정 필요
                             </p>
                           )}
-                          {row.registered && row.cell && (
+                          {/* 🔴 액션은 **셀마다 한 벌**이다 — [재생성]·[수정 요청]·[배송 설정]·
+                              [가격/재고/옵션명]·[승인 새로고침]은 전부 productListingId 를 지목하므로,
+                              첫 셀에만 달면 두 번째 쿠팡 페이지는 손댈 창구가 없다.
+                              ⚠️ `cells` 로는 **자기 셀 하나만** 넘긴다 — CellActions 가 해제·삭제
+                              버튼을 그 목록만큼 그리므로, 전체를 넘기면 셀 수의 제곱만큼 버튼이 선다.
+                              어느 셀인지는 CellStack 의 상품 ID 꼬리표가 알려준다. */}
+                          {row.registered && rowCells.map((cell) => (
                             <CellActions
+                              key={cell.productListingId}
                               masterId={masterId}
                               listing={{
-                                id: row.cell.productListingId,
-                                status: cellStatus(row.cell),
+                                id: cell.productListingId,
+                                status: cellStatus(cell),
                               }}
                               options={options}
                               onReload={load}
                               accountId={row.accountId}
                               platform={row.platform}
-                              channelLabel={`${row.sellerName} · ${row.platform}`}
-                              shippingOverride={generated[row.cell.productListingId]?.shippingOverride}
-                              shippingReady={generated[row.cell.productListingId]?.shippingReady}
+                              channelLabel={cellLabel(cell)}
+                              shippingOverride={generated[cell.productListingId]?.shippingOverride}
+                              shippingReady={generated[cell.productListingId]?.shippingReady}
                               shippingUseCase={shippingUseCase}
                               onShippingSaved={(updated) =>
-                                handleShippingSaved(row.cell!.productListingId, updated)
+                                handleShippingSaved(cell.productListingId, updated)
                               }
-                              usesOwnCategory={row.cell.usesOwnCategory === true}
-                              channelCategoryLabel={row.cell.categoryName ?? row.cell.categoryCode ?? null}
+                              usesOwnCategory={cell.usesOwnCategory === true}
+                              channelCategoryLabel={cell.categoryName ?? cell.categoryCode ?? null}
                               masterCategoryName={matrix.masterCategoryName ?? null}
-                              cells={rowCells}
+                              cells={[cell]}
                               onCellRemoved={handleCellRemoved}
                             />
-                          )}
+                          ))}
                         </div>
                       )}
                     </td>
                   </tr>
-                  {isAdmin && row.registered && row.cell && (
-                    <DisplayNameRow
-                      listingId={row.cell.productListingId}
-                      name={row.cell.name}
-                      registrationName={row.cell.registrationName}
-                      tags={generated[row.cell.productListingId]?.tags ?? []}
-                      options={channelOptionsByListingId.get(row.cell.productListingId) ?? []}
-                      optionsLoading={channelOptionCells == null && !channelOptionError}
-                      onEditMasterOption={handleEditMasterOption}
-                      onSaved={load}
-                    />
-                  )}
+                  {/* 서브행도 **셀마다 하나씩** — 노출상품명·등록상품명·태그·옵션 목록은 전부
+                      셀(ProductListing) 단위 값이다. 셀이 여럿이면 어느 페이지의 것인지 알 수
+                      있도록 헤더에 상품 ID 꼬리표를 붙인다. */}
+                  {isAdmin &&
+                    row.registered &&
+                    rowCells.map((cell) => (
+                      <DisplayNameRow
+                        key={cell.productListingId}
+                        listingId={cell.productListingId}
+                        cellTag={multiCell ? cellTag(cell) : null}
+                        name={cell.name}
+                        registrationName={cell.registrationName}
+                        tags={generated[cell.productListingId]?.tags ?? []}
+                        options={channelOptionsByListingId.get(cell.productListingId) ?? []}
+                        optionsLoading={channelOptionCells == null && !channelOptionError}
+                        onEditMasterOption={handleEditMasterOption}
+                        onSaved={load}
+                      />
+                    ))}
                   </Fragment>
                 );
               })}
