@@ -321,10 +321,17 @@ export function ProductRegistrationForm({
               <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
                 단위
               </label>
+              {/* 내용물 양을 적었으면 단위를 함께 골라야 한다(서버가 400 으로 거절한다).
+                  ⚠️ 반대(단위만 고르고 양은 빈칸)는 서버가 막지 않으므로 여기서도 막지 않는다. */}
               <select
                 id="netContentUnit"
                 disabled={isLoading}
-                {...register('netContentUnit')}
+                {...register('netContentUnit', {
+                  validate: (value, values) =>
+                    (values.netContent ?? '').trim() !== '' && !(value ?? '').trim()
+                      ? '내용물 양을 입력하면 단위를 함께 선택해주세요'
+                      : true,
+                })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">단위 선택</option>
@@ -333,6 +340,9 @@ export function ProductRegistrationForm({
                 <option value="L">l</option>
                 <option value="ML">ml</option>
               </select>
+              {errors.netContentUnit && (
+                <p className="text-red-600 text-sm mt-1">{errors.netContentUnit.message}</p>
+              )}
             </div>
           </div>
 
@@ -392,7 +402,7 @@ export function ProductRegistrationForm({
                 pattern="[0-9]+([.][0-9]+)?"
                 placeholder="0"
                 disabled={isLoading}
-                {...register('netContent')}
+                {...register('netContent', { deps: ['netContentUnit'] })}
               />
               {errors.netContent && <p className="text-red-600 text-sm mt-1">{errors.netContent.message}</p>}
             </div>
