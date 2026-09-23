@@ -90,12 +90,23 @@ export function ProductListContainer() {
   /**
    * 조회 조건 갱신 단일 진입점(검색·페이지네이션 공용).
    * `patch` 에 `page` 키가 없으면 1페이지로 리셋한다(검색 변경) — 페이지 이동만 예외.
+   *
+   * 🔴 조회 조건이 지금과 같으면 `router.replace` 는 **아무 일도 하지 않는다**(같은 URL). 그러면
+   * `page`/`search` 가 그대로라 재조회 이펙트도 돌지 않아 [검색] 을 눌러도 **이전 결과가 그대로
+   * 남는다**(상세를 보고 [← 목록] 으로 돌아오면 입력창에 직전 검색어가 채워져 있어, 그대로 [검색]
+   * 을 누르는 것이 흔한 동선이다). [검색] 은 언제나 다시 불러오는 동작이어야 하므로 그 자리에서
+   * 재조회를 건다.
    */
   const updateQuery = useCallback(
     (patch: Partial<ProductListQuery>) => {
       const next: ProductListQuery = { ...queryRef.current, ...patch };
       if (!('page' in patch)) next.page = 0;
       const qs = toSearchParams(next).toString();
+      // 키 순서에 흔들리지 않게 양쪽 모두 정규화한 쿼리스트링으로 비교한다.
+      if (qs === toSearchParams(queryRef.current).toString()) {
+        setReloadToken((t) => t + 1);
+        return;
+      }
       router.replace(qs ? `?${qs}` : ROUTES.PRODUCTS_RETRIEVE, { scroll: false });
     },
     [router]
