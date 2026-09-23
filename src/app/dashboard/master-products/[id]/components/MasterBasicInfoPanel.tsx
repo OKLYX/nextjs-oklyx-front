@@ -28,8 +28,10 @@ interface MasterBasicInfoPanelProps {
  *
  * ⚠️ 구성상품은 여기서 읽기 전용이다. 변경은 [구성상품 변경] → 전용 페이지(2609_64)에서 한다 —
  * 구성과 옵션 수량은 서로를 검증하므로 한 요청으로 같이 저장돼야 한다.
- * ⚠️ 마스터를 치우는 길은 목록의 [삭제](하드 삭제, 2609_72) 하나다 — 비활성 토글은 없앴다
+ * ⚠️ 마스터를 치우는 길은 [삭제](하드 삭제, 2609_72)뿐이다 — 비활성 토글은 없앴다
  * (같은 일을 하는 버튼이 둘이었고, 비활성은 목록에서 사라져 되돌릴 길이 화면에 없었다).
+ * ⚠️ 삭제 버튼은 **이 패널이 아니라 상세 머리말 오른쪽**에 있다(목록에도 하나 있다).
+ * 여기에 두 번째 삭제 버튼을 만들지 말 것.
  */
 export function MasterBasicInfoPanel({ master, useCase, onSaved }: MasterBasicInfoPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
