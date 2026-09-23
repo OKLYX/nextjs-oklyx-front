@@ -11,8 +11,8 @@ const MAX_PAGES = 30;
  *
  * 🔴 **바코드로 물품을 돌려주는 서버 창구가 없다.** 있는 것은 두 개뿐이다:
  * - `GET /api/products/check-barcode` → 있다/없다(`exists`)만 준다. id 가 없다.
- * - `GET /api/products?search=` → **상품명 · 브랜드 · 설명**만 본다(`ProductRepository.searchByKeyword`).
- *   바코드는 검색어에 걸리지 않는다.
+ * - `GET /api/products?search=` → **상품명 · 브랜드 · 설명 · 물품ID(완전일치)** 를 본다
+ *   (`ProductRepository.searchByKeyword`). **바코드는 여전히 검색어에 걸리지 않는다.**
  *
  * 그래서 목록을 쪽 단위로 받아 `barcodeId` 가 정확히 같은 물품을 화면에서 고른다. 병합 화면은
  * 관리자가 이따금 쓰는 화면이고 찾는 즉시 멈추므로 이 방식으로 충분하다.

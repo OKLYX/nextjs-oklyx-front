@@ -43,7 +43,7 @@ export function ProductSearchCard({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onSearch();
               }}
-              placeholder="상품명 · 브랜드 · 설명"
+              placeholder="상품명 · 브랜드 · 설명 · 물품ID"
               className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
             {searchTerm && (
