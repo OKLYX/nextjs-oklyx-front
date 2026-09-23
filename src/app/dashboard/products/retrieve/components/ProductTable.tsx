@@ -55,6 +55,17 @@ export function ProductTable({
   // Older products were registered without a barcode; keep the column aligned.
   const barcode = (product: Product): string => product.barcodeId || '-';
 
+  // 연결된 판매채널 수. 🔴 `undefined`(백엔드가 아직 안 내려주는 환경) 는 `-`, 0 은 `0` —
+  // 「모른다」와 「없다」를 같은 글자로 쓰면 값이 안 보이는 이유를 구분할 수 없다.
+  const channelCount = (product: Product) =>
+    product.channelCount === undefined || product.channelCount === null ? (
+      <span className="text-gray-400">-</span>
+    ) : product.channelCount === 0 ? (
+      <span className="text-gray-400">0</span>
+    ) : (
+      <span className="text-gray-900">{product.channelCount}</span>
+    );
+
   // Representative image as a thumbnail; a product without one keeps the row
   // height stable with a placeholder box (same shape as the purchase list).
   const thumbnail = (product: Product) => {
@@ -146,6 +157,7 @@ export function ProductTable({
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">브랜드</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">가격</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">구매처</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">판매채널</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">상태</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">등록일</th>
             </tr>
@@ -174,6 +186,7 @@ export function ProductTable({
                 <td className="px-4 py-3 text-sm text-gray-900">{product.brand}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{formatKrw(product.price)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.store}</td>
+                <td className="px-4 py-3 text-sm">{channelCount(product)}</td>
                 <td className="px-4 py-3 text-sm">{statusChip(product.active)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{formatDate(product.createdDate)}</td>
               </tr>
@@ -197,6 +210,7 @@ export function ProductTable({
                 { label: '브랜드', value: product.brand },
                 { label: '가격', value: formatKrw(product.price) },
                 { label: '구매처', value: product.store },
+                { label: '판매채널', value: channelCount(product) },
                 { label: '상태', value: statusChip(product.active) },
                 { label: '등록일', value: formatDate(product.createdDate) },
               ]}
