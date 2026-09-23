@@ -1463,23 +1463,36 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     <td className="px-4 py-3">
                       {!isAdmin ? (
                         <span className="text-xs text-gray-400">–</span>
-                      ) : !row.registered || !row.cell ? (
+                      ) : (
                         <div className="space-y-1">
                           <div className="flex flex-wrap gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleRowAdd(row.accountId, row.sellerId, row.platform)
-                            }
-                            disabled={busy || isShippingBlocked(row.accountId)}
-                            title={isShippingBlocked(row.accountId) ? SHIPPING_BLOCK_REASON : undefined}
-                            className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                          >
-                            {rowBusyId === row.accountId ? <Spinner size={12} label="등록 중" /> : '등록'}
-                          </button>
+                          {/* 🔴 [등록] = 채널 셀 **생성**이라 미등록 행 전용이다. 등록된 행에 노출하면
+                              ChannelAddServiceImpl 의 계정당 1셀 가드에 걸려 409 다 — 신규 등록에서
+                              두 번 만드는 것은 쿠팡에 중복 상품을 만드는 일이라 의미가 정반대다. */}
+                          {(!row.registered || !row.cell) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRowAdd(row.accountId, row.sellerId, row.platform)
+                              }
+                              disabled={busy || isShippingBlocked(row.accountId)}
+                              title={isShippingBlocked(row.accountId) ? SHIPPING_BLOCK_REASON : undefined}
+                              className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                            >
+                              {rowBusyId === row.accountId ? <Spinner size={12} label="등록 중" /> : '등록'}
+                            </button>
+                          )}
                           {/* 2609_22: 이미 마켓에 올라간 상품을 이 셀로 편입한다. 다른 플랫폼은 백엔드가
                               미지원이므로 버튼 자체를 노출하지 않는다. ⚠️ isShippingBlocked 가드는 걸지
-                              않는다 — 이미 팔고 있는 상품이라 출고지 미설정이어도 가져올 수 있다. */}
+                              않는다 — 이미 팔고 있는 상품이라 출고지 미설정이어도 가져올 수 있다.
+                              🔴 **등록된 행에도 그린다**(2026-09-19 편입 가드 완화 대응). 한 계정이 같은
+                              마스터로 쿠팡 페이지를 여러 개 가질 수 있는데(실측 139건) 이 버튼이 미등록
+                              분기 안에만 있어서 첫 편입 뒤 두 번째 상품을 넣을 입구가 사라졌다.
+                              🔴 **"계정당 첫 셀만 그린다" 부채와 충돌하지 않는다** — 이 버튼은 셀을
+                              지목하지 않는다. 넘기는 값은 {sellerId, platform} 뿐이고 어느 셀에 넣을지는
+                              사용자가 입력한 쿠팡 상품 ID 로 백엔드가 정한다(없으면 새 셀, 연결이 끊긴
+                              셀이면 그 행 재사용). productListingId 를 받는 다른 액션과 다르다 —
+                              첫 셀 계약을 이유로 되돌리지 말 것. */}
                           {row.platform === 'COUPANG' && (
                             <button
                               type="button"
@@ -1493,40 +1506,42 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                               disabled={busy}
                               className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                             >
-                              가져오기
+                              {/* 이미 셀이 있는 행에서 "가져오기"는 기존 셀을 덮어쓰는 것처럼 읽힌다. */}
+                              {row.registered && row.cell ? '쿠팡 상품 추가' : '가져오기'}
                             </button>
                           )}
                           </div>
-                          {isShippingBlocked(row.accountId) && (
+                          {(!row.registered || !row.cell) && isShippingBlocked(row.accountId) && (
                             <p className="text-[11px] text-amber-700" title={SHIPPING_BLOCK_REASON}>
                               배송 설정 필요
                             </p>
                           )}
+                          {row.registered && row.cell && (
+                            <CellActions
+                              masterId={masterId}
+                              listing={{
+                                id: row.cell.productListingId,
+                                status: cellStatus(row.cell),
+                              }}
+                              options={options}
+                              onReload={load}
+                              accountId={row.accountId}
+                              platform={row.platform}
+                              channelLabel={`${row.sellerName} · ${row.platform}`}
+                              shippingOverride={generated[row.cell.productListingId]?.shippingOverride}
+                              shippingReady={generated[row.cell.productListingId]?.shippingReady}
+                              shippingUseCase={shippingUseCase}
+                              onShippingSaved={(updated) =>
+                                handleShippingSaved(row.cell!.productListingId, updated)
+                              }
+                              usesOwnCategory={row.cell.usesOwnCategory === true}
+                              channelCategoryLabel={row.cell.categoryName ?? row.cell.categoryCode ?? null}
+                              masterCategoryName={matrix.masterCategoryName ?? null}
+                              cells={rowCells}
+                              onCellRemoved={handleCellRemoved}
+                            />
+                          )}
                         </div>
-                      ) : (
-                        <CellActions
-                          masterId={masterId}
-                          listing={{
-                            id: row.cell.productListingId,
-                            status: cellStatus(row.cell),
-                          }}
-                          options={options}
-                          onReload={load}
-                          accountId={row.accountId}
-                          platform={row.platform}
-                          channelLabel={`${row.sellerName} · ${row.platform}`}
-                          shippingOverride={generated[row.cell.productListingId]?.shippingOverride}
-                          shippingReady={generated[row.cell.productListingId]?.shippingReady}
-                          shippingUseCase={shippingUseCase}
-                          onShippingSaved={(updated) =>
-                            handleShippingSaved(row.cell!.productListingId, updated)
-                          }
-                          usesOwnCategory={row.cell.usesOwnCategory === true}
-                          channelCategoryLabel={row.cell.categoryName ?? row.cell.categoryCode ?? null}
-                          masterCategoryName={matrix.masterCategoryName ?? null}
-                          cells={rowCells}
-                          onCellRemoved={handleCellRemoved}
-                        />
                       )}
                     </td>
                   </tr>
