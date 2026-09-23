@@ -151,8 +151,9 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
         setProduct(updated);
         router.push(detailHref);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to update product';
-        setError(errorMessage);
+        // 🔴 저장 실패를 페이지 `error` 로 올리지 말 것 — 이 컨테이너는 `error` 면 화면 전체를
+        //    `StateBlock` 으로 바꾼다. 400 하나에 수정 폼과 입력하던 값이 통째로 날아간다.
+        //    실패는 폼이 받아 인라인 배너로 보여준다.
         throw err;
       }
     },
