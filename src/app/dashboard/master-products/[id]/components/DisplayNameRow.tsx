@@ -16,6 +16,13 @@ const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 interface DisplayNameRowProps {
   listingId: number;
+  /**
+   * 이 서브행이 어느 셀의 것인지 알려주는 꼬리표(그 셀의 상품 ID, 미전송이면 `미전송`).
+   * 한 계정이 쿠팡 상품페이지를 여러 개 가지면 서브행도 그만큼 연달아 서므로, 꼬리표가 없으면
+   * 어느 페이지의 노출상품명·태그를 고치는지 알 수 없다. 셀이 하나뿐이면 `null` = 표시 안 함
+   * (기존 화면 그대로).
+   */
+  cellTag?: string | null;
   name: string;
   // Registration name (등록상품명, 67/68): always auto-computed, read-only. Always present.
   registrationName: string;
@@ -54,6 +61,7 @@ interface DisplayNameRowProps {
  */
 export function DisplayNameRow({
   listingId,
+  cellTag = null,
   name,
   registrationName,
   tags,
@@ -129,6 +137,12 @@ export function DisplayNameRow({
         <div className="space-y-2">
           {/* 노출상품명 */}
           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+            {/* 셀이 여럿일 때만 붙는 꼬리표 — 매트릭스 본문 각 열의 꼬리표와 같은 값이다. */}
+            {cellTag && (
+              <span className="shrink-0 font-mono text-[10px] tabular-nums text-gray-500">
+                {cellTag}
+              </span>
+            )}
             <span className="shrink-0 rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
               노출상품명
             </span>
