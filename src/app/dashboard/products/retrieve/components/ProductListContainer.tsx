@@ -149,8 +149,10 @@ export function ProductListContainer() {
     };
   }, [useCase, router, page, search, reloadToken]);
 
+  // `term` 은 Enter 경로에서만 들어온다 — IME 조합 중 Enter 는 조합 확정 전이라 입력창의 값이
+  // `searchTerm` state 보다 최신일 수 있다(`ProductSearchCard` 주석 참고). 버튼은 인자 없이 부른다.
   const handleSearch = useCallback(
-    () => updateQuery({ search: searchTerm.trim() }),
+    (term?: string) => updateQuery({ search: (term ?? searchTerm).trim() }),
     [updateQuery, searchTerm]
   );
 
