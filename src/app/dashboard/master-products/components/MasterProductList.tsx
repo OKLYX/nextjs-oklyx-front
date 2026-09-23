@@ -32,7 +32,8 @@ import { MasterProductSearchCard } from './MasterProductSearchCard';
  * 커밋되지 않은** 글자라 조회 조건이 아니다 — [검색] 을 눌러야 URL 로 넘어간다.
  *
  * ⚠️ 같은 URL 로 replace 하면 파생값이 그대로라 재조회 이펙트가 돌지 않는다 → URL 이 안 바뀌어도
- * 재조회해야 하는 경로(삭제 후, 기본 상태에서의 생성)는 `reloadTick` 을 올려 강제한다.
+ * 재조회해야 하는 경로(**같은 조건으로 다시 [검색]**, 삭제 후, 기본 상태에서의 생성)는
+ * `reloadTick` 을 올려 강제한다. 앞의 둘은 `updateQuery` 안에서 자동으로 처리된다.
  */
 export function MasterProductList() {
   const router = useRouter();
@@ -67,12 +68,24 @@ export function MasterProductList() {
   /**
    * 조회 조건 갱신 단일 진입점(툴바·페이지네이션 공용).
    * `patch` 에 `page` 키가 없으면 1페이지로 리셋한다(검색·정렬·크기 변경) — 페이지 이동만 예외.
+   *
+   * 🔴 바뀐 조건이 지금과 같으면 `router.replace` 는 **아무 일도 하지 않는다**(같은 URL). 그러면
+   * 파생값(page/size/sort/q)이 그대로라 재조회 이펙트도 돌지 않아 [검색] 을 눌러도 **요청이 아예
+   * 나가지 않는다**(2026-09-23 실제 버그: 한 번 검색한 뒤 같은 검색어로 다시 [검색] → 무반응).
+   * [검색] 은 언제나 다시 불러오는 동작이어야 하므로 그 자리에서 `reloadTick` 으로 재조회를 건다.
+   * ⚠️ 범위 초과 페이지 보정은 항상 다른 페이지로 가므로 이 분기를 타지 않는다(tick 안 오름).
    */
   const updateQuery = useCallback(
     (patch: Partial<MasterListQuery>) => {
       const next: MasterListQuery = { ...query, ...patch };
       if (!('page' in patch)) next.page = 0;
-      router.replace(`?${toSearchParams(next).toString()}`, { scroll: false });
+      const qs = toSearchParams(next).toString();
+      // 키 순서에 흔들리지 않게 양쪽 모두 정규화한 쿼리스트링으로 비교한다.
+      if (qs === toSearchParams(query).toString()) {
+        setReloadTick((tick) => tick + 1);
+        return;
+      }
+      router.replace(`?${qs}`, { scroll: false });
     },
     [query, router],
   );
