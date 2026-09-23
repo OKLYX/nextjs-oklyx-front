@@ -6,7 +6,6 @@ import { TopBar } from './components/TopBar';
 import { Navbar } from './components/Navbar';
 import { ToolRail } from './components/ToolRail';
 import { ToolPanel } from './components/ToolPanel';
-import { ChannelProductTool } from './components/ChannelProductTool';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
@@ -190,10 +189,9 @@ export default function DashboardLayout({
         <main className="flex-1 p-4 md:p-6 min-w-0 overflow-x-auto">{children}</main>
       </div>
 
-      {/* 전역 도구(FEATURE_2609_68). 🔴 도구는 화면에 속하지 않는다 — 레이아웃이 직접 그린다. */}
-      <ToolPanel>
-        <ChannelProductTool />
-      </ToolPanel>
+      {/* 전역 도구(FEATURE_2609_68). 🔴 도구는 화면에 속하지 않는다 — 레이아웃이 직접 그린다.
+          도구 목록(플랫폼 상품 조회 · 클립보드)은 `components/toolRegistry.tsx` 한 곳에 있다. */}
+      <ToolPanel />
       <ToolRail />
     </div>
   );
