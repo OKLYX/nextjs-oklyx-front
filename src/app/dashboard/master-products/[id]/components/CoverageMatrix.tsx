@@ -90,6 +90,9 @@ const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
  * 채널(판매자×플랫폼)은 판매채널 관리 화면에서 정의됨 → 여기선 다시 선택하지 않는다.
  * 매트릭스 행이 곧 테넌트 전 채널 목록(registered 플래그). 미등록 행을 체크해 일괄 등록하거나
  * 행별 [등록] 원클릭으로 등록한다. 옵션은 15에서 전체 복사되므로 옵션 선택 UI 없음.
+ *
+ * ⚠️ 머리말 오른쪽 끝에 [마스터 삭제](하드 삭제, 2609_72)가 있다. 성공하면 이 화면이 사라지므로
+ * **사용자가 왔던 목록 상태로 `replace`** 한다(`listReturnHref`) — 실패는 여기 머물며 배너로 알린다.
  */
 /**
  * 출고지·반품지가 없는 판매자에 채널을 만들 수 없는 이유(사용자 결정 2026-08-28). 그 판매자의 채널은
@@ -295,6 +298,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // 2609_22/D4: [옵션명 일괄 적용] 확인 모달 + 재진입 가드.
   const [applyNamesOpen, setApplyNamesOpen] = useState(false);
   const [isApplyingNames, setIsApplyingNames] = useState(false);
+
+  // 2609_72: 마스터 삭제 확인창. 목록의 [삭제]와 같은 흐름이지만, 여기서는 보고 있던 대상이
+  // 사라지므로 성공하면 이 화면을 떠난다(아래 `handleDelete`).
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch per-channel generated assets (thumbnail + detail HTML) in one call each,
   // N calls total, without blocking the table render. Each failure is absorbed as
@@ -739,6 +747,33 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     }
   };
 
+  /**
+   * 마스터 삭제(2609_72 하드 삭제). 호출·확인 문구는 목록의 [삭제]와 같지만 **끝이 다르다** —
+   * 보고 있던 대상이 사라지므로 이 화면에 남아 있을 수 없다.
+   *
+   * 🔴 성공하면 사용자가 왔던 **목록 상태(페이지·검색어)로** 돌아간다(`listReturnHref`).
+   *    그냥 1페이지로 튕기면 지우려던 다음 항목을 다시 찾아 들어가야 한다.
+   * 🔴 `replace` 를 쓴다 — 삭제된 상세가 뒤로가기 스택에 남으면 빈 화면으로 되돌아간다.
+   * ⚠️ 실패(마켓에 올린 채널이 남음 등)는 **이 화면에 머물며** 서버 문구를 그대로 배너에 띄운다.
+   *    창 위에 창을 겹치지 않도록 확인창은 닫는다.
+   */
+  const handleDelete = async () => {
+    // ⚠️ ConfirmDialog 은 선언형이라 재진입 가드는 호출부 책임.
+    if (isDeleting) return;
+    setIsDeleting(true);
+    setError('');
+    try {
+      await masterUseCase.remove(masterId);
+      setDeleteOpen(false);
+      // 이동 중에도 버튼이 눌리지 않게 `isDeleting` 은 되돌리지 않는다(성공 경로엔 finally 없음).
+      router.replace(listReturnHref(ROUTES.MASTER_PRODUCTS, searchParams));
+    } catch (e: unknown) {
+      setIsDeleting(false);
+      setDeleteOpen(false);
+      setError(extractErrorMessage(e, '삭제에 실패했습니다.'));
+    }
+  };
+
   // Toggle one option's per-channel active flag inline (43). Sends the full active set (backend
   // requires ≥1 active). On success we patch just this cell's optionPrices in place — no full
   // reload — so the row doesn't flash. needsResync (already-pushed cell) shows the re-register hint.
@@ -871,6 +906,19 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
             {syncPreview?.inSync && (
               <span className="self-center text-sm text-gray-500">모든 채널이 최신입니다</span>
             )}
+            {/* 마스터 삭제(2609_72) — 물품 상세와 같은 자리다: 상세 머리말 오른쪽 끝, 파괴적 액션이
+                맨 마지막. 🔴 이 화면의 삭제 버튼은 이 하나뿐이다(섹션마다 두 번째 삭제를 만들지 말 것).
+                ⚠️ `master` 가 실리기 전에는 누르지 못한다 — 확인창이 옵션·구성상품 **건수**를 말해야
+                무엇이 함께 사라지는지 알 수 있다. */}
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(true)}
+              disabled={master === null || isDeleting || busy}
+              title={master === null ? '마스터를 불러오는 중입니다' : undefined}
+              className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              {isDeleting ? <Spinner label="삭제 중..." /> : '마스터 삭제'}
+            </button>
           </div>
         )}
       </div>
@@ -983,6 +1031,39 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         confirmText="적용하기"
         onConfirm={handleApplyNamesConfirm}
         onCancel={() => setApplyNamesOpen(false)}
+      />
+
+      {/* 마스터 삭제 확인(2609_72). 문구는 목록의 확인창과 같은 것을 쓴다 — 하드 삭제라 무엇이
+          함께 사라지는지 숫자와 함께 말해야 한다. ⚠️ 이번 범위에서는 목록 쪽을 손대지 않으므로
+          문구가 두 곳에 있다(공통화는 하지 않는다). */}
+      <ConfirmDialog
+        isOpen={deleteOpen}
+        title="마스터 삭제"
+        confirmText="삭제"
+        isDangerous
+        isLoading={isDeleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteOpen(false)}
+        message={
+          <div className="space-y-2 text-left">
+            <p>
+              <span className="font-medium">{master?.name ?? matrix?.masterName}</span> 을(를)
+              삭제합니다.
+              <span className="text-red-600"> 되돌릴 수 없습니다.</span>
+            </p>
+            <ul className="list-disc pl-5 text-sm text-gray-600">
+              <li>
+                옵션 {master?.options.length}개 · 구성상품 {master?.components.length}개와 사진이 함께
+                삭제됩니다
+              </li>
+              <li>마켓에 올리지 않은 채널은 함께 삭제됩니다</li>
+              <li>마켓에 올린 채널이 있으면 삭제되지 않습니다 — 먼저 [연결 해제] 하세요</li>
+              <li>
+                연결 해제한 판매상품이 이 마스터의 사진을 쓰고 있었다면 상세 이미지가 깨질 수 있습니다
+              </li>
+            </ul>
+          </div>
+        }
       />
 
       {/* 마스터 편집 = 토글 섹션 스택(83A/83B). 순서 = 상품 기본 정보(기본 정보·표준 카테고리·
