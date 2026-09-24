@@ -1,24 +1,37 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ProductListingRepositoryImpl } from '@/infrastructure/repositories/ProductListingRepositoryImpl';
 import { ProductListingUseCase } from '@/application/usecases/ProductListingUseCase';
 import type { ProductListing } from '@/domain/entities/ProductListingEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
+import { Pagination } from '@/presentation/components/Pagination';
 import { ProductListingSearchCard } from './ProductListingSearchCard';
 import { ProductListingTable } from './ProductListingTable';
 
+/** 한 페이지 행 수. 서버에 보내는 size 와 화면 계산이 어긋나지 않도록 한 곳에서만 정한다. */
+const PAGE_SIZE = 20;
+
 export function ProductListingContainer() {
   const [searchPlatform, setSearchPlatform] = useState('');
+  // 입력창의 값(타이핑 중) — 서버에 나간 검색어는 `appliedSearch` 다.
+  const [searchTerm, setSearchTerm] = useState('');
+  // 마지막으로 **조회에 쓴** 검색어. 페이지 이동·필터 토글이 이 값을 그대로 이어 써야
+  // 2페이지로 넘어가는 순간 검색이 풀리는 일이 없다.
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [listings, setListings] = useState<ProductListing[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [expandedListingId, setExpandedListingId] = useState<number | null>(null);
   // 2609_22/D24: 마스터 미연결 셀만 보기(기본 false).
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
+  // 🔴 [검색] 버튼을 로딩 중에 잠그지 않으므로 요청이 겹칠 수 있다. 늦게 도착한 옛 응답이 새 결과를
+  // 덮어쓰지 않도록 **마지막 요청만** 화면에 반영한다(물품 목록의 `alive` 가드와 같은 역할).
+  const requestSeq = useRef(0);
 
   const productListingUseCase = useMemo(() => {
     const repository = new ProductListingRepositoryImpl();
@@ -27,26 +40,33 @@ export function ProductListingContainer() {
 
   // 서버를 치는 3경로(검색 · 페이지 이동 · refresh-flag 복원)를 한 함수로 모은다(파라미터 누락 방지).
   const fetchPage = useCallback(
-    async (platform: string, page: number, onlyUnlinked: boolean) => {
+    async (platform: string, page: number, onlyUnlinked: boolean, keyword: string) => {
+      const seq = ++requestSeq.current;
+      const isLatest = () => seq === requestSeq.current;
       try {
         setIsLoading(true);
         setError('');
         const result = await productListingUseCase.getByPlatform(
           platform,
           page,
-          20,
+          PAGE_SIZE,
           onlyUnlinked ? false : undefined, // masterLinked=false = 미연결만
+          keyword,
         );
+        if (!isLatest()) return; // 더 최신 요청이 이미 나갔다 — 이 응답은 버린다.
         setListings(result.content);
         setTotalPages(result.totalPages);
+        setTotalElements(result.totalElements);
         setCurrentPage(page);
+        setAppliedSearch(keyword);
         setHasSearched(true);
       } catch {
+        if (!isLatest()) return;
         // 실패 시 목록을 비우는 것은 기존 handleSearch 동작 — 페이지 이동 실패에도 같게 적용한다.
         setError('판매상품 조회에 실패했습니다. 다시 시도해주세요.');
         setListings([]);
       } finally {
-        setIsLoading(false);
+        if (isLatest()) setIsLoading(false);
       }
     },
     [productListingUseCase],
@@ -70,11 +90,13 @@ export function ProductListingContainer() {
               if (state.searchPlatform) {
                 setSearchPlatform(state.searchPlatform);
                 const restoredUnlinked = state.unlinkedOnly ?? false;
+                const restoredSearch = state.searchTerm ?? '';
                 setUnlinkedOnly(restoredUnlinked);
+                setSearchTerm(restoredSearch);
 
                 // 비동기로 재검색 실행
                 setTimeout(() => {
-                  void fetchPage(state.searchPlatform, 0, restoredUnlinked);
+                  void fetchPage(state.searchPlatform, 0, restoredUnlinked, restoredSearch);
                 }, 0);
               }
               sessionStorage.removeItem('sales-products-retrieve-state');
@@ -94,7 +116,10 @@ export function ProductListingContainer() {
           setHasSearched(state.hasSearched);
           setCurrentPage(state.currentPage);
           setTotalPages(state.totalPages);
+          setTotalElements(state.totalElements ?? state.listings?.length ?? 0);
           setUnlinkedOnly(state.unlinkedOnly ?? false);
+          setSearchTerm(state.searchTerm ?? '');
+          setAppliedSearch(state.searchTerm ?? '');
           sessionStorage.removeItem('sales-products-retrieve-state');
         }
       } catch (err) {
@@ -121,23 +146,30 @@ export function ProductListingContainer() {
     }
   }, [fetchPage]);
 
-  const handleSearch = async () => {
+  /**
+   * 🔴 `term` 은 **Enter 경로에서만** 넘어온다 — IME 조합 중 Enter 는 `searchTerm` 이 아직 한 글자
+   * 뒤처져 있을 수 있어, 입력창에 보이는 값을 그대로 받아 쓴다.
+   */
+  const handleSearch = async (term?: string) => {
+    const keyword = term ?? searchTerm;
+    if (term !== undefined && term !== searchTerm) setSearchTerm(term);
     if (!searchPlatform) {
       setError('플랫폼을 선택해주세요.');
       return;
     }
-    await fetchPage(searchPlatform, 0, unlinkedOnly);
+    // 검색 조건이 바뀌었으므로 항상 첫 페이지부터 — 3페이지에서 검색하면 결과가 빈 화면이 된다.
+    await fetchPage(searchPlatform, 0, unlinkedOnly, keyword);
   };
 
   const handlePageChange = async (page: number) => {
-    await fetchPage(searchPlatform, page, unlinkedOnly);
+    await fetchPage(searchPlatform, page, unlinkedOnly, appliedSearch);
   };
 
   const handleUnlinkedOnlyChange = async (next: boolean) => {
     setUnlinkedOnly(next);
     // 플랫폼 미선택 상태면 상태만 바꾸고 재조회하지 않는다(에러도 띄우지 않는다).
     if (!searchPlatform) return;
-    await fetchPage(searchPlatform, 0, next);
+    await fetchPage(searchPlatform, 0, next, appliedSearch);
   };
 
   const handleRowClick = async (id: number) => {
@@ -163,10 +195,12 @@ export function ProductListingContainer() {
     // 상태 저장 (detail page 이동 전)
     const state = {
       searchPlatform,
+      searchTerm: appliedSearch,
       listings,
       hasSearched,
       currentPage,
       totalPages,
+      totalElements,
       unlinkedOnly,
     };
     sessionStorage.setItem('sales-products-retrieve-state', JSON.stringify(state));
@@ -177,9 +211,11 @@ export function ProductListingContainer() {
       <ProductListingSearchCard
           searchPlatform={searchPlatform}
           onSearchChange={setSearchPlatform}
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
           onSearch={handleSearch}
           isLoading={isLoading}
-          resultCount={listings.length}
+          resultCount={totalElements}
           unlinkedOnly={unlinkedOnly}
           onUnlinkedOnlyChange={handleUnlinkedOnlyChange}
         />
@@ -194,39 +230,15 @@ export function ProductListingContainer() {
           onSaveState={handleSaveStateBeforeNavigation}
         />
 
+        {/* 🔴 페이지 버튼을 여기서 새로 만들지 말 것 — 공통 `Pagination` 을 쓴다(그 파일의 금지 패턴).
+            직접 만들었던 옛 UI 는 `totalPages` 만큼 번호 버튼을 **전부** 그려서, 페이지가 수십 개면
+            줄이 화면 밖으로 넘치고 마지막 페이지로 한 번에 갈 수도 없었다. */}
         {hasSearched && listings.length > 0 && totalPages > 1 && (
-          <div className="bg-white rounded-lg shadow px-6 py-4 flex items-center justify-center gap-2">
-            <button
-              onClick={() => handlePageChange(Math.max(0, currentPage - 1))}
-              disabled={currentPage === 0 || isLoading}
-              className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-            >
-              ← 이전
-            </button>
-
-            {[...Array(totalPages)].map((_, i) => (
-              <button
-                key={i}
-                onClick={() => handlePageChange(i)}
-                disabled={isLoading}
-                className={`px-2 py-1 text-sm rounded transition-colors ${
-                  currentPage === i
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed'
-                }`}
-              >
-                {i + 1}
-              </button>
-            ))}
-
-            <button
-              onClick={() => handlePageChange(Math.min(totalPages - 1, currentPage + 1))}
-              disabled={currentPage === totalPages - 1 || isLoading}
-              className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
-            >
-              다음 →
-            </button>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
         )}
 
     </PageContainer>
