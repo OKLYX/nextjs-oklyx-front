@@ -13,11 +13,20 @@ export class ProductListingRepositoryImpl implements ProductListingRepository {
     platform: string,
     page: number,
     size: number,
-    masterLinked?: boolean
+    masterLinked?: boolean,
+    search?: string
   ) {
+    const keyword = search?.trim();
     const response = await axiosInstance.get('/api/product-listings', {
       // 미지정이면 파라미터 자체를 보내지 않는다 — 백엔드의 3값(null/true/false) 계약.
-      params: { platform, page, size, ...(masterLinked === undefined ? {} : { masterLinked }) },
+      // 빈 검색어도 마찬가지로 보내지 않는다(= 검색 없음).
+      params: {
+        platform,
+        page,
+        size,
+        ...(masterLinked === undefined ? {} : { masterLinked }),
+        ...(keyword ? { search: keyword } : {}),
+      },
     });
     return response.data.data;
   }
