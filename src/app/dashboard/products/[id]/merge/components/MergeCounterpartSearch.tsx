@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { Product } from '@/domain/entities/Product';
 import type { FindProductByBarcodeUseCase } from '@/application/usecases/FindProductByBarcodeUseCase';
 import type { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
 import { Input } from '@/presentation/components/ui/Input';
+import { ImageLightbox } from '@/presentation/components/ImageLightbox';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 
@@ -20,6 +21,8 @@ import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
  * 🔴 결과 줄에는 **대표 사진**을 같이 보여준다 — 이름·바코드만으로는 같은 물건인지 가리기 어렵고,
  *    사진이 중복 판단의 가장 빠른 근거다(2026-09-24). 사진 주소는 목록 화면과 같은
  *    `getProductThumbUrl` 로 푼다(S3 는 직접, 로컬은 인증 프록시).
+ * 🔴 사진을 누르면 공용 `ImageLightbox` 로 크게 본다 — 48px 로는 같은 물건인지 가릴 수 없다.
+ *    ◀▶ 로는 사진이 있는 결과들을 이어서 넘겨본다(사진 없는 줄은 목록에서 빠진다).
  */
 const KEYWORD_PAGE_SIZE = 20;
 
@@ -49,6 +52,17 @@ export function MergeCounterpartSearch({
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<Product[]>([]);
   const [notice, setNotice] = useState('');
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
+
+  // 확대 보기 목록은 사진이 있는 결과만 — 빈 칸을 넘겨보게 만들 이유가 없다.
+  const zoomImages = useMemo(
+    () =>
+      results.flatMap((product) => {
+        const url = getProductThumbUrl(product.imageUrl, product.id);
+        return url ? [{ productId: product.id, url, alt: `#${product.id} ${product.productName}` }] : [];
+      }),
+    [results]
+  );
 
   const search = useCallback(async () => {
     const value = keyword.trim();
@@ -56,6 +70,7 @@ export function MergeCounterpartSearch({
     setIsSearching(true);
     setNotice('');
     setResults([]);
+    setZoomIndex(null);
     try {
       if (looksLikeBarcode(value)) {
         const found = await findByBarcode.execute(value, currentProductId);
@@ -109,7 +124,13 @@ export function MergeCounterpartSearch({
           {results.map((product) => (
             <li key={product.id} className="flex items-center justify-between gap-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
-                <ResultThumbnail product={product} />
+                <ResultThumbnail
+                  product={product}
+                  onZoom={() => {
+                    const at = zoomImages.findIndex((image) => image.productId === product.id);
+                    if (at >= 0) setZoomIndex(at);
+                  }}
+                />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-gray-900">
                     #{product.id} {product.productName}
@@ -126,12 +147,22 @@ export function MergeCounterpartSearch({
           ))}
         </ul>
       )}
+
+      <ImageLightbox
+        images={zoomImages}
+        index={zoomIndex}
+        onIndexChange={setZoomIndex}
+        onClose={() => setZoomIndex(null)}
+      />
     </Card>
   );
 }
 
-/** 결과 줄의 대표 사진. 사진이 없는 물품도 줄 높이가 흔들리지 않게 같은 크기의 빈 칸을 둔다. */
-function ResultThumbnail({ product }: { product: Product }) {
+/**
+ * 결과 줄의 대표 사진. 사진이 없는 물품도 줄 높이가 흔들리지 않게 같은 크기의 빈 칸을 둔다.
+ * 사진이 있으면 눌러서 크게 본다([이 물품과 병합]은 오른쪽 버튼이 따로 가지고 있다).
+ */
+function ResultThumbnail({ product, onZoom }: { product: Product; onZoom: () => void }) {
   const src = getProductThumbUrl(product.imageUrl, product.id);
   if (!src) {
     return (
@@ -141,11 +172,19 @@ function ResultThumbnail({ product }: { product: Product }) {
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={product.productName}
-      className="h-12 w-12 shrink-0 rounded border border-gray-200 bg-gray-50 object-cover"
-    />
+    <button
+      type="button"
+      onClick={onZoom}
+      aria-label={`${product.productName} 사진 크게 보기`}
+      title="크게 보기"
+      className="shrink-0"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={product.productName}
+        className="h-12 w-12 cursor-zoom-in rounded border border-gray-200 bg-gray-50 object-cover"
+      />
+    </button>
   );
 }
