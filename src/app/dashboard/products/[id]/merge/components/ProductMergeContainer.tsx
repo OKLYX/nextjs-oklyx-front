@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import type { Product } from '@/domain/entities/Product';
+import type { ProductImage } from '@/domain/entities/ProductImage';
 import type { ProductUsage } from '@/domain/entities/ProductUsage';
 import type { MergeTransferOptions } from '@/domain/repositories/ProductMergeRepository';
 import { GetProductDetailUseCase } from '@/application/usecases/GetProductDetailUseCase';
@@ -18,6 +19,8 @@ import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/Produc
 import { ProductMergeRepositoryImpl } from '@/infrastructure/repositories/ProductMergeRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
+import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
+import { ImageLightbox } from '@/presentation/components/ImageLightbox';
 import { ROUTES } from '@/config/routes';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Button } from '@/presentation/components/ui/Button';
@@ -604,7 +607,7 @@ function SideCard({
         )}
       </div>
       <div className="mt-3 flex items-start gap-3">
-        <SideThumbnail product={data.product} />
+        <SideThumbnail product={data.product} images={data.images} />
         <div className="min-w-0">
           <p className="text-lg font-semibold text-gray-900">
             #{data.product.id} {data.product.productName}
@@ -622,8 +625,13 @@ function SideCard({
   );
 }
 
-/** 좌우 칸의 대표 사진 — 이름이 비슷한 두 물품을 눈으로 가르는 가장 빠른 단서다. */
-function SideThumbnail({ product }: { product: Product }) {
+/**
+ * 좌우 칸의 대표 사진 — 이름이 비슷한 두 물품을 눈으로 가르는 가장 빠른 단서다.
+ * 누르면 공용 `ImageLightbox` 로 **그 물품의 사진 전부**를 크게 본다(◀▶ 로 넘김).
+ * 갤러리를 못 받았으면(사진 목록이 비었으면) 대표 사진 한 장만 띄운다.
+ */
+function SideThumbnail({ product, images }: { product: Product; images: ProductImage[] }) {
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
   const src = getProductThumbUrl(product.imageUrl, product.id);
   if (!src) {
     return (
@@ -632,13 +640,33 @@ function SideThumbnail({ product }: { product: Product }) {
       </div>
     );
   }
+  const zoomImages =
+    images.length > 0
+      ? images.map((image) => ({ url: resolveThumbUrl(image.imageUrl), alt: product.productName }))
+      : [{ url: src, alt: product.productName }];
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={product.productName}
-      className="h-16 w-16 shrink-0 rounded border border-gray-200 bg-gray-50 object-cover"
-    />
+    <>
+      <button
+        type="button"
+        onClick={() => setZoomIndex(0)}
+        aria-label={`${product.productName} 사진 크게 보기`}
+        title="크게 보기"
+        className="shrink-0"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={product.productName}
+          className="h-16 w-16 cursor-zoom-in rounded border border-gray-200 bg-gray-50 object-cover"
+        />
+      </button>
+      <ImageLightbox
+        images={zoomImages}
+        index={zoomIndex}
+        onIndexChange={setZoomIndex}
+        onClose={() => setZoomIndex(null)}
+      />
+    </>
   );
 }
 
