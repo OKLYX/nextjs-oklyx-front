@@ -27,10 +27,16 @@ import {
 /**
  * 상품 목록(상품조회) 컨테이너.
  *
- * ⚠️ 조회 조건(page/q)은 URL 이 단일 진실원이다(`../productListQuery`). 같은 값을 `useState` 로
- * 이중 보관하지 말 것 — 상세로 갔다가 뒤로가기로 돌아오면 컨테이너가 다시 마운트되므로
- * 로컬 state 는 항상 첫 페이지로 초기화된다. (입력창의 `searchTerm` 은 **아직 커밋되지 않은**
- * 글자라 조회 조건이 아니다 — [검색] 을 눌러야 URL 로 넘어간다.)
+ * ⚠️ 조회 조건(page/q)은 **URL 이 원본**이다(`../productListQuery`). 상세로 갔다가 돌아오거나
+ * 주소를 직접 열어도 같은 화면이 나와야 하므로, 마운트·URL 변경 때는 언제나 URL 값을 따른다.
+ * (입력창의 `searchTerm` 은 **아직 커밋되지 않은** 글자라 조회 조건이 아니다 — [검색] 을 눌러야
+ * 커밋된다.)
+ *
+ * 🔴 다만 **조회를 거는 값은 `applied`** 다. [검색]·페이지 이동은 URL 왕복을 기다리지 않고 그
+ * 자리에서 `applied` 를 바꾼다. `router.replace` 는 비동기라(정적 페이지는 RSC 왕복이 따른다)
+ * URL 이 바뀌기를 기다려 조회하면, 그 사이에 누른 [검색] 이 통째로 사라지거나 늦게 반영된다
+ * (2026-09-24 사용자 보고 "재검색이 안 된다"). URL 이 뒤늦게 따라오면 값이 같으므로 재조회는
+ * 일어나지 않는다.
  *
  * ⚠️ 조건 변경은 `updateQuery` 하나로만 한다. `push` 가 아니라 `router.replace` 를 쓴다
  * (페이지를 넘길 때마다 뒤로가기 스택이 쌓이면 상세에서 한 번에 목록으로 못 돌아온다).
@@ -43,9 +49,24 @@ export function ProductListContainer() {
   const searchKey = searchParams.toString();
   const { page, search } = useMemo(() => parseQuery(new URLSearchParams(searchKey)), [searchKey]);
 
-  // 입력 중인 검색어는 로컬 state, 커밋된 검색어는 URL(`search`) — 마운트 시 한 번만 URL 에서
+  // 입력 중인 검색어는 로컬 state, 커밋된 검색어는 `applied.search` — 마운트 시 한 번만 URL 에서
   // 가져온다. URL→입력값 역동기화를 넣으면 뒤로가기로 돌아왔을 때 입력이 튄다.
   const [searchTerm, setSearchTerm] = useState(search);
+
+  /**
+   * 실제로 조회에 쓰는 조건. [검색]·페이지 이동이 즉시 바꾸고, URL 은 뒤따라 맞춰진다.
+   *
+   * 🔴 URL 이 바뀐 때(뒤로가기 · 상세에서 [← 목록] · 주소 직접 입력)는 URL 을 따른다 —
+   * 아래 `urlKey` 블록이 **URL 이 바뀐 순간에만** 덮어쓴다. 매 렌더 덮어쓰면 방금 누른 [검색] 이
+   * URL 이 따라오기 전에 되돌아간다.
+   */
+  const [applied, setApplied] = useState<ProductListQuery>({ page, search });
+  const urlCondition = `${page}:${search}`;
+  const [urlKey, setUrlKey] = useState(urlCondition);
+  if (urlKey !== urlCondition) {
+    setUrlKey(urlCondition);
+    setApplied({ page, search });
+  }
 
   const [products, setProducts] = useState<Product[]>([]);
   const [totalPages, setTotalPages] = useState(0);
@@ -74,28 +95,31 @@ export function ProductListContainer() {
   // 🔴 페이지·검색어가 바뀌면 선택을 비운다. 안 비우면 화면에 보이지 않는 물품의 바코드를 건드린다.
   // 조회 조건이 바뀐 것을 렌더 중에 알아채 그 자리에서 버린다 — `useEffect` 로 비우면 한 번 더
   // 그린 뒤에 지워지므로, 그 사이에 [바코드 추출] 을 누르면 이전 페이지의 물품이 딸려 간다.
-  const conditionKey = `${page}:${search}`;
+  const conditionKey = `${applied.page}:${applied.search}`;
   const [selectionKey, setSelectionKey] = useState(conditionKey);
   if (selectionKey !== conditionKey) {
     setSelectionKey(conditionKey);
     setSelectedIds([]);
   }
 
-  // 최신 조회 조건을 ref 로 읽어 `updateQuery` 를 page/search 변화와 무관한 안정된 함수로 유지한다.
-  const queryRef = useRef<ProductListQuery>({ page, search });
+  // 최신 조회 조건을 ref 로 읽어 `updateQuery` 를 조건 변화와 무관한 안정된 함수로 유지한다.
+  // 🔴 `setApplied` 직후에도 최신이어야 하므로 `updateQuery` 안에서 직접 갱신한다(이펙트는 URL·
+  // 뒤로가기로 `applied` 가 바뀐 경우를 받아낸다).
+  const queryRef = useRef<ProductListQuery>(applied);
   useEffect(() => {
-    queryRef.current = { page, search };
-  });
+    queryRef.current = applied;
+  }, [applied]);
 
   /**
    * 조회 조건 갱신 단일 진입점(검색·페이지네이션 공용).
    * `patch` 에 `page` 키가 없으면 1페이지로 리셋한다(검색 변경) — 페이지 이동만 예외.
    *
-   * 🔴 조회 조건이 지금과 같으면 `router.replace` 는 **아무 일도 하지 않는다**(같은 URL). 그러면
-   * `page`/`search` 가 그대로라 재조회 이펙트도 돌지 않아 [검색] 을 눌러도 **이전 결과가 그대로
-   * 남는다**(상세를 보고 [← 목록] 으로 돌아오면 입력창에 직전 검색어가 채워져 있어, 그대로 [검색]
-   * 을 누르는 것이 흔한 동선이다). [검색] 은 언제나 다시 불러오는 동작이어야 하므로 그 자리에서
-   * 재조회를 건다.
+   * 🔴 조건을 **먼저 `applied` 에 반영하고** URL 은 뒤에 맞춘다. `router.replace` 를 기다렸다가
+   * 조회하면 URL 왕복이 늦거나 실패했을 때 [검색] 이 아무 일도 안 한 것처럼 보인다.
+   * 🔴 조건이 지금과 같으면 `applied` 도 그대로여서 재조회 이펙트가 돌지 않는다. [검색] 은 언제나
+   * 다시 불러오는 동작이어야 하므로 그때는 `reloadToken` 으로 재조회를 건다(상세를 보고
+   * [← 목록] 으로 돌아오면 입력창에 직전 검색어가 채워져 있어, 그대로 [검색] 을 누르는 것이 흔한
+   * 동선이다).
    */
   const updateQuery = useCallback(
     (patch: Partial<ProductListQuery>) => {
@@ -103,14 +127,18 @@ export function ProductListContainer() {
       if (!('page' in patch)) next.page = 0;
       const qs = toSearchParams(next).toString();
       // 키 순서에 흔들리지 않게 양쪽 모두 정규화한 쿼리스트링으로 비교한다.
-      if (qs === toSearchParams(queryRef.current).toString()) {
-        setReloadToken((t) => t + 1);
-        return;
-      }
+      const unchanged = qs === toSearchParams(queryRef.current).toString();
+      queryRef.current = next;
+      setApplied(next);
+      if (unchanged) setReloadToken((t) => t + 1);
       router.replace(qs ? `?${qs}` : ROUTES.PRODUCTS_RETRIEVE, { scroll: false });
     },
     [router]
   );
+
+  // 상세에 실어 보낼 목록 조회 조건. 🔴 URL(`searchKey`) 이 아니라 `applied` 로 만든다 —
+  // URL 이 아직 따라오지 않았어도 [← 목록] 은 **화면에 보이는 목록**으로 돌아와야 한다.
+  const appliedQuery = useMemo(() => toSearchParams(applied).toString(), [applied]);
 
   useEffect(() => {
     let alive = true;
@@ -119,9 +147,9 @@ export function ProductListContainer() {
       setError(null);
       try {
         const response = await useCase.getProducts({
-          page,
+          page: applied.page,
           size: PAGE_SIZE,
-          search: search || undefined,
+          search: applied.search || undefined,
         });
         if (!alive) return;
         setProducts(response.content);
@@ -147,7 +175,9 @@ export function ProductListContainer() {
     return () => {
       alive = false;
     };
-  }, [useCase, router, page, search, reloadToken]);
+    // 🔴 `applied` 객체가 아니라 안의 값으로 건다 — URL 이 뒤늦게 같은 값으로 따라오며 객체만
+    // 새로 만들어질 때 한 번 더 조회하지 않기 위해서다.
+  }, [useCase, router, applied.page, applied.search, reloadToken]);
 
   // `term` 은 Enter 경로에서만 들어온다 — IME 조합 중 Enter 는 조합 확정 전이라 입력창의 값이
   // `searchTerm` state 보다 최신일 수 있다(`ProductSearchCard` 주석 참고). 버튼은 인자 없이 부른다.
@@ -222,10 +252,10 @@ export function ProductListContainer() {
       {extractNotice && <p className="pb-2 text-sm text-gray-600">{extractNotice}</p>}
       <ProductTable
         products={products}
-        listQuery={searchKey}
+        listQuery={appliedQuery}
         isLoading={isLoading}
         error={error}
-        currentPage={page}
+        currentPage={applied.page}
         pageSize={PAGE_SIZE}
         selectedIds={selectedIds}
         onToggle={handleToggle}
@@ -233,7 +263,7 @@ export function ProductListContainer() {
       />
       {totalPages > 1 && (
         <Pagination
-          currentPage={page}
+          currentPage={applied.page}
           totalPages={totalPages}
           onPageChange={handlePageChange}
         />

@@ -20,6 +20,12 @@ import { Button } from '@/presentation/components/ui/Button';
  * `key === 'Enter'` 만 검사하면 그 Enter 가 통째로 무시돼 **요청이 아예 나가지 않고 이전 검색
  * 결과가 그대로 남는다** — 검색어를 바꿔 Enter 를 친 사용자에게는 "검색이 작동하지 않는다"로
  * 보인다(2026-09-24 사용자 보고, 운영에서 재현). 물리 키(`code`)로도 Enter 를 판정한다.
+ *
+ * 🔴 **[검색] 버튼을 불러오는 중이라고 잠그지 말 것.** 목록을 불러오는 동안 버튼을 `disabled` 로
+ * 두면, 그 사이에 검색어를 바꿔 누른 [검색] 이 **아무 일도 없이 사라진다** — 입력창에는 새 검색어가
+ * 있는데 목록은 이전 결과라 사용자에게는 "다시 검색해도 재검색이 안 된다"로 보인다(2026-09-24
+ * 사용자 보고, 느린 서버에서 재현). 로딩은 버튼 글자("검색 중...")와 표로만 알린다. 누르는 동안
+ * 몇 번을 눌러도 마지막 요청만 화면에 반영되므로(컨테이너의 `alive` 가드) 잠글 이유가 없다.
  */
 interface ProductSearchCardProps {
   searchTerm: string;
@@ -83,8 +89,9 @@ export function ProductSearchCard({
               <p className="text-sm text-gray-600">{resultCount}개의 결과</p>
             )}
           </div>
-          {/* 🔴 `onClick={onSearch}` 로 넘기면 MouseEvent 가 `term` 자리로 들어간다 — 반드시 감싼다. */}
-          <Button onClick={() => onSearch()} disabled={isLoading}>
+          {/* 🔴 `onClick={onSearch}` 로 넘기면 MouseEvent 가 `term` 자리로 들어간다 — 반드시 감싼다.
+              🔴 `disabled={isLoading}` 를 붙이지 말 것 — 아래 주석 참고. */}
+          <Button onClick={() => onSearch()}>
             {isLoading ? '검색 중...' : '검색'}
           </Button>
         </div>
