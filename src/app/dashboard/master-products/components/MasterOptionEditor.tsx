@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
+import { QuantityStepper } from '@/presentation/components/QuantityStepper';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
@@ -901,13 +902,11 @@ export function MasterOptionEditor({
               <div key={c.productId} className="flex items-center gap-2">
                 <span className="flex-1 text-sm text-gray-700">{c.productName}</span>
                 {/* ⚠️ 84 lock 대상이 아니다 — 등록 시 잘못 넣은 수량을 고칠 유일한 경로다(이름·삭제만 잠금). */}
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  className="w-24 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                <QuantityStepper
+                  className="w-24"
+                  ariaLabel={`${c.productName} 수량`}
                   value={quantities[c.productId] ?? '1'}
-                  onChange={(e) => handleQuantityChange(c.productId, e.target.value)}
+                  onChange={(next) => handleQuantityChange(c.productId, next)}
                 />
               </div>
             ))}
