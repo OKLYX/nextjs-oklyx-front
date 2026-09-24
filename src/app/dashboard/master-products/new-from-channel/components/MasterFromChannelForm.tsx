@@ -8,6 +8,7 @@ import { Button } from '@/presentation/components/ui/Button';
 import { Input } from '@/presentation/components/ui/Input';
 import { Spinner } from '@/presentation/components/Spinner';
 import { CategoryTreeColumns } from '@/presentation/components/CategoryTreeColumns';
+import { QuantityStepper } from '@/presentation/components/QuantityStepper';
 import { ROUTES } from '@/config/routes';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { getImageUrl } from '@/infrastructure/utils/imageUrl';
@@ -828,14 +829,12 @@ export function MasterFromChannelForm() {
                           </td>
                           {selectedProducts.map((p) => (
                             <td key={p.id} className="px-2 py-1.5 text-right">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                aria-label={`${o.itemName} · ${p.productName} 수량`}
+                              <QuantityStepper
+                                className="w-24"
+                                ariaLabel={`${o.itemName} · ${p.productName} 수량`}
                                 disabled={busy}
-                                className="w-20 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100"
                                 value={row[p.id] ?? ''}
-                                onChange={(e) => setQuantity(key, p.id, e.target.value)}
+                                onChange={(next) => setQuantity(key, p.id, next)}
                               />
                             </td>
                           ))}

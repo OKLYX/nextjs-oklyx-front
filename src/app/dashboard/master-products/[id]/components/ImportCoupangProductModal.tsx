@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
+import { QuantityStepper } from '@/presentation/components/QuantityStepper';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
@@ -282,15 +283,14 @@ export function ImportCoupangProductModal({
                             {c.brand ? `${c.brand} ` : ''}
                             {c.productName}
                           </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
+                          <QuantityStepper
+                            className="w-24 shrink-0"
                             disabled={busy}
-                            className="w-20 shrink-0 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100"
+                            ariaLabel={`${c.productName} 수량`}
                             value={value}
-                            onChange={(e) =>
+                            onChange={(next) =>
                               patchRow(key, {
-                                quantities: { ...row.quantities, [c.productId]: e.target.value },
+                                quantities: { ...row.quantities, [c.productId]: next },
                               })
                             }
                           />
