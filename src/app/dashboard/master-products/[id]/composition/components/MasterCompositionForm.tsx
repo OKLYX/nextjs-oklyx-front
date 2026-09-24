@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
+import { QuantityStepper } from '@/presentation/components/QuantityStepper';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { getImageUrl } from '@/infrastructure/utils/imageUrl';
@@ -410,12 +411,11 @@ export function MasterCompositionForm({
                       {selectedIds.map((pid) => (
                         <td key={pid} className="px-2 py-1.5">
                           {/* 잠긴 옵션도 수량은 편집 가능하다 — 수량은 우리 원장이지 마켓 소유가 아니다. */}
-                          <input
-                            type="number"
-                            min={1}
-                            className="w-20 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                          <QuantityStepper
+                            className="w-24"
+                            ariaLabel={`${d.name || '옵션'} · ${nameOf(pid)} 수량`}
                             value={d.qty[pid] ?? ''}
-                            onChange={(e) => setDraftQty(d.key, pid, e.target.value)}
+                            onChange={(next) => setDraftQty(d.key, pid, next)}
                           />
                         </td>
                       ))}
