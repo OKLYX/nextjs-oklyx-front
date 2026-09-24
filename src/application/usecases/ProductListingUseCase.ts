@@ -9,8 +9,14 @@ export class ProductListingUseCase {
     return this.repository.getProductListingById(id);
   }
 
-  async getByPlatform(platform: string, page: number, size: number, masterLinked?: boolean) {
-    return this.repository.getProductListingsByPlatform(platform, page, size, masterLinked);
+  async getByPlatform(
+    platform: string,
+    page: number,
+    size: number,
+    masterLinked?: boolean,
+    search?: string,
+  ) {
+    return this.repository.getProductListingsByPlatform(platform, page, size, masterLinked, search);
   }
 
   async update(id: number, request: UpdateProductListingRequest): Promise<ProductListing> {
