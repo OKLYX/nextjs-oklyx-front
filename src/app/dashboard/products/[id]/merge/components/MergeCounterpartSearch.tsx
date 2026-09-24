@@ -8,6 +8,7 @@ import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
 import { Input } from '@/presentation/components/ui/Input';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 
 /**
  * 병합할 **상대 물품** 고르기 (FEATURE_2609_69 / B).
@@ -15,6 +16,10 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
  * 중복의 근거가 바코드라 바코드가 첫 번째 길이다. 숫자 8자리 이상이면 바코드로 보고
  * 정확히 일치하는 물품을 찾고, 그 밖의 입력은 상품명·브랜드·설명 검색으로 돌린다
  * (⚠️ 서버 검색은 바코드를 보지 않는다 — `FindProductByBarcodeUseCase` 주석 참고).
+ *
+ * 🔴 결과 줄에는 **대표 사진**을 같이 보여준다 — 이름·바코드만으로는 같은 물건인지 가리기 어렵고,
+ *    사진이 중복 판단의 가장 빠른 근거다(2026-09-24). 사진 주소는 목록 화면과 같은
+ *    `getProductThumbUrl` 로 푼다(S3 는 직접, 로컬은 인증 프록시).
  */
 const KEYWORD_PAGE_SIZE = 20;
 
@@ -103,13 +108,16 @@ export function MergeCounterpartSearch({
         <ul className="mt-4 divide-y divide-gray-100 border-t border-gray-100">
           {results.map((product) => (
             <li key={product.id} className="flex items-center justify-between gap-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-gray-900">
-                  #{product.id} {product.productName}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {product.brand || '브랜드 없음'} · 바코드 {product.barcodeId || '없음'}
-                </p>
+              <div className="flex min-w-0 items-center gap-3">
+                <ResultThumbnail product={product} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">
+                    #{product.id} {product.productName}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {product.brand || '브랜드 없음'} · 바코드 {product.barcodeId || '없음'}
+                  </p>
+                </div>
               </div>
               <Button size="sm" variant="secondary" onClick={() => onSelect(product)} disabled={disabled}>
                 이 물품과 병합
@@ -119,5 +127,25 @@ export function MergeCounterpartSearch({
         </ul>
       )}
     </Card>
+  );
+}
+
+/** 결과 줄의 대표 사진. 사진이 없는 물품도 줄 높이가 흔들리지 않게 같은 크기의 빈 칸을 둔다. */
+function ResultThumbnail({ product }: { product: Product }) {
+  const src = getProductThumbUrl(product.imageUrl, product.id);
+  if (!src) {
+    return (
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-gray-200 bg-gray-50 text-xs text-gray-300">
+        없음
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={product.productName}
+      className="h-12 w-12 shrink-0 rounded border border-gray-200 bg-gray-50 object-cover"
+    />
   );
 }

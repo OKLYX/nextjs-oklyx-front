@@ -17,6 +17,7 @@ import { ProductUsageRepositoryImpl } from '@/infrastructure/repositories/Produc
 import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/ProductImageRepositoryImpl';
 import { ProductMergeRepositoryImpl } from '@/infrastructure/repositories/ProductMergeRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 import { ROUTES } from '@/config/routes';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Button } from '@/presentation/components/ui/Button';
@@ -52,6 +53,9 @@ import {
  * - 연결 현황은 **02 의 `ProductUsageSection` 을 `compact` 로 재사용**한다. 다시 만들지 않는다.
  * - 🔴 **연결은 옮겨지지 않는다.** 버릴 쪽에 연결이 하나라도 있으면 [병합하기]를 막는다
  *   (서버도 409 로 거절한다 — 화면이 먼저 알려줄 뿐이다).
+ * - 🔴 연결 현황 카드의 **[연결 새로고침]** 은 다른 탭에서 마스터·셀의 연결을 끊고 돌아온 사용자를 위한
+ *   것이다(2026-09-24). 화면을 떠났다 오지 않아도 여기서 다시 조회해 막힌 [병합하기]가 풀린다.
+ *   양쪽을 함께 다시 부른다 — 남길 쪽의 연결 수도 같이 변했을 수 있다.
  */
 const ALL_TRANSFERRED: MergeTransferOptions = {
   purchaseRecords: true,
@@ -95,6 +99,10 @@ export function ProductMergeContainer({ id }: { id: number }) {
   const [choices, setChoices] = useState<Record<MergeFieldKey, MergeSide> | null>(null);
   const [transfer, setTransfer] = useState<MergeTransferOptions>(ALL_TRANSFERRED);
   const [representativeImageId, setRepresentativeImageId] = useState<number | null>(null);
+
+  const [isRefreshingUsage, setIsRefreshingUsage] = useState(false);
+  const [usageRefreshError, setUsageRefreshError] = useState<string | null>(null);
+  const [usageRefreshNotice, setUsageRefreshNotice] = useState<string | null>(null);
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
@@ -148,6 +156,8 @@ export function ProductMergeContainer({ id }: { id: number }) {
       setBarcodeConflict(null);
       setLinkConflict(null);
       setMergeError(null);
+      setUsageRefreshNotice(null);
+      setUsageRefreshError(null);
     },
     []
   );
@@ -202,7 +212,50 @@ export function ProductMergeContainer({ id }: { id: number }) {
     setBarcodeConflict(null);
     setLinkConflict(null);
     setMergeError(null);
+    setUsageRefreshNotice(null);
+    setUsageRefreshError(null);
   }, []);
+
+  /**
+   * 연결 현황만 다시 불러온다 — 다른 탭에서 마스터·셀의 연결을 끊고 돌아온 경우.
+   *
+   * 🔴 상세·사진은 그대로 두고 `usage` 만 갈아끼운다. 여기서 화면을 통째로 다시 그리면
+   *    고른 항목 값·남길 쪽 선택이 초기화돼 사용자가 하던 일을 잃는다.
+   * 🔴 양쪽을 함께 부른다 — 남길 쪽의 연결 수도 그 사이 달라졌을 수 있다.
+   */
+  const handleRefreshUsage = useCallback(async () => {
+    if (!left) return;
+    setIsRefreshingUsage(true);
+    setUsageRefreshError(null);
+    setUsageRefreshNotice(null);
+    try {
+      const rightId = right?.product.id ?? null;
+      const [leftUsage, rightUsage] = await Promise.all([
+        usageUseCase.execute(left.product.id),
+        rightId === null
+          ? Promise.resolve<ProductUsage | null>(null)
+          : usageUseCase.execute(rightId),
+      ]);
+      setLeft((prev) => (prev ? { ...prev, usage: leftUsage } : prev));
+      if (rightUsage) setRight((prev) => (prev ? { ...prev, usage: rightUsage } : prev));
+
+      // 서버가 막던 사유가 사라졌으면 그 문구도 같이 거둔다 — 낡은 빨간 문구가 남으면 여전히 막힌 줄 안다.
+      setLinkConflict(null);
+      const discardUsage = keepSide === 'left' ? rightUsage : leftUsage;
+      if (discardUsage) {
+        const remaining = linkCount(discardUsage);
+        setUsageRefreshNotice(
+          remaining === 0
+            ? '버릴 물품에 남은 연결이 없습니다 — 이제 병합할 수 있습니다.'
+            : `버릴 물품에 연결이 아직 ${remaining}건 남아 있습니다.`
+        );
+      }
+    } catch (err) {
+      setUsageRefreshError(extractErrorMessage(err, '연결 현황을 다시 불러오지 못했습니다.'));
+    } finally {
+      setIsRefreshingUsage(false);
+    }
+  }, [left, right, keepSide, usageUseCase]);
 
   const handleFieldChoice = useCallback((key: MergeFieldKey, side: MergeSide) => {
     setChoices((prev) => (prev ? { ...prev, [key]: side } : prev));
@@ -392,13 +445,36 @@ export function ProductMergeContainer({ id }: { id: number }) {
           />
 
           {/* 연결 현황 — 02 의 컴포넌트를 좌우에 하나씩. 🔴 연결은 옮겨지지 않는다 */}
-          <Card title="연결 현황">
+          <Card
+            title="연결 현황"
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void handleRefreshUsage()}
+                isLoading={isRefreshingUsage}
+                loadingText="불러오는 중…"
+                disabled={isMerging}
+              >
+                연결 새로고침
+              </Button>
+            }
+          >
             <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <p>연결(마스터 구성품 · 판매 옵션 구성품)은 옮겨지지 않습니다.</p>
               <p>버릴 물품에 연결이 남아 있으면 삭제할 수 없습니다 — 마스터와 셀에서 먼저 빼주세요.</p>
+              <p>다른 탭에서 연결을 끊었다면 [연결 새로고침]으로 다시 불러오세요.</p>
             </div>
             {linkConflict && (
               <p className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{linkConflict}</p>
+            )}
+            {usageRefreshError && (
+              <p className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                {usageRefreshError}
+              </p>
+            )}
+            {usageRefreshNotice && (
+              <p className="mt-3 text-sm text-gray-600">{usageRefreshNotice}</p>
             )}
             <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="space-y-2">
@@ -409,7 +485,7 @@ export function ProductMergeContainer({ id }: { id: number }) {
                   usage={keepData.usage}
                   isLoading={false}
                   error={null}
-                  onRetry={loadLeft}
+                  onRetry={() => void handleRefreshUsage()}
                   compact
                 />
               </div>
@@ -421,7 +497,7 @@ export function ProductMergeContainer({ id }: { id: number }) {
                   usage={discardData.usage}
                   isLoading={false}
                   error={null}
-                  onRetry={loadLeft}
+                  onRetry={() => void handleRefreshUsage()}
                   compact
                 />
               </div>
@@ -527,16 +603,42 @@ function SideCard({
           </Button>
         )}
       </div>
-      <p className="mt-3 text-lg font-semibold text-gray-900">
-        #{data.product.id} {data.product.productName}
-      </p>
-      <p className="mt-1 text-sm text-gray-600">
-        {data.product.brand || '브랜드 없음'} · 바코드 {data.product.barcodeId || '없음'}
-      </p>
-      <p className="mt-1 text-sm text-gray-600">
-        연결 {linkCount(data.usage)} · 기록 {historyCount(data.usage)}건 · 사진 {data.images.length}장
-      </p>
+      <div className="mt-3 flex items-start gap-3">
+        <SideThumbnail product={data.product} />
+        <div className="min-w-0">
+          <p className="text-lg font-semibold text-gray-900">
+            #{data.product.id} {data.product.productName}
+          </p>
+          <p className="mt-1 text-sm text-gray-600">
+            {data.product.brand || '브랜드 없음'} · 바코드 {data.product.barcodeId || '없음'}
+          </p>
+          <p className="mt-1 text-sm text-gray-600">
+            연결 {linkCount(data.usage)} · 기록 {historyCount(data.usage)}건 · 사진{' '}
+            {data.images.length}장
+          </p>
+        </div>
+      </div>
     </Card>
+  );
+}
+
+/** 좌우 칸의 대표 사진 — 이름이 비슷한 두 물품을 눈으로 가르는 가장 빠른 단서다. */
+function SideThumbnail({ product }: { product: Product }) {
+  const src = getProductThumbUrl(product.imageUrl, product.id);
+  if (!src) {
+    return (
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded border border-gray-200 bg-gray-50 text-xs text-gray-300">
+        없음
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={product.productName}
+      className="h-16 w-16 shrink-0 rounded border border-gray-200 bg-gray-50 object-cover"
+    />
   );
 }
 
