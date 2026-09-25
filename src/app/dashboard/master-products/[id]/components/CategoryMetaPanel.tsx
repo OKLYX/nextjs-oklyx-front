@@ -60,7 +60,9 @@ export function CategoryMetaPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
-  const [onlyRequired, setOnlyRequired] = useState(false); // display filter: show only required fields
+  // Display filter, checked by default: 필수 항목만 보기. Mirrors the option-level editor
+  // (CategoryMetaOverrideFields), which also starts required-only and opts into optional fields.
+  const [onlyRequired, setOnlyRequired] = useState(true);
   // 상품정보제공고시 = 품목군 셀렉션(하나 선택). null = 실효 그룹(값 있는 그룹 → 첫 그룹) 사용.
   const [noticeGroup, setNoticeGroup] = useState<string | null>(null);
 
