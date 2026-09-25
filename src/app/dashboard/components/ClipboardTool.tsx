@@ -4,6 +4,7 @@ import { useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useClipboardStore } from '@/infrastructure/stores/clipboardStore';
 import { CLIP_MIME, hasClipPayload, type ClipItem } from '@/domain/entities/ClipItem';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
+import { setSmallDragImage } from '@/infrastructure/utils/dragGhost';
 import { NavBadge } from './NavBadge';
 
 /**
@@ -136,6 +137,8 @@ export function ClipboardTool() {
   const startDragItem = (e: React.DragEvent, item: ClipItem) => {
     e.dataTransfer.setData(CLIP_MIME, JSON.stringify(item));
     e.dataTransfer.effectAllowed = 'copy';
+    // 붙이는 쪽(물품 갤러리)도 같은 규칙 — 행 전체 대신 작은 조각이 따라다닌다.
+    setSmallDragImage(e);
   };
 
   return (

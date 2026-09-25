@@ -9,6 +9,7 @@ import type { ProductImageUseCase } from '@/application/usecases/ProductImageUse
 import { Card } from '@/presentation/components/ui/Card';
 import { CLIP_MIME, clipSourceImageIds, hasClipPayload, type ClipItem } from '@/domain/entities/ClipItem';
 import { newClipId } from '@/infrastructure/stores/clipboardStore';
+import { setSmallDragImage } from '@/infrastructure/utils/dragGhost';
 import { ImageLightbox } from '@/presentation/components/ImageLightbox';
 
 /**
@@ -408,6 +409,8 @@ export function ProductImageGallery({
     };
     e.dataTransfer.setData(CLIP_MIME, JSON.stringify(clip));
     e.dataTransfer.effectAllowed = 'copy';
+    // 카드를 그대로 찍으면 큰 사진이 화면을 덮어 툴바의 클립보드가 가린다 → 작은 조각만 따라다닌다.
+    setSmallDragImage(e);
   };
 
   // 드롭 여부와 무관하게 드래그가 끝나면 자기 드롭존을 다시 연다(drop → dragend 순서).
