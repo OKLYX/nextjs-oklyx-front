@@ -147,14 +147,14 @@ export default function DashboardLayout({
       {/* Right column: top bar over the content area, then the page content
           below. Desktop padding tracks the rail — pl-16 collapsed, pl-56 when
           pinned (push). Mobile has no rail, so pl-0 (drawer overlays).
-          오른쪽은 도구 툴바(w-12 = 3rem)가 늘 자리를 차지하고(pr-12), 패널은 lg 이상일 때만
-          본문을 민다(lg:pr-[31rem] = 패널 28rem + 툴바 3rem). 🔴 패딩을 `main` 이 아니라 이 div 에
+          오른쪽은 도구 툴바(w-16 = 4rem, **접힌 왼쪽 레일과 같은 폭**)가 늘 자리를 차지하고(pr-16),
+          패널은 lg 이상일 때만 본문을 민다(lg:pr-[32rem] = 패널 28rem + 툴바 4rem). 🔴 패딩을 `main` 이 아니라 이 div 에
           거는 이유: main 에만 걸면 위의 상단바 행이 패딩을 못 받아 [Logout]·테마 스위치가 레일
           밑에 깔려 눌리지 않는다. */}
       <div
-        className={`flex flex-1 flex-col min-w-0 transition-[padding] duration-200 pr-12 ${
+        className={`flex flex-1 flex-col min-w-0 transition-[padding] duration-200 pr-16 ${
           isMobile ? 'pl-0' : isSidebarOpen ? 'pl-56' : 'pl-16'
-        } ${openTool ? 'lg:pr-[31rem]' : ''}`}
+        } ${openTool ? 'lg:pr-[32rem]' : ''}`}
       >
         <div className="flex items-stretch bg-white">
           {/* Sidebar toggle — the only one. Lives at the top bar's far left on
