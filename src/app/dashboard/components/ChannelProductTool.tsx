@@ -17,6 +17,7 @@ import type {
 import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 import { CLIP_MIME } from '@/domain/entities/ClipItem';
 import { newClipId } from '@/infrastructure/stores/clipboardStore';
+import { setSmallDragImage } from '@/infrastructure/utils/dragGhost';
 import { MarketImagePreviewModal } from './MarketImagePreviewModal';
 
 /**
@@ -229,6 +230,8 @@ export function ChannelProductTool() {
       };
       e.dataTransfer.setData(CLIP_MIME, JSON.stringify(clip));
       e.dataTransfer.effectAllowed = 'copy';
+      // 확대 창의 사진은 화면 높이만 하다 → 기본 미리보기 대신 작은 조각만 따라다니게 한다.
+      setSmallDragImage(e);
     },
     [],
   );
