@@ -186,7 +186,13 @@ export default function DashboardLayout({
             <TopBar />
           </div>
         </div>
-        <main className="flex-1 p-4 md:p-6 min-w-0 overflow-x-auto">{children}</main>
+        {/* 🔴 overflow-x-clip 이다(auto 아님, 2609_73). `auto` 면 세로축까지 스크롤 영역으로
+            계산돼(CSS: 한 축이 visible 이 아니면 다른 축의 visible 은 auto 로 계산) 이 안의 sticky
+            가 전부 죽는다 — 이 영역은 높이 제한이 없어 실제로는 스크롤하지 않으므로 붙을 기준이
+            없다(2026-09-25 실측). 가로로 넓은 목록 표는 자기 스크롤을 이미 갖고 있다
+            (globals.css `.list-table-scroll`). overflow-x 를 **없애지도 말 것** — 넓은 내용이
+            오른쪽 툴바 위로 겹치고 페이지 전체에 가로 스크롤바가 생긴다. */}
+        <main className="flex-1 p-4 md:p-6 min-w-0 overflow-x-clip">{children}</main>
       </div>
 
       {/* 전역 도구(FEATURE_2609_68). 🔴 도구는 화면에 속하지 않는다 — 레이아웃이 직접 그린다.
