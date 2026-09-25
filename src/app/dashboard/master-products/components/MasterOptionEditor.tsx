@@ -345,6 +345,10 @@ export function MasterOptionEditor({
   const masterRef = useRef(master);
   const focusTargetRef = useRef(focusOption);
   const openEditServerRef = useRef<(opt: MasterOptionResponse) => void>(() => {});
+  // 2609_73: 「옵션별 설정」 <details> 엘리먼트. 저장이 필수 게이트에 막혔을 때 **그 순간 한 번**
+  // 펼쳐 주기 위한 것이다. 🔴 useState 로 open 을 제어형으로 만들지 말 것 — 사용자가 손으로
+  // 여닫는 상태와 다투게 된다.
+  const optionMetaRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     masterRef.current = master;
     focusTargetRef.current = focusOption;
@@ -639,6 +643,8 @@ export function MasterOptionEditor({
       })
     ) {
       setFormError('이 옵션의 필수 항목(카테고리가 요구하는 속성·고시)을 입력하세요.');
+      // 2609_73: 「옵션별 설정」이 기본 접힘이라, 막힌 채로 두면 어디를 고쳐야 하는지 보이지 않는다.
+      if (optionMetaRef.current) optionMetaRef.current.open = true;
       return;
     }
 
@@ -783,249 +789,285 @@ export function MasterOptionEditor({
       ? '구성상품을 먼저 선택하면 옵션을 추가할 수 있습니다.'
       : '카테고리를 먼저 선택하면 옵션을 추가할 수 있습니다.';
 
+  // 2609_73: 「옵션별 설정」이 접혀 있을 때 <summary> 에 붙이는 미입력 경고의 판정.
+  // 🔴 저장 게이트(handleSubmit)와 **같은 함수**를 쓴다. 개수를 세는 두 번째 구현을 만들지 말 것 —
+  // 쌍 속성·고시 품목군·마스터 상속 폴백이 그 함수 안에 있어 어긋나면 "미입력 0인데 저장이 막히는"
+  // 상태가 된다. ⚠️ 저장 핸들러의 호출과 중복 계산이지만 그대로 둔다(값의 출처가 하나인 것이 중요
+  // 하고, 저장 핸들러의 호출을 이 변수로 갈아끼우면 `!attrLoading` 타이밍이 렌더 시점과 저장 시점
+  // 에서 달라질 수 있다).
+  const optionMetaMissing =
+    categoryId != null &&
+    !attrLoading &&
+    computeMissingOptionRequired(attributes, optAttrValues, hideCategoryAttrs, {
+      notices,
+      optNoticeValues,
+      masterNoticeValues,
+      noticeGroup: masterNoticeGroup,
+    });
+
+  /* 2609_73: 목록(왼쪽) ↔ 편집 폼(오른쪽) 2열. 폼이 목록을 아래로 밀지 않아 [수정] 을 눌러도
+     스크롤 위치를 잃지 않고, 세로 길이가 대략 절반이 된다. 선례 = MasterImagePool 의 2열 + 내부 스크롤.
+     🔴 폼이 닫혀 있으면 2열을 만들지 않는다 — 빈 칸이 절반을 먹으면 오히려 낭비다.
+     🔴 목록 내부 스크롤은 `<ul>` 에만 건다 — 칼럼 div 에 걸면 안내·에러까지 한 상자에 갇혀
+     스크롤 밖으로 사라진다.
+     ⚠️ `min-w-0` 을 두 칼럼에 준다 — 없으면 폼 안의 긴 <select>(택배비·상자비 라벨)가 칼럼을 밀어
+     격자가 넘친다. ⚠️ md 미만에서는 grid-cols-1 이라 지금처럼 위아래로 쌓인다. */
   return (
-    <div>
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">옵션</h3>
-        <button
-          type="button"
-          onClick={openAdd}
-          disabled={!canAddOption}
-          title={canAddOption ? undefined : addBlockedReason}
-          className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          옵션 추가
-        </button>
+    <div className={showForm ? 'grid grid-cols-1 gap-4 md:grid-cols-2' : ''}>
+      <div className="min-w-0">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">옵션</h3>
+          <button
+            type="button"
+            onClick={openAdd}
+            disabled={!canAddOption}
+            title={canAddOption ? undefined : addBlockedReason}
+            className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            옵션 추가
+          </button>
+        </div>
+
+        {!canAddOption && <p className="mb-3 text-[11px] text-amber-700">{addBlockedReason}</p>}
+
+        {listError && (
+          <p className="mb-2 rounded bg-red-50 px-3 py-1.5 text-sm text-red-700">{listError}</p>
+        )}
+
+        {clampNotice && (
+          <p className="mb-2 rounded bg-green-50 px-3 py-1.5 text-sm text-green-700">{clampNotice}</p>
+        )}
+
+        {rows.length === 0 ? (
+          <p className="mb-3 text-sm text-gray-500">등록된 옵션이 없습니다.</p>
+        ) : (
+          <ul className="mb-1 max-h-96 space-y-2 overflow-y-auto pr-1">
+            {rows.map((row) => (
+              <li
+                key={row.key}
+                id={row.optionId != null ? `master-option-${row.optionId}` : undefined}
+                className={`flex items-center justify-between rounded border px-3 py-2 text-sm text-gray-900 ${
+                  row.optionId != null && highlight?.optionId === row.optionId
+                    ? highlight.fading
+                      ? 'border-gray-200 bg-transparent transition-colors duration-[2000ms]'
+                      : 'border-amber-400 bg-amber-100'
+                    : 'border-gray-200'
+                }`}
+              >
+                <span>
+                  <span className="font-medium">{row.name}</span>{' '}
+                  {row.locked && (
+                    <span className="mr-1" title={LOCKED_ROW_TITLE}>
+                      🔒
+                    </span>
+                  )}
+                  <span className="text-gray-500">({row.summary})</span>
+                </span>
+                <span className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={row.onEdit}
+                    disabled={row.busy}
+                    className="rounded border border-blue-300 px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    onClick={row.onDelete}
+                    disabled={row.busy || row.deleteBlockedReason != null}
+                    title={row.deleteBlockedReason}
+                    className="rounded border border-red-300 px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:hover:bg-gray-100"
+                  >
+                    삭제
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {listBlockedReason && <p className="mb-3 text-[11px] text-amber-700">{listBlockedReason}</p>}
       </div>
 
-      {!canAddOption && <p className="mb-3 text-[11px] text-amber-700">{addBlockedReason}</p>}
-
-      {listError && (
-        <p className="mb-2 rounded bg-red-50 px-3 py-1.5 text-sm text-red-700">{listError}</p>
-      )}
-
-      {clampNotice && (
-        <p className="mb-2 rounded bg-green-50 px-3 py-1.5 text-sm text-green-700">{clampNotice}</p>
-      )}
-
-      {rows.length === 0 ? (
-        <p className="mb-3 text-sm text-gray-500">등록된 옵션이 없습니다.</p>
-      ) : (
-        <ul className="mb-1 space-y-2">
-          {rows.map((row) => (
-            <li
-              key={row.key}
-              id={row.optionId != null ? `master-option-${row.optionId}` : undefined}
-              className={`flex items-center justify-between rounded border px-3 py-2 text-sm text-gray-900 ${
-                row.optionId != null && highlight?.optionId === row.optionId
-                  ? highlight.fading
-                    ? 'border-gray-200 bg-transparent transition-colors duration-[2000ms]'
-                    : 'border-amber-400 bg-amber-100'
-                  : 'border-gray-200'
-              }`}
-            >
-              <span>
-                <span className="font-medium">{row.name}</span>{' '}
-                {row.locked && (
-                  <span className="mr-1" title={LOCKED_ROW_TITLE}>
-                    🔒
-                  </span>
-                )}
-                <span className="text-gray-500">({row.summary})</span>
-              </span>
-              <span className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={row.onEdit}
-                  disabled={row.busy}
-                  className="rounded border border-blue-300 px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
-                >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  onClick={row.onDelete}
-                  disabled={row.busy || row.deleteBlockedReason != null}
-                  title={row.deleteBlockedReason}
-                  className="rounded border border-red-300 px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:hover:bg-gray-100"
-                >
-                  삭제
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {listBlockedReason && <p className="mb-3 text-[11px] text-amber-700">{listBlockedReason}</p>}
-
       {showForm && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <h4 className="mb-2 text-xs font-semibold text-gray-900">
-            {editingKey == null ? '옵션 추가' : '옵션 수정'}
-            {lockedEditing && (
-              <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
-                🔒 쿠팡 판매 중
-              </span>
+        <div className="min-w-0">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <h4 className="mb-2 text-xs font-semibold text-gray-900">
+              {editingKey == null ? '옵션 추가' : '옵션 수정'}
+              {lockedEditing && (
+                <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
+                  🔒 쿠팡 판매 중
+                </span>
+              )}
+            </h4>
+            {formError && (
+              <p className="mb-2 rounded bg-red-50 px-3 py-1.5 text-sm text-red-700">{formError}</p>
             )}
-          </h4>
-          {formError && (
-            <p className="mb-2 rounded bg-red-50 px-3 py-1.5 text-sm text-red-700">{formError}</p>
-          )}
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-gray-600">옵션 이름 *</label>
-            <input
-              className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-              value={optName}
-              onChange={(e) => setOptName(e.target.value)}
-              disabled={lockedEditing}
-            />
-          </div>
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-gray-600">재고수량</label>
-            {/* ⚠️ 84 lock 대상이 아니다 — 판매 중 옵션도 재고는 고칠 수 있어야 한다. */}
-            <input
-              type="number"
-              min={0}
-              max={99999}
-              step={1}
-              className="w-32 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
-              value={optStock}
-              onChange={(e) => setOptStock(e.target.value === '' ? '' : Number(e.target.value))}
-            />
-            <p className="mt-1 text-[11px] text-gray-500">
-              비우면 9999개, 0은 품절로 전송됩니다. 채널에서 더 낮게 조정할 수 있습니다.
-            </p>
-          </div>
-          <div className="space-y-2">
-            {components.map((c) => (
-              <div key={c.productId} className="flex items-center gap-2">
-                <span className="flex-1 text-sm text-gray-700">{c.productName}</span>
-                {/* ⚠️ 84 lock 대상이 아니다 — 등록 시 잘못 넣은 수량을 고칠 유일한 경로다(이름·삭제만 잠금). */}
-                <QuantityStepper
-                  className="w-24"
-                  ariaLabel={`${c.productName} 수량`}
-                  value={quantities[c.productId] ?? '1'}
-                  onChange={(next) => handleQuantityChange(c.productId, next)}
-                />
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-medium text-gray-600">옵션 이름 *</label>
+              <input
+                className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+                value={optName}
+                onChange={(e) => setOptName(e.target.value)}
+                disabled={lockedEditing}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-medium text-gray-600">재고수량</label>
+              {/* ⚠️ 84 lock 대상이 아니다 — 판매 중 옵션도 재고는 고칠 수 있어야 한다. */}
+              <input
+                type="number"
+                min={0}
+                max={99999}
+                step={1}
+                className="w-32 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                value={optStock}
+                onChange={(e) => setOptStock(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+              <p className="mt-1 text-[11px] text-gray-500">
+                비우면 9999개, 0은 품절로 전송됩니다. 채널에서 더 낮게 조정할 수 있습니다.
+              </p>
+            </div>
+            <div className="space-y-2">
+              {components.map((c) => (
+                <div key={c.productId} className="flex items-center gap-2">
+                  <span className="flex-1 text-sm text-gray-700">{c.productName}</span>
+                  {/* ⚠️ 84 lock 대상이 아니다 — 등록 시 잘못 넣은 수량을 고칠 유일한 경로다(이름·삭제만 잠금). */}
+                  <QuantityStepper
+                    className="w-24"
+                    ariaLabel={`${c.productName} 수량`}
+                    value={quantities[c.productId] ?? '1'}
+                    onChange={(next) => handleQuantityChange(c.productId, next)}
+                  />
+                </div>
+              ))}
+            </div>
+            {lockedEditing && (
+              <p className="mt-2 text-[11px] text-amber-700">
+                쿠팡에 등록된 옵션이라 이름은 바꿀 수 없습니다(다른 조합이 필요하면 옵션을 새로 추가하세요).
+                구성 수량은 고칠 수 있지만, 고치면 쿠팡에 표시된 수량·고시 문구와 달라져 이 채널에 [수정
+                요청]이 필요합니다.
+              </p>
+            )}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">택배비</label>
+                <select
+                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                  value={optDeliveryId}
+                  onChange={(e) => setOptDeliveryId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  <option value="">마스터 기본값 사용</option>
+                  {carrierRates.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.carrier} {r.type} · {formatWon(r.cost)}
+                      {r.id === masterDefaults.deliveryId ? ' (마스터 기본값)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
-            ))}
-          </div>
-          {lockedEditing && (
-            <p className="mt-2 text-[11px] text-amber-700">
-              쿠팡에 등록된 옵션이라 이름은 바꿀 수 없습니다(다른 조합이 필요하면 옵션을 새로 추가하세요).
-              구성 수량은 고칠 수 있지만, 고치면 쿠팡에 표시된 수량·고시 문구와 달라져 이 채널에 [수정
-              요청]이 필요합니다.
-            </p>
-          )}
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">택배비</label>
-              <select
-                className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
-                value={optDeliveryId}
-                onChange={(e) => setOptDeliveryId(e.target.value ? Number(e.target.value) : '')}
-              >
-                <option value="">마스터 기본값 사용</option>
-                {carrierRates.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.carrier} {r.type} · {formatWon(r.cost)}
-                    {r.id === masterDefaults.deliveryId ? ' (마스터 기본값)' : ''}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">상자비</label>
+                <select
+                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                  value={optPackageId}
+                  onChange={(e) => setOptPackageId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  <option value="">마스터 기본값 사용</option>
+                  {packages.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.type} · {formatWon(p.cost)}
+                      {p.id === masterDefaults.packageId ? ' (마스터 기본값)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="col-span-2 text-[11px] text-gray-500">
+                비우거나 마스터 기본값과 같으면 마스터 기본 택배/박스를 그대로 사용합니다.
+              </p>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">상자비</label>
-              <select
-                className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
-                value={optPackageId}
-                onChange={(e) => setOptPackageId(e.target.value ? Number(e.target.value) : '')}
-              >
-                <option value="">마스터 기본값 사용</option>
-                {packages.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.type} · {formatWon(p.cost)}
-                    {p.id === masterDefaults.packageId ? ' (마스터 기본값)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="col-span-2 text-[11px] text-gray-500">
-              비우거나 마스터 기본값과 같으면 마스터 기본 택배/박스를 그대로 사용합니다.
-            </p>
-          </div>
 
-          {categoryId != null && (
-            <details open className="mt-3 rounded border border-gray-200 bg-white p-3">
-              <summary className="cursor-pointer text-xs font-semibold text-gray-700">
-                옵션별 설정 — 개당 용량/중량·수량
-              </summary>
-              <div className="mt-3">
-                {attrLoading ? (
-                  <div className="flex min-h-16 items-center justify-center">
-                    <Spinner size={20} label="불러오는 중..." />
-                  </div>
-                ) : (
-                  <>
-                    {attrLoadError && (
-                      <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
-                        {attrLoadError}
-                      </p>
-                    )}
-                    {attributes.length > 0 || notices.length > 0 ? (
-                      <>
-                        <p className="mb-3 text-[11px] text-gray-500">
-                          개당 용량/중량·수량은 옵션마다 다르므로 마스터가 아닌 이 옵션에서 입력합니다.
-                          <span className="text-red-600"> *</span> 표시는 카테고리(쿠팡 메타)가 요구하는
-                          필수 항목입니다.
+            {/* 2609_73: 기본 접힘(개당 용량/중량은 매번 고치는 값이 아니다). 필수 미입력은 summary
+                에 표시하고, 저장이 게이트에 막히면 그때 열어 준다 — 판정은 저장 게이트와 같은
+                computeMissingOptionRequired. 🔴 손으로 짠 접기로 바꾸지 말 것. */}
+            {categoryId != null && (
+              <details
+                ref={optionMetaRef}
+                className="mt-3 rounded border border-gray-200 bg-white p-3"
+              >
+                <summary className="cursor-pointer text-xs font-semibold text-gray-700">
+                  옵션별 설정 — 개당 용량/중량·수량
+                  {optionMetaMissing && (
+                    <span className="ml-2 font-medium text-amber-700">· 필수 미입력</span>
+                  )}
+                </summary>
+                <div className="mt-3">
+                  {attrLoading ? (
+                    <div className="flex min-h-16 items-center justify-center">
+                      <Spinner size={20} label="불러오는 중..." />
+                    </div>
+                  ) : (
+                    <>
+                      {attrLoadError && (
+                        <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+                          {attrLoadError}
                         </p>
-                        <CategoryMetaOverrideFields
-                          attributes={attributes}
-                          notices={notices}
-                          attrValues={optAttrValues}
-                          noticeValues={optNoticeValues}
-                          onAttrChange={(name, value) => handleAttrChange(name, value)}
-                          onNoticeChange={(key, value) => {
-                            setOptNoticeValues((prev) => ({ ...prev, [key]: value }));
-                            setTouchedNotices((prev) =>
-                              prev.has(key) ? prev : new Set([...prev, key]),
-                            );
-                          }}
-                          onMeasureUnit={handleOptMeasureUnit}
-                          disabled={isSubmitting}
-                          hideCategoryAttrs={hideCategoryAttrs}
-                          noticeGroup={masterNoticeGroup}
-                        />
-                      </>
-                    ) : (
-                      <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-500">
-                        이 카테고리에는 옵션별로 설정할 항목(용량/중량·수량)이 없습니다.
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            </details>
-          )}
+                      )}
+                      {attributes.length > 0 || notices.length > 0 ? (
+                        <>
+                          <p className="mb-3 text-[11px] text-gray-500">
+                            개당 용량/중량·수량은 옵션마다 다르므로 마스터가 아닌 이 옵션에서 입력합니다.
+                            <span className="text-red-600"> *</span> 표시는 카테고리(쿠팡 메타)가 요구하는
+                            필수 항목입니다.
+                          </p>
+                          <CategoryMetaOverrideFields
+                            attributes={attributes}
+                            notices={notices}
+                            attrValues={optAttrValues}
+                            noticeValues={optNoticeValues}
+                            onAttrChange={(name, value) => handleAttrChange(name, value)}
+                            onNoticeChange={(key, value) => {
+                              setOptNoticeValues((prev) => ({ ...prev, [key]: value }));
+                              setTouchedNotices((prev) =>
+                                prev.has(key) ? prev : new Set([...prev, key]),
+                              );
+                            }}
+                            onMeasureUnit={handleOptMeasureUnit}
+                            disabled={isSubmitting}
+                            hideCategoryAttrs={hideCategoryAttrs}
+                            noticeGroup={masterNoticeGroup}
+                          />
+                        </>
+                      ) : (
+                        <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                          이 카테고리에는 옵션별로 설정할 항목(용량/중량·수량)이 없습니다.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </details>
+            )}
 
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isSubmitting ? <Spinner label="저장 중..." /> : '저장'}
-            </button>
-            <button
-              type="button"
-              onClick={closeForm}
-              disabled={isSubmitting}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-            >
-              취소
-            </button>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isSubmitting ? <Spinner label="저장 중..." /> : '저장'}
+              </button>
+              <button
+                type="button"
+                onClick={closeForm}
+                disabled={isSubmitting}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              >
+                취소
+              </button>
+            </div>
           </div>
         </div>
       )}
