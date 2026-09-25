@@ -150,8 +150,7 @@ export function CategoryMetaPanel({
 
   if (isLoading) {
     return (
-      <div className="border-t border-gray-200 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">카테고리 필수속성 · 고시</h3>
+      <div className="p-4">
         <div className="flex min-h-16 items-center justify-center">
           <Spinner size={20} label="불러오는 중..." />
         </div>
@@ -159,10 +158,10 @@ export function CategoryMetaPanel({
     );
   }
 
+  // 2609_73: 탭 안의 패널이다 — 테두리·제목을 스스로 그리지 않는다(탭 바의 선과 라벨이 그 역할).
+  // 🔴 위 로딩 분기도 같다 — 한쪽만 고치면 로딩 중에만 선이 남는다.
   return (
-    <div className="border-t border-gray-200 p-4">
-      <h3 className="mb-3 text-sm font-semibold text-gray-900">카테고리 필수속성 · 고시</h3>
-
+    <div className="p-4">
       {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {saved && <p className="mb-3 rounded bg-green-50 px-3 py-2 text-sm text-green-700">저장되었습니다.</p>}
 

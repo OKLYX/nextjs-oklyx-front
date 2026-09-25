@@ -119,10 +119,10 @@ export function MasterCategoryPanel({
 
   const busy = isSaving || isClearing;
 
+  // 2609_73: 탭 안의 패널이다 — 테두리·제목을 스스로 그리지 않는다(탭 바의 선과 라벨이 그 역할).
+  // 🔴 `border-t` 나 `<h3>표준 카테고리` 를 되살리지 말 것 — 선이 두 번, 제목이 두 번 보인다.
   return (
-    <div className="border-t border-gray-200 p-4">
-      <h3 className="mb-3 text-sm font-semibold text-gray-900">표준 카테고리</h3>
-
+    <div className="p-4">
       {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       {isLoading ? (

@@ -63,6 +63,7 @@ import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroup
 import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import { submitNoticeGroup } from './categoryMetaValidation';
 import { DetailSection } from './DetailSection';
+import { BasicInfoTabs, type BasicTabKey } from './BasicInfoTabs';
 import { ChannelOptionTable } from './ChannelOptionTable';
 import { MasterCategoryPanel } from './MasterCategoryPanel';
 import { CategoryMetaPanel } from './CategoryMetaPanel';
@@ -300,6 +301,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [focusOption, setFocusOption] = useState<{ optionId: number; nonce: number } | undefined>(
     undefined,
   );
+  // 2609_73: 「채널별 옵션」 → 옵션 **탭**으로. `basicOpenSignal` 이 섹션을 열고, 이것이 탭을 고른다.
+  // 탭이 생긴 뒤로는 섹션만 열어서는 아무 일도 안 보이기 때문이다(옵션 탭이 아니면 가려져 있다).
+  // ⚠️ 초기값 undefined — 객체를 처음부터 넘기면 마운트 때 옵션 탭이 켜진다(basicOpenSignal 과 같은 함정).
+  const [basicOpenTab, setBasicOpenTab] = useState<{ key: BasicTabKey; nonce: number } | undefined>(
+    undefined,
+  );
   // 2609_61: 마스터의 **모든** 셀 + 그 셀의 옵션. 한 번에 받아 두 곳이 나눠 쓴다 —
   // 채널 행 아래 인라인 옵션 목록(`DisplayNameRow`)과 「채널별 옵션」 표(`ChannelOptionTable`).
   // 🔴 셀마다 옵션을 조회하지 말 것(D6). null = 미로드/조회 중, `channelOptionError` = 실패.
@@ -479,9 +486,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
    * 해시는 새로고침·뒤로가기에도 "어디로 갔었는지" 가 남도록 `replaceState` 로만 바꾼다.
    */
   const handleEditMasterOption = useCallback((masterOptionId: number) => {
+    // 🔴 `basicOpenSignal` 은 **증가 카운터**다(타임스탬프로 바꾸지 말 것).
     setBasicOpenSignal((n) => (n ?? 0) + 1);
     // nonce = 같은 옵션을 다시 눌러도 에디터가 또 반응하게 하는 값.
-    setFocusOption({ optionId: masterOptionId, nonce: Date.now() });
+    // 2609_73: 하이라이트(focusOption)와 탭 전환(basicOpenTab)이 한 번의 클릭으로 묶이도록 같은 값을 쓴다.
+    const nonce = Date.now();
+    setFocusOption({ optionId: masterOptionId, nonce });
+    setBasicOpenTab({ key: 'options', nonce });
     window.history.replaceState(null, '', `#master-option-${masterOptionId}`);
   }, []);
 
@@ -893,9 +904,23 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   const busy = isBatchAdding || rowBusyId !== null;
 
+  /* 2609_73: 순서 = 보기(채널 매트릭스 표 · 채널별 옵션) → 편집(상품 기본 정보 + 섹션 5개).
+     이 페이지의 본체가 매트릭스 표이므로, 편집 섹션 6개를 지나야 표가 나오던 순서를 뒤집었다
+     (사용자 결정 2026-09-25). 머리말은 지금처럼 맨 위 그대로이고 고정도 거기 걸린다.
+     ⚠️ 블록 순서만 바꾼 것이고 조건·props·조회 시점은 무변경이다. 특히 훅·파생값 선언 구역은
+     손대지 않았다 — `categorySummary`/`metaFilledCount` 는 `basicSummary` 앞에 있어야 한다. */
   return (
     <PageContainer>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* 2609_73: 머리말 한 줄(← 목록 · 마스터 이름 · 주요 버튼)을 화면 맨 위에 고정한다 — 아래로
+          길게 스크롤해도 어떤 마스터를 보고 있는지와 버튼이 손에 닿는다(사용자 지시 2026-09-25).
+          🔴 `bg-page` 가 없으면 지나가는 내용이 글자 뒤로 비친다(`PageContainer` 와 같은 배경 토큰).
+          🔴 `z-20` = 표의 고정 머리(z-10)보다 위, 알림 말풍선(z-40)·`ui/Modal`(z-50) 아래.
+          z-50·z-[60]·fixed inset-0 은 `npm run lint:ui`(HAND_ROLLED_POPUP)가 error 로 막는다.
+          🔴 좌우 음수 마진 = 컨테이너 안쪽 여백만큼 번져 나가야 옆으로 새는 내용이 안 보인다.
+          ⚠️ 섹션 제목(`DetailSection`)·탭 바는 고정하지 않는다 — 겹겹이 쌓이면 볼 내용이 줄어든다.
+          ⚠️ 이 고정은 `dashboard/layout.tsx` 의 `<main>` 이 `overflow-x-clip` 이어야 동작한다
+          (`auto` 면 세로축까지 스크롤 영역으로 계산돼 sticky 가 죽는다). */}
+      <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 bg-page px-4 py-2 md:-mx-6 md:px-6">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -1102,140 +1127,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           </div>
         }
       />
-
-      {/* 마스터 편집 = 토글 섹션 스택(83A/83B). 순서 = 상품 기본 정보(기본 정보·표준 카테고리·
-          카테고리 필수속성·고시·옵션·이미지) → 템플릿 필드값 → 기본 택배/상자 → 태그 →
-          등록상품명 접미사 → 배송 설정. ⚠️ 마스터 편집 지점은 이 상세 페이지 하나다(모달은 생성 전용). */}
-      {/* 상품 기본 정보 = 기본 정보 + 표준 카테고리 + 카테고리 필수속성·고시 + 옵션 + 이미지 한
-          토글(사용자 요청 2026-08-29). 상품 자체를 이루는 값이라 함께 열어 본다 → 다시 쪼개지 말 것.
-          블록 순서 = 입력 의존 순서 그대로 = 카테고리 → 그 카테고리의 필수속성·고시 → 옵션(마스터
-          필수속성 값을 상속) → 이미지. ⚠️ 이 그룹을 펼치면 카테고리 메타·옵션 스키마 조회와 이미지 풀
-          조회가 함께 일어난다(그룹 단위 lazy mount). ⚠️ 두 카테고리 패널은 `master` 가 로드된 뒤에만
-          렌더된다(그룹 조건) — 예전 단독 섹션은 `isAdmin` 만 봤다. */}
-      {isAdmin && master && (
-        <DetailSection title="상품 기본 정보" summary={basicSummary} openSignal={basicOpenSignal}>
-          <MasterBasicInfoPanel
-            master={master}
-            useCase={masterUseCase}
-            onSaved={handlePanelSaved}
-          />
-
-          <MasterCategoryPanel
-            masterId={masterId}
-            useCase={masterUseCase}
-            categoryUseCase={categoryUseCase}
-            mappingUseCase={mappingUseCase}
-            onCategoryChanged={setCategory}
-          />
-
-          <CategoryMetaPanel
-            masterId={masterId}
-            categoryCode={category ? String(category.categoryId) : null}
-            isBundle={isBundle}
-            onSaved={() => setMetaVersion((v) => v + 1)}
-          />
-
-          <div className="space-y-2 border-t border-gray-200 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setApplyNamesOpen(true)}
-                  disabled={options.length === 0 || isApplyingNames}
-                  className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                >
-                  옵션명 일괄 적용
-                </button>
-              </div>
-            </div>
-            <p className="text-[11px] text-gray-500">
-              옵션의 카테고리 필수속성은 저장된 마스터 값을 기준으로 상속 여부를 판단합니다. 위
-              [카테고리 필수속성 · 고시]에서 저장한 뒤 입력하세요.
-            </p>
-            {metaBaseError && (
-              <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">{metaBaseError}</p>
-            )}
-            <MasterOptionEditor
-              master={master}
-              useCase={masterUseCase}
-              carrierRates={carrierRates}
-              packages={packages}
-              masterDefaults={optionMasterDefaults}
-              categoryId={categoryId}
-              masterAttrValues={masterAttrValues}
-              masterNoticeValues={masterNoticeValues}
-              masterNoticeGroup={masterNoticeGroup}
-              hideCategoryAttrs={hideCategoryAttrs}
-              onChanged={load}
-              focusOption={focusOption}
-            />
-          </div>
-
-          <div className="space-y-2 border-t border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-900">이미지</h3>
-            <p className="text-[11px] text-gray-500">변경 즉시 저장됩니다.</p>
-            <MasterImagePool
-              masterId={masterId}
-              detailUseCase={detailUseCase}
-              fields={imageFields}
-              fieldFilters={imageFieldFilters}
-              productImageUseCase={productImageUseCase}
-              sourceProducts={sourceProducts}
-            />
-          </div>
-        </DetailSection>
-      )}
-
-      {isAdmin && master && (
-        <DetailSection title="템플릿 필드값" summary={fieldValuesSummary}>
-          <MasterFieldValuesPanel
-            master={master}
-            useCase={masterUseCase}
-            templateUseCase={templateUseCase}
-            onSaved={handlePanelSaved}
-          />
-        </DetailSection>
-      )}
-
-      {isAdmin && master && (
-        <DetailSection title="기본 택배/상자" summary={defaultCostSummary}>
-          <MasterDefaultCostPanel
-            master={master}
-            useCase={masterUseCase}
-            carrierRates={carrierRates}
-            packages={packages}
-            onSaved={handlePanelSaved}
-          />
-        </DetailSection>
-      )}
-
-      {isAdmin && master && (
-        <DetailSection title="등록상품명 · 태그" summary={tagsSummary}>
-          <MasterTagsPanel master={master} useCase={masterUseCase} onSaved={handlePanelSaved} />
-        </DetailSection>
-      )}
-
-      {isAdmin && (
-        <DetailSection title="등록상품명 추가 문구" summary={suffixSummary}>
-          <MasterRegistrationSuffixPanel
-            masterId={masterId}
-            useCase={masterUseCase}
-            onSaved={load}
-          />
-        </DetailSection>
-      )}
-
-      {isAdmin && (
-        <DetailSection title="배송 설정 (전 채널)" summary={shippingSummary}>
-          <MasterShippingOverridePanel
-            masterId={masterId}
-            useCase={masterUseCase}
-            channels={forceApplyChannels}
-            onSaved={load}
-          />
-        </DetailSection>
-      )}
 
       <div className="rounded-lg bg-white shadow list-table-scroll">
         {isLoading ? (
@@ -1689,6 +1580,156 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
             cells={channelOptionCells}
             error={channelOptionError}
             onEditMasterOption={handleEditMasterOption}
+          />
+        </DetailSection>
+      )}
+
+      {/* 마스터 편집 = 토글 섹션 스택(83A/83B). 순서 = 상품 기본 정보(기본 정보·표준 카테고리·
+          카테고리 필수속성·고시·옵션·이미지) → 템플릿 필드값 → 기본 택배/상자 → 태그 →
+          등록상품명 접미사 → 배송 설정. ⚠️ 마스터 편집 지점은 이 상세 페이지 하나다(모달은 생성 전용). */}
+      {/* 상품 기본 정보 = 기본 정보 + 표준 카테고리 + 카테고리 필수속성·고시 + 옵션 + 이미지 한
+          토글(사용자 요청 2026-08-29). 상품 자체를 이루는 값이라 함께 열어 본다 → 다시 쪼개지 말 것.
+          2609_73: 겉 토글은 **그대로 하나**이고 그 안만 탭 5개다(세로로 쌓이던 블록 5개 → 한 번에 하나).
+          블록 순서 = 입력 의존 순서 그대로 **= 탭 순서** = 카테고리 → 그 카테고리의 필수속성·고시 →
+          옵션(마스터 필수속성 값을 상속) → 이미지. ⚠️ 펼치면 **첫 탭(기본 정보)만** 마운트된다 —
+          카테고리 메타·옵션 스키마 조회와 이미지 풀 조회는 **그 탭을 처음 열 때** 일어난다(탭 단위
+          lazy mount). 한 번 본 탭은 `hidden` 으로 남아 미저장 입력을 지킨다.
+          ⚠️ 두 카테고리 패널은 `master` 가 로드된 뒤에만 렌더된다(그룹 조건) — 예전 단독 섹션은
+          `isAdmin` 만 봤다. */}
+      {isAdmin && master && (
+        <DetailSection title="상품 기본 정보" summary={basicSummary} openSignal={basicOpenSignal}>
+          <BasicInfoTabs
+            openTab={basicOpenTab}
+            panes={{
+              basic: (
+                <MasterBasicInfoPanel
+                  master={master}
+                  useCase={masterUseCase}
+                  onSaved={handlePanelSaved}
+                />
+              ),
+              category: (
+                <MasterCategoryPanel
+                  masterId={masterId}
+                  useCase={masterUseCase}
+                  categoryUseCase={categoryUseCase}
+                  mappingUseCase={mappingUseCase}
+                  onCategoryChanged={setCategory}
+                />
+              ),
+              meta: (
+                <CategoryMetaPanel
+                  masterId={masterId}
+                  categoryCode={category ? String(category.categoryId) : null}
+                  isBundle={isBundle}
+                  onSaved={() => setMetaVersion((v) => v + 1)}
+                />
+              ),
+              options: (
+                <div className="space-y-2 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setApplyNamesOpen(true)}
+                        disabled={options.length === 0 || isApplyingNames}
+                        className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                      >
+                        옵션명 일괄 적용
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    옵션의 카테고리 필수속성은 저장된 마스터 값을 기준으로 상속 여부를 판단합니다.
+                    [필수속성 · 고시] 탭에서 저장한 뒤 입력하세요.
+                  </p>
+                  {metaBaseError && (
+                    <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      {metaBaseError}
+                    </p>
+                  )}
+                  <MasterOptionEditor
+                    master={master}
+                    useCase={masterUseCase}
+                    carrierRates={carrierRates}
+                    packages={packages}
+                    masterDefaults={optionMasterDefaults}
+                    categoryId={categoryId}
+                    masterAttrValues={masterAttrValues}
+                    masterNoticeValues={masterNoticeValues}
+                    masterNoticeGroup={masterNoticeGroup}
+                    hideCategoryAttrs={hideCategoryAttrs}
+                    onChanged={load}
+                    focusOption={focusOption}
+                  />
+                </div>
+              ),
+              images: (
+                <div className="space-y-2 p-4">
+                  <h3 className="text-sm font-semibold text-gray-900">이미지</h3>
+                  <p className="text-[11px] text-gray-500">변경 즉시 저장됩니다.</p>
+                  <MasterImagePool
+                    masterId={masterId}
+                    detailUseCase={detailUseCase}
+                    fields={imageFields}
+                    fieldFilters={imageFieldFilters}
+                    productImageUseCase={productImageUseCase}
+                    sourceProducts={sourceProducts}
+                  />
+                </div>
+              ),
+            }}
+          />
+        </DetailSection>
+      )}
+
+      {isAdmin && master && (
+        <DetailSection title="템플릿 필드값" summary={fieldValuesSummary}>
+          <MasterFieldValuesPanel
+            master={master}
+            useCase={masterUseCase}
+            templateUseCase={templateUseCase}
+            onSaved={handlePanelSaved}
+          />
+        </DetailSection>
+      )}
+
+      {isAdmin && master && (
+        <DetailSection title="기본 택배/상자" summary={defaultCostSummary}>
+          <MasterDefaultCostPanel
+            master={master}
+            useCase={masterUseCase}
+            carrierRates={carrierRates}
+            packages={packages}
+            onSaved={handlePanelSaved}
+          />
+        </DetailSection>
+      )}
+
+      {isAdmin && master && (
+        <DetailSection title="등록상품명 · 태그" summary={tagsSummary}>
+          <MasterTagsPanel master={master} useCase={masterUseCase} onSaved={handlePanelSaved} />
+        </DetailSection>
+      )}
+
+      {isAdmin && (
+        <DetailSection title="등록상품명 추가 문구" summary={suffixSummary}>
+          <MasterRegistrationSuffixPanel
+            masterId={masterId}
+            useCase={masterUseCase}
+            onSaved={load}
+          />
+        </DetailSection>
+      )}
+
+      {isAdmin && (
+        <DetailSection title="배송 설정 (전 채널)" summary={shippingSummary}>
+          <MasterShippingOverridePanel
+            masterId={masterId}
+            useCase={masterUseCase}
+            channels={forceApplyChannels}
+            onSaved={load}
           />
         </DetailSection>
       )}
