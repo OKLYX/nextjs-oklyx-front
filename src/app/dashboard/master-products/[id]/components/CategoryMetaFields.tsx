@@ -264,6 +264,11 @@ export function CategoryMetaFields({
           <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-500">
             이 카테고리에는 입력할 상품정보제공고시 항목이 없습니다.
           </p>
+        ) : noticeGroups.length === 0 ? (
+          // "필수 항목만 보기"(기본 켜짐)로 전부 걸러진 경우 — 빈 자리로 두면 고장처럼 보인다.
+          <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-500">
+            이 품목군에는 필수 항목이 없습니다. 「필수 항목만 보기」를 끄면 선택 항목을 입력할 수 있습니다.
+          </p>
         ) : (
           <div className="space-y-4">
             {noticeGroups.map(([group, groupNoticeList]) => (

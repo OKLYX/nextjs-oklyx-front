@@ -57,7 +57,8 @@ export function CategoryMetaCreateFields({
   const [notices, setNotices] = useState<CategoryNotice[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [onlyRequired, setOnlyRequired] = useState(false);
+  // Display filter, checked by default: 필수 항목만 보기 (same default as CategoryMetaPanel).
+  const [onlyRequired, setOnlyRequired] = useState(true);
 
   // Keep the schema-report callback fresh without re-running the fetch effect.
   const onSchemaLoadRef = useRef(onSchemaLoad);
