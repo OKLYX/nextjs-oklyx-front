@@ -26,6 +26,17 @@ export function applyNoticeRefAll(
   return next;
 }
 
+// 기본값: 주어진 notices 에 입력된 값이 하나도 없으면 "전체 상품 상세페이지 참조" 로 채운 맵,
+// 하나라도 있으면 원본 그대로. 값으로 파생하므로 체크박스(isNoticeRefAll)가 저절로 켜진다.
+// ⚠️ 호출부가 선택 그룹의 **마스터 소유** 고시만 넘긴다(옵션-소유 고시는 옵션별 값이라 제외).
+export function defaultNoticeRefAll(
+  notices: CategoryNotice[],
+  values: Record<string, string>,
+): Record<string, string> {
+  const anyFilled = notices.some((n) => (values[n.key] ?? '').trim() !== '');
+  return anyFilled || notices.length === 0 ? values : applyNoticeRefAll(notices, values, true);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 상품정보제공고시 = 품목군(groupName) 셀렉션 (사용자 하나 선택 → 그 그룹만 전송, 62 이전 UX 복원)
 //
