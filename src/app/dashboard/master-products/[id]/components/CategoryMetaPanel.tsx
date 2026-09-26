@@ -9,6 +9,19 @@ import type { CategoryAttribute, CategoryNotice } from '@/domain/entities/Master
 import type { MeasurePair } from './measureAttributes';
 import { CategoryMetaFields } from './CategoryMetaFields';
 import { computeMissingRequired, noticesToSubmit, submitNoticeGroup } from './categoryMetaValidation';
+import { defaultNoticeRefAll, noticeGroupName } from './noticeTemplates';
+import { isOptionNotice } from './optionMetaFields';
+
+// 선택 그룹의 마스터 소유 고시가 전부 비었으면 "전체 상품 상세페이지 참조" 로 채운다(기본 체크).
+const withNoticeRefDefault = (
+  notices: CategoryNotice[],
+  values: Record<string, string>,
+  group: string,
+): Record<string, string> =>
+  defaultNoticeRefAll(
+    notices.filter((n) => !isOptionNotice(n) && noticeGroupName(n) === group),
+    values,
+  );
 
 interface CategoryMetaPanelProps {
   masterId: number;
@@ -84,9 +97,12 @@ export function CategoryMetaPanel({
         setAttributes(meta.attributes);
         setNotices(meta.notices);
         setAttrValues(meta.values.attributes ?? {});
-        setNoticeValues(meta.values.notices ?? {});
         // 저장된 품목군으로 복원(91). 공백만/미필드 = 미지정 → null 로 두고 폴백에 맡긴다.
-        setNoticeGroup(meta.values.noticeGroup?.trim() ? meta.values.noticeGroup : null);
+        const savedGroup = meta.values.noticeGroup?.trim() ? meta.values.noticeGroup : null;
+        const values = meta.values.notices ?? {};
+        const group = submitNoticeGroup(meta.notices, values, savedGroup);
+        setNoticeValues(withNoticeRefDefault(meta.notices, values, group));
+        setNoticeGroup(savedGroup);
       }
     } catch (e) {
       // Attribute lookup failed (e.g. mapping not set -> 400): show inline guidance.
@@ -123,6 +139,12 @@ export function CategoryMetaPanel({
     hideCategoryAttrs,
     noticeGroup,
   );
+
+  // 품목군을 바꾸면 그 그룹도 입력값이 없을 때 "전체 상품 상세페이지 참조" 로 시작한다.
+  const handleNoticeGroupChange = (group: string) => {
+    setNoticeGroup(group);
+    setNoticeValues((prev) => withNoticeRefDefault(notices, prev, group));
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -179,7 +201,7 @@ export function CategoryMetaPanel({
         onOnlyRequiredChange={setOnlyRequired}
         hideCategoryAttrs={hideCategoryAttrs}
         noticeGroup={noticeGroup}
-        onNoticeGroupChange={setNoticeGroup}
+        onNoticeGroupChange={handleNoticeGroupChange}
       />
 
       {readOnly ? (
