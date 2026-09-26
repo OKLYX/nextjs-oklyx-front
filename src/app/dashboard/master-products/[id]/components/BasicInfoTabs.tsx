@@ -19,7 +19,7 @@ interface BasicInfoTabsProps {
   /**
    * 밖에서 특정 탭으로 **보내는 신호**. 객체가 새로 올 때만 반응한다(같은 탭을 다시 지목해도 되도록
    * 부모가 클릭마다 새 객체를 만든다 — `nonce` 는 그 사실을 읽는 사람에게 알리는 표식이다).
-   * ⚠️ 닫지는 않는다 — `DetailSection.openSignal` 과 같은 성격이다.
+   * ⚠️ 닫지는 않는다 — `MasterSectionTabs.openTab` 과 같은 성격이다.
    * ⚠️ 초기값은 `undefined` 여야 한다. 객체를 처음부터 넘기면 마운트 때 그 탭이 켜진다.
    */
   openTab?: { key: BasicTabKey; nonce: number };
@@ -29,11 +29,11 @@ interface BasicInfoTabsProps {
  * 마스터 상세 「상품 기본 정보」 **전용** 탭 셸 (2609_73).
  * File: src/app/dashboard/master-products/[id]/components/BasicInfoTabs.tsx
  *
- * **용도**: 한 토글(`DetailSection` 「상품 기본 정보」) 안에 세로로 쌓여 있던 블록 5개
+ * **용도**: 바깥 탭(`MasterSectionTabs` 「상품 기본 정보」) 안에 세로로 쌓여 있던 블록 5개
  * (기본 정보 · 표준 카테고리 · 필수속성/고시 · 옵션 · 이미지)를 탭 5개로 바꿔 **한 번에 하나만**
  * 보이게 한다. 페이지 높이가 「블록 5개 합계」에서 「가장 긴 블록 하나」로 줄어든다.
  *
- * **마운트 규칙** — `DetailSection` 과 **같은 규칙**이다. 셋이 다 필요하다:
+ * **마운트 규칙** — `MasterSectionTabs` 와 **같은 규칙**이다. 셋이 다 필요하다:
  * | 상태 | 처리 | 이유 |
  * |---|---|---|
  * | 한 번도 안 본 탭 | 렌더하지 않는다 | lazy — 그 탭의 조회가 일어나지 않는다 |
@@ -41,8 +41,8 @@ interface BasicInfoTabsProps {
  * | 봤다가 떠난 탭 | **마운트 유지 + `hidden`** | 🔴 미저장 입력을 지킨다 |
  *
  * ⚠️ **비활성 탭을 언마운트하지 말 것** — `{active === key && <Pane/>}` 로 갈아끼우면 필수속성을
- * 절반 입력하고 옵션 탭을 봤다가 돌아왔을 때 **빈 칸**이다. 겉의 `DetailSection` 이 접었다 펴도
- * 미저장 입력을 지키려고 일부러 마운트를 유지하는데(`hasOpened`), 탭이 언마운트하면 그 보호가
+ * 절반 입력하고 옵션 탭을 봤다가 돌아왔을 때 **빈 칸**이다. 바깥 탭(`MasterSectionTabs`)이 옮겼다 돌아와도
+ * 미저장 입력을 지키려고 일부러 마운트를 유지하는데(`visited`), 탭이 언마운트하면 그 보호가
  * 탭 전환에서 조용히 뚫린다. 저장소의 다른 탭 둘(`DetailEditorTabs` 의 `&&`,
  * `MetaPlatformTabs` 의 `<div key={active}>` remount)은 **따르지 말아야 할** 선례다.
  *
@@ -71,7 +71,7 @@ export function BasicInfoTabs({ panes, openTab }: BasicInfoTabsProps) {
   };
 
   // 밖에서 보내는 신호. 🔴 effect 본문에서 setState 를 동기로 부르면 프로젝트 lint
-  // (react-hooks/set-state-in-effect)가 error 로 막는다 — DetailSection 과 같이 microtask 로 미룬다.
+  // (react-hooks/set-state-in-effect)가 error 로 막는다 — microtask 로 미룬다.
   useEffect(() => {
     if (openTab === undefined) return;
     const key = openTab.key;
