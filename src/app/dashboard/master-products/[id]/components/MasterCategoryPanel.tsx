@@ -119,7 +119,7 @@ export function MasterCategoryPanel({
 
   const busy = isSaving || isClearing;
 
-  // 2609_73: 탭 안의 패널이다 — 테두리·제목을 스스로 그리지 않는다(탭 바의 선과 라벨이 그 역할).
+  // 테두리·제목을 스스로 그리지 않는다 — 「상품 기본 정보」 탭의 `StackedBlock` 이 제목을, `divide-y` 가 선을 긋는다.
   // 🔴 `border-t` 나 `<h3>표준 카테고리` 를 되살리지 말 것 — 선이 두 번, 제목이 두 번 보인다.
   return (
     <div className="p-4">
