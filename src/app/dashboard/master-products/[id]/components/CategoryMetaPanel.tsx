@@ -32,7 +32,7 @@ interface CategoryMetaPanelProps {
  *   master 단일 Map 덮어쓰기 방지를 위해 저장 버튼 disabled + 인라인 안내.
  *
  * ⚠️ 이 패널은 [상품 기본 정보] 토글 **안의 하위 블록**이다(사용자 요청 2026-08-29) → 제목 `<h3>` 를
- * 스스로 렌더하고(옛 단독 `DetailSection` 의 title 을 대체) 카드 껍데기(rounded/shadow) 없이
+ * 스스로 렌더하고(옛 단독 토글 섹션의 제목을 대체) 카드 껍데기(rounded/shadow) 없이
  * `border-t + p-4` 를 쓴다. 단독 섹션으로 되돌리지 말 것.
  */
 export function CategoryMetaPanel({

@@ -26,7 +26,7 @@ const placeholderFor = (key: string) =>
  *
  * 필드 **목록**은 기본 썸네일 템플릿(`isDefault`)의 `fields`, 필드 **값**은 부모가 내려준
  * `master.fieldValues` 프리필이다(패널이 `getById` 를 다시 부르지 않는다).
- * 목록 로드는 이 패널이 마운트될 때 = `DetailSection` 을 처음 펼칠 때 한 번 일어난다(lazy).
+ * 목록 로드는 이 패널이 마운트될 때 = 그 탭(`MasterSectionTabs`)을 처음 열 때 한 번 일어난다(lazy).
  *
  * 빈 값은 전송에서 제외 → 예약 필드는 등록상품값, 커스텀 필드는 템플릿 기본값으로 채워진다.
  * 저장은 **자기 필드만** PATCH(`{ fieldValues }`)하고 `onSaved(patched)` 로 부모에 통지한다
