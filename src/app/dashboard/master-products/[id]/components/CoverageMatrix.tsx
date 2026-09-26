@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
@@ -61,7 +61,6 @@ import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroup
 import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import { submitNoticeGroup } from './categoryMetaValidation';
 import { MasterSectionTabs, type MasterSectionKey } from './MasterSectionTabs';
-import { BasicInfoTabs, type BasicTabKey } from './BasicInfoTabs';
 import { ChannelOptionTable } from './ChannelOptionTable';
 import { MasterCategoryPanel } from './MasterCategoryPanel';
 import { CategoryMetaPanel } from './CategoryMetaPanel';
@@ -289,11 +288,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [focusOption, setFocusOption] = useState<{ optionId: number; nonce: number } | undefined>(
     undefined,
   );
-  // 2609_73: 「채널별 옵션」 → 「상품 기본 정보」 안쪽 옵션 **탭**으로. `sectionOpenTab` 이 바깥 탭을 고르고,
-  // 이것이 안쪽 탭을 고른다. ⚠️ 초기값 undefined — 객체를 처음부터 넘기면 마운트 때 옵션 탭이 켜진다.
-  const [basicOpenTab, setBasicOpenTab] = useState<{ key: BasicTabKey; nonce: number } | undefined>(
-    undefined,
-  );
   // 2609_61: 마스터의 **모든** 셀 + 그 셀의 옵션. 한 번에 받아 두 곳이 나눠 쓴다 —
   // 판매상품 행 펼침의 옵션 표(`ListingDetailPanel`)과 「채널별 옵션」 표(`ChannelOptionTable`).
   // 🔴 셀마다 옵션을 조회하지 말 것(D6). null = 미로드/조회 중, `channelOptionError` = 실패.
@@ -474,11 +468,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
    */
   const handleEditMasterOption = useCallback((masterOptionId: number) => {
     // nonce = 같은 옵션을 다시 눌러도 에디터가 또 반응하게 하는 값.
-    // 2609_73: 하이라이트(focusOption)와 두 탭 전환이 한 번의 클릭으로 묶이도록 같은 값을 쓴다.
+    // 하이라이트(focusOption)와 탭 전환이 한 번의 클릭으로 묶이도록 같은 값을 쓴다.
+    // 옵션 블록은 「상품 기본 정보」 탭 안에 펼쳐져 있어 에디터의 scrollIntoView 가 그 위치로 보낸다.
     const nonce = Date.now();
     setSectionOpenTab({ key: 'basic', nonce });
     setFocusOption({ optionId: masterOptionId, nonce });
-    setBasicOpenTab({ key: 'options', nonce });
     window.history.replaceState(null, '', `#master-option-${masterOptionId}`);
   }, []);
 
@@ -897,7 +891,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           🔴 `z-20` = 표의 고정 머리(z-10)보다 위, 알림 말풍선(z-40)·`ui/Modal`(z-50) 아래.
           z-50·z-[60]·fixed inset-0 은 `npm run lint:ui`(HAND_ROLLED_POPUP)가 error 로 막는다.
           🔴 좌우 음수 마진 = 컨테이너 안쪽 여백만큼 번져 나가야 옆으로 새는 내용이 안 보인다.
-          ⚠️ 탭 바(`MasterSectionTabs`·`BasicInfoTabs`)는 고정하지 않는다 — 겹겹이 쌓이면 볼 내용이 줄어든다.
+          ⚠️ 탭 바(`MasterSectionTabs`)는 고정하지 않는다 — 겹겹이 쌓이면 볼 내용이 줄어든다.
           ⚠️ 이 고정은 `dashboard/layout.tsx` 의 `<main>` 이 `overflow-x-clip` 이어야 동작한다
           (`auto` 면 세로축까지 스크롤 영역으로 계산돼 sticky 가 죽는다). */}
       <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 bg-page px-4 py-2 md:-mx-6 md:px-6">
@@ -1264,7 +1258,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           탭 순서 = 옛 섹션 순서. 처음 여는 탭만 마운트되고(lazy), 본 탭은 `hidden` 으로 남아 미저장 입력을 지킨다.
           🔴 전부 ADMIN 전용 — 「채널별 옵션」의 `channel-options` 는 `/api/admin/**` 이다(비-ADMIN 은 403).
           ⚠️ `master` 가 필요한 탭은 로드 뒤에만 나타난다. 마스터 편집 지점은 이 상세 페이지 하나다(모달은 생성 전용).
-          「상품 기본 정보」 안쪽은 다시 탭 5개(`BasicInfoTabs`)다 — 다시 쪼개 바깥 탭으로 올리지 말 것. */}
+          「상품 기본 정보」 = 기본 정보 · 표준 카테고리 · 필수속성/고시 · 옵션을 **한 탭에 세로로 펼친다**(안쪽 탭 없음).
+          이미지는 별도 탭, 기본 택배/상자 + 전 채널 배송은 「배송 설정」 한 탭이다. */}
       {isAdmin && (
         <MasterSectionTabs
           openTab={sectionOpenTab}
@@ -1290,89 +1285,88 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     label: '상품 기본 정보',
                     summary: basicSummary,
                     content: (
-                      <BasicInfoTabs
-                        openTab={basicOpenTab}
-                        panes={{
-                          basic: (
-                            <MasterBasicInfoPanel
-                              master={master}
-                              useCase={masterUseCase}
-                              onSaved={handlePanelSaved}
-                            />
-                          ),
-                          category: (
-                            <MasterCategoryPanel
-                              masterId={masterId}
-                              useCase={masterUseCase}
-                              categoryUseCase={categoryUseCase}
-                              mappingUseCase={mappingUseCase}
-                              onCategoryChanged={setCategory}
-                            />
-                          ),
-                          meta: (
-                            <CategoryMetaPanel
-                              masterId={masterId}
-                              categoryCode={category ? String(category.categoryId) : null}
-                              isBundle={isBundle}
-                              onSaved={() => setMetaVersion((v) => v + 1)}
-                            />
-                          ),
-                          options: (
-                            <div className="space-y-2 p-4">
-                              <div className="flex items-center justify-between gap-2">
-                                <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setApplyNamesOpen(true)}
-                                    disabled={options.length === 0 || isApplyingNames}
-                                    className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                                  >
-                                    옵션명 일괄 적용
-                                  </button>
-                                </div>
-                              </div>
-                              <p className="text-[11px] text-gray-500">
-                                옵션의 카테고리 필수속성은 저장된 마스터 값을 기준으로 상속 여부를 판단합니다.
-                                [필수속성 · 고시] 탭에서 저장한 뒤 입력하세요.
-                              </p>
-                              {metaBaseError && (
-                                <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                                  {metaBaseError}
-                                </p>
-                              )}
-                              <MasterOptionEditor
-                                master={master}
-                                useCase={masterUseCase}
-                                carrierRates={carrierRates}
-                                packages={packages}
-                                masterDefaults={optionMasterDefaults}
-                                categoryId={categoryId}
-                                masterAttrValues={masterAttrValues}
-                                masterNoticeValues={masterNoticeValues}
-                                masterNoticeGroup={masterNoticeGroup}
-                                hideCategoryAttrs={hideCategoryAttrs}
-                                onChanged={load}
-                                focusOption={focusOption}
-                              />
+                      <div className="divide-y divide-gray-200">
+                        <StackedBlock title="기본 정보">
+                          <MasterBasicInfoPanel
+                            master={master}
+                            useCase={masterUseCase}
+                            onSaved={handlePanelSaved}
+                          />
+                        </StackedBlock>
+                        <StackedBlock title="표준 카테고리">
+                          <MasterCategoryPanel
+                            masterId={masterId}
+                            useCase={masterUseCase}
+                            categoryUseCase={categoryUseCase}
+                            mappingUseCase={mappingUseCase}
+                            onCategoryChanged={setCategory}
+                          />
+                        </StackedBlock>
+                        <StackedBlock title="필수속성 · 고시">
+                          <CategoryMetaPanel
+                            masterId={masterId}
+                            categoryCode={category ? String(category.categoryId) : null}
+                            isBundle={isBundle}
+                            onSaved={() => setMetaVersion((v) => v + 1)}
+                          />
+                        </StackedBlock>
+                        <div className="space-y-2 p-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setApplyNamesOpen(true)}
+                                disabled={options.length === 0 || isApplyingNames}
+                                className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                              >
+                                옵션명 일괄 적용
+                              </button>
                             </div>
-                          ),
-                          images: (
-                            <div className="space-y-2 p-4">
-                              <h3 className="text-sm font-semibold text-gray-900">이미지</h3>
-                              <p className="text-[11px] text-gray-500">변경 즉시 저장됩니다.</p>
-                              <MasterImagePool
-                                masterId={masterId}
-                                detailUseCase={detailUseCase}
-                                fields={imageFields}
-                                fieldFilters={imageFieldFilters}
-                                productImageUseCase={productImageUseCase}
-                                sourceProducts={sourceProducts}
-                              />
-                            </div>
-                          ),
-                        }}
-                      />
+                          </div>
+                          <p className="text-[11px] text-gray-500">
+                            옵션의 카테고리 필수속성은 저장된 마스터 값을 기준으로 상속 여부를 판단합니다.
+                            위 [필수속성 · 고시]에서 저장한 뒤 입력하세요.
+                          </p>
+                          {metaBaseError && (
+                            <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                              {metaBaseError}
+                            </p>
+                          )}
+                          <MasterOptionEditor
+                            master={master}
+                            useCase={masterUseCase}
+                            carrierRates={carrierRates}
+                            packages={packages}
+                            masterDefaults={optionMasterDefaults}
+                            categoryId={categoryId}
+                            masterAttrValues={masterAttrValues}
+                            masterNoticeValues={masterNoticeValues}
+                            masterNoticeGroup={masterNoticeGroup}
+                            hideCategoryAttrs={hideCategoryAttrs}
+                            onChanged={load}
+                            focusOption={focusOption}
+                          />
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'images' as const,
+                    label: '이미지',
+                    content: (
+                      <div className="space-y-2 p-4">
+                        <h3 className="text-sm font-semibold text-gray-900">이미지</h3>
+                        <p className="text-[11px] text-gray-500">변경 즉시 저장됩니다.</p>
+                        <MasterImagePool
+                          masterId={masterId}
+                          detailUseCase={detailUseCase}
+                          fields={imageFields}
+                          fieldFilters={imageFieldFilters}
+                          productImageUseCase={productImageUseCase}
+                          sourceProducts={sourceProducts}
+                        />
+                      </div>
                     ),
                   },
                   {
@@ -1389,17 +1383,27 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     ),
                   },
                   {
-                    key: 'defaultCost' as const,
-                    label: '기본 택배/상자',
-                    summary: defaultCostSummary,
+                    key: 'shipping' as const,
+                    label: '배송 설정',
+                    summary: `${defaultCostSummary} · ${shippingSummary}`,
                     content: (
-                      <MasterDefaultCostPanel
-                        master={master}
-                        useCase={masterUseCase}
-                        carrierRates={carrierRates}
-                        packages={packages}
-                        onSaved={handlePanelSaved}
-                      />
+                      <div className="divide-y divide-gray-200">
+                        <StackedBlock title="기본 택배/상자">
+                          <MasterDefaultCostPanel
+                            master={master}
+                            useCase={masterUseCase}
+                            carrierRates={carrierRates}
+                            packages={packages}
+                            onSaved={handlePanelSaved}
+                          />
+                        </StackedBlock>
+                        <MasterShippingOverridePanel
+                          masterId={masterId}
+                          useCase={masterUseCase}
+                          channels={forceApplyChannels}
+                          onSaved={load}
+                        />
+                      </div>
                     ),
                   },
                   {
@@ -1424,19 +1428,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                 />
               ),
             },
-            {
-              key: 'shipping',
-              label: '배송 설정 (전 채널)',
-              summary: shippingSummary,
-              content: (
-                <MasterShippingOverridePanel
-                  masterId={masterId}
-                  useCase={masterUseCase}
-                  channels={forceApplyChannels}
-                  onSaved={load}
-                />
-              ),
-            },
           ]}
         />
       )}
@@ -1454,5 +1445,18 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
       <ChannelPreviewModal data={preview} onClose={() => setPreview(null)} />
     </PageContainer>
+  );
+}
+
+/**
+ * 한 탭 안에 세로로 펼친 블록의 제목 + 본문. 패널들은 스스로 제목을 그리지 않는다(탭 시절 규칙)라
+ * 여기서 붙인다. 구분선은 부모의 `divide-y` 가 긋는다 — 여기서 `border-t` 를 더하지 말 것.
+ */
+function StackedBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h3 className="px-4 pt-4 text-sm font-semibold text-gray-900">{title}</h3>
+      {children}
+    </section>
   );
 }
