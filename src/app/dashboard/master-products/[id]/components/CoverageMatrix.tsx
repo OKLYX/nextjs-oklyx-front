@@ -615,9 +615,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     summaryPackage ? packageLabel(summaryPackage) : '미지정'
   }`;
   const tagsSummary = `태그 ${(master?.tags ?? []).length}개`;
-  const suffixSummary = master?.optionCheckSuffix?.trim()
-    ? master.optionCheckSuffix
-    : '기본값 사용';
   const shippingOverrideCount = Object.keys(master?.shippingOverride ?? {}).length;
   const shippingSummary =
     shippingOverrideCount > 0 ? `${shippingOverrideCount}개 항목 지정` : '기본값 사용';
@@ -1255,31 +1252,19 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       </p>
 
       {/* 목록 아래 편집 섹션 = 탭(`MasterSectionTabs`). 예전엔 `DetailSection` 토글 7개를 세로로 쌓았다.
-          탭 순서 = 옛 섹션 순서. 처음 여는 탭만 마운트되고(lazy), 본 탭은 `hidden` 으로 남아 미저장 입력을 지킨다.
-          🔴 전부 ADMIN 전용 — 「채널별 옵션」의 `channel-options` 는 `/api/admin/**` 이다(비-ADMIN 은 403).
-          ⚠️ `master` 가 필요한 탭은 로드 뒤에만 나타난다. 마스터 편집 지점은 이 상세 페이지 하나다(모달은 생성 전용).
+          탭 4개 = 상품 기본 정보 | 이미지 | 배송 설정 | 채널별 옵션 설정 (사용자 결정 2026-09-26).
+          처음 여는 탭만 마운트되고(lazy), 본 탭은 `hidden` 으로 남아 미저장 입력을 지킨다.
+          🔴 전부 ADMIN 전용 — 「채널별 옵션 설정」의 `channel-options` 는 `/api/admin/**` 이다(비-ADMIN 은 403).
+          ⚠️ 탭은 `master` 로드 뒤에만 나타난다. 마스터 편집 지점은 이 상세 페이지 하나다(모달은 생성 전용).
           「상품 기본 정보」 = 기본 정보 · 표준 카테고리 · 필수속성/고시 · 옵션을 **한 탭에 세로로 펼친다**(안쪽 탭 없음).
-          이미지는 별도 탭, 기본 택배/상자 + 전 채널 배송은 「배송 설정」 한 탭이다. */}
+          「이미지」 = 이미지 풀 + 템플릿 필드값, 「배송 설정」 = 기본 택배/상자 + 전 채널 배송,
+          「채널별 옵션 설정」 = 채널별 옵션 표 + 등록상품명·태그 + 등록상품명 추가 문구. */}
       {isAdmin && (
         <MasterSectionTabs
           openTab={sectionOpenTab}
-          tabs={[
-            ...(master
+          tabs={
+            master
               ? [
-                  {
-                    key: 'channelOptions' as const,
-                    label: '채널별 옵션',
-                    summary: channelOptionSummary,
-                    content: (
-                      <ChannelOptionTable
-                        rows={matrix?.rows ?? []}
-                        masterOptions={options}
-                        cells={channelOptionCells}
-                        error={channelOptionError}
-                        onEditMasterOption={handleEditMasterOption}
-                      />
-                    ),
-                  },
                   {
                     key: 'basic' as const,
                     label: '상품 기본 정보',
@@ -1354,32 +1339,30 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                   {
                     key: 'images' as const,
                     label: '이미지',
-                    content: (
-                      <div className="space-y-2 p-4">
-                        <h3 className="text-sm font-semibold text-gray-900">이미지</h3>
-                        <p className="text-[11px] text-gray-500">변경 즉시 저장됩니다.</p>
-                        <MasterImagePool
-                          masterId={masterId}
-                          detailUseCase={detailUseCase}
-                          fields={imageFields}
-                          fieldFilters={imageFieldFilters}
-                          productImageUseCase={productImageUseCase}
-                          sourceProducts={sourceProducts}
-                        />
-                      </div>
-                    ),
-                  },
-                  {
-                    key: 'fieldValues' as const,
-                    label: '템플릿 필드값',
                     summary: fieldValuesSummary,
                     content: (
-                      <MasterFieldValuesPanel
-                        master={master}
-                        useCase={masterUseCase}
-                        templateUseCase={templateUseCase}
-                        onSaved={handlePanelSaved}
-                      />
+                      <div className="divide-y divide-gray-200">
+                        <div className="space-y-2 p-4">
+                          <h3 className="text-sm font-semibold text-gray-900">이미지</h3>
+                          <p className="text-[11px] text-gray-500">변경 즉시 저장됩니다.</p>
+                          <MasterImagePool
+                            masterId={masterId}
+                            detailUseCase={detailUseCase}
+                            fields={imageFields}
+                            fieldFilters={imageFieldFilters}
+                            productImageUseCase={productImageUseCase}
+                            sourceProducts={sourceProducts}
+                          />
+                        </div>
+                        <StackedBlock title="템플릿 필드값">
+                          <MasterFieldValuesPanel
+                            master={master}
+                            useCase={masterUseCase}
+                            templateUseCase={templateUseCase}
+                            onSaved={handlePanelSaved}
+                          />
+                        </StackedBlock>
+                      </div>
                     ),
                   },
                   {
@@ -1407,28 +1390,34 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     ),
                   },
                   {
-                    key: 'tags' as const,
-                    label: '등록상품명 · 태그',
-                    summary: tagsSummary,
+                    key: 'channelOptions' as const,
+                    label: '채널별 옵션 설정',
+                    summary: `${channelOptionSummary} · ${tagsSummary}`,
                     content: (
-                      <MasterTagsPanel master={master} useCase={masterUseCase} onSaved={handlePanelSaved} />
+                      <div className="divide-y divide-gray-200">
+                        <ChannelOptionTable
+                          rows={matrix?.rows ?? []}
+                          masterOptions={options}
+                          cells={channelOptionCells}
+                          error={channelOptionError}
+                          onEditMasterOption={handleEditMasterOption}
+                        />
+                        <StackedBlock title="등록상품명 · 태그">
+                          <MasterTagsPanel master={master} useCase={masterUseCase} onSaved={handlePanelSaved} />
+                        </StackedBlock>
+                        <div className="p-4">
+                          <MasterRegistrationSuffixPanel
+                            masterId={masterId}
+                            useCase={masterUseCase}
+                            onSaved={load}
+                          />
+                        </div>
+                      </div>
                     ),
                   },
                 ]
-              : []),
-            {
-              key: 'suffix',
-              label: '등록상품명 추가 문구',
-              summary: suffixSummary,
-              content: (
-                <MasterRegistrationSuffixPanel
-                  masterId={masterId}
-                  useCase={masterUseCase}
-                  onSaved={load}
-                />
-              ),
-            },
-          ]}
+              : []
+          }
         />
       )}
 
