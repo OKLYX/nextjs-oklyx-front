@@ -226,6 +226,10 @@ export interface MatrixCell {
   // ⚠️ 프론트가 `categoryCode` 유무나 이름 비교로 다시 판정하지 말 것(2609_45/D10-1) — 가져오기는
   // 카테고리가 같아도 코드를 저장하므로 기존 셀 전부에 배지가 뜬다. 판정은 서버 값 하나뿐이다.
   usesOwnCategory?: boolean;
+  // true = 로컬에서 바뀐 값이 아직 마켓에 가지 않았다([수정 요청] 필요). 백엔드 `ProductListing.needsMarketSync`.
+  // ⚠️ optional — 매트릭스 응답이 아직 이 필드를 싣지 않는다. 없으면(undefined) 「변경 미반영」 칩을
+  //    띄우지 않고 [수정 요청]은 ⋯ 메뉴에 남는다(주장하지 않는다). 판정은 `=== true` 엄격 비교.
+  needsMarketSync?: boolean;
 }
 
 export interface MatrixRow {
