@@ -13,7 +13,6 @@ import {
   type ShippingOverride,
 } from '@/domain/entities/ShippingEntity';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
-import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
 
 /** One registered channel cell of this master — the force-apply selection unit (79). */
@@ -208,8 +207,9 @@ export function MasterShippingOverridePanel({
   const busy = isSaving || isApplying;
 
   return (
-    <Card>
-      <h2 className="mb-1 text-sm font-semibold text-gray-900">배송 설정 (전 채널)</h2>
+    // 「배송 설정」 탭 안에서 기본 택배/상자 아래 블록이다 — 카드 껍데기 없이 형제 블록과 같은 p-4.
+    <div className="p-4">
+      <h3 className="mb-1 text-sm font-semibold text-gray-900">전 채널 배송</h3>
       <p className="mb-3 text-xs text-gray-500">
         비운 값은 판매채널의 기본 배송 설정을 그대로 쓰고, 채워진 값은 이 마스터의 전 채널에 적용됩니다.
         (출고지·반품지는 채널에서만 지정)
@@ -334,6 +334,6 @@ export function MasterShippingOverridePanel({
         onConfirm={handleForceApply}
         onCancel={() => setConfirmApply(false)}
       />
-    </Card>
+    </div>
   );
 }

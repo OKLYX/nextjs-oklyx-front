@@ -5,8 +5,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 export type MasterSectionKey =
   | 'channelOptions'
   | 'basic'
+  | 'images'
   | 'fieldValues'
-  | 'defaultCost'
   | 'tags'
   | 'suffix'
   | 'shipping';
@@ -33,14 +33,15 @@ interface MasterSectionTabsProps {
  * 마스터 상세에서 판매상품 목록(채널 매트릭스) **아래** 편집 섹션들의 탭 셸.
  * File: src/app/dashboard/master-products/[id]/components/MasterSectionTabs.tsx
  *
- * **용도**: 세로로 쌓여 있던 토글 섹션 7개(채널별 옵션 · 상품 기본 정보 · 템플릿 필드값 ·
- * 기본 택배/상자 · 등록상품명·태그 · 등록상품명 추가 문구 · 배송 설정)를 탭으로 바꿔 한 번에 하나만 보인다.
+ * **용도**: 목록 아래 편집 섹션(채널별 옵션 · 상품 기본 정보 · 이미지 · 템플릿 필드값 · 배송 설정 ·
+ * 등록상품명·태그 · 등록상품명 추가 문구)을 탭으로 보여 한 번에 하나만 보인다.
+ * 「상품 기본 정보」는 하위 블록 4개를 한 탭에 세로로 펼치고, 「배송 설정」은 기본 택배/상자 + 전 채널 배송을 합친 탭이다.
  *
  * **필수 사용 규칙**:
  * - 목록 아래에 새 편집 패널을 추가할 때는 토글 섹션으로 쌓지 말고 이 탭에 항목을 추가한다.
  * - 첫 탭이 기본 선택이다. 활성 탭은 **컴포넌트 로컬** — store·localStorage 로 persist 하지 않는다.
  *
- * **마운트 규칙** — `BasicInfoTabs` 와 같다:
+ * **마운트 규칙**:
  * | 상태 | 처리 | 이유 |
  * |---|---|---|
  * | 한 번도 안 본 탭 | 렌더하지 않는다 | lazy — 그 탭의 조회가 일어나지 않는다 |
@@ -49,13 +50,13 @@ interface MasterSectionTabsProps {
  *
  * ❌ `{active === key && <Pane/>}` 로 갈아끼우지 말 것 — 탭을 옮겼다 오면 입력 중이던 값이 사라진다.
  * ❌ 탭 바를 sticky 로 고정하지 말 것 — 이 화면에서 고정하는 것은 페이지 머리말 하나뿐이다.
- * ⚠️ `BasicInfoTabs` 와 합치지 말 것 — 그쪽은 「상품 기본 정보」 탭 **안쪽** 전용이다.
+ * ❌ 탭 안에 다시 탭을 두지 말 것 — 「상품 기본 정보」 하위 블록은 한 탭에 펼쳐 보이는 것이 사용자 결정이다.
  *
  * @example
  * <MasterSectionTabs
  *   openTab={sectionOpenTab}
  *   tabs={[
- *     { key: 'basic', label: '상품 기본 정보', summary: basicSummary, content: <BasicInfoTabs … /> },
+ *     { key: 'basic', label: '상품 기본 정보', summary: basicSummary, content: <div>…</div> },
  *     { key: 'tags', label: '등록상품명 · 태그', summary: tagsSummary, content: <MasterTagsPanel … /> },
  *   ]}
  * />
