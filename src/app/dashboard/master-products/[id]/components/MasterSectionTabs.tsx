@@ -2,14 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 
-export type MasterSectionKey =
-  | 'channelOptions'
-  | 'basic'
-  | 'images'
-  | 'fieldValues'
-  | 'tags'
-  | 'suffix'
-  | 'shipping';
+export type MasterSectionKey = 'basic' | 'images' | 'shipping' | 'channelOptions';
 
 export interface MasterSectionTab {
   key: MasterSectionKey;
@@ -33,9 +26,9 @@ interface MasterSectionTabsProps {
  * 마스터 상세에서 판매상품 목록(채널 매트릭스) **아래** 편집 섹션들의 탭 셸.
  * File: src/app/dashboard/master-products/[id]/components/MasterSectionTabs.tsx
  *
- * **용도**: 목록 아래 편집 섹션(채널별 옵션 · 상품 기본 정보 · 이미지 · 템플릿 필드값 · 배송 설정 ·
- * 등록상품명·태그 · 등록상품명 추가 문구)을 탭으로 보여 한 번에 하나만 보인다.
- * 「상품 기본 정보」는 하위 블록 4개를 한 탭에 세로로 펼치고, 「배송 설정」은 기본 택배/상자 + 전 채널 배송을 합친 탭이다.
+ * **용도**: 목록 아래 편집 섹션을 탭 4개(상품 기본 정보 · 이미지 · 배송 설정 · 채널별 옵션 설정)로 보여
+ * 한 번에 하나만 보인다. 각 탭은 하위 블록을 세로로 펼친다 — 「이미지」 = 이미지 풀 + 템플릿 필드값,
+ * 「배송 설정」 = 기본 택배/상자 + 전 채널 배송, 「채널별 옵션 설정」 = 옵션 표 + 등록상품명·태그 + 추가 문구.
  *
  * **필수 사용 규칙**:
  * - 목록 아래에 새 편집 패널을 추가할 때는 토글 섹션으로 쌓지 말고 이 탭에 항목을 추가한다.
@@ -50,14 +43,14 @@ interface MasterSectionTabsProps {
  *
  * ❌ `{active === key && <Pane/>}` 로 갈아끼우지 말 것 — 탭을 옮겼다 오면 입력 중이던 값이 사라진다.
  * ❌ 탭 바를 sticky 로 고정하지 말 것 — 이 화면에서 고정하는 것은 페이지 머리말 하나뿐이다.
- * ❌ 탭 안에 다시 탭을 두지 말 것 — 「상품 기본 정보」 하위 블록은 한 탭에 펼쳐 보이는 것이 사용자 결정이다.
+ * ❌ 탭 안에 다시 탭을 두지 말 것 — 하위 블록은 한 탭에 펼쳐 보이는 것이 사용자 결정이다.
  *
  * @example
  * <MasterSectionTabs
  *   openTab={sectionOpenTab}
  *   tabs={[
  *     { key: 'basic', label: '상품 기본 정보', summary: basicSummary, content: <div>…</div> },
- *     { key: 'tags', label: '등록상품명 · 태그', summary: tagsSummary, content: <MasterTagsPanel … /> },
+ *     { key: 'images', label: '이미지', summary: fieldValuesSummary, content: <div>…</div> },
  *   ]}
  * />
  */
