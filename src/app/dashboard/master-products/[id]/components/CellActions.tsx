@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { MoreHorizontal } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { ROUTES } from '@/config/routes';
@@ -61,7 +62,32 @@ interface CellActionsProps {
   cells: CellRef[];
   /** 해제·삭제 성공 시 부모가 배너를 띄우고 다시 읽는다(두 동작 공용). */
   onCellRemoved: (message: string) => void;
+  /** 로컬 변경이 마켓에 아직 안 갔다(`MatrixCell.needsMarketSync === true`) → [수정 요청]이 주 버튼. */
+  needsMarketSync: boolean;
 }
+
+interface MenuItem {
+  key: string;
+  label: string;
+  onClick?: () => void;
+  /** 있으면 새 탭 링크로 연다(onClick 무시). */
+  href?: string;
+}
+
+interface MenuGroup {
+  label: string;
+  items: MenuItem[];
+}
+
+/**
+ * [쿠팡에서 보기] = WING 의 판매자 상품 화면. `platformProductId` 는 쿠팡 sellerProductId 다
+ * (구매자용 상품 페이지 id 가 아니다 — 그 값은 저장하지 않는다).
+ * ⚠️ 주소 형식은 실계정으로 확인하지 않았다 — 틀리면 이 함수 한 곳만 고친다.
+ */
+const coupangWingUrl = (sellerProductId: string) =>
+  `https://wing.coupang.com/tenants/seller-web/vendor-inventory/modify?vendorInventoryId=${encodeURIComponent(
+    sellerProductId,
+  )}`;
 
 type Busy =
   | 'register'
@@ -74,11 +100,17 @@ type Busy =
   | null;
 
 /**
- * 등록됨/DRAFT 셀의 상태별 액션 버튼 (register / update-request / fetch-status / regenerate / 필드값 편집).
+ * 판매상품(셀) 한 줄의 액션 = **주 버튼 하나 + ⋯ 메뉴**.
  * File: src/app/dashboard/master-products/[id]/components/CellActions.tsx
+ *
+ * - 주 버튼: 미전송(DRAFT) = [마켓 등록] · 변경 미반영(`needsMarketSync`) = [수정 요청] · 그 외 없음.
+ * - ⋯ 메뉴: 편집(필드값·상세·가격·재고·옵션명·배송) / 동기화(수정 요청·승인 새로고침·재생성) /
+ *   연결(쿠팡에서 보기·마스터 카테고리로 변경) / 구분선 아래 빨간 [마스터 연결 해제]·[채널 삭제].
+ * - 결과 알림(성공·실패·승인 결과)은 행 아래 한 줄(`basis-full`)로 나온다 — 부모 행이 flex-wrap 이어야 한다.
  *
  * 마켓 호출은 비동기(즉시 반환) — 승인은 이후 [승인 새로고침]으로 확인.
  * [수정 요청](109): 등록된 셀(DRAFT 아님)의 현재 값을 마켓에 강제 재전송 → 재심사(SUBMITTED).
+ * ⚠️ 동작(핸들러·확인창·모달)은 버튼 줄 시절과 같다 — 바뀐 것은 위치와 묶음뿐이다.
  */
 export function CellActions({
   masterId,
@@ -97,6 +129,7 @@ export function CellActions({
   masterCategoryName,
   cells,
   onCellRemoved,
+  needsMarketSync,
 }: CellActionsProps) {
   const router = useRouter();
   const useCase = useMemo(
@@ -119,6 +152,25 @@ export function CellActions({
   // "열려 있다"만으로는 어느 셀을 떼는지 알 수 없다.
   const [unlinkTarget, setUnlinkTarget] = useState<CellRef | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CellRef | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // 바깥 클릭·Esc 로 메뉴를 닫는다. 닫혀 있을 때는 리스너를 걸지 않는다.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
 
   const optionName = (id: number) => options.find((o) => o.id === id)?.name ?? `옵션 #${id}`;
 
@@ -236,21 +288,112 @@ export function CellActions({
       onReload();
     });
 
-  // The matrix cell can't distinguish SUBMITTED/SELLING; the fetch-status result
-  // (when present) is the source of truth and reveals the SELLING regenerate action.
+  // The fetch-status result (when present) is fresher than the matrix value until the reload lands.
   const status: ListingStatus = statusResult?.status ?? listing.status;
 
-  // This channel has a stored shipping override → highlight the button.
+  // This channel has a stored shipping override → mark the menu item.
   const hasShippingOverride = !!shippingOverride && Object.keys(shippingOverride).length > 0;
 
   // Guard the register action only (77). Strict false — undefined/null means "not judged" → allow.
   const shippingBlocked = shippingReady === false;
   const shippingBlockedReason = '배송 설정 미완료 — 마스터/채널/계정 중 한 곳에서 배송 설정 필요';
 
+  // 주 버튼은 상태에 따라 **하나만**: 미전송 = [마켓 등록], 변경 미반영 = [수정 요청], 그 외 = 없음.
+  // 나머지 동작은 전부 ⋯ 메뉴로 간다(동작 자체는 무변경 — 위치와 묶음만 바뀌었다).
+  const primary: 'register' | 'update' | null =
+    status === 'DRAFT' ? 'register' : needsMarketSync ? 'update' : null;
+
+  const menuGroups: MenuGroup[] = [
+    {
+      label: '편집',
+      items: [
+        { key: 'fields', label: '필드값 편집', onClick: () => setShowFieldValues(true) },
+        {
+          key: 'detail',
+          label: '상세 편집',
+          onClick: () => router.push(ROUTES.MASTER_PRODUCT_DETAIL_EDIT(masterId, listing.id)),
+        },
+        // 판매가·재고·옵션명은 등록 전에도 정해두는 값이라 DRAFT 를 포함한 모든 셀에서 노출한다
+        // (2609_19 / 103/D3 / 2609_22/D23).
+        { key: 'price', label: '가격 설정', onClick: () => setShowPrice(true) },
+        { key: 'stock', label: '재고 설정', onClick: () => setShowStock(true) },
+        { key: 'option-name', label: '옵션명', onClick: () => setShowOptionName(true) },
+        {
+          key: 'shipping',
+          label: `채널 배송 설정${hasShippingOverride ? ' ✓' : ''}`,
+          onClick: () => setShowShipping(true),
+        },
+      ],
+    },
+    {
+      label: '동기화',
+      items: [
+        ...(status !== 'DRAFT' && primary !== 'update'
+          ? [{ key: 'update', label: '수정 요청', onClick: handleUpdateRequest }]
+          : []),
+        // ⚠️ 반려는 막다른 길이 아니라 재확인이 가능해야 한다 → REJECTED 에도 노출.
+        ...(status === 'SUBMITTED' || status === 'SELLING' || status === 'REJECTED'
+          ? [{ key: 'fetch', label: '승인 새로고침', onClick: handleFetch }]
+          : []),
+        ...(status === 'SELLING'
+          ? [{ key: 'regenerate', label: '재생성', onClick: handleRegenerate }]
+          : []),
+      ],
+    },
+    {
+      label: '연결',
+      items: [
+        ...cells
+          .filter((c) => platform === 'COUPANG' && c.platformProductId)
+          .map((c) => ({
+            key: `market-${c.productListingId}`,
+            label: '쿠팡에서 보기',
+            href: coupangWingUrl(c.platformProductId!),
+          })),
+        // 채널이 자기 카테고리를 쓰는 셀에만(2609_45/D13). 마스터 → 채널 방향은 없다.
+        ...(usesOwnCategory
+          ? [
+              {
+                key: 'category-source',
+                label: '마스터 카테고리로 변경',
+                onClick: () => setShowCategorySource(true),
+              },
+            ]
+          : []),
+      ],
+    },
+  ];
+
+  // 2609_63: 파괴적 조작은 구분선 아래 빨간색. 마켓 상품 ID 가 있으면 [마스터 연결 해제],
+  // 없으면(미전송) [채널 삭제] — 한 셀에 둘이 동시에 보이는 일은 없다.
+  const dangerItems: MenuItem[] = cells.map((c) =>
+    c.platformProductId
+      ? {
+          key: `unlink-${c.productListingId}`,
+          label: `마스터 연결 해제${cells.length > 1 ? ` · ${c.platformProductId}` : ''}`,
+          onClick: () => setUnlinkTarget(c),
+        }
+      : {
+          key: `delete-${c.productListingId}`,
+          label: `채널 삭제${cells.length > 1 ? ' · 미전송' : ''}`,
+          onClick: () => setDeleteTarget(c),
+        },
+  );
+
+  const runMenuItem = (item: MenuItem) => {
+    setMenuOpen(false);
+    item.onClick?.();
+  };
+
+  const hasFeedback =
+    (status === 'DRAFT' && shippingBlocked) || !!pushedBanner || !!statusResult || !!error;
+
   return (
-    <div className="space-y-1.5">
-      <div className="flex flex-wrap gap-1.5">
-        {status === 'DRAFT' && (
+    // `contents` = 액션 묶음과 알림 줄이 부모(판매상품 행)의 flex 흐름에 그대로 들어간다 —
+    // 액션은 행 오른쪽 끝, 알림 줄은 `basis-full` 로 행 아래 한 줄을 차지한다.
+    <div className="contents">
+      <div className="flex shrink-0 items-center gap-1.5">
+        {primary === 'register' && (
           <button
             type="button"
             onClick={handleRegister}
@@ -258,202 +401,123 @@ export function CellActions({
             title={shippingBlocked ? shippingBlockedReason : undefined}
             className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
           >
-            {busy === 'register' ? <Spinner label="요청 중..." /> : '마켓 등록'}
+            {busy === 'register' ? <Spinner size={12} label="요청 중..." /> : '마켓 등록'}
           </button>
         )}
-
-        {status !== 'DRAFT' && (
+        {primary === 'update' && (
           <button
             type="button"
             onClick={handleUpdateRequest}
             disabled={busy !== null}
             className="flex items-center gap-1 rounded border border-amber-300 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
           >
-            {busy === 'update' ? <Spinner label="요청 중..." /> : '수정 요청'}
+            {busy === 'update' ? <Spinner size={12} label="요청 중..." /> : '수정 요청'}
           </button>
         )}
 
-        {(status === 'SUBMITTED' || status === 'SELLING') && (
+        <div ref={menuRef} className="relative">
           <button
             type="button"
-            onClick={handleFetch}
+            onClick={() => setMenuOpen((v) => !v)}
             disabled={busy !== null}
-            className="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="더 보기"
+            className="flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
           >
-            {busy === 'fetch' ? <Spinner label="확인 중..." /> : '승인 새로고침'}
+            {busy !== null && busy !== primary ? <Spinner size={12} /> : <MoreHorizontal size={16} />}
           </button>
-        )}
-
-        {status === 'SELLING' && (
-          <button
-            type="button"
-            onClick={handleRegenerate}
-            disabled={busy !== null}
-            className="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          >
-            {busy === 'regenerate' ? <Spinner label="재생성 중..." /> : '재생성'}
-          </button>
-        )}
-
-        {status === 'REJECTED' && (
-          <button
-            type="button"
-            onClick={handleFetch}
-            disabled={busy !== null}
-            className="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          >
-            {busy === 'fetch' ? <Spinner label="확인 중..." /> : '승인 새로고침'}
-          </button>
-        )}
-
-        {/* ⚠️ enum 원문을 노출하지 않는다(UI 용어 규칙). 반려는 막다른 길이 아니라 재확인이 가능해야 한다. */}
-        {(status === 'REJECTED' || status === 'SUSPENDED') && (
-          <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">
-            {status === 'REJECTED' ? '승인 반려' : '판매 중지'}
-          </span>
-        )}
-
-        <button
-          type="button"
-          onClick={() => setShowFieldValues(true)}
-          disabled={busy !== null}
-          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-        >
-          필드값 편집
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push(ROUTES.MASTER_PRODUCT_DETAIL_EDIT(masterId, listing.id))}
-          disabled={busy !== null}
-          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-        >
-          상세 편집
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setShowShipping(true)}
-          disabled={busy !== null}
-          className={`rounded border px-2 py-1 text-xs font-medium disabled:opacity-50 ${
-            hasShippingOverride
-              ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-              : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          채널 배송 설정{hasShippingOverride ? ' ✓' : ''}
-        </button>
-
-        {/* 재고는 등록 전에도 정해두는 값이라 DRAFT 를 포함한 모든 셀에서 노출한다(103/D3). */}
-        <button
-          type="button"
-          onClick={() => setShowStock(true)}
-          disabled={busy !== null}
-          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-        >
-          재고 설정
-        </button>
-
-        {/* 판매가도 등록 전에 정해두는 값이라 DRAFT 를 포함한 모든 셀에서 노출한다(2609_19). */}
-        <button
-          type="button"
-          onClick={() => setShowPrice(true)}
-          disabled={busy !== null}
-          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-        >
-          가격 설정
-        </button>
-
-        {/* 옵션명도 등록 전에 정해두는 값이라 DRAFT 를 포함한 모든 셀에서 노출한다(2609_22/D23). */}
-        <button
-          type="button"
-          onClick={() => setShowOptionName(true)}
-          disabled={busy !== null}
-          className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-        >
-          옵션명
-        </button>
-
-        {/* 채널이 자기 카테고리를 쓰는 셀에만 노출(2609_45/D13). 마스터 → 채널 방향은 없다. */}
-        {usesOwnCategory && (
-          <button
-            type="button"
-            onClick={() => setShowCategorySource(true)}
-            disabled={busy !== null}
-            className="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          >
-            {busy === 'category-source' ? (
-              <Spinner label="변경 중..." />
-            ) : (
-              '마스터 카테고리로 변경'
-            )}
-          </button>
-        )}
-
-        {/* 2609_63: 파괴적 조작은 액션 줄 맨 끝에 둔다. 🔴 버튼은 **셀마다 하나씩**(D10-1) —
-            마켓 상품 ID 가 있으면 [마스터 연결 해제], 없으면(미전송) [채널 삭제] 다.
-            한 셀에 둘이 동시에 보이는 일은 없다. 셀이 둘 이상이면 라벨에 그 셀의 상품 ID 를 붙인다
-            — 없으면 같은 버튼이 여러 개 서서 어느 쿠팡 페이지를 떼는지 알 수 없다.
-            ⚠️ 셀별 스피너를 두지 않는다 — 한 번에 한 동작이라 `busy !== null` 이면 전부 잠긴다. */}
-        {cells.map((c) =>
-          c.platformProductId ? (
-            <button
-              key={c.productListingId}
-              type="button"
-              onClick={() => setUnlinkTarget(c)}
-              disabled={busy !== null}
-              className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+          {/* 드롭다운은 팝업이 아니다(백드롭·작성 중 확인 없음) → `ui/Modal` 대신 말풍선 층(z-30).
+              바깥 클릭·Esc 로 닫는다(`AlertBell` 과 같은 규칙). */}
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-30 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 text-left shadow-lg"
             >
-              마스터 연결 해제{cells.length > 1 ? ` · ${c.platformProductId}` : ''}
-            </button>
-          ) : (
-            <button
-              key={c.productListingId}
-              type="button"
-              onClick={() => setDeleteTarget(c)}
-              disabled={busy !== null}
-              className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-            >
-              채널 삭제{cells.length > 1 ? ' · 미전송' : ''}
-            </button>
-          ),
-        )}
+              {menuGroups
+                .filter((g) => g.items.length > 0)
+                .map((group) => (
+                  <div key={group.label} className="py-1">
+                    <p className="px-3 pb-0.5 text-[10px] font-semibold text-gray-400">
+                      {group.label}
+                    </p>
+                    {group.items.map((item) =>
+                      item.href ? (
+                        <a
+                          key={item.key}
+                          role="menuitem"
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => setMenuOpen(false)}
+                          className="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                        >
+                          {item.label} ↗
+                        </a>
+                      ) : (
+                        <button
+                          key={item.key}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => runMenuItem(item)}
+                          className="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-100"
+                        >
+                          {item.label}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                ))}
+              {dangerItems.length > 0 && (
+                <div className="border-t border-gray-200 py-1">
+                  {dangerItems.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => runMenuItem(item)}
+                      className="block w-full px-3 py-1.5 text-left text-xs font-medium text-red-600 hover:bg-red-50"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {status === 'DRAFT' && shippingBlocked && (
-        <p className="text-[11px] text-gray-500">{shippingBlockedReason}</p>
-      )}
-
-      {status === 'SUBMITTED' && !statusResult && (
-        <p className="text-[11px] text-amber-600">승인 대기중</p>
-      )}
-
-      {pushedBanner && <p className="text-[11px] text-green-700">{pushedBanner}</p>}
-
-      {statusResult && (
-        <div className="space-y-1">
-          {statusResult.status === 'SELLING' && (
-            <p className="text-[11px] text-green-700">판매중으로 전환됨</p>
+      {hasFeedback && (
+        <div className="basis-full space-y-1 pl-9">
+          {/* disabled 버튼의 title 은 hover 가 안 뜨는 브라우저가 있어 보이는 안내 1줄을 함께 둔다. */}
+          {status === 'DRAFT' && shippingBlocked && (
+            <p className="text-[11px] text-gray-500">{shippingBlockedReason}</p>
           )}
-          <div className="flex flex-wrap gap-1">
-            {statusResult.options.map((o) => (
-              <span
-                key={o.optionId}
-                className={`rounded px-1.5 py-0.5 text-[10px] ${
-                  o.approvalStatus === 'APPROVED'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-500'
-                }`}
-                title={o.platformOptionId ?? undefined}
-              >
-                {optionName(o.optionId)}
-              </span>
-            ))}
-          </div>
+          {pushedBanner && <p className="text-[11px] text-green-700">{pushedBanner}</p>}
+          {statusResult && (
+            <div className="flex flex-wrap items-center gap-1">
+              {statusResult.status === 'SELLING' && (
+                <span className="text-[11px] text-green-700">판매중으로 전환됨</span>
+              )}
+              {statusResult.options.map((o) => (
+                <span
+                  key={o.optionId}
+                  className={`rounded px-1.5 py-0.5 text-[10px] ${
+                    o.approvalStatus === 'APPROVED'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}
+                  title={o.platformOptionId ?? undefined}
+                >
+                  {optionName(o.optionId)}
+                </span>
+              ))}
+            </div>
+          )}
+          {error && <p className="text-[11px] text-red-600">{error}</p>}
         </div>
       )}
-
-      {error && <p className="text-[11px] text-red-600">{error}</p>}
 
       {showFieldValues && (
         <ChannelFieldValuesModal
