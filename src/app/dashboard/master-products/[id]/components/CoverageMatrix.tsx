@@ -60,7 +60,7 @@ import { deriveMasterImageFields } from '../../components/masterImageFields';
 import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
 import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
 import { submitNoticeGroup } from './categoryMetaValidation';
-import { DetailSection } from './DetailSection';
+import { MasterSectionTabs, type MasterSectionKey } from './MasterSectionTabs';
 import { BasicInfoTabs, type BasicTabKey } from './BasicInfoTabs';
 import { ChannelOptionTable } from './ChannelOptionTable';
 import { MasterCategoryPanel } from './MasterCategoryPanel';
@@ -212,7 +212,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // place by MasterCategoryPanel's onCategoryChanged. 카테고리 메타 섹션과 옵션 섹션이 같은 값을 쓴다.
   const [category, setCategory] = useState<MasterCategoryResponse | null>(null);
   // Bumped by the 카테고리 메타 섹션 after a save → re-fetches the option editor's inherit baseline.
-  // ⚠️ 유일한 갱신 경로다: DetailSection 은 접었다 펴도 remount 되지 않아 스스로 낫지 않는다.
+  // ⚠️ 유일한 갱신 경로다: 탭(MasterSectionTabs)은 옮겼다 돌아와도 remount 되지 않아 스스로 낫지 않는다.
   const [metaVersion, setMetaVersion] = useState(0);
   // 옵션 override diff 의 기준값 = **서버에 저장된** 마스터 카테고리 메타(쿠팡).
   const [masterAttrValues, setMasterAttrValues] = useState<Record<string, string>>({});
@@ -280,16 +280,17 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   // Per-channel option activation (43): the listing id currently saving an active-set change.
   const [optionBusyId, setOptionBusyId] = useState<number | null>(null);
-  // 2609_61: 옵션×채널 표 → 「상품 기본 정보 > 옵션」 이동. `basicOpenSignal` 은 섹션을 여는 신호(닫지
-  // 않는다), `focusOption` 은 옵션 에디터가 반응할 대상이다. ⚠️ 초기값 undefined — 0 으로 두면 마운트
-  // 때 섹션이 저절로 펼쳐진다(기본은 전부 접힘).
-  const [basicOpenSignal, setBasicOpenSignal] = useState<number | undefined>(undefined);
+  // 2609_61: 옵션×채널 표 → 「상품 기본 정보 > 옵션」 이동. `sectionOpenTab` 은 바깥 탭을 고르는 신호,
+  // `focusOption` 은 옵션 에디터가 반응할 대상이다. ⚠️ 초기값 undefined — 객체를 처음부터 넘기면 마운트
+  // 때 그 탭이 켜진다(기본 = 첫 탭).
+  const [sectionOpenTab, setSectionOpenTab] = useState<
+    { key: MasterSectionKey; nonce: number } | undefined
+  >(undefined);
   const [focusOption, setFocusOption] = useState<{ optionId: number; nonce: number } | undefined>(
     undefined,
   );
-  // 2609_73: 「채널별 옵션」 → 옵션 **탭**으로. `basicOpenSignal` 이 섹션을 열고, 이것이 탭을 고른다.
-  // 탭이 생긴 뒤로는 섹션만 열어서는 아무 일도 안 보이기 때문이다(옵션 탭이 아니면 가려져 있다).
-  // ⚠️ 초기값 undefined — 객체를 처음부터 넘기면 마운트 때 옵션 탭이 켜진다(basicOpenSignal 과 같은 함정).
+  // 2609_73: 「채널별 옵션」 → 「상품 기본 정보」 안쪽 옵션 **탭**으로. `sectionOpenTab` 이 바깥 탭을 고르고,
+  // 이것이 안쪽 탭을 고른다. ⚠️ 초기값 undefined — 객체를 처음부터 넘기면 마운트 때 옵션 탭이 켜진다.
   const [basicOpenTab, setBasicOpenTab] = useState<{ key: BasicTabKey; nonce: number } | undefined>(
     undefined,
   );
@@ -467,16 +468,15 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   }, []);
 
   /**
-   * 2609_61: 옵션×채널 표의 [옵션 수정] — 「상품 기본 정보」를 펼치고 그 옵션의 수정 폼으로 보낸다.
+   * 2609_61: 옵션×채널 표의 [옵션 수정] — 「상품 기본 정보」 탭을 고르고 그 옵션의 수정 폼으로 보낸다.
    * 🔴 `router.push` 를 쓰지 말 것 — 페이지가 다시 렌더되며 매트릭스 상태(선택·배너·썸네일)가 날아간다.
    * 해시는 새로고침·뒤로가기에도 "어디로 갔었는지" 가 남도록 `replaceState` 로만 바꾼다.
    */
   const handleEditMasterOption = useCallback((masterOptionId: number) => {
-    // 🔴 `basicOpenSignal` 은 **증가 카운터**다(타임스탬프로 바꾸지 말 것).
-    setBasicOpenSignal((n) => (n ?? 0) + 1);
     // nonce = 같은 옵션을 다시 눌러도 에디터가 또 반응하게 하는 값.
-    // 2609_73: 하이라이트(focusOption)와 탭 전환(basicOpenTab)이 한 번의 클릭으로 묶이도록 같은 값을 쓴다.
+    // 2609_73: 하이라이트(focusOption)와 두 탭 전환이 한 번의 클릭으로 묶이도록 같은 값을 쓴다.
     const nonce = Date.now();
+    setSectionOpenTab({ key: 'basic', nonce });
     setFocusOption({ optionId: masterOptionId, nonce });
     setBasicOpenTab({ key: 'options', nonce });
     window.history.replaceState(null, '', `#master-option-${masterOptionId}`);
@@ -897,7 +897,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           🔴 `z-20` = 표의 고정 머리(z-10)보다 위, 알림 말풍선(z-40)·`ui/Modal`(z-50) 아래.
           z-50·z-[60]·fixed inset-0 은 `npm run lint:ui`(HAND_ROLLED_POPUP)가 error 로 막는다.
           🔴 좌우 음수 마진 = 컨테이너 안쪽 여백만큼 번져 나가야 옆으로 새는 내용이 안 보인다.
-          ⚠️ 섹션 제목(`DetailSection`)·탭 바는 고정하지 않는다 — 겹겹이 쌓이면 볼 내용이 줄어든다.
+          ⚠️ 탭 바(`MasterSectionTabs`·`BasicInfoTabs`)는 고정하지 않는다 — 겹겹이 쌓이면 볼 내용이 줄어든다.
           ⚠️ 이 고정은 `dashboard/layout.tsx` 의 `<main>` 이 `overflow-x-clip` 이어야 동작한다
           (`auto` 면 세로축까지 스크롤 영역으로 계산돼 sticky 가 죽는다). */}
       <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 bg-page px-4 py-2 md:-mx-6 md:px-6">
@@ -1260,171 +1260,185 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         {`${MARKET_OPTION_LOCK_REASON} 옵션 추가는 언제든 가능합니다.`}
       </p>
 
-      {/* 2609_61: 옵션 × 채널 표. ⚠️ `DetailSection` 은 처음 펼칠 때 children 을 마운트한다 →
-          표를 열지 않으면 `channel-options` 도 부르지 않는다(의도).
-          🔴 ADMIN 게이트 필수 — `channel-options` 는 `/api/admin/**` 이고 이 페이지는 비-ADMIN 도
-          열리므로, 게이트가 없으면 펼치는 순간 403 이다(90 의 `fetchSyncPreview` 와 같은 이유).
-          [옵션 수정] 의 도착지인 「상품 기본 정보」도 ADMIN 에게만 렌더된다. */}
-      {isAdmin && master && (
-        <DetailSection title="채널별 옵션" summary={channelOptionSummary}>
-          <ChannelOptionTable
-            rows={matrix?.rows ?? []}
-            masterOptions={options}
-            cells={channelOptionCells}
-            error={channelOptionError}
-            onEditMasterOption={handleEditMasterOption}
-          />
-        </DetailSection>
-      )}
-
-      {/* 마스터 편집 = 토글 섹션 스택(83A/83B). 순서 = 상품 기본 정보(기본 정보·표준 카테고리·
-          카테고리 필수속성·고시·옵션·이미지) → 템플릿 필드값 → 기본 택배/상자 → 태그 →
-          등록상품명 접미사 → 배송 설정. ⚠️ 마스터 편집 지점은 이 상세 페이지 하나다(모달은 생성 전용). */}
-      {/* 상품 기본 정보 = 기본 정보 + 표준 카테고리 + 카테고리 필수속성·고시 + 옵션 + 이미지 한
-          토글(사용자 요청 2026-08-29). 상품 자체를 이루는 값이라 함께 열어 본다 → 다시 쪼개지 말 것.
-          2609_73: 겉 토글은 **그대로 하나**이고 그 안만 탭 5개다(세로로 쌓이던 블록 5개 → 한 번에 하나).
-          블록 순서 = 입력 의존 순서 그대로 **= 탭 순서** = 카테고리 → 그 카테고리의 필수속성·고시 →
-          옵션(마스터 필수속성 값을 상속) → 이미지. ⚠️ 펼치면 **첫 탭(기본 정보)만** 마운트된다 —
-          카테고리 메타·옵션 스키마 조회와 이미지 풀 조회는 **그 탭을 처음 열 때** 일어난다(탭 단위
-          lazy mount). 한 번 본 탭은 `hidden` 으로 남아 미저장 입력을 지킨다.
-          ⚠️ 두 카테고리 패널은 `master` 가 로드된 뒤에만 렌더된다(그룹 조건) — 예전 단독 섹션은
-          `isAdmin` 만 봤다. */}
-      {isAdmin && master && (
-        <DetailSection title="상품 기본 정보" summary={basicSummary} openSignal={basicOpenSignal}>
-          <BasicInfoTabs
-            openTab={basicOpenTab}
-            panes={{
-              basic: (
-                <MasterBasicInfoPanel
-                  master={master}
-                  useCase={masterUseCase}
-                  onSaved={handlePanelSaved}
-                />
-              ),
-              category: (
-                <MasterCategoryPanel
+      {/* 목록 아래 편집 섹션 = 탭(`MasterSectionTabs`). 예전엔 `DetailSection` 토글 7개를 세로로 쌓았다.
+          탭 순서 = 옛 섹션 순서. 처음 여는 탭만 마운트되고(lazy), 본 탭은 `hidden` 으로 남아 미저장 입력을 지킨다.
+          🔴 전부 ADMIN 전용 — 「채널별 옵션」의 `channel-options` 는 `/api/admin/**` 이다(비-ADMIN 은 403).
+          ⚠️ `master` 가 필요한 탭은 로드 뒤에만 나타난다. 마스터 편집 지점은 이 상세 페이지 하나다(모달은 생성 전용).
+          「상품 기본 정보」 안쪽은 다시 탭 5개(`BasicInfoTabs`)다 — 다시 쪼개 바깥 탭으로 올리지 말 것. */}
+      {isAdmin && (
+        <MasterSectionTabs
+          openTab={sectionOpenTab}
+          tabs={[
+            ...(master
+              ? [
+                  {
+                    key: 'channelOptions' as const,
+                    label: '채널별 옵션',
+                    summary: channelOptionSummary,
+                    content: (
+                      <ChannelOptionTable
+                        rows={matrix?.rows ?? []}
+                        masterOptions={options}
+                        cells={channelOptionCells}
+                        error={channelOptionError}
+                        onEditMasterOption={handleEditMasterOption}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'basic' as const,
+                    label: '상품 기본 정보',
+                    summary: basicSummary,
+                    content: (
+                      <BasicInfoTabs
+                        openTab={basicOpenTab}
+                        panes={{
+                          basic: (
+                            <MasterBasicInfoPanel
+                              master={master}
+                              useCase={masterUseCase}
+                              onSaved={handlePanelSaved}
+                            />
+                          ),
+                          category: (
+                            <MasterCategoryPanel
+                              masterId={masterId}
+                              useCase={masterUseCase}
+                              categoryUseCase={categoryUseCase}
+                              mappingUseCase={mappingUseCase}
+                              onCategoryChanged={setCategory}
+                            />
+                          ),
+                          meta: (
+                            <CategoryMetaPanel
+                              masterId={masterId}
+                              categoryCode={category ? String(category.categoryId) : null}
+                              isBundle={isBundle}
+                              onSaved={() => setMetaVersion((v) => v + 1)}
+                            />
+                          ),
+                          options: (
+                            <div className="space-y-2 p-4">
+                              <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setApplyNamesOpen(true)}
+                                    disabled={options.length === 0 || isApplyingNames}
+                                    className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                                  >
+                                    옵션명 일괄 적용
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-gray-500">
+                                옵션의 카테고리 필수속성은 저장된 마스터 값을 기준으로 상속 여부를 판단합니다.
+                                [필수속성 · 고시] 탭에서 저장한 뒤 입력하세요.
+                              </p>
+                              {metaBaseError && (
+                                <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                                  {metaBaseError}
+                                </p>
+                              )}
+                              <MasterOptionEditor
+                                master={master}
+                                useCase={masterUseCase}
+                                carrierRates={carrierRates}
+                                packages={packages}
+                                masterDefaults={optionMasterDefaults}
+                                categoryId={categoryId}
+                                masterAttrValues={masterAttrValues}
+                                masterNoticeValues={masterNoticeValues}
+                                masterNoticeGroup={masterNoticeGroup}
+                                hideCategoryAttrs={hideCategoryAttrs}
+                                onChanged={load}
+                                focusOption={focusOption}
+                              />
+                            </div>
+                          ),
+                          images: (
+                            <div className="space-y-2 p-4">
+                              <h3 className="text-sm font-semibold text-gray-900">이미지</h3>
+                              <p className="text-[11px] text-gray-500">변경 즉시 저장됩니다.</p>
+                              <MasterImagePool
+                                masterId={masterId}
+                                detailUseCase={detailUseCase}
+                                fields={imageFields}
+                                fieldFilters={imageFieldFilters}
+                                productImageUseCase={productImageUseCase}
+                                sourceProducts={sourceProducts}
+                              />
+                            </div>
+                          ),
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'fieldValues' as const,
+                    label: '템플릿 필드값',
+                    summary: fieldValuesSummary,
+                    content: (
+                      <MasterFieldValuesPanel
+                        master={master}
+                        useCase={masterUseCase}
+                        templateUseCase={templateUseCase}
+                        onSaved={handlePanelSaved}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'defaultCost' as const,
+                    label: '기본 택배/상자',
+                    summary: defaultCostSummary,
+                    content: (
+                      <MasterDefaultCostPanel
+                        master={master}
+                        useCase={masterUseCase}
+                        carrierRates={carrierRates}
+                        packages={packages}
+                        onSaved={handlePanelSaved}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'tags' as const,
+                    label: '등록상품명 · 태그',
+                    summary: tagsSummary,
+                    content: (
+                      <MasterTagsPanel master={master} useCase={masterUseCase} onSaved={handlePanelSaved} />
+                    ),
+                  },
+                ]
+              : []),
+            {
+              key: 'suffix',
+              label: '등록상품명 추가 문구',
+              summary: suffixSummary,
+              content: (
+                <MasterRegistrationSuffixPanel
                   masterId={masterId}
                   useCase={masterUseCase}
-                  categoryUseCase={categoryUseCase}
-                  mappingUseCase={mappingUseCase}
-                  onCategoryChanged={setCategory}
+                  onSaved={load}
                 />
               ),
-              meta: (
-                <CategoryMetaPanel
+            },
+            {
+              key: 'shipping',
+              label: '배송 설정 (전 채널)',
+              summary: shippingSummary,
+              content: (
+                <MasterShippingOverridePanel
                   masterId={masterId}
-                  categoryCode={category ? String(category.categoryId) : null}
-                  isBundle={isBundle}
-                  onSaved={() => setMetaVersion((v) => v + 1)}
+                  useCase={masterUseCase}
+                  channels={forceApplyChannels}
+                  onSaved={load}
                 />
               ),
-              options: (
-                <div className="space-y-2 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-gray-900">옵션 (수량조합)</h3>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setApplyNamesOpen(true)}
-                        disabled={options.length === 0 || isApplyingNames}
-                        className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                      >
-                        옵션명 일괄 적용
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-gray-500">
-                    옵션의 카테고리 필수속성은 저장된 마스터 값을 기준으로 상속 여부를 판단합니다.
-                    [필수속성 · 고시] 탭에서 저장한 뒤 입력하세요.
-                  </p>
-                  {metaBaseError && (
-                    <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                      {metaBaseError}
-                    </p>
-                  )}
-                  <MasterOptionEditor
-                    master={master}
-                    useCase={masterUseCase}
-                    carrierRates={carrierRates}
-                    packages={packages}
-                    masterDefaults={optionMasterDefaults}
-                    categoryId={categoryId}
-                    masterAttrValues={masterAttrValues}
-                    masterNoticeValues={masterNoticeValues}
-                    masterNoticeGroup={masterNoticeGroup}
-                    hideCategoryAttrs={hideCategoryAttrs}
-                    onChanged={load}
-                    focusOption={focusOption}
-                  />
-                </div>
-              ),
-              images: (
-                <div className="space-y-2 p-4">
-                  <h3 className="text-sm font-semibold text-gray-900">이미지</h3>
-                  <p className="text-[11px] text-gray-500">변경 즉시 저장됩니다.</p>
-                  <MasterImagePool
-                    masterId={masterId}
-                    detailUseCase={detailUseCase}
-                    fields={imageFields}
-                    fieldFilters={imageFieldFilters}
-                    productImageUseCase={productImageUseCase}
-                    sourceProducts={sourceProducts}
-                  />
-                </div>
-              ),
-            }}
-          />
-        </DetailSection>
-      )}
-
-      {isAdmin && master && (
-        <DetailSection title="템플릿 필드값" summary={fieldValuesSummary}>
-          <MasterFieldValuesPanel
-            master={master}
-            useCase={masterUseCase}
-            templateUseCase={templateUseCase}
-            onSaved={handlePanelSaved}
-          />
-        </DetailSection>
-      )}
-
-      {isAdmin && master && (
-        <DetailSection title="기본 택배/상자" summary={defaultCostSummary}>
-          <MasterDefaultCostPanel
-            master={master}
-            useCase={masterUseCase}
-            carrierRates={carrierRates}
-            packages={packages}
-            onSaved={handlePanelSaved}
-          />
-        </DetailSection>
-      )}
-
-      {isAdmin && master && (
-        <DetailSection title="등록상품명 · 태그" summary={tagsSummary}>
-          <MasterTagsPanel master={master} useCase={masterUseCase} onSaved={handlePanelSaved} />
-        </DetailSection>
-      )}
-
-      {isAdmin && (
-        <DetailSection title="등록상품명 추가 문구" summary={suffixSummary}>
-          <MasterRegistrationSuffixPanel
-            masterId={masterId}
-            useCase={masterUseCase}
-            onSaved={load}
-          />
-        </DetailSection>
-      )}
-
-      {isAdmin && (
-        <DetailSection title="배송 설정 (전 채널)" summary={shippingSummary}>
-          <MasterShippingOverridePanel
-            masterId={masterId}
-            useCase={masterUseCase}
-            channels={forceApplyChannels}
-            onSaved={load}
-          />
-        </DetailSection>
+            },
+          ]}
+        />
       )}
 
       {importTarget && (
