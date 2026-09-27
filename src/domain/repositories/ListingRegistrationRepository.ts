@@ -28,6 +28,7 @@ import type {
   MasterFromChannelPreview,
   MasterFromChannelRequest,
   MasterFromChannelResult,
+  ChannelApplyOptionNamesResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -97,6 +98,8 @@ export interface ListingRegistrationRepository {
   setOptionNames(listingId: number, data: OptionNamesRequest): Promise<ListingOptionsResponse>;
   /** 2609_22/D4: 마스터 기준으로 모든 채널 옵션명 되돌리기. */
   applyMasterOptionNames(masterId: number): Promise<ApplyOptionNamesResponse>;
+  /** 2609_74/D15: 이 채널의 옵션명을 마스터 옵션 이름으로 바꾼다(로컬 저장 — 마켓 반영은 [수정 요청]). */
+  applyMasterOptionNamesToListing(listingId: number): Promise<ChannelApplyOptionNamesResponse>;
   /** 2609_22: 가져오기 미리보기 — 쓰기 없음. 실패는 그대로 throw 해서 모달이 문구를 노출한다. */
   importPreview(masterId: number, body: ImportPreviewRequest): Promise<ImportPreviewResponse>;
   /** 2609_22: 가져오기 커밋 — 성공 시 새 셀 id 를 담은 ChannelAddResponse. */

@@ -32,6 +32,7 @@ import type {
   MasterFromChannelPreview,
   MasterFromChannelRequest,
   MasterFromChannelResult,
+  ChannelApplyOptionNamesResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -229,6 +230,13 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async applyMasterOptionNames(masterId: number): Promise<ApplyOptionNamesResponse> {
     const response = await axiosInstance.post(`${masterBase}/${masterId}/options/apply-names`);
+    return response.data.data;
+  }
+
+  async applyMasterOptionNamesToListing(listingId: number): Promise<ChannelApplyOptionNamesResponse> {
+    const response = await axiosInstance.post(
+      `${listingBase}/${listingId}/options/apply-master-names`,
+    );
     return response.data.data;
   }
 

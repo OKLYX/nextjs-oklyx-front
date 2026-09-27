@@ -746,8 +746,8 @@ export function MasterProductCreateForm({
       }
       onCreated(created.id);
     } catch (e: unknown) {
-      const status = (e as { response?: { status?: number } })?.response?.status;
-      setError(status === 400 ? '입력값을 확인하세요.' : '저장에 실패했습니다.');
+      // 2609_74/D7: 같은 구성의 마스터가 이미 있다 · 옵션이 구성상품을 다 담지 않았다 등 서버 사유를 그대로.
+      setError(extractErrorMessage(e, '저장에 실패했습니다.'));
     } finally {
       setIsSubmitting(false);
     }

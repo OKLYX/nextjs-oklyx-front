@@ -27,8 +27,8 @@ export interface MasterOptionResponse {
   // master value are stored; a missing/empty key inherits the master value. Nullable.
   categoryAttributes?: Record<string, string> | null;
   categoryNotices?: Record<string, string> | null;
-  // 쿠팡에 등록돼 판매 중 = 수량·이름 수정/삭제 불가 (84). Backend flag is the single source of
-  // truth — never recompute it on the front. legacy/미지원 응답은 undefined = 잠그지 않음.
+  // 쿠팡에 등록돼 판매 중 = 삭제 불가(2609_74 — 이름·구성 수량은 고칠 수 있다). Backend flag is the single
+  // source of truth — never recompute it on the front. legacy/미지원 응답은 undefined = 잠그지 않음.
   marketRegistered?: boolean;
   // Master default stock (102). null = 미지정 (channels fall back to 9999). 0 = 품절 —
   // never treat this as falsy/absent.
@@ -227,8 +227,7 @@ export interface MatrixCell {
   // 카테고리가 같아도 코드를 저장하므로 기존 셀 전부에 배지가 뜬다. 판정은 서버 값 하나뿐이다.
   usesOwnCategory?: boolean;
   // true = 로컬에서 바뀐 값이 아직 마켓에 가지 않았다([수정 요청] 필요). 백엔드 `ProductListing.needsMarketSync`.
-  // ⚠️ optional — 매트릭스 응답이 아직 이 필드를 싣지 않는다. 없으면(undefined) 「변경 미반영」 칩을
-  //    띄우지 않고 [수정 요청]은 ⋯ 메뉴에 남는다(주장하지 않는다). 판정은 `=== true` 엄격 비교.
+  // ⚠️ optional — 구버전 응답(필드 없음)에서는 undefined 다. 판정은 `=== true` 엄격 비교.
   needsMarketSync?: boolean;
 }
 
