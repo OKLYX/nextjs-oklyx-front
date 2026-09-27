@@ -7,6 +7,7 @@ import { TagChipsInput } from '@/presentation/components/TagChipsInput';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { CopyIdButton } from './CopyIdButton';
+import { MarketOptionLinkModal } from './MarketOptionLinkModal';
 
 const CHANNEL_ONLY_REASON = '마스터 옵션이 없는 채널 전용 옵션입니다';
 const OPTION_LINK_UNKNOWN_REASON = '채널별 옵션을 불러오지 못해 연결된 마스터 옵션을 알 수 없습니다';
@@ -50,6 +51,8 @@ interface ListingDetailPanelProps {
   registrationName: string;
   tags: string[];
   isAdmin: boolean;
+  /** 2609_74/D13: 이 판매상품이 쿠팡에 올라가 있다(상품 ID 있음) — 옵션 ID 가 빈 줄에 [쿠팡 옵션 연결]을 연다. */
+  onMarket: boolean;
   options: ListingOptionView[];
   /** 옵션 조회가 아직 안 끝났다 — 빈 목록("옵션 없음")과 구분해 스피너를 보여준다. */
   optionsLoading: boolean;
@@ -73,6 +76,7 @@ interface ListingDetailPanelProps {
  * - 옵션 표: 옵션명 / 가격 / 재고 / 옵션 ID / [수정]. 🔴 **옵션·가격·재고를 보여주는 곳은 여기 한 곳**이다
  *   (예전 매트릭스 「판매가」 열은 없앴다). 체크박스 = 이 채널에서 마켓에 보낼지(43), 미사용 옵션은 흐리게.
  *   마켓에 올라간 옵션은 끌 수 없다(🔒, 87). [수정]은 옵션을 편집하지 않고 편집 지점으로 보낸다(2609_61/D7).
+ *   옵션 ID 가 비어 있고 판매상품이 쿠팡에 올라가 있으면 그 칸에 [쿠팡 옵션 연결]이 뜬다(2609_74/D13).
  * - 태그: 채널 raw 태그(33). 현재값은 매트릭스가 이미 받은 `generated[].tags`(추가 호출 없음).
  *
  * 저장은 모두 상위 재조회(onSaved)로 갱신한다.
@@ -83,6 +87,7 @@ export function ListingDetailPanel({
   registrationName,
   tags,
   isAdmin,
+  onMarket,
   options,
   optionsLoading,
   optionBusy,
@@ -110,6 +115,9 @@ export function ListingDetailPanel({
   const [tagsError, setTagsError] = useState('');
 
   const [extrasOpen, setExtrasOpen] = useState(false);
+
+  // 2609_74/D13: 쿠팡 옵션과 직접 이을 채널 옵션. null = 닫힘.
+  const [linkTarget, setLinkTarget] = useState<{ optionId: number; name: string } | null>(null);
 
   const trimmedName = nameDraft.trim();
 
@@ -285,6 +293,16 @@ export function ListingDetailPanel({
                           </span>
                           <CopyIdButton value={o.platformOptionId} />
                         </span>
+                      ) : isAdmin && onMarket && o.masterOptionId !== undefined ? (
+                        // 2609_74/D13: 쿠팡에 올라간 판매상품인데 옵션 ID 가 비어 있다 → 사람이 잇는다.
+                        // undefined = 채널별 옵션 조회 전/실패 — 옵션 ID 유무를 모른다
+                        <button
+                          type="button"
+                          onClick={() => setLinkTarget({ optionId: o.optionId, name: o.name })}
+                          className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
+                        >
+                          쿠팡 옵션 연결
+                        </button>
                       ) : (
                         <span className="text-gray-400" title={OPTION_ID_PENDING_HINT}>
                           –
@@ -399,6 +417,15 @@ export function ListingDetailPanel({
           </div>
         )}
       </div>
+      {linkTarget && (
+        <MarketOptionLinkModal
+          listingId={listingId}
+          optionId={linkTarget.optionId}
+          optionName={linkTarget.name}
+          onClose={() => setLinkTarget(null)}
+          onLinked={onSaved}
+        />
+      )}
     </div>
   );
 }

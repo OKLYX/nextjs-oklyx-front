@@ -30,6 +30,9 @@ import type {
   ImportRequest,
   DetachedListing,
   DetachedListingQuery,
+  MarketOption,
+  MarketLinkRequest,
+  ListingStatusOption,
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
   MasterFromChannelRequest,
@@ -265,6 +268,23 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     const response = await axiosInstance.get(`${masterBase}/${masterId}/listings/detached`, {
       params: query,
     });
+    return response.data.data;
+  }
+
+  async getMarketOptions(listingId: number): Promise<MarketOption[]> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/market-options`);
+    return response.data.data;
+  }
+
+  async linkMarketOption(
+    listingId: number,
+    optionId: number,
+    data: MarketLinkRequest,
+  ): Promise<ListingStatusOption> {
+    const response = await axiosInstance.put(
+      `${listingBase}/${listingId}/options/${optionId}/market-link`,
+      data,
+    );
     return response.data.data;
   }
 

@@ -324,6 +324,23 @@ export interface DetachedListingQuery {
   keyword?: string;
 }
 
+// ── 쿠팡 옵션 직접 잇기 (2609_74/D13) ──────────────────────────────────────
+/** 쿠팡에 지금 있는 옵션 한 건. */
+export interface MarketOption {
+  itemName: string | null;
+  /** 쿠팡 옵션 ID. 승인 전이면 null — 이을 수 없다. */
+  vendorItemId: string | null;
+  sellerProductItemId: string | null;
+  salePrice: number | null;
+  /** 이 쿠팡 옵션 ID 를 이미 갖고 있는 우리 채널 옵션. 없으면 null. */
+  linkedOptionId: number | null;
+  linkedOptionName: string | null;
+}
+
+export interface MarketLinkRequest {
+  vendorItemId: string;
+}
+
 // 채널 옵션명 부분 갱신(2609_22/D3). optionName null = 마스터 옵션명으로 복귀(AUTO).
 // 부분 저장이다(재고·판매가와 같은 규칙): 목록에 없는 옵션은 손대지 않는다.
 export interface OptionNamesRequest {
