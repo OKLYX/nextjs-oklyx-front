@@ -24,6 +24,8 @@ import type {
   ImportPreviewRequest,
   ImportPreviewResponse,
   ImportRequest,
+  DetachedListing,
+  DetachedListingQuery,
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
   MasterFromChannelRequest,
@@ -104,6 +106,8 @@ export interface ListingRegistrationRepository {
   importPreview(masterId: number, body: ImportPreviewRequest): Promise<ImportPreviewResponse>;
   /** 2609_22: 가져오기 커밋 — 성공 시 새 셀 id 를 담은 ChannelAddResponse. */
   importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse>;
+  /** 2609_74/D14: 이 계정의 미연결 판매상품(최근 20건). 읽기 전용. */
+  findDetachedListings(masterId: number, query: DetachedListingQuery): Promise<DetachedListing[]>;
   /**
    * 2609_63/D3: 이 채널 셀을 마스터에서 떼어낸다. 로컬만 바뀐다 — 마켓 호출 0회, 판매상품 행은 남는다.
    * 마켓 상품 ID 가 있는 셀만 가능하다(미전송 셀은 백엔드가 400, D4).

@@ -71,6 +71,7 @@ import { MasterTagsPanel } from './MasterTagsPanel';
 import { MasterRegistrationSuffixPanel } from './MasterRegistrationSuffixPanel';
 import { MasterShippingOverridePanel } from './MasterShippingOverridePanel';
 import { ImportCoupangProductModal } from './ImportCoupangProductModal';
+import { DetachedListingPickerModal } from './DetachedListingPickerModal';
 import { ListingRow, cellActionCount } from './ListingRow';
 import { MARKET_OPTION_LOCK_REASON } from './ListingDetailPanel';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
@@ -297,7 +298,15 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [channelOptionError, setChannelOptionError] = useState('');
 
   // 2609_22: 쿠팡 상품 가져오기 대상 행(모달 mount). null = 닫힘.
+  // 2609_74: initialProductId 가 있으면 미연결 판매상품을 골라 들어온 것이다.
   const [importTarget, setImportTarget] = useState<{
+    sellerId: number;
+    platform: string;
+    sellerName: string;
+    initialProductId?: string;
+  } | null>(null);
+  // 2609_74/D14: 미연결 판매상품을 고를 계정 줄. null = 닫힘.
+  const [detachedTarget, setDetachedTarget] = useState<{
     sellerId: number;
     platform: string;
     sellerName: string;
@@ -1202,6 +1211,23 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           {canRegister ? '가져오기' : '쿠팡 상품 추가'}
                         </button>
                       )}
+                      {/* 2609_74/D14: 마스터 연결이 끊긴 판매상품을 이 계정 범위에서 찾아 다시 붙인다. */}
+                      {isAdmin && row.platform === 'COUPANG' && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDetachedTarget({
+                              sellerId: row.sellerId,
+                              platform: row.platform,
+                              sellerName: row.sellerName,
+                            })
+                          }
+                          disabled={busy}
+                          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                        >
+                          미연결 판매상품 연결
+                        </button>
+                      )}
                     </div>
                     {isAdmin && canRegister && isShippingBlocked(row.accountId) && (
                       <p className="basis-full text-[11px] text-amber-700" title={SHIPPING_BLOCK_REASON}>
@@ -1415,12 +1441,28 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         />
       )}
 
+      {detachedTarget && (
+        <DetachedListingPickerModal
+          masterId={masterId}
+          sellerId={detachedTarget.sellerId}
+          platform={detachedTarget.platform}
+          sellerName={detachedTarget.sellerName}
+          onClose={() => setDetachedTarget(null)}
+          onPick={(platformProductId) => {
+            setImportTarget({ ...detachedTarget, initialProductId: platformProductId });
+            setDetachedTarget(null);
+          }}
+        />
+      )}
+
       {importTarget && (
         <ImportCoupangProductModal
           masterId={masterId}
           sellerId={importTarget.sellerId}
           platform={importTarget.platform}
           sellerName={importTarget.sellerName}
+          masterOptions={options}
+          initialProductId={importTarget.initialProductId}
           onClose={() => setImportTarget(null)}
           onDone={handleImportDone}
         />

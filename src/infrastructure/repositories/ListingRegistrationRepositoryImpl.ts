@@ -28,6 +28,8 @@ import type {
   ImportPreviewRequest,
   ImportPreviewResponse,
   ImportRequest,
+  DetachedListing,
+  DetachedListingQuery,
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
   MasterFromChannelRequest,
@@ -253,6 +255,16 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse> {
     const response = await axiosInstance.post(`${masterBase}/${masterId}/listings/import`, body);
+    return response.data.data;
+  }
+
+  async findDetachedListings(
+    masterId: number,
+    query: DetachedListingQuery,
+  ): Promise<DetachedListing[]> {
+    const response = await axiosInstance.get(`${masterBase}/${masterId}/listings/detached`, {
+      params: query,
+    });
     return response.data.data;
   }
 

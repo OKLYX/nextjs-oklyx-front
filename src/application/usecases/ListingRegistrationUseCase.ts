@@ -25,6 +25,8 @@ import type {
   ImportPreviewRequest,
   ImportPreviewResponse,
   ImportRequest,
+  DetachedListing,
+  DetachedListingQuery,
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
   MasterFromChannelRequest,
@@ -188,6 +190,10 @@ export class ListingRegistrationUseCase {
 
   importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse> {
     return this.repository.importListing(masterId, body);
+  }
+
+  findDetachedListings(masterId: number, query: DetachedListingQuery): Promise<DetachedListing[]> {
+    return this.repository.findDetachedListings(masterId, query);
   }
 
   /** 2609_63/D3: 채널 셀을 마스터에서 떼어낸다(로컬만 — 마켓 호출 0회). */

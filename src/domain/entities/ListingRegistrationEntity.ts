@@ -308,6 +308,22 @@ export interface ImportRequest extends ImportPreviewRequest {
   options: ImportOptionSpec[];
 }
 
+// ── 미연결 판매상품 검색 (2609_74/D1·D14) ────────────────────────────────────
+/** 마스터 연결이 끊긴 판매상품 한 건. 같은 판매자·플랫폼의 것만 온다(서버가 거른다). */
+export interface DetachedListing {
+  productListingId: number;
+  platformProductId: string;
+  name: string;
+  status: string;
+}
+
+export interface DetachedListingQuery {
+  sellerId: number;
+  platform: string;
+  /** 이름 부분일치 또는 쿠팡 상품 ID 완전일치. 생략 = 최근 20건. */
+  keyword?: string;
+}
+
 // 채널 옵션명 부분 갱신(2609_22/D3). optionName null = 마스터 옵션명으로 복귀(AUTO).
 // 부분 저장이다(재고·판매가와 같은 규칙): 목록에 없는 옵션은 손대지 않는다.
 export interface OptionNamesRequest {
