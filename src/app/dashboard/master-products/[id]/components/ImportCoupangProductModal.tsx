@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { QuantityStepper } from '@/presentation/components/QuantityStepper';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { ImportPreviewResponse } from '@/domain/entities/ListingRegistrationEntity';
+import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
 
@@ -15,6 +16,10 @@ interface ImportCoupangProductModalProps {
   sellerId: number;
   platform: string;
   sellerName: string;
+  /** 2609_74/D12: 이 마스터의 옵션(구성 수량 포함). 고르는 칸의 선택지다. */
+  masterOptions: MasterOptionResponse[];
+  /** 2609_74/D1: 미연결 판매상품을 골라 들어온 경우의 쿠팡 상품 ID. 있으면 열리자마자 조회한다. */
+  initialProductId?: string;
   onClose: () => void;
   /** 성공 시 커밋 응답의 categoryWarning(없으면 null)을 매트릭스로 올린다. */
   onDone: (categoryWarning: string | null) => void;
@@ -58,10 +63,52 @@ const importErrorMessage = (e: unknown): string => {
 const optionKey = (o: ImportPreviewResponse['options'][number]) => o.vendorItemId ?? o.itemName;
 
 interface OptionDraft {
+  /** 2609_74/D12: 고른 마스터 옵션 id. 'new' = 같은 수량의 옵션이 없어 새로 만든다(D18). */
+  masterOptionId: number | 'new';
+  /** 새로 만들 때만 쓰는 이름(기본값 = 쿠팡 옵션명). 기존 옵션을 고르면 보내지 않는다. */
   masterOptionName: string;
   /** productId → 입력 문자열. 숫자 변환은 제출 직전에 한 번만(입력 중 변환은 지우는 순간 값이 튄다). */
   quantities: Record<number, string>;
 }
+
+/**
+ * 2609_74/D31: 입력한 수량과 **구성이 완전히 같은** 마스터 옵션. 없으면 undefined.
+ * 서버의 연결 규칙(`CoupangListingImportServiceImpl.resolveMasterOption`)과 같은 판정이다 —
+ * 구성상품 집합이 같고 수량이 전부 같아야 한다.
+ */
+const matchMasterOption = (
+  componentIds: number[],
+  quantities: Record<number, string>,
+  masterOptions: MasterOptionResponse[],
+): MasterOptionResponse | undefined =>
+  masterOptions.find(
+    (o) =>
+      o.items.length === componentIds.length &&
+      componentIds.every(
+        (id) => o.items.find((it) => it.productId === id)?.quantity === Number(quantities[id]),
+      ),
+  );
+
+/** 미리보기 응답 → 옵션별 입력 초기값. 수량은 전부 1 로 시작하고, 그 구성과 같은 옵션을 골라 둔다. */
+const buildDraft = (
+  res: ImportPreviewResponse,
+  masterOptions: MasterOptionResponse[],
+): Record<string, OptionDraft> => {
+  const componentIds = res.components.map((c) => c.productId);
+  return Object.fromEntries(
+    res.options.map((o) => {
+      const quantities = Object.fromEntries(componentIds.map((id) => [id, '1']));
+      return [
+        optionKey(o),
+        {
+          masterOptionId: matchMasterOption(componentIds, quantities, masterOptions)?.id ?? 'new',
+          masterOptionName: o.itemName,
+          quantities,
+        },
+      ];
+    }),
+  );
+};
 
 const isPositiveInt = (raw: string) => {
   const v = Number(raw);
@@ -73,7 +120,7 @@ const isPositiveInt = (raw: string) => {
  * File: src/app/dashboard/master-products/[id]/components/ImportCoupangProductModal.tsx
  *
  * 이미 쿠팡에 올라가 있는 상품을 이 마스터의 채널 셀로 편입한다. 2단계 — ① 상품 ID 로 조회
- * ② 옵션마다 구성 수량을 채워 [가져오기].
+ * ② 옵션마다 마스터 옵션을 고르거나 구성 수량을 채워 [가져오기](2609_74 — 둘은 항상 일치한다).
  * - 판매자·플랫폼은 매트릭스 행에서 받아 고정 표시한다(모달에 선택 UI 없음).
  * - 단계는 `preview` 유무로만 갈린다(별도 step state 금지 — 조회 실패 후 되돌아갈 자리가 하나여야 한다).
  * - ⚠️ 판매가·재고 입력칸을 만들지 않는다. 서버가 커밋 시점에 쿠팡을 재조회해 확정한다.
@@ -85,6 +132,8 @@ export function ImportCoupangProductModal({
   sellerId,
   platform,
   sellerName,
+  masterOptions,
+  initialProductId,
   onClose,
   onDone,
 }: ImportCoupangProductModalProps) {
@@ -93,11 +142,40 @@ export function ImportCoupangProductModal({
     [],
   );
 
-  const [productId, setProductId] = useState('');
+  const [productId, setProductId] = useState(initialProductId ?? '');
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [draft, setDraft] = useState<Record<string, OptionDraft>>({});
-  const [busy, setBusy] = useState(false);
+  // 미연결 판매상품을 골라 들어왔으면 열리자마자 조회한다 → 처음부터 조회 중이다.
+  const [busy, setBusy] = useState(initialProductId != null);
   const [error, setError] = useState('');
+
+  // 2609_74/D1: 미연결 판매상품을 골라 들어온 경우의 첫 조회. 상품 ID 를 손으로 넣는 경로는 handleLookup.
+  useEffect(() => {
+    if (initialProductId == null) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await useCase.importPreview(masterId, {
+          sellerId,
+          platform,
+          platformProductId: initialProductId,
+        });
+        if (!alive) return;
+        setPreview(res);
+        setDraft(buildDraft(res, masterOptions));
+      } catch (e: unknown) {
+        if (!alive) return;
+        setError(importErrorMessage(e));
+      } finally {
+        if (alive) setBusy(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // masterOptions 는 첫 조회의 초기값에만 쓴다 — 부모가 다시 그릴 때마다 조회를 되풀이하지 않는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProductId, useCase, masterId, sellerId, platform]);
 
   const handleLookup = async () => {
     setBusy(true);
@@ -112,17 +190,7 @@ export function ImportCoupangProductModal({
         platformProductId: productId.trim(),
       });
       setPreview(res);
-      setDraft(
-        Object.fromEntries(
-          res.options.map((o) => [
-            optionKey(o),
-            {
-              masterOptionName: o.itemName,
-              quantities: Object.fromEntries(res.components.map((c) => [c.productId, '1'])),
-            },
-          ]),
-        ),
-      );
+      setDraft(buildDraft(res, masterOptions));
     } catch (e: unknown) {
       setError(importErrorMessage(e));
     } finally {
@@ -130,13 +198,19 @@ export function ImportCoupangProductModal({
     }
   };
 
-  const rowOf = (key: string): OptionDraft => draft[key] ?? { masterOptionName: '', quantities: {} };
+  const rowOf = (key: string): OptionDraft =>
+    draft[key] ?? { masterOptionId: 'new', masterOptionName: '', quantities: {} };
 
   const patchRow = (key: string, patch: Partial<OptionDraft>) =>
     setDraft((prev) => ({ ...prev, [key]: { ...rowOf(key), ...patch } }));
 
+  // 이름은 새 옵션을 만들 때만 필요하다 — 기존 옵션을 고른 줄은 그 옵션의 이름을 쓴다.
   const nameMissing =
-    preview != null && preview.options.some((o) => rowOf(optionKey(o)).masterOptionName.trim() === '');
+    preview != null &&
+    preview.options.some((o) => {
+      const row = rowOf(optionKey(o));
+      return row.masterOptionId === 'new' && row.masterOptionName.trim() === '';
+    });
   const quantityInvalid =
     preview != null &&
     preview.options.some((o) =>
@@ -155,10 +229,13 @@ export function ImportCoupangProductModal({
         platformProductId: productId.trim(),
         options: preview.options.map((o) => {
           const row = rowOf(optionKey(o));
+          const picked = masterOptions.find((m) => m.id === row.masterOptionId);
           return {
             vendorItemId: o.vendorItemId,
             itemName: o.itemName,
-            masterOptionName: row.masterOptionName.trim(),
+            // 서버는 이 값을 새 옵션을 만들 때만 쓴다(구성이 같으면 기존 옵션에 연결). 빈 값은 거절되므로
+            // 기존 옵션을 고른 줄은 그 옵션의 이름을 그대로 보낸다.
+            masterOptionName: picked ? picked.name : row.masterOptionName.trim(),
             components: preview.components.map((c) => ({
               productId: c.productId,
               quantity: Number(row.quantities[c.productId]),
@@ -195,7 +272,7 @@ export function ImportCoupangProductModal({
           id="coupang-product-id"
           type="text"
           inputMode="numeric"
-          disabled={busy}
+          disabled={busy || initialProductId != null}
           className="w-48 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100"
           value={productId}
           onChange={(e) => setProductId(e.target.value)}
@@ -203,7 +280,7 @@ export function ImportCoupangProductModal({
         <button
           type="button"
           onClick={handleLookup}
-          disabled={productId.trim() === '' || busy}
+          disabled={productId.trim() === '' || busy || initialProductId != null}
           className="flex items-center gap-1 rounded border border-blue-300 px-3 py-1 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
         >
           {busy && preview == null ? '조회 중…' : '조회'}
@@ -247,6 +324,7 @@ export function ImportCoupangProductModal({
             {preview.options.map((o) => {
               const key = optionKey(o);
               const row = rowOf(key);
+              const componentIds = preview.components.map((c) => c.productId);
               return (
                 <li key={key} className="rounded border border-gray-200 p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -260,17 +338,56 @@ export function ImportCoupangProductModal({
                   </div>
 
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="shrink-0 text-xs text-gray-500">마스터 옵션명</span>
-                    <input
-                      type="text"
+                    <span className="shrink-0 text-xs text-gray-500">마스터 옵션</span>
+                    <select
                       disabled={busy}
+                      aria-label={`${o.itemName} 마스터 옵션`}
                       className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100"
-                      value={row.masterOptionName}
-                      onChange={(e) => patchRow(key, { masterOptionName: e.target.value })}
-                    />
+                      value={String(row.masterOptionId)}
+                      onChange={(e) => {
+                        const picked = masterOptions.find((m) => String(m.id) === e.target.value);
+                        // 'new' 는 직접 고를 수 없다(아래 disabled) — 여기 오는 값은 항상 기존 옵션이다.
+                        if (!picked) return;
+                        patchRow(key, {
+                          masterOptionId: picked.id,
+                          quantities: Object.fromEntries(
+                            componentIds.map((id) => [
+                              id,
+                              String(picked.items.find((it) => it.productId === id)?.quantity ?? 1),
+                            ]),
+                          ),
+                        });
+                      }}
+                    >
+                      {masterOptions.map((m) => (
+                        <option key={m.id} value={String(m.id)}>
+                          {m.name} ({m.items.map((it) => `${it.productName}×${it.quantity}`).join(', ')})
+                        </option>
+                      ))}
+                      <option value="new" disabled={row.masterOptionId !== 'new'}>
+                        새 옵션 만들기
+                      </option>
+                    </select>
                   </div>
-                  {row.masterOptionName.trim() === '' && (
-                    <p className="mt-1 text-[11px] text-gray-500">마스터 옵션명을 입력하세요</p>
+                  {row.masterOptionId === 'new' && (
+                    <>
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="shrink-0 text-xs text-gray-500">새 옵션 이름</span>
+                        <input
+                          type="text"
+                          disabled={busy}
+                          aria-label={`${o.itemName} 새 옵션 이름`}
+                          className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100"
+                          value={row.masterOptionName}
+                          onChange={(e) => patchRow(key, { masterOptionName: e.target.value })}
+                        />
+                      </div>
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        {row.masterOptionName.trim() === ''
+                          ? '새 옵션 이름을 입력하세요'
+                          : '이 수량과 같은 옵션이 마스터에 없어 새 옵션을 만듭니다.'}
+                      </p>
+                    </>
                   )}
 
                   <p className="mt-2 text-xs text-gray-500">구성</p>
@@ -288,11 +405,16 @@ export function ImportCoupangProductModal({
                             disabled={busy}
                             ariaLabel={`${c.productName} 수량`}
                             value={value}
-                            onChange={(next) =>
+                            onChange={(next) => {
+                              const quantities = { ...row.quantities, [c.productId]: next };
                               patchRow(key, {
-                                quantities: { ...row.quantities, [c.productId]: next },
-                              })
-                            }
+                                quantities,
+                                // D31: 수량이 바뀌면 고른 옵션도 그 수량을 따라간다.
+                                masterOptionId:
+                                  matchMasterOption(componentIds, quantities, masterOptions)?.id ??
+                                  'new',
+                              });
+                            }}
                           />
                         </li>
                       );
@@ -304,7 +426,9 @@ export function ImportCoupangProductModal({
           </ul>
 
           <p className="shrink-0 text-[11px] text-gray-500">
-            구성이 마스터의 기존 옵션과 같으면 그 옵션에 연결되고, 다르면 새 옵션이 만들어집니다.
+            마스터 옵션을 고르면 수량이 그 옵션 값으로 채워지고, 수량을 바꾸면 같은 수량의 옵션이 골라집니다.
+            <br />
+            같은 수량의 옵션이 없으면 새 옵션이 만들어집니다.
           </p>
         </>
       )}
@@ -333,7 +457,7 @@ export function ImportCoupangProductModal({
         </div>
         {/* 비활성 사유를 숨기지 않는다 — 왜 못 누르는지 보여준다. */}
         {preview && !busy && nameMissing && (
-          <p className="text-[11px] text-gray-500">마스터 옵션명을 모두 입력하세요</p>
+          <p className="text-[11px] text-gray-500">새 옵션 이름을 모두 입력하세요</p>
         )}
         {preview && !busy && !nameMissing && quantityInvalid && (
           <p className="text-[11px] text-gray-500">수량은 1 이상의 정수여야 합니다</p>

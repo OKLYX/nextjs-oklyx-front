@@ -330,6 +330,7 @@ export function ListingRow({
           registrationName={cell.registrationName}
           tags={gen?.tags ?? []}
           isAdmin={isAdmin}
+          onMarket={cell.platformProductId != null}
           options={views}
           optionsLoading={pending || (isAdmin && channelOptionsLoading)}
           optionBusy={optionBusy}

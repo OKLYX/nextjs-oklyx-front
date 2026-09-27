@@ -25,6 +25,11 @@ import type {
   ImportPreviewRequest,
   ImportPreviewResponse,
   ImportRequest,
+  DetachedListing,
+  DetachedListingQuery,
+  MarketOption,
+  MarketLinkRequest,
+  ListingStatusOption,
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
   MasterFromChannelRequest,
@@ -188,6 +193,18 @@ export class ListingRegistrationUseCase {
 
   importListing(masterId: number, body: ImportRequest): Promise<ChannelAddResponse> {
     return this.repository.importListing(masterId, body);
+  }
+
+  findDetachedListings(masterId: number, query: DetachedListingQuery): Promise<DetachedListing[]> {
+    return this.repository.findDetachedListings(masterId, query);
+  }
+
+  getMarketOptions(listingId: number): Promise<MarketOption[]> {
+    return this.repository.getMarketOptions(listingId);
+  }
+
+  linkMarketOption(listingId: number, optionId: number, data: MarketLinkRequest): Promise<ListingStatusOption> {
+    return this.repository.linkMarketOption(listingId, optionId, data);
   }
 
   /** 2609_63/D3: 채널 셀을 마스터에서 떼어낸다(로컬만 — 마켓 호출 0회). */
