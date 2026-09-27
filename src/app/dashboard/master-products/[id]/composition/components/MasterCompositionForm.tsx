@@ -10,9 +10,7 @@ import type { MasterProductUseCase } from '@/application/usecases/MasterProductU
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import type { Product } from '@/domain/entities/Product';
 
-// 옵션 잠금 안내 문구 (85). 잠금 판정은 백엔드 플래그(marketRegistered) 하나만 쓴다.
-// 🔴 `MasterOptionEditor` 의 같은 상수를 재수출하지 않고 문장만 맞춘다(PLAN/D10 — 그 파일은 건드리지 않는다).
-const LOCKED_ROW_TITLE = '쿠팡에 등록돼 판매 중 — 이름 수정 및 삭제 불가 (구성 수량은 수정 가능)';
+// 옵션 잠금 안내 문구 (85 → 2609_74). 잠금은 삭제만 막는다. 판정은 백엔드 플래그(marketRegistered) 하나만 쓴다.
 const LOCKED_DELETE_REASON = '쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다.';
 
 const PRODUCT_SEARCH_LIMIT = 50;
@@ -400,10 +398,8 @@ export function MasterCompositionForm({
                     <tr key={d.key} className="border-t border-gray-100">
                       <td className="px-2 py-1.5">
                         <input
-                          className="w-40 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 read-only:bg-gray-100 read-only:text-gray-500"
+                          className="w-40 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
                           value={d.name}
-                          readOnly={d.locked}
-                          title={d.locked ? LOCKED_ROW_TITLE : undefined}
                           placeholder="옵션명"
                           onChange={(e) => setDraftName(d.key, e.target.value)}
                         />

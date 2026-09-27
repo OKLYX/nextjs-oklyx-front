@@ -29,6 +29,7 @@ import type {
   MasterFromChannelPreview,
   MasterFromChannelRequest,
   MasterFromChannelResult,
+  ChannelApplyOptionNamesResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -175,6 +176,10 @@ export class ListingRegistrationUseCase {
 
   applyMasterOptionNames(masterId: number): Promise<ApplyOptionNamesResponse> {
     return this.repository.applyMasterOptionNames(masterId);
+  }
+
+  applyMasterOptionNamesToListing(listingId: number): Promise<ChannelApplyOptionNamesResponse> {
+    return this.repository.applyMasterOptionNamesToListing(listingId);
   }
 
   importPreview(masterId: number, body: ImportPreviewRequest): Promise<ImportPreviewResponse> {

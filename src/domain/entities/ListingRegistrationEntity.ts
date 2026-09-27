@@ -114,6 +114,11 @@ export interface ListingStatusResponse {
   productListingId: number;
   status: ListingStatus;
   options: ListingStatusOption[];
+  // 2609_74/D9: 심사 사유. 서버가 저장하지 않는 값이라 [승인 새로고침] 응답에만 실려 온다.
+  // 조회하지 않았거나 받지 못했으면 null. 구버전 응답(필드 없음)은 undefined.
+  reviewNote?: string | null;
+  // null/undefined = 이 상태에서는 조회하지 않았다(반려·부분 승인이 아니다).
+  reviewNoteState?: 'FOUND' | 'NOT_FOUND' | 'FAILED' | null;
 }
 
 // Batch summaries
@@ -310,13 +315,20 @@ export interface OptionNamesRequest {
 }
 
 // [옵션명 일괄 적용] 결과(2609_22/D4).
-// ⚠️ `warnings` = 이름 중복으로 통째로 건너뛴 셀의 **사람이 읽는 문장**이다
-// (`옵션명 중복으로 건너뜀: listingId=12`). 셀 id 배열이 아니므로 파싱하지 말고 그대로 나열한다.
-// 구버전 응답 대비 화면에서는 `?? []` 로 읽는다.
+// ⚠️ `warnings` = 건너뛴 셀·옵션의 **사람이 읽는 문장**이다 — 이름 중복으로 통째로 건너뛴 셀
+// (`옵션명 중복으로 건너뜀: listingId=12`) · 이름이 잠긴 옵션(`심사 중이라 건너뜀: listingId=12, option=…`, 2609_74/D32).
+// id 배열이 아니므로 파싱하지 말고 그대로 나열한다. 구버전 응답 대비 화면에서는 `?? []` 로 읽는다.
 export interface ApplyOptionNamesResponse {
   updatedCells: number;
   updatedOptions: number;
   warnings: string[];
+}
+
+/** 2609_74/D15: 채널 단위 「마스터 옵션명 반영」 결과. */
+export interface ChannelApplyOptionNamesResponse {
+  updatedOptions: number;
+  /** 이름이 잠겨 건너뛴 옵션의 현재 채널 옵션명(쿠팡에 올렸고 옵션 ID 없음 · 판매상품이 승인반려 아님 — D32·D33). */
+  skippedAwaitingId: string[];
 }
 
 // ── 마켓 상품으로 마스터 만들기 (2609_45) ────────────────────────────────────
