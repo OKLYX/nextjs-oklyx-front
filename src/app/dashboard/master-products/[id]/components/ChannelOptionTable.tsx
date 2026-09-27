@@ -195,7 +195,7 @@ export function ChannelOptionTable({
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-gray-900">{opt.name}</span>
                     {opt.marketRegistered === true && (
-                      <span title="쿠팡에 등록돼 판매 중 — 이름 수정 및 삭제 불가">🔒</span>
+                      <span title="쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다 (이름·구성 수량은 수정 가능)">🔒</span>
                     )}
                     {/* 🔴 [옵션 수정] 은 행 머리에 하나다(PLAN/D8). 칸마다 두지 말 것. */}
                     <button

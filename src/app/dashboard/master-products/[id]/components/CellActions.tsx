@@ -7,6 +7,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { ROUTES } from '@/config/routes';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { ChannelFieldValuesModal } from './ChannelFieldValuesModal';
@@ -95,6 +96,7 @@ type Busy =
   | 'regenerate'
   | 'update'
   | 'category-source'
+  | 'apply-names'
   | 'unlink'
   | 'delete-cell'
   | null;
@@ -148,6 +150,8 @@ export function CellActions({
   const [showPrice, setShowPrice] = useState(false);
   const [showOptionName, setShowOptionName] = useState(false);
   const [showCategorySource, setShowCategorySource] = useState(false);
+  // 2609_74/D15: 「마스터 옵션명 반영」 확인창.
+  const [showApplyNames, setShowApplyNames] = useState(false);
   // 2609_63: boolean 이 아니라 **대상 셀**을 담는다 — 한 계정에 셀이 여럿일 수 있어(D10-1)
   // "열려 있다"만으로는 어느 셀을 떼는지 알 수 없다.
   const [unlinkTarget, setUnlinkTarget] = useState<CellRef | null>(null);
@@ -180,8 +184,9 @@ export function CellActions({
     setPushedBanner('');
     try {
       await fn();
-    } catch {
-      setError('요청에 실패했습니다.');
+    } catch (e: unknown) {
+      // 2609_74/D7: 서버·쿠팡이 준 사유를 그대로 보여준다(필수 고시 누락·배송설정 미완료 등).
+      setError(extractErrorMessage(e, '요청에 실패했습니다.'));
     } finally {
       setBusy(null);
     }
@@ -193,9 +198,7 @@ export function CellActions({
       onReload();
     });
 
-  // Forced re-push of an already-registered cell (109). Not routed through run():
-  // the backend's 400 message (미등록 / 비활성 계정 / 자동생성 먼저 / 활성 옵션 없음)
-  // must surface as-is, and run() overwrites every failure with a fixed string.
+  // Forced re-push of an already-registered cell (109).
   const handleUpdateRequest = async () => {
     if (!window.confirm('수정한 값을 마켓에 다시 보내고 재심사를 요청합니다. 계속하시겠습니까?')) return;
     setBusy('update');
@@ -229,6 +232,36 @@ export function CellActions({
       const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
       setShowCategorySource(false);
       setError(msg ?? '마스터 카테고리로 변경하지 못했습니다.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // 「마스터 옵션명 반영」(2609_74/D15): 이 채널의 옵션명을 마스터 옵션 이름으로 바꾼다.
+  // 결과 문구를 직접 만들어야 해서 run() 을 타지 않는다.
+  const handleApplyNames = async () => {
+    setBusy('apply-names');
+    setError('');
+    setPushedBanner('');
+    try {
+      const res = await useCase.applyMasterOptionNamesToListing(listing.id);
+      const skipped = res.skippedAwaitingId ?? [];
+      const skippedText =
+        skipped.length > 0
+          ? `옵션 ID 를 받기 전인 옵션 ${skipped.length}개는 건너뛰었습니다(${skipped.join(', ')}).`
+          : '';
+      const changedText =
+        res.updatedOptions > 0
+          ? `${res.updatedOptions}개 옵션의 이름을 마스터 기준으로 바꿨습니다.`
+          : skipped.length > 0
+            ? ''
+            : '바꿀 옵션명이 없습니다 — 이미 마스터와 같습니다.';
+      setShowApplyNames(false);
+      setPushedBanner([changedText, skippedText].filter((t) => t !== '').join(' '));
+      onReload();
+    } catch (e: unknown) {
+      setShowApplyNames(false);
+      setError(extractErrorMessage(e, '마스터 옵션명을 반영하지 못했습니다.'));
     } finally {
       setBusy(null);
     }
@@ -338,6 +371,8 @@ export function CellActions({
         ...(status === 'SELLING'
           ? [{ key: 'regenerate', label: '재생성', onClick: handleRegenerate }]
           : []),
+        // 2609_74/D15: 미전송 채널에도 보인다 — 옵션명은 등록 전에도 정해두는 값이다.
+        { key: 'apply-names', label: '마스터 옵션명 반영', onClick: () => setShowApplyNames(true) },
       ],
     },
     {
@@ -515,6 +550,16 @@ export function CellActions({
               ))}
             </div>
           )}
+          {/* 2609_74/D21: 심사 사유는 저장하지 않는다 — [승인 새로고침]을 누른 직후에만 보인다. */}
+          {statusResult?.reviewNoteState === 'FOUND' && (
+            <p className="text-[11px] text-amber-700">심사 사유: {statusResult.reviewNote}</p>
+          )}
+          {statusResult?.reviewNoteState === 'NOT_FOUND' && (
+            <p className="text-[11px] text-gray-500">사유 기록을 찾지 못했습니다</p>
+          )}
+          {statusResult?.reviewNoteState === 'FAILED' && (
+            <p className="text-[11px] text-gray-500">사유를 불러오지 못했습니다</p>
+          )}
           {error && <p className="text-[11px] text-red-600">{error}</p>}
         </div>
       )}
@@ -581,6 +626,29 @@ export function CellActions({
         onConfirm={handleCategorySource}
         onCancel={() => setShowCategorySource(false)}
         isLoading={busy === 'category-source'}
+      />
+
+      {/* 2609_74/D15: 되돌릴 수 있는 조작이라 isDangerous 를 쓰지 않는다(채널에서 옵션명을 다시 고치면 된다). */}
+      <ConfirmDialog
+        isOpen={showApplyNames}
+        title="마스터 옵션명 반영"
+        message={
+          <>
+            <b>{channelLabel}</b> 채널의 옵션명을 마스터 옵션 이름으로 바꿉니다.
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-base">
+              <li>이 채널에서 직접 정했거나 쿠팡에서 가져온 옵션명이 마스터 이름으로 바뀝니다.</li>
+              <li>쿠팡에 올렸지만 옵션 ID 를 아직 받지 못한 옵션은 건너뜁니다(판매상품이 승인반려 상태면 바꿉니다 — 마지막 [승인 새로고침] 결과 기준).</li>
+              <li>
+                지금 쿠팡에 반영되지는 않습니다. 쿠팡에 올라간 옵션의 이름이 바뀌면 「변경 미반영」이
+                표시되고, [수정 요청]을 눌러야 전송됩니다.
+              </li>
+            </ul>
+          </>
+        }
+        confirmText="반영"
+        onConfirm={handleApplyNames}
+        onCancel={() => setShowApplyNames(false)}
+        isLoading={busy === 'apply-names'}
       />
 
       {/* 2609_63/D10: 문구는 결과를 그대로 말한다. 지우는 게 아니므로 "삭제"·"편입 취소"로 쓰지 않는다.

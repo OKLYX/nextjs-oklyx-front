@@ -32,7 +32,7 @@ import { computeMissingOptionRequired } from '../[id]/components/categoryMetaVal
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 // 옵션 잠금 안내 문구 (85). 잠금 판정은 백엔드 플래그(marketRegistered) 하나만 쓴다.
-const LOCKED_ROW_TITLE = '쿠팡에 등록돼 판매 중 — 이름 수정 및 삭제 불가 (구성 수량은 수정 가능)';
+const LOCKED_ROW_TITLE = '쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다 (이름·구성 수량은 수정 가능)';
 const LOCKED_DELETE_REASON = '쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다.';
 const LAST_OPTION_DELETE_REASON =
   '옵션은 1개 이상 있어야 합니다. 모든 옵션을 제거하기 위해서는 마스터 상품을 삭제해야 합니다.';
@@ -774,7 +774,7 @@ export function MasterOptionEditor({
     rows.find((r) => r.deleteBlockedReason)?.deleteBlockedReason ??
     '';
 
-  // 편집 중인 옵션의 잠금(수량·이름 입력 잠금). 옵션 추가(editingKey == null)는 절대 잠기지 않는다.
+  // 편집 중인 옵션이 쿠팡 판매 중인가(안내 표시용 — 입력은 잠그지 않는다, 2609_74/D4). 옵션 추가는 해당 없음.
   const lockedEditing =
     isEdit &&
     editingKey != null &&
@@ -907,10 +907,9 @@ export function MasterOptionEditor({
             <div className="mb-3">
               <label className="mb-1 block text-xs font-medium text-gray-600">옵션 이름 *</label>
               <input
-                className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+                className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
                 value={optName}
                 onChange={(e) => setOptName(e.target.value)}
-                disabled={lockedEditing}
               />
             </div>
             <div className="mb-3">
@@ -933,7 +932,7 @@ export function MasterOptionEditor({
               {components.map((c) => (
                 <div key={c.productId} className="flex items-center gap-2">
                   <span className="flex-1 text-sm text-gray-700">{c.productName}</span>
-                  {/* ⚠️ 84 lock 대상이 아니다 — 등록 시 잘못 넣은 수량을 고칠 유일한 경로다(이름·삭제만 잠금). */}
+                  {/* ⚠️ 84 lock 대상이 아니다 — 등록 시 잘못 넣은 수량을 고칠 유일한 경로다(삭제만 잠금). */}
                   <QuantityStepper
                     className="w-24"
                     ariaLabel={`${c.productName} 수량`}
@@ -945,9 +944,10 @@ export function MasterOptionEditor({
             </div>
             {lockedEditing && (
               <p className="mt-2 text-[11px] text-amber-700">
-                쿠팡에 등록된 옵션이라 이름은 바꿀 수 없습니다(다른 조합이 필요하면 옵션을 새로 추가하세요).
-                구성 수량은 고칠 수 있지만, 고치면 쿠팡에 표시된 수량·고시 문구와 달라져 이 채널에 [수정
-                요청]이 필요합니다.
+                쿠팡에 등록된 옵션입니다. 이름과 구성 수량은 고칠 수 있고, 삭제는 할 수 없습니다. 이름을
+                바꾸면 이 이름을 따라 쓰는 채널 옵션명도 함께 바뀝니다(채널에서 직접 정한 이름은 그대로).
+                구성 수량을 고치면 쿠팡에 표시된 수량·고시 문구와 달라집니다. 어느 쪽이든 쿠팡에는
+                [수정 요청]을 눌러야 전송됩니다.
               </p>
             )}
             <div className="mt-3 grid grid-cols-2 gap-2">

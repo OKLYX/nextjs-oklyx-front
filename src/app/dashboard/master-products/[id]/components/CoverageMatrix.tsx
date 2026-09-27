@@ -667,8 +667,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         failures,
       });
       await load();
-    } catch {
-      setError('일괄 등록에 실패했습니다.');
+    } catch (e: unknown) {
+      setError(extractErrorMessage(e, '일괄 등록에 실패했습니다.'));
     } finally {
       setIsBatchAdding(false);
     }
@@ -681,15 +681,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       await listingUseCase.addChannel(masterId, { sellerId, platform });
       await load();
     } catch (e: unknown) {
-      const err = e as { response?: { status?: number; data?: { message?: string } } };
-      if (err?.response?.status === 400) {
-        setError(
-          '표준 카테고리가 마스터에 설정되지 않았거나 이 플랫폼 매핑이 없습니다. 위 ‘표준 카테고리’에서 먼저 지정하세요.'
-            + (err.response.data?.message ? ` (${err.response.data.message})` : ''),
-        );
-      } else {
-        setError('채널 등록에 실패했습니다.');
-      }
+      // 2609_74/D7: 400 의 원인은 카테고리 말고도 있다(마진 설정 없음·옵션 없는 마스터·이미 등록된 채널).
+      // 고정 안내문을 앞에 붙이면 엉뚱한 곳을 고치게 된다.
+      setError(extractErrorMessage(e, '채널 등록에 실패했습니다.'));
     } finally {
       setRowBusyId(null);
     }
