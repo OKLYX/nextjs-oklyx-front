@@ -208,7 +208,10 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       open: isSettingsOpen,
       toggle: toggleSettingsMenu,
       adminOnly: true,
-      items: [{ href: ROUTES.SETTINGS_LOGGING, label: '로그 설정' }],
+      items: [
+        { href: ROUTES.SETTINGS_LOGGING, label: '로그 설정' },
+        { href: ROUTES.SETTINGS_PURCHASE_PLACES, label: '구매처 관리' },
+      ],
     },
   ];
 

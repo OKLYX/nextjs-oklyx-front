@@ -5,6 +5,9 @@ import { useForm } from 'react-hook-form';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from '@/app/dashboard/products/[id]/components/ProductImageGallery';
+import { PurchasePlaceCheckboxes } from '@/app/dashboard/products/[id]/components/PurchasePlaceCheckboxes';
+import { usePurchasePlaces } from '@/presentation/hooks/usePurchasePlaces';
+import { COUNT_UNITS } from '@/domain/entities/Product';
 import { Input } from '@/presentation/components/ui/Input';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
@@ -20,12 +23,15 @@ export interface ProductRegistrationFormValues {
   barcodeId: string;
   brand?: string;
   price?: string;
-  store?: string;
+  /** 구매처 id 목록 — `register` 하지 않고 `watch`/`setValue` 로만 다룬다(체크 목록, FEATURE_2609_76). */
+  purchasePlaceIds: number[];
   netContentUnit?: string;
   packageHeight?: string;
   packageLength?: string;
   packageWidth?: string;
   netContent?: string;
+  countQuantity?: string;
+  countUnit?: string;
   description?: string;
 }
 
@@ -86,12 +92,14 @@ export function ProductRegistrationForm({
       barcodeId: '',
       brand: '',
       price: '',
-      store: '',
+      purchasePlaceIds: [],
       netContentUnit: '',
       packageHeight: '',
       packageLength: '',
       packageWidth: '',
       netContent: '',
+      countQuantity: '',
+      countUnit: '',
       description: '',
     },
   });
@@ -112,6 +120,8 @@ export function ProductRegistrationForm({
   }, [setFillTarget, setValue]);
 
   const barcodeValue = watch('barcodeId');
+  const purchasePlaceIds = watch('purchasePlaceIds');
+  const { places, loading: placesLoading, failed: placesFailed } = usePurchasePlaces();
 
   const handleCheckBarcode = useCallback(async () => {
     if (!barcodeValue || barcodeValue.trim() === '') {
@@ -163,6 +173,9 @@ export function ProductRegistrationForm({
           packageLength: data.packageLength?.trim() || undefined,
           packageWidth: data.packageWidth?.trim() || undefined,
           netContent: data.netContent?.trim() || undefined,
+          // 개수는 둘 다 있거나 둘 다 없다(검증은 아래 두 칸의 validate). 빈칸은 보내지 않는다.
+          countQuantity: data.countQuantity?.trim() ? Number(data.countQuantity.trim()) : undefined,
+          countUnit: data.countUnit || undefined,
         };
         await onSubmit(payload);
         reset();
@@ -300,37 +313,31 @@ export function ProductRegistrationForm({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="store" className="block text-sm font-medium text-gray-900 mb-1">
-                구매처
-              </label>
-              <select
-                id="store"
-                disabled={isLoading}
-                {...register('store')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                <option value="">구매처 선택</option>
-                <option value="이마트">이마트</option>
-                <option value="코스트코">코스트코</option>
-                <option value="노브랜드">노브랜드</option>
-              </select>
-            </div>
+            <PurchasePlaceCheckboxes
+              places={places}
+              loading={placesLoading}
+              failed={placesFailed}
+              disabled={isLoading}
+              value={purchasePlaceIds}
+              onChange={(ids) => setValue('purchasePlaceIds', ids, { shouldDirty: true })}
+            />
 
             <div>
               <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
                 단위
               </label>
-              {/* 내용물 양을 적었으면 단위를 함께 골라야 한다(서버가 400 으로 거절한다).
-                  ⚠️ 반대(단위만 고르고 양은 빈칸)는 서버가 막지 않으므로 여기서도 막지 않는다. */}
+              {/* 내용물 양과 단위는 함께 넣거나 둘 다 비운다(서버가 400 으로 거절한다, FEATURE_2609_76 / D18). */}
               <select
                 id="netContentUnit"
                 disabled={isLoading}
                 {...register('netContentUnit', {
-                  validate: (value, values) =>
-                    (values.netContent ?? '').trim() !== '' && !(value ?? '').trim()
-                      ? '내용물 양을 입력하면 단위를 함께 선택해주세요'
-                      : true,
+                  validate: (value, values) => {
+                    const hasContent = (values.netContent ?? '').trim() !== '';
+                    const hasUnit = (value ?? '').trim() !== '';
+                    if (hasContent && !hasUnit) return '내용물 양을 입력하면 단위를 함께 선택해주세요';
+                    if (!hasContent && hasUnit) return '단위를 고르면 내용물 양을 함께 입력해주세요';
+                    return true;
+                  },
                 })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
@@ -405,6 +412,58 @@ export function ProductRegistrationForm({
                 {...register('netContent', { deps: ['netContentUnit'] })}
               />
               {errors.netContent && <p className="text-red-600 text-sm mt-1">{errors.netContent.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="countQuantity" className="block text-sm font-medium text-gray-900 mb-1">
+                개수
+              </label>
+              <Input
+                id="countQuantity"
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                disabled={isLoading}
+                error={errors.countQuantity?.message}
+                {...register('countQuantity', {
+                  deps: ['countUnit'],
+                  validate: (value) =>
+                    (value ?? '').trim() === '' || /^[1-9][0-9]*$/.test((value ?? '').trim())
+                      ? true
+                      : '개수는 1 이상의 정수로 입력해주세요',
+                })}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="countUnit" className="block text-sm font-medium text-gray-900 mb-1">
+                개수 단위
+              </label>
+              {/* 개수와 개수 단위는 함께 넣거나 둘 다 비운다(D6). 무게·부피 단위와 섞지 않는다(D7). */}
+              <select
+                id="countUnit"
+                disabled={isLoading}
+                {...register('countUnit', {
+                  validate: (value, values) => {
+                    const hasQuantity = (values.countQuantity ?? '').trim() !== '';
+                    const hasUnit = (value ?? '') !== '';
+                    if (hasQuantity && !hasUnit) return '개수를 입력하면 개수 단위를 함께 선택해주세요';
+                    if (!hasQuantity && hasUnit) return '개수 단위를 고르면 개수를 함께 입력해주세요';
+                    return true;
+                  },
+                })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">개수 단위 선택</option>
+                {COUNT_UNITS.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+              </select>
+              {errors.countUnit && <p className="text-red-600 text-sm mt-1">{errors.countUnit.message}</p>}
             </div>
           </div>
 

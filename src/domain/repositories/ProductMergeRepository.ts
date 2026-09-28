@@ -27,11 +27,13 @@ export interface MergedProductFields {
   productName: string | null;
   brand: string | null;
   barcodeId: string | null;
-  store: string | null;
   price: number | null;
   description: string | null;
   netContent: string | null;
   netContentUnit: string | null;
+  /** 개수·개수 단위 — 고르는 항목이다. 🔴 구매처는 여기 없다: 고르지 않고 두 물품 것을 합친다(FEATURE_2609_76 / D16). */
+  countQuantity: number | null;
+  countUnit: string | null;
   packageHeight: string | null;
   packageLength: string | null;
   packageWidth: string | null;

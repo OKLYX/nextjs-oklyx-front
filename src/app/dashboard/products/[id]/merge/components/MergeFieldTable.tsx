@@ -1,12 +1,14 @@
 'use client';
 
-import type { Product } from '@/domain/entities/Product';
+import { purchasePlaceNames, type Product } from '@/domain/entities/Product';
 import { Card } from '@/presentation/components/ui/Card';
 import {
   MERGE_FIELDS,
   fieldText,
   fieldValue,
   isSameField,
+  isSamePurchasePlaces,
+  mergedPurchasePlaces,
   otherSide,
   type MergeFieldKey,
   type MergeSide,
@@ -18,6 +20,7 @@ import {
  * - 양쪽 값이 **같은 항목은 숨긴다** — 고를 것이 없는 줄을 보여주면 다른 값이 묻힌다.
  * - 값이 **비어 있는 쪽은 고를 수 없다**. 값을 비우는 일은 수정 화면에서 한다.
  * - 바코드 충돌(409)은 서버 문구 그대로 바코드 줄 아래에 붙인다.
+ * - 구매처는 고르지 않는다 — 두 물품 것을 합친 결과를 「합쳐짐」 줄 하나로 보인다(FEATURE_2609_76 / D16).
  */
 export interface MergeFieldTableProps {
   keep: Product;
@@ -41,10 +44,12 @@ export function MergeFieldTable({
 }: MergeFieldTableProps) {
   const discardSide = otherSide(keepSide);
   const rows = MERGE_FIELDS.filter(({ key }) => !isSameField(keep, discard, key));
+  const showPurchasePlaces = !isSamePurchasePlaces(keep, discard);
+  const mergedPlaceNames = purchasePlaceNames({ purchasePlaces: mergedPurchasePlaces(keep, discard) });
 
   return (
     <Card title="항목별로 어느 값을 쓸지">
-      {rows.length === 0 ? (
+      {rows.length === 0 && !showPurchasePlaces ? (
         <p className="text-sm text-gray-600">두 물품의 값이 모두 같습니다. 고를 것이 없습니다.</p>
       ) : (
         <>
@@ -88,6 +93,14 @@ export function MergeFieldTable({
                   </td>
                 </tr>
               ))}
+              {showPurchasePlaces && (
+                <tr className="border-b border-gray-100 align-top last:border-b-0">
+                  <td className="px-4 py-3 text-gray-600">구매처</td>
+                  <td className="px-4 py-3 text-gray-900" colSpan={2}>
+                    합쳐짐 — {mergedPlaceNames}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </>
