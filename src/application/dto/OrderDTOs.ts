@@ -154,3 +154,20 @@ export interface OrderCancelResult {
   skipped: SkippedLine[];
   unsupported: SkippedLine[];
 }
+
+/** 내부 발주·해제·예약 취소 결과 (FEATURE_2609_75 / PLAN §4-3). 목록은 주문번호 단위다. */
+export interface InternalStageResult {
+  requestedLines: number;
+  changedShipments: number;
+  skippedOrderIds: string[];
+  unsupported: string[];
+}
+
+/**
+ * 주문관리 설정 (GET/PUT /api/admin/order-settings).
+ * 🔴 두 값 모두 KST 벽시계 문자열이다 — `new Date()` 로 바꾸면 브라우저 시간대가 끼어 어긋난다.
+ */
+export interface OrderSetting {
+  reservedShipmentTime: string;   // 'HH:mm'
+  nextExecuteAt: string;          // 'yyyy-MM-ddTHH:mm:ss'
+}

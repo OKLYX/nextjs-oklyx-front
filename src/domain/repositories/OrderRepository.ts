@@ -1,8 +1,8 @@
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  CancelReasonOption, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult, OrderMonth,
-  OrderRefreshResult, OrderSyncResponse, OrderSyncResult, SyncTarget,
+  CancelReasonOption, InternalStageResult, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
+  OrderMonth, OrderRefreshResult, OrderSetting, OrderSyncResponse, OrderSyncResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export interface OrderRepository {
@@ -15,4 +15,8 @@ export interface OrderRepository {
   refreshOrders(orderItemIds: number[]): Promise<OrderRefreshResult>;
   getCancelReasons(): Promise<CancelReasonOption[]>;
   cancelOrders(lines: OrderCancelLine[], reason: string): Promise<OrderCancelResult>;
+  markInternal(orderItemIds: number[]): Promise<InternalStageResult>;
+  releaseInternal(orderItemIds: number[]): Promise<InternalStageResult>;
+  getOrderSetting(): Promise<OrderSetting>;
+  updateOrderSetting(reservedShipmentTime: string): Promise<OrderSetting>;
 }

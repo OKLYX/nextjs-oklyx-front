@@ -3,6 +3,7 @@
 import { getCustomerName } from '@/domain/entities/OrderEntity';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { InternalStageBadge } from './InternalStageBadge';
 
 interface OrderTableProps {
   orders: OrderItem[];
@@ -136,7 +137,10 @@ export function OrderTable({
                   />
                 </td>
               )}
-              <td className="px-6 py-3 text-sm text-gray-700">{order.externalOrderId}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                {order.externalOrderId}
+                <InternalStageBadge stage={order.internalStage} />
+              </td>
               <td className="px-6 py-3 text-sm text-gray-700">{getCustomerName(order)}</td>
               <td className="px-6 py-3 text-sm text-gray-700">{order.itemName || '-'}</td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">{order.orderCount}</td>
