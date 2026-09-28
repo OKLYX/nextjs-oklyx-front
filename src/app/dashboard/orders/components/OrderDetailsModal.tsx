@@ -6,10 +6,12 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { addressHead } from '@/infrastructure/utils/address';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { getOrderStatusLabel, isAlreadyShipped } from '@/domain/entities/OrderEntity';
+import type { InternalStage } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { OrderUseCase } from '@/application/usecases/OrderUseCase';
 import type {
   CancelReasonOption,
+  InternalStageResult,
   OrderAcknowledgeResult,
   OrderCancelResult,
   OrderRefreshResult,
@@ -21,6 +23,9 @@ import type {
   ShippingLabelExportRow,
 } from '@/application/dto/ShippingLabelDTOs';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { Button } from '@/presentation/components/ui/Button';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { InternalStageBadge } from './InternalStageBadge';
 
 /**
  * 주문 상세 모달 — 읽기전용 정보 + (ADMIN·쿠팡) 단건 송장 접수시트 조회·다운로드
@@ -127,6 +132,12 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const [ackResult, setAckResult] = useState<OrderAcknowledgeResult | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
   const [ackError, setAckError] = useState('');
+  // 내부 발주처리(FEATURE_2609_75 / D13). 쿠팡에 보내지 않는다.
+  const [internalResult, setInternalResult] = useState<InternalStageResult | null>(null);
+  const [isMarkingInternal, setIsMarkingInternal] = useState(false);
+  const [internalError, setInternalError] = useState('');
+  // D14 안내 Modal — 내부 단계 주문에 [발주처리]를 눌렀을 때.
+  const [ackConfirmOpen, setAckConfirmOpen] = useState(false);
   // 주문 상태 갱신(쿠팡에서 이 주문을 다시 읽어 상태를 맞춘다, PLAN 2609_50). 읽기라 탭 밖에 둔다(D12).
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshBanner, setRefreshBanner] = useState('');
@@ -217,6 +228,11 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   // 미발송이면 늘 열려 있고, 발송된 건은 [송장 수정하기] 를 누른 뒤에만 열린다.
   const isFormOpen = !isShipped || isEditingInvoice;
   const ackSucceeded = ackResult != null && ackResult.succeeded > 0;
+  const internalMarked = internalResult != null && internalResult.changedShipments > 0;
+  // 배지 = 방금 한 동작의 결과가 우선. 발주처리 성공이면 서버가 내부 단계를 지웠다(D14).
+  const shownStage: InternalStage | null = ackSucceeded
+    ? null
+    : internalMarked ? 'INTERNAL_PREPARING' : order.internalStage;
   // 취소 파생값 — 화면은 라인 1건만 보내므로(D6) 성공 라인도 최대 1건이다.
   const cancelledLine = cancelResult?.cancelled[0] ?? null;
   const cancelSucceeded = cancelledLine != null;
@@ -233,6 +249,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const isCancelInputDisabled = isCancelling || cancelSucceeded || cancelReasons.length === 0;
   // 액션 노출 게이트 — 발주처리는 하단 고정 바로, 나머지 둘은 탭으로 갈린다.
   const canAcknowledge = isAdmin && isCoupang && order.status === 'PAID' && !fullyCanceled;
+  // [내부 발주처리] = [발주처리] 대상 중 내부 단계가 없는 주문(D1·D13).
+  const canMarkInternal = canAcknowledge && order.internalStage == null;
   // 시트는 쿠팡 전용이 아니다 — 버튼만 비활성되고 안내가 붙으므로 ADMIN 이면 탭을 연다.
   const canSheet = isAdmin;
   const canShip = isAdmin && isCoupang && !fullyCanceled;
@@ -258,7 +276,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     // Only a real success justifies the parent's refetch (PLAN 2609_11 D13).
     // 발주처리 성공도 같은 채널로 올린다(2609_17) — 호출부가 갈리지 않게 새 콜백을 만들지 않는다.
     // 취소 성공도 같은 채널로 올린다 — 부모 재조회가 stale 재취소 경로를 없앤다(PLAN 2609_25 D14).
-    onClose((result != null && result.succeeded > 0) || ackSucceeded || cancelSucceeded);
+    onClose((result != null && result.succeeded > 0) || ackSucceeded || cancelSucceeded || internalMarked);
   };
 
   const handlePreview = async () => {
@@ -325,16 +343,38 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
    * 단건 발주처리 — 이 라인이 속한 박스 1개를 결제완료→상품준비중으로 전환한다.
    * 일괄(출고관리)과 같은 엔드포인트를 쓴다(PLAN 2609_17 D6) — 대상 판정은 서버가 한다.
    */
-  const handleAcknowledge = async () => {
+  const runAcknowledge = async () => {
     try {
       setIsAcknowledging(true);
       setAckError('');
       setAckResult(await orderUseCase.acknowledgeOrders([order.id]));
     } catch (err) {
-      // 요청이 안 갔을 수도 있으므로 버튼은 다시 누를 수 있게 열어 둔다.
+      // 요청이 안 갔을 수도 있으므로 버튼은 다시 누를 수 있게 열어 둔다(예약 처리 중 400 포함).
       setAckError(extractErrorMessage(err, '발주처리에 실패했습니다. 다시 시도해주세요.'));
     } finally {
       setIsAcknowledging(false);
+    }
+  };
+
+  // 내부 단계 주문이면 D14 안내 Modal 을 먼저 띄운다. 방금 이 창에서 내부 발주한 주문(internalMarked)도 서버에서는 내부 단계다.
+  const handleAcknowledge = () => {
+    if (order.internalStage != null || internalMarked) {
+      setAckConfirmOpen(true);
+      return;
+    }
+    void runAcknowledge();
+  };
+
+  /** 내부 발주처리 — 쿠팡에 보내지 않는다(D1). 성공하면 배지가 「내부 상품준비중」으로 바뀐다. */
+  const handleMarkInternal = async () => {
+    try {
+      setIsMarkingInternal(true);
+      setInternalError('');
+      setInternalResult(await orderUseCase.markInternal([order.id]));
+    } catch (err) {
+      setInternalError(extractErrorMessage(err, '내부 발주처리에 실패했습니다. 다시 시도해주세요.'));
+    } finally {
+      setIsMarkingInternal(false);
     }
   };
 
@@ -471,7 +511,10 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             버튼을 끼울 수 없고, 앱 전체가 쓰는 공용 컴포넌트를 고치지 않는다. */}
         {isCoupang && (
           <div className="flex items-center justify-between gap-2 pb-3 border-b border-gray-200">
-            <span className="text-xs text-gray-500">주문번호 {order.externalOrderId}</span>
+            <span className="text-xs text-gray-500">
+              주문번호 {order.externalOrderId}
+              <InternalStageBadge stage={shownStage} />
+            </span>
             <button
               type="button"
               onClick={() => void handleRefresh()}
@@ -904,6 +947,12 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             </div>
           )}
 
+          {internalError && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+              {internalError}
+            </div>
+          )}
+
           {/* 왼쪽 = 발주처리 하나만. 발주는 발송·취소와 달리 배타적 선택이 아니라 앞 단계라
               탭에 넣지 않고 항상 보이는 자리에 둔다(PLAN 2609_17 D14).
               대상이 아니면 왼쪽 칸은 빈 채로 두고 오른쪽 버튼 자리는 그대로 유지한다. */}
@@ -916,11 +965,23 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                   <>
                     <button
                       onClick={handleAcknowledge}
-                      disabled={isAcknowledging}
+                      disabled={isAcknowledging || isMarkingInternal}
                       className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                     >
                       {isAcknowledging ? <Spinner label="전송 중..." /> : '발주처리'}
                     </button>
+                    {canMarkInternal &&
+                      (internalMarked ? (
+                        <span className="text-sm font-medium text-green-700">내부 발주 완료</span>
+                      ) : (
+                        <Button
+                          variant="confirm"
+                          onClick={() => void handleMarkInternal()}
+                          disabled={isAcknowledging || isMarkingInternal}
+                        >
+                          {isMarkingInternal ? <Spinner label="처리 중..." /> : '내부 발주처리'}
+                        </Button>
+                      ))}
                     <span className="hidden text-sm text-gray-500 sm:inline">
                       박스 {order.externalBoxId ?? '-'} 전체가 상품준비중으로 전환됩니다. 되돌릴 수 없습니다.
                     </span>
@@ -947,6 +1008,16 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             </div>
           </div>
         </div>
+        <ConfirmDialog
+          isOpen={ackConfirmOpen}
+          nested
+          title="예약된 주문 포함"
+          message="예약된 주문입니다. 쿠팡에 지금 발주처리하면 해당 주문의 내부 발주·예약 발송이 해제됩니다. 계속할까요?"
+          confirmText="발주처리"
+          isDangerous
+          onConfirm={() => { setAckConfirmOpen(false); void runAcknowledge(); }}
+          onCancel={() => setAckConfirmOpen(false)}
+        />
     </Modal>
   );
 }

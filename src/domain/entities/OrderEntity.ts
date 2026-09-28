@@ -12,6 +12,18 @@ export type OrderStatus =
   | 'DELIVERED'
   | 'CANCELLED';
 
+/**
+ * 내부 단계 (FEATURE_2609_75 / D9). 쿠팡 상태(`status`)와 별개다 — 칩·필터·발주처리 판정은 `status` 로만 한다.
+ * null = 없음.
+ */
+export type InternalStage = 'INTERNAL_PREPARING' | 'AWAITING_SHIPMENT';
+
+// 화면 문구의 단일 출처(D10·D11). 「발주대기중」「출고 준비」 등 다른 표기 금지.
+export const INTERNAL_STAGE_LABELS: Record<InternalStage, string> = {
+  INTERNAL_PREPARING: '내부 상품준비중',
+  AWAITING_SHIPMENT: '발송대기중',
+};
+
 export interface OrderItem {
   id: number;
   marketplaceAccountId: number;
@@ -32,6 +44,8 @@ export interface OrderItem {
   platformStatus: string | null;
   // 전량 취소 여부 — 서버 판정(cancelCount + holdCount >= orderCount)이 유일한 기준이다.
   cancelled: boolean;
+  // 내부 단계(FEATURE_2609_75 / D9 · D29). 값은 배송 묶음의 것이지만 서버가 표시용 상태가 결제완료인 줄에만 내려준다 — 같은 묶음이라도 전량 취소된 줄은 null 이다.
+  internalStage: InternalStage | null;
   paidAt: string | null;
   // 주문 시점 금액 스냅샷. 과거 주문은 백필된 만큼만 채워져 null 이 온다 — 0 으로 그리지 말 것.
   unitPrice: number | null;

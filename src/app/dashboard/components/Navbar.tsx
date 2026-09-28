@@ -112,6 +112,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         { href: ROUTES.ORDERS_RETRIEVE, label: '주문내역' },
         { href: ROUTES.ORDERS_CLAIMS, label: '반품/교환', badge: alerts?.openClaims },
         { href: ROUTES.ORDERS_INQUIRIES, label: '고객문의', badge: alerts?.unansweredInquiries },
+        { href: ROUTES.ORDERS_SETTINGS, label: '주문관리 설정' },
       ],
     },
     {

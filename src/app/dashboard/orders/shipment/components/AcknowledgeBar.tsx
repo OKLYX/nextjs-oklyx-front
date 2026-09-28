@@ -4,13 +4,15 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { Button } from '@/presentation/components/ui/Button';
 
 /**
- * 출고관리 표 상단 선택 액션 바 — 선택 건수 · [주문 상태 갱신] · [발주처리] · 페이지 크기 · 결과 메시지.
+ * 출고관리 표 상단 선택 액션 바 — 선택 건수 · [주문 상태 갱신] · [발주처리] · [내부 발주처리] · [내부 발주 해제] ·
+ * 페이지 크기 · 결과 메시지.
  *
  * ⚠️ 버튼 글자에 선택 건수를 넣지 않는다 — 건수를 말하는 자리는 이 바의 왼쪽 한 곳뿐이다.
  *
  * ⚠️ `ShipmentFilterCard` 에 넣지 않는다 — 그 카드는 "조회 조건 + 서버가 sellerId 로 처리하는 액션"의
  * 자리다. 발주처리는 선택에 종속되고 페이지 크기는 표에 종속이라 표 바로 위가 맞다.
- * ⚠️ 바 자체는 항상 렌더한다(비-ADMIN·결과 0건 포함) — 숨는 것은 [발주처리] 버튼뿐.
+ * ⚠️ 바 자체는 항상 렌더한다(비-ADMIN·결과 0건 포함) — 숨는 것은 ADMIN 버튼들뿐.
+ * ⚠️ [내부 발주처리]는 [발주처리] **바로 옆 · 초록**(`variant="confirm"`)이다(FEATURE_2609_75 / D13). 색을 바꾸지 말 것.
  */
 /** 페이지 크기는 판매상품 마스터와 같은 25/50/100 (PLAN 2609_17 D16). 그 화면의 URL 쿼리 모듈에서 import 하지 않는다. */
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
@@ -24,6 +26,14 @@ interface AcknowledgeBarProps {
   onAcknowledge: () => void;
   isSubmitting: boolean;
   canAcknowledge: boolean;      // = isAdmin
+  /** 선택 중 내부 발주처리되는 건수(결제완료·내부 단계 없음). */
+  internalCount: number;
+  /** 선택 중 「내부 상품준비중」 건수 — [내부 발주 해제] 대상. */
+  releaseCount: number;
+  onInternalAcknowledge: () => void;
+  onReleaseInternal: () => void;
+  /** 진행 중인 내부 작업. 버튼 두 개가 같은 요청 자리를 쓴다. */
+  internalBusy: 'mark' | 'release' | null;
   /** 선택한 주문을 마켓에서 다시 읽어 상태를 맞춘다(PLAN 2609_50). */
   onRefresh: () => void;
   isRefreshing: boolean;
@@ -38,6 +48,11 @@ export function AcknowledgeBar({
   onAcknowledge,
   isSubmitting,
   canAcknowledge,
+  internalCount,
+  releaseCount,
+  onInternalAcknowledge,
+  onReleaseInternal,
+  internalBusy,
   onRefresh,
   isRefreshing,
   pageSize,
@@ -59,7 +74,7 @@ export function AcknowledgeBar({
             : '주문을 선택하세요'}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {/* 상태 갱신은 마켓에 쓰지 않는 읽기라 ADMIN 게이트를 걸지 않는다(PLAN 2609_50 D17).
               상한(주문 50건)도 서버가 판정하므로 여기서 건수로 막지 않는다(D3). */}
           <Button
@@ -76,6 +91,26 @@ export function AcknowledgeBar({
               disabled={acknowledgeableCount === 0 || isOverLimit || isSubmitting}
             >
               {isSubmitting ? <Spinner label="전송 중..." /> : '발주처리'}
+            </Button>
+          )}
+
+          {canAcknowledge && (
+            <Button
+              variant="confirm"
+              onClick={onInternalAcknowledge}
+              disabled={internalCount === 0 || internalBusy !== null}
+            >
+              {internalBusy === 'mark' ? <Spinner label="처리 중..." /> : '내부 발주처리'}
+            </Button>
+          )}
+
+          {canAcknowledge && (
+            <Button
+              variant="secondary"
+              onClick={onReleaseInternal}
+              disabled={releaseCount === 0 || internalBusy !== null}
+            >
+              {internalBusy === 'release' ? <Spinner label="처리 중..." /> : '내부 발주 해제'}
             </Button>
           )}
 
@@ -106,6 +141,13 @@ export function AcknowledgeBar({
         <p className="text-xs text-gray-500">
           선택한 {selectedCount}건 중 {notAcknowledgeable}건은 결제완료가 아니어서 발주처리 대상이 아닙니다.
           주문 상태 갱신은 그대로 됩니다.
+        </p>
+      )}
+
+      {/* 내부 발주처리는 쿠팡에 보내지 않는다 — 쿠팡에는 결제완료로 남는다(D1). */}
+      {canAcknowledge && internalCount > 0 && (
+        <p className="text-xs text-gray-500">
+          내부 발주처리는 쿠팡에 보내지 않습니다. 쿠팡에는 결제완료로 남고 오클릭스에만 「내부 상품준비중」으로 표시됩니다.
         </p>
       )}
 
