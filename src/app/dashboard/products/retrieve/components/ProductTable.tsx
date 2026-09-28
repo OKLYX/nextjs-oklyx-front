@@ -9,7 +9,7 @@ import { useListViewStore } from '@/infrastructure/stores/listViewStore';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 import { detailHrefWithReturn } from '@/infrastructure/utils/listReturn';
 import { formatKrw } from '@/infrastructure/utils/money';
-import type { Product } from '@/domain/entities/Product';
+import { purchasePlaceNames, type Product } from '@/domain/entities/Product';
 
 interface ProductTableProps {
   products: Product[];
@@ -193,7 +193,7 @@ export function ProductTable({
                 <td className="px-4 py-3 text-sm text-gray-900">{barcode(product)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.brand}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{formatKrw(product.price)}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{product.store}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">{purchasePlaceNames(product)}</td>
                 <td className="px-4 py-3 text-sm">{channelCount(product)}</td>
                 <td className="px-4 py-3 text-sm">{statusChip(product.active)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{formatDate(product.createdDate)}</td>
@@ -218,7 +218,7 @@ export function ProductTable({
                 { label: '바코드', value: barcode(product) },
                 { label: '브랜드', value: product.brand },
                 { label: '가격', value: formatKrw(product.price) },
-                { label: '구매처', value: product.store },
+                { label: '구매처', value: purchasePlaceNames(product) },
                 { label: '판매채널', value: channelCount(product) },
                 { label: '상태', value: statusChip(product.active) },
                 { label: '등록일', value: formatDate(product.createdDate) },

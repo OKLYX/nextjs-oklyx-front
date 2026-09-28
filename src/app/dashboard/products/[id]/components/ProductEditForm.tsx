@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import type { Product } from '@/domain/entities/Product';
+import { COUNT_UNITS, type Product } from '@/domain/entities/Product';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ProductImageGallery } from './ProductImageGallery';
@@ -13,18 +13,23 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { useClipboardStore } from '@/infrastructure/stores/clipboardStore';
 import type { ClipValues } from '@/domain/entities/ClipItem';
 import { ClipboardFillModal, CLIP_FIELD_LABELS, type ProductClip } from './ClipboardFillModal';
+import { PurchasePlaceCheckboxes } from './PurchasePlaceCheckboxes';
+import { usePurchasePlaces } from '@/presentation/hooks/usePurchasePlaces';
 
 interface ProductEditFormValues {
   productName: string;
   barcodeId: string;
   brand: string;
   price: string;
-  store: string;
+  /** 구매처 id 목록 — `register` 하지 않고 `watch`/`setValue` 로만 다룬다(체크 목록). */
+  purchasePlaceIds: number[];
   netContentUnit: string;
   packageHeight: string;
   packageLength: string;
   packageWidth: string;
   netContent: string;
+  countQuantity: string;
+  countUnit: string;
   description: string;
 }
 
@@ -55,6 +60,7 @@ export function ProductEditForm({
   // 값을 가진 항목만 채우기 대상이다(사진 한 장짜리 항목에는 채울 값이 없다).
   // 목록 앞이 가장 최근에 담은 것 — 팝업의 기본 선택이 된다.
   const productClips = clipItems.filter((item): item is ProductClip => item.kind === 'product');
+  const { places, loading: placesLoading, failed: placesFailed } = usePurchasePlaces();
 
   const {
     register,
@@ -68,18 +74,21 @@ export function ProductEditForm({
       barcodeId: product.barcodeId,
       brand: product.brand ?? '',
       price: product.price ? String(product.price) : '',
-      store: product.store ?? '',
+      purchasePlaceIds: (product.purchasePlaces ?? []).map((place) => place.id),
       netContentUnit: product.netContentUnit ?? '',
       packageHeight: product.packageHeight ? String(product.packageHeight) : '',
       packageLength: product.packageLength ? String(product.packageLength) : '',
       packageWidth: product.packageWidth ? String(product.packageWidth) : '',
       netContent: product.netContent ? String(product.netContent) : '',
+      countQuantity: product.countQuantity != null ? String(product.countQuantity) : '',
+      countUnit: product.countUnit ?? '',
       description: product.description ?? '',
     },
   });
 
   const barcodeValue = watch('barcodeId');
   const formValues = watch();
+  const purchasePlaceIds = watch('purchasePlaceIds');
 
   // 🔴 어느 물품에서·어느 항목을 채울지는 팝업이 고른다 — 여기서는 고른 것만 그대로 넣는다.
   //    체크한 항목은 이미 값이 있어도 **덮어쓴다**(일부러 고른 것). 무엇을 잃는지는 팝업이
@@ -89,9 +98,16 @@ export function ProductEditForm({
     (values: ClipValues, keys: (keyof ClipValues)[]) => {
       const filled: string[] = [];
       keys.forEach((key) => {
-        const next = values[key];
-        if (next == null || next === '') return;
-        setValue(key, next, { shouldDirty: true });
+        // 구매처는 id 목록이라 따로 넣는다(FEATURE_2609_76 / D17).
+        if (key === 'purchasePlaceIds') {
+          const ids = values.purchasePlaceIds ?? [];
+          if (ids.length === 0) return;
+          setValue('purchasePlaceIds', ids, { shouldDirty: true });
+        } else {
+          const next = values[key];
+          if (next == null || next === '') return;
+          setValue(key, next, { shouldDirty: true });
+        }
         filled.push(CLIP_FIELD_LABELS[key]);
       });
       setClipNotice(
@@ -139,6 +155,8 @@ export function ProductEditForm({
       try {
         // 치수·내용물 양은 서버에서 문자열이다 → 입력한 글자를 그대로 보낸다.
         // 빈칸은 `null` 이 아니라 `''` 로 보내야 실제로 지워진다(서버의 `null` = 필드 미전송).
+        // 🔴 개수는 두 칸을 **항상 함께** 보낸다 — 서버는 `countUnit` 을 받으면 개수 쌍을 통째로 바꾼다
+        //    (`countUnit: ''` + `countQuantity: null` = 개수 지움). 구매처도 항상 보낸다(= 통째로 교체).
         const payload: UpdateProductRequest = {
           ...data,
           price: data.price ? Number(data.price) : null,
@@ -146,6 +164,8 @@ export function ProductEditForm({
           packageLength: data.packageLength.trim(),
           packageWidth: data.packageWidth.trim(),
           netContent: data.netContent.trim(),
+          countQuantity: data.countQuantity.trim() === '' ? null : Number(data.countQuantity.trim()),
+          countUnit: data.countUnit,
         };
         await onSave(payload);
       } catch (err) {
@@ -261,37 +281,32 @@ export function ProductEditForm({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="store" className="block text-sm font-medium text-gray-900 mb-1">
-                구매처
-              </label>
-              <select
-                id="store"
-                {...register('store')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">구매처 선택</option>
-                <option value="이마트">이마트</option>
-                <option value="코스트코">코스트코</option>
-                <option value="노브랜드">노브랜드</option>
-              </select>
-            </div>
+            <PurchasePlaceCheckboxes
+              places={places}
+              loading={placesLoading}
+              failed={placesFailed}
+              value={purchasePlaceIds}
+              onChange={(ids) => setValue('purchasePlaceIds', ids, { shouldDirty: true })}
+            />
 
             <div>
               <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
                 단위
               </label>
-              {/* 내용물 양을 적었으면 단위를 함께 골라야 한다(서버가 400 으로 거절한다).
-                  ⚠️ 반대(단위만 고르고 양은 빈칸)는 서버가 막지 않으므로 여기서도 막지 않는다.
-                  🔴 이 물품이 원래 단위가 없었더라도 수정 화면은 빈 단위로 시작하므로,
-                     양만 입력하는 경로가 여기서 걸린다. */}
+              {/* 내용물 양과 단위는 함께 넣거나 둘 다 비운다(서버가 400 으로 거절한다, FEATURE_2609_76 / D18).
+                  🔴 단위만 저장돼 있던 옛 물품은 이 검사에 걸린다 — 양을 넣거나 단위를 비워야 저장된다. */}
               <select
                 id="netContentUnit"
                 {...register('netContentUnit', {
-                  validate: (value, values) =>
-                    values.netContent.trim() !== '' && !value.trim()
-                      ? '내용물 양을 입력하면 단위를 함께 선택해주세요'
-                      : true,
+                  validate: (value, values) => {
+                    if (values.netContent.trim() !== '' && !value.trim()) {
+                      return '내용물 양을 입력하면 단위를 함께 선택해주세요';
+                    }
+                    if (values.netContent.trim() === '' && value.trim() !== '') {
+                      return '단위를 고르면 내용물 양을 함께 입력해주세요';
+                    }
+                    return true;
+                  },
                 })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
@@ -361,6 +376,58 @@ export function ProductEditForm({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="countQuantity" className="block text-sm font-medium text-gray-900 mb-1">
+                개수
+              </label>
+              <Input
+                id="countQuantity"
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                error={errors.countQuantity?.message}
+                {...register('countQuantity', {
+                  deps: ['countUnit'],
+                  validate: (value) =>
+                    value.trim() === '' || /^[1-9][0-9]*$/.test(value.trim())
+                      ? true
+                      : '개수는 1 이상의 정수로 입력해주세요',
+                })}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="countUnit" className="block text-sm font-medium text-gray-900 mb-1">
+                개수 단위
+              </label>
+              {/* 개수와 개수 단위는 함께 넣거나 둘 다 비운다(D6). 무게·부피 단위와 섞지 않는다(D7). */}
+              <select
+                id="countUnit"
+                {...register('countUnit', {
+                  validate: (value, values) => {
+                    if (values.countQuantity.trim() !== '' && value === '') {
+                      return '개수를 입력하면 개수 단위를 함께 선택해주세요';
+                    }
+                    if (values.countQuantity.trim() === '' && value !== '') {
+                      return '개수 단위를 고르면 개수를 함께 입력해주세요';
+                    }
+                    return true;
+                  },
+                })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">개수 단위 선택</option>
+                {COUNT_UNITS.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+              </select>
+              {errors.countUnit && <p className="text-red-600 text-sm mt-1">{errors.countUnit.message}</p>}
+            </div>
+          </div>
+
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
               설명
@@ -386,6 +453,7 @@ export function ProductEditForm({
       {isFillOpen && (
         <ClipboardFillModal
           clips={productClips}
+          purchasePlaces={places}
           currentValues={formValues}
           onApply={handleApplyFill}
           onClose={() => setIsFillOpen(false)}

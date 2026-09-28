@@ -5,6 +5,7 @@ import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import type { ClipItem, ClipValues } from '@/domain/entities/ClipItem';
+import type { PurchasePlaceRef } from '@/domain/entities/PurchasePlace';
 
 /**
  * [클립보드에서 채우기] 를 누르면 뜨는 선택 팝업 (FEATURE_2609_62 후속).
@@ -27,6 +28,7 @@ import type { ClipItem, ClipValues } from '@/domain/entities/ClipItem';
  * {isFillOpen && (
  *   <ClipboardFillModal
  *     clips={productClips}
+ *     purchasePlaces={places}
  *     currentValues={formValues}
  *     onApply={handleApplyFill}
  *     onClose={() => setIsFillOpen(false)}
@@ -41,23 +43,27 @@ import type { ClipItem, ClipValues } from '@/domain/entities/ClipItem';
  * ⚠️ 물품을 바꿀 때 `useEffect` 로 체크를 갱신하지 말 것 — 이 저장소 lint 규칙
  *   `react-hooks/set-state-in-effect`(error) 에 걸린다. 선택 핸들러 안에서 함께 갱신한다.
  * ❌ 값이 없는 항목을 체크 가능하게 두지 말 것 — 눌러도 아무 일이 없는 체크박스가 된다.
+ * 🔴 구매처는 id 목록으로 담겨 있다(FEATURE_2609_76 / D17). 지금 구매처 목록에 없는 id 는 버리고,
+ *    이름은 `purchasePlaces` 에서 찾아 보인다. 예전에 글자로 담긴 구매처(`store`)는 읽지 않는다.
  */
 
 /** 값 스냅샷을 가진 항목(사진 한 장짜리 항목에는 채울 값이 없다). */
 export type ProductClip = Extract<ClipItem, { kind: 'product' }>;
 
 /**
- * 채우기 대상 9개 항목의 표시 이름 — 순서가 곧 팝업에 나오는 순서다.
+ * 채우기 대상 11개 항목의 표시 이름 — 순서가 곧 팝업에 나오는 순서다.
  *
  * 🔴 상품명·바코드는 여기에 없다. `ClipValues` 자체에 없는 값이라 채울 수 없다
  *   (바코드는 복제하면 중복이 생기고, 상품명은 물품을 구분하는 이름이다).
  */
 export const CLIP_FIELD_LABELS: Record<keyof ClipValues, string> = {
   brand: '브랜드',
-  store: '구매처',
+  purchasePlaceIds: '구매처',
   price: '가격',
   netContent: '내용물 양',
   netContentUnit: '단위',
+  countQuantity: '개수',
+  countUnit: '개수 단위',
   packageWidth: '너비',
   packageLength: '길이',
   packageHeight: '높이',
@@ -66,7 +72,35 @@ export const CLIP_FIELD_LABELS: Record<keyof ClipValues, string> = {
 
 const FIELD_ORDER = Object.keys(CLIP_FIELD_LABELS) as (keyof ClipValues)[];
 
-const isBlank = (value: string | undefined | null): boolean => value == null || value === '';
+const isBlank = (value: ClipValues[keyof ClipValues] | null): boolean =>
+  value == null || value === '' || (Array.isArray(value) && value.length === 0);
+
+/**
+ * 채울 값 — 담긴 값 그대로, 구매처만 **지금 목록에 있는 id** 로 거른다(지워진 구매처는 채울 곳이 없다).
+ */
+function incomingValues(clip: ProductClip, places: PurchasePlaceRef[]): ClipValues {
+  const known = new Set(places.map((place) => place.id));
+  return {
+    ...clip.values,
+    purchasePlaceIds: (clip.values.purchasePlaceIds ?? []).filter((id) => known.has(id)),
+  };
+}
+
+/** 화면에 보일 글자. 구매처는 id 를 이름으로 바꿔 `, ` 로 잇는다. */
+function valueText(
+  key: keyof ClipValues,
+  value: ClipValues[keyof ClipValues],
+  places: PurchasePlaceRef[],
+): string {
+  if (value == null) return '';
+  if (key === 'purchasePlaceIds' && Array.isArray(value)) {
+    return value
+      .map((id) => places.find((place) => place.id === id)?.name)
+      .filter((name): name is string => name != null)
+      .join(', ');
+  }
+  return String(value);
+}
 
 /**
  * 물품을 고른 순간의 기본 체크 — **담긴 값이 있고, 지금 폼이 비어 있는** 항목만 켠다.
@@ -75,12 +109,14 @@ const isBlank = (value: string | undefined | null): boolean => value == null || 
  */
 function defaultKeys(
   clip: ProductClip,
-  currentValues: Record<keyof ClipValues, string>,
+  currentValues: ClipValues,
+  places: PurchasePlaceRef[],
 ): Set<keyof ClipValues> {
+  const incoming = incomingValues(clip, places);
   const picked = new Set<keyof ClipValues>();
   FIELD_ORDER.forEach((key) => {
-    if (isBlank(clip.values[key])) return;
-    if (!isBlank(currentValues[key])) return;
+    if (isBlank(incoming[key] ?? null)) return;
+    if (!isBlank(currentValues[key] ?? null)) return;
     picked.add(key);
   });
   return picked;
@@ -89,8 +125,10 @@ function defaultKeys(
 interface ClipboardFillModalProps {
   /** 담긴 물품 목록(최근 것이 앞). 비어 있으면 호출부가 버튼 자체를 막는다. */
   clips: ProductClip[];
+  /** 지금 구매처 목록(`usePurchasePlaces().places`) — 담긴 구매처 id 를 이름으로 바꾸고, 지워진 것은 뺀다. */
+  purchasePlaces: PurchasePlaceRef[];
   /** 지금 폼에 들어 있는 값 — 덮어쓰기 여부 표시와 기본 체크 판단에 쓴다. */
-  currentValues: Record<keyof ClipValues, string>;
+  currentValues: ClipValues;
   /** [채우기] — 고른 물품의 값과 고른 항목만 넘긴다. 폼 반영은 호출부가 한다. */
   onApply: (values: ClipValues, keys: (keyof ClipValues)[]) => void;
   onClose: () => void;
@@ -98,6 +136,7 @@ interface ClipboardFillModalProps {
 
 export function ClipboardFillModal({
   clips,
+  purchasePlaces,
   currentValues,
   onApply,
   onClose,
@@ -105,15 +144,17 @@ export function ClipboardFillModal({
   const [clipId, setClipId] = useState(clips[0]?.clipId ?? '');
   const selected = clips.find((clip) => clip.clipId === clipId) ?? clips[0];
   const [keys, setKeys] = useState<Set<keyof ClipValues>>(() =>
-    selected ? defaultKeys(selected, currentValues) : new Set(),
+    selected ? defaultKeys(selected, currentValues, purchasePlaces) : new Set(),
   );
 
   if (!selected) return null;
 
+  const incoming = incomingValues(selected, purchasePlaces);
+
   // 물품 선택과 체크 갱신은 한 핸들러 안에서 함께 일어난다(위 ⚠️ lint 규칙).
   const pickClip = (next: ProductClip) => {
     setClipId(next.clipId);
-    setKeys(defaultKeys(next, currentValues));
+    setKeys(defaultKeys(next, currentValues, purchasePlaces));
   };
 
   const toggleKey = (key: keyof ClipValues) => {
@@ -126,16 +167,18 @@ export function ClipboardFillModal({
   };
 
   /** 담긴 값이 있는 항목만 고를 수 있다. */
-  const fillable = FIELD_ORDER.filter((key) => !isBlank(selected.values[key]));
-  const overwriting = [...keys].filter((key) => !isBlank(currentValues[key]));
+  const fillable = FIELD_ORDER.filter((key) => !isBlank(incoming[key] ?? null));
+  const overwriting = [...keys].filter((key) => !isBlank(currentValues[key] ?? null));
 
   const thumbOf = (clip: ProductClip): string | null => {
     const first = clip.imageRefs[0];
     return first ? resolveThumbUrl(first.imageUrl) : null;
   };
 
+  // 🔴 FIELD_ORDER 로 센다 — 예전 항목에 남은 글자 구매처(`store`)는 세지 않는다(D17).
   const summaryOf = (clip: ProductClip): string => {
-    const valueCount = Object.values(clip.values).filter((value) => !isBlank(value)).length;
+    const values = incomingValues(clip, purchasePlaces);
+    const valueCount = FIELD_ORDER.filter((key) => !isBlank(values[key] ?? null)).length;
     return `사진 ${clip.imageRefs.length}장 · 값 ${valueCount}개`;
   };
 
@@ -149,7 +192,7 @@ export function ClipboardFillModal({
           <Button variant="secondary" onClick={onClose}>
             취소
           </Button>
-          <Button onClick={() => onApply(selected.values, [...keys])} disabled={keys.size === 0}>
+          <Button onClick={() => onApply(incoming, [...keys])} disabled={keys.size === 0}>
             {keys.size === 0 ? '채우기' : `${keys.size}개 항목 채우기`}
           </Button>
         </>
@@ -244,10 +287,10 @@ export function ClipboardFillModal({
           ) : (
             <div className="space-y-1">
               {FIELD_ORDER.map((key) => {
-                const incoming = selected.values[key];
-                const current = currentValues[key] ?? '';
-                const hasIncoming = !isBlank(incoming);
-                const willOverwrite = !isBlank(current);
+                const incomingText = valueText(key, incoming[key], purchasePlaces);
+                const current = valueText(key, currentValues[key], purchasePlaces);
+                const hasIncoming = !isBlank(incoming[key] ?? null);
+                const willOverwrite = !isBlank(currentValues[key] ?? null);
                 const checked = keys.has(key);
                 return (
                   <label
@@ -280,10 +323,10 @@ export function ClipboardFillModal({
                         <p className="text-xs text-gray-600">
                           <span className="text-red-600 line-through">{current}</span>
                           <span className="mx-1 text-gray-400">→</span>
-                          <span className="font-medium text-gray-900">{incoming}</span>
+                          <span className="font-medium text-gray-900">{incomingText}</span>
                         </p>
                       ) : (
-                        <p className="truncate text-xs text-gray-600">{incoming}</p>
+                        <p className="truncate text-xs text-gray-600">{incomingText}</p>
                       )}
                     </div>
                   </label>

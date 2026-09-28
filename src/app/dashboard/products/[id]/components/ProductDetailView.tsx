@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Product } from '@/domain/entities/Product';
+import { purchasePlaceNames, type Product } from '@/domain/entities/Product';
 import type { ProductUsage } from '@/domain/entities/ProductUsage';
 import { deleteBlockedReason } from '@/domain/entities/ProductUsage';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
@@ -71,15 +71,22 @@ export function ProductDetailView({
       const images = await imageUseCase.list(product.id);
       const values: ClipValues = {};
       // 🔴 폼(RHF)이 전부 string 이라 담을 때부터 문자열로 맞춘다. 빈 값은 담지 않는다.
-      const put = (key: keyof ClipValues, value: string | number | null | undefined) => {
+      const put = (
+        key: Exclude<keyof ClipValues, 'purchasePlaceIds'>,
+        value: string | number | null | undefined,
+      ) => {
         const text = value == null ? '' : String(value).trim();
         if (text !== '') values[key] = text;
       };
       put('brand', product.brand);
-      put('store', product.store);
+      // 구매처는 이름이 아니라 id 목록으로 담는다(FEATURE_2609_76 / D17).
+      const placeIds = (product.purchasePlaces ?? []).map((place) => place.id);
+      if (placeIds.length > 0) values.purchasePlaceIds = placeIds;
       put('price', product.price);
       put('netContent', product.netContent);
       put('netContentUnit', product.netContentUnit);
+      put('countQuantity', product.countQuantity);
+      put('countUnit', product.countUnit);
       put('packageWidth', product.packageWidth);
       put('packageLength', product.packageLength);
       put('packageHeight', product.packageHeight);
@@ -170,9 +177,11 @@ export function ProductDetailView({
     { label: '바코드 ID', value: product.barcodeId ?? null },
     { label: '브랜드', value: product.brand ?? null },
     { label: '가격', value: product.price == null ? null : formatKrw(product.price) },
-    { label: '구매처', value: product.store ?? null },
+    { label: '구매처', value: purchasePlaceNames(product) || null },
     { label: '내용물 양', value: product.netContent ?? null },
     { label: '단위', value: product.netContentUnit ?? null },
+    { label: '개수', value: product.countQuantity != null ? String(product.countQuantity) : null },
+    { label: '개수 단위', value: product.countUnit ?? null },
     { label: '높이', value: product.packageHeight ?? null },
     { label: '길이', value: product.packageLength ?? null },
     { label: '너비', value: product.packageWidth ?? null },

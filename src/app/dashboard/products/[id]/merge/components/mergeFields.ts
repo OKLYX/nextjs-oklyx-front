@@ -1,19 +1,24 @@
 import type { Product } from '@/domain/entities/Product';
+import type { PurchasePlaceRef } from '@/domain/entities/PurchasePlace';
 import type { ProductUsage } from '@/domain/entities/ProductUsage';
 import type { ProductImage } from '@/domain/entities/ProductImage';
 import type { MergedProductFields } from '@/domain/repositories/ProductMergeRepository';
 import { formatKrw } from '@/infrastructure/utils/money';
 
-/** 병합 화면에서 사람이 고르는 항목. 🔴 백엔드 `MergedFields` 와 같은 집합이다(대표 사진 제외). */
+/**
+ * 병합 화면에서 사람이 고르는 항목. 🔴 백엔드 `MergedFields` 와 같은 집합이다(대표 사진 제외).
+ * 🔴 구매처는 고르는 항목이 아니다 — 두 물품 것을 합친다(FEATURE_2609_76 / D16, `mergedPurchasePlaces`).
+ */
 export type MergeFieldKey =
   | 'productName'
   | 'brand'
   | 'barcodeId'
-  | 'store'
   | 'price'
   | 'description'
   | 'netContent'
   | 'netContentUnit'
+  | 'countQuantity'
+  | 'countUnit'
   | 'packageHeight'
   | 'packageLength'
   | 'packageWidth';
@@ -22,10 +27,11 @@ export const MERGE_FIELDS: { key: MergeFieldKey; label: string }[] = [
   { key: 'productName', label: '상품명' },
   { key: 'brand', label: '브랜드' },
   { key: 'barcodeId', label: '바코드' },
-  { key: 'store', label: '구매처' },
   { key: 'price', label: '가격' },
   { key: 'netContent', label: '내용물 양' },
   { key: 'netContentUnit', label: '단위' },
+  { key: 'countQuantity', label: '개수' },
+  { key: 'countUnit', label: '개수 단위' },
   { key: 'packageHeight', label: '높이' },
   { key: 'packageLength', label: '길이' },
   { key: 'packageWidth', label: '너비' },
@@ -46,7 +52,7 @@ export interface MergeSideData {
   images: ProductImage[];
 }
 
-/** 비교용 원본 값. 가격만 숫자고 나머지는 문자열이다(서버 컬럼이 VARCHAR). */
+/** 비교용 원본 값. 가격·개수는 숫자고 나머지는 문자열이다(서버 컬럼이 VARCHAR). */
 export function fieldValue(product: Product, key: MergeFieldKey): string | number | null {
   const raw = product[key];
   if (raw === undefined || raw === null) return null;
@@ -101,21 +107,45 @@ export function buildMergedFields(
   };
   const price =
     choices.price === keepSide ? null : ((fieldValue(discard, 'price') as number | null) ?? null);
+  const countQuantity =
+    choices.countQuantity === keepSide
+      ? null
+      : ((fieldValue(discard, 'countQuantity') as number | null) ?? null);
 
   return {
     productName: pick('productName'),
     brand: pick('brand'),
     barcodeId: pick('barcodeId'),
-    store: pick('store'),
     price,
     description: pick('description'),
     netContent: pick('netContent'),
     netContentUnit: pick('netContentUnit'),
+    countQuantity,
+    countUnit: pick('countUnit'),
     packageHeight: pick('packageHeight'),
     packageLength: pick('packageLength'),
     packageWidth: pick('packageWidth'),
     representativeImageId,
   };
+}
+
+/**
+ * 병합 뒤 남길 물품의 구매처 = 남길 쪽 것 + 버릴 쪽에만 있던 것(FEATURE_2609_76 / D16).
+ * 🔴 서버(`ProductMergeService.mergePurchasePlaces`)가 같은 규칙으로 합친다 — 화면은 미리 보여주기만 한다.
+ */
+export function mergedPurchasePlaces(keep: Product, discard: Product): PurchasePlaceRef[] {
+  const merged = [...(keep.purchasePlaces ?? [])];
+  (discard.purchasePlaces ?? []).forEach((place) => {
+    if (!merged.some((kept) => kept.id === place.id)) merged.push(place);
+  });
+  return merged;
+}
+
+/** 두 물품의 구매처가 같은 집합인지(순서 무시). 같으면 병합 표에서 구매처 줄을 숨긴다. */
+export function isSamePurchasePlaces(left: Product, right: Product): boolean {
+  const leftIds = (left.purchasePlaces ?? []).map((place) => place.id).sort((a, b) => a - b);
+  const rightIds = (right.purchasePlaces ?? []).map((place) => place.id).sort((a, b) => a - b);
+  return leftIds.length === rightIds.length && leftIds.every((id, index) => id === rightIds[index]);
 }
 
 /** 이관 항목 표시 순서·문구. 키는 백엔드 `TransferOptions` 필드명과 같다. */

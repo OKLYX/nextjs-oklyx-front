@@ -49,6 +49,7 @@ export const ROUTES = {
   ALERTS: '/dashboard/alerts' as const,
   PURCHASE_LIST: '/dashboard/purchase/list' as const,
   SETTINGS_LOGGING: '/dashboard/settings/logging' as const,
+  SETTINGS_PURCHASE_PLACES: '/dashboard/settings/purchase-places' as const,
   THUMBNAIL_TEMPLATES: '/dashboard/thumbnail-templates' as const,
   THUMBNAIL_TEMPLATE_NEW: '/dashboard/thumbnail-templates/new' as const,
   THUMBNAIL_TEMPLATE_EDIT: (id: number | string) => `/dashboard/thumbnail-templates/${id}` as const,
