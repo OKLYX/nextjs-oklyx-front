@@ -11,12 +11,16 @@ export interface CreateProductRequest {
   barcodeId?: string;
   brand?: string;
   price?: number;
-  store?: string;
+  /** 구매처 id 목록(FEATURE_2609_76). 비면 구매처 없음. */
+  purchasePlaceIds?: number[];
   netContentUnit?: string;
   packageHeight?: string;
   packageLength?: string;
   packageWidth?: string;
   netContent?: string;
+  /** 개수(1 이상 정수). `countUnit` 과 함께 보내거나 둘 다 뺀다. */
+  countQuantity?: number;
+  countUnit?: string;
   description?: string;
 }
 
@@ -25,12 +29,19 @@ export interface UpdateProductRequest {
   barcodeId?: string;
   brand?: string | null;
   price?: number | null;
-  store?: string | null;
+  /** 구매처 id 목록 — 보내면 이 목록으로 **통째로** 바뀐다(`[]` = 전부 지움). */
+  purchasePlaceIds?: number[];
   netContentUnit?: string | null;
   packageHeight?: string | null;
   packageLength?: string | null;
   packageWidth?: string | null;
   netContent?: string | null;
+  /**
+   * 🔴 개수 쌍은 `countUnit` 을 보내면 통째로 바뀐다 — 그때 `countQuantity` 가 null 이면 개수가 지워진다.
+   * 지우기 = `countUnit: ''` + `countQuantity: null`. 수정 화면은 두 칸을 항상 함께 보낸다.
+   */
+  countQuantity?: number | null;
+  countUnit?: string | null;
   description?: string | null;
 }
 

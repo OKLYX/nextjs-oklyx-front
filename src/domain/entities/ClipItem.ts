@@ -14,11 +14,18 @@
  */
 export interface ClipValues {
   brand?: string;
-  store?: string;
+  /**
+   * 구매처 id 목록 (FEATURE_2609_76 / D17). 🔴 이름이 아니라 id 다 — 이름은 채울 때 구매처 목록에서 찾는다.
+   * 🔴 예전에 담긴 항목의 글자 구매처(`store`)는 읽지 않는다(버린다). 그 키는 이 타입에 없다.
+   */
+  purchasePlaceIds?: number[];
   /** 🔴 number 가 아니다 — ProductEditForm 의 RHF 필드가 전부 string 이다. */
   price?: string;
   netContent?: string;
   netContentUnit?: string;
+  /** 개수 — `price` 와 같은 이유로 string 이다. */
+  countQuantity?: string;
+  countUnit?: string;
   packageWidth?: string;
   packageLength?: string;
   packageHeight?: string;

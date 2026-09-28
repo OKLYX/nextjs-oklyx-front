@@ -28,7 +28,7 @@ import type {
   CategoryAttribute,
   CategoryNotice,
 } from '@/domain/entities/MasterProductEntity';
-import type { Product } from '@/domain/entities/Product';
+import { purchasePlaceNames, type Product } from '@/domain/entities/Product';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { Package } from '@/domain/entities/PackageEntity';
 import { BUILTIN_FIELD_KEYS, type TemplateField } from '@/domain/entities/ThumbnailEntity';
@@ -1288,8 +1288,8 @@ export function MasterProductCreateForm({
                   <dd className="text-right text-gray-900">{formatWon(detailProduct.price)}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt className="text-gray-500">스토어</dt>
-                  <dd className="text-right text-gray-900">{detailProduct.store || '—'}</dd>
+                  <dt className="text-gray-500">구매처</dt>
+                  <dd className="text-right text-gray-900">{purchasePlaceNames(detailProduct) || '—'}</dd>
                 </div>
                 {detailProduct.barcodeId && (
                   <div className="flex justify-between gap-2">
