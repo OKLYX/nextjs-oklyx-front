@@ -312,7 +312,7 @@ export function ProductRegistrationForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div>
             <PurchasePlaceCheckboxes
               places={places}
               loading={placesLoading}
@@ -321,6 +321,26 @@ export function ProductRegistrationForm({
               value={purchasePlaceIds}
               onChange={(ids) => setValue('purchasePlaceIds', ids, { shouldDirty: true })}
             />
+          </div>
+
+          <div className="border-t border-gray-200 pt-4 space-y-4">
+          <h3 className="text-base font-semibold text-gray-900">중량 / 수량</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
+                내용물 양
+              </label>
+              <Input
+                id="netContent"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]+([.][0-9]+)?"
+                placeholder="0"
+                disabled={isLoading}
+                {...register('netContent', { deps: ['netContentUnit'] })}
+              />
+              {errors.netContent && <p className="text-red-600 text-sm mt-1">{errors.netContent.message}</p>}
+            </div>
 
             <div>
               <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
@@ -350,68 +370,6 @@ export function ProductRegistrationForm({
               {errors.netContentUnit && (
                 <p className="text-red-600 text-sm mt-1">{errors.netContentUnit.message}</p>
               )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
-                높이
-              </label>
-              <Input
-                id="packageHeight"
-                type="text"
-                placeholder="예: 160mm"
-                disabled={isLoading}
-                {...register('packageHeight')}
-              />
-              {errors.packageHeight && <p className="text-red-600 text-sm mt-1">{errors.packageHeight.message}</p>}
-            </div>
-
-            <div>
-              <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
-                길이
-              </label>
-              <Input
-                id="packageLength"
-                type="text"
-                placeholder="예: 75mm"
-                disabled={isLoading}
-                {...register('packageLength')}
-              />
-              {errors.packageLength && <p className="text-red-600 text-sm mt-1">{errors.packageLength.message}</p>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
-                너비
-              </label>
-              <Input
-                id="packageWidth"
-                type="text"
-                placeholder="예: 8.9mm"
-                disabled={isLoading}
-                {...register('packageWidth')}
-              />
-              {errors.packageWidth && <p className="text-red-600 text-sm mt-1">{errors.packageWidth.message}</p>}
-            </div>
-
-            <div>
-              <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
-                내용물 양
-              </label>
-              <Input
-                id="netContent"
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0"
-                disabled={isLoading}
-                {...register('netContent', { deps: ['netContentUnit'] })}
-              />
-              {errors.netContent && <p className="text-red-600 text-sm mt-1">{errors.netContent.message}</p>}
             </div>
           </div>
 
@@ -466,8 +424,58 @@ export function ProductRegistrationForm({
               {errors.countUnit && <p className="text-red-600 text-sm mt-1">{errors.countUnit.message}</p>}
             </div>
           </div>
+          </div>
 
-          <div>
+          <div className="border-t border-gray-200 pt-4 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">부피</h3>
+            <div className="flex flex-col sm:flex-row gap-6">
+              <VolumeDiagram />
+              <div className="flex-1 space-y-4">
+                <div>
+                  <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
+                    너비
+                  </label>
+                  <Input
+                    id="packageWidth"
+                    type="text"
+                    placeholder="예: 8.9mm"
+                    disabled={isLoading}
+                    {...register('packageWidth')}
+                  />
+                  {errors.packageWidth && <p className="text-red-600 text-sm mt-1">{errors.packageWidth.message}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
+                    깊이
+                  </label>
+                  <Input
+                    id="packageLength"
+                    type="text"
+                    placeholder="예: 75mm"
+                    disabled={isLoading}
+                    {...register('packageLength')}
+                  />
+                  {errors.packageLength && <p className="text-red-600 text-sm mt-1">{errors.packageLength.message}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
+                    높이
+                  </label>
+                  <Input
+                    id="packageHeight"
+                    type="text"
+                    placeholder="예: 160mm"
+                    disabled={isLoading}
+                    {...register('packageHeight')}
+                  />
+                  {errors.packageHeight && <p className="text-red-600 text-sm mt-1">{errors.packageHeight.message}</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-gray-200 pt-4">
             <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
               설명
             </label>
@@ -508,5 +516,40 @@ export function ProductRegistrationForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * 부피 입력칸 옆 안내 그림 — 너비·깊이·높이가 상자의 어느 변인지 보여준다(등록 화면 전용).
+ * 정면(흰 면) 기준: 너비 = 정면 가로, 높이 = 정면 세로, 깊이 = 앞에서 뒤로 들어가는 변.
+ * 색은 Tailwind 유틸(fill/stroke/text)로만 준다 — hex 하드코딩 금지(다크모드·브랜드 리맵 규칙).
+ */
+function VolumeDiagram() {
+  return (
+    <div className="shrink-0 sm:w-72 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col items-center justify-center">
+      <svg viewBox="0 0 220 160" className="w-full max-w-[240px]" role="img" aria-label="너비·깊이·높이 안내 그림">
+        <defs>
+          <marker id="volArrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" className="fill-blue-600" />
+          </marker>
+        </defs>
+        {/* box: top and right faces tinted, front face white */}
+        <path d="M60 40 L90 16 L150 16 L120 40 Z" className="fill-amber-100 stroke-gray-500" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M120 40 L150 16 L150 88 L120 112 Z" className="fill-amber-200 stroke-gray-500" strokeWidth="1.5" strokeLinejoin="round" />
+        <rect x="60" y="40" width="60" height="72" className="fill-white stroke-gray-500" strokeWidth="1.5" />
+        {/* dimension arrows */}
+        <g className="stroke-blue-600" strokeWidth="1.5" markerStart="url(#volArrow)" markerEnd="url(#volArrow)">
+          <line x1="42" y1="42" x2="42" y2="110" />
+          <line x1="62" y1="128" x2="118" y2="128" />
+          <line x1="128" y1="118" x2="154" y2="97" />
+        </g>
+        <g className="fill-blue-600" fontSize="13" fontWeight="600" textAnchor="middle">
+          <text x="24" y="80">높이</text>
+          <text x="90" y="148">너비</text>
+          <text x="176" y="118">깊이</text>
+        </g>
+      </svg>
+      <p className="mt-2 text-xs text-gray-500">상품 정면 기준으로 측정</p>
+    </div>
   );
 }
