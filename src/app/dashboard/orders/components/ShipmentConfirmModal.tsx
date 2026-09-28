@@ -7,8 +7,10 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { getOrderStatusLabel } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
-import type { ShipmentConfirmResult } from '@/application/dto/ShippingLabelDTOs';
+import type { ReservationCreateResult, ShipmentConfirmResult } from '@/application/dto/ShippingLabelDTOs';
 import { Button } from '@/presentation/components/ui/Button';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { formatKstWallClock, fromDateTimeLocal, toDateTimeLocal } from '@/infrastructure/utils/kstWallClock';
 
 // Buckets whose detail table can be opened from a summary chip = the three the server returns a
 // *list* for (PLAN 2609_12 D2). 요청 건수·매칭·성공 are counts only, so they stay static chips —
@@ -81,29 +83,41 @@ function ResultTable({
 const statusLabel = (s: string) => (s ? getOrderStatusLabel(s) : '알 수 없음');
 
 /**
- * 발송처리(운송장 업로드) 모달 — 택배사 결과 xlsx를 올려 쿠팡 송장업로드를 배치 전송
+ * 발송처리(운송장 업로드) 모달 — 택배사 결과 xlsx를 올리고 [지금 발송]·[예약 발송] 버튼으로 보낸다.
  *
- * 택배사가 운송장번호를 채운 결과 xlsx를 업로드 → 서버가 주문번호로 order_item을 전개해
- * 계정별 쿠팡 송장업로드(INSTRUCT→배송지시)를 실행하고, 성공/미매칭/실패/제외 요약을 돌려준다.
- * 이미 배송지시 이상으로 넘어간 주문은 서버가 전송에서 제외하고 `skipped`로 돌려준다(실패 아님).
- * 결과는 요약 칩 6개 + 선택한 칩의 상세 표 1개로 보여준다(PLAN 2609_12 D2 — 목록이 있는 3개만 클릭 가능).
+ * [지금 발송] = 서버가 주문번호로 order_item을 전개해 계정별 쿠팡 송장업로드를 실행하고
+ * 성공/미매칭/실패/제외 요약을 돌려준다. 결과는 요약 칩 6개 + 선택한 칩의 상세 표 1개(PLAN 2609_12 D2).
+ * 「내부 상품준비중」·「발송대기중」 주문은 서버가 발주처리 → 송장 등록 순으로 보낸다(FEATURE_2609_75 / D27) — 화면 흐름은 같다.
+ * [예약 발송] = 「내부 상품준비중」 배송건의 송장만 저장하고 예약 시각에 서버가 발주처리·송장 등록을 한다
+ * (FEATURE_2609_75 / D20·D27). 파일은 저장하지 않는다.
+ * 저장된 송장 모드(`storedOrderItemIds` 전달, D18) = 파일 선택이 없고 두 버튼이 저장된 송장으로 보낸다(E15·E16). 결과 화면은 같다.
  *
- * ⚠️ ADMIN 전용 · 주문내역(orders) 페이지에서만 사용.
- * ⚠️ useCase는 부모(OrderContainer)가 useMemo로 만든 인스턴스를 재사용 — 여기서 새로 만들지 말 것.
+ * ⚠️ ADMIN 전용 · 출고관리 페이지에서만 사용.
+ * ⚠️ useCase는 부모가 useMemo로 만든 인스턴스를 재사용 — 여기서 새로 만들지 말 것.
+ * ⚠️ 부모는 열 때마다 `key` 를 바꿔 다시 마운트한다 — 예약 시각 입력칸이 `defaultExecuteAt` 로 새로 시작한다.
  *
- * @param isOpen  모달 표시 여부
- * @param onClose 닫기 콜백. 인자 = 업로드 성공 여부(true 면 부모가 목록 재조회, PLAN 2609_07 D16).
- *                닫으면 내부 상태 전체 초기화
- * @param useCase 부모가 주입하는 ShippingLabelUseCase 인스턴스
+ * @param isOpen             모달 표시 여부
+ * @param onClose            닫기 콜백. 인자 = 전송·예약이 한 번이라도 성공했는지(true 면 부모가 목록 재조회)
+ * @param useCase            부모가 주입하는 ShippingLabelUseCase 인스턴스
+ * @param defaultExecuteAt   기본 예약 시각(KST 'yyyy-MM-ddTHH:mm:ss', D12). null 이면 빈 칸
+ * @param storedOrderItemIds 저장된 송장 모드의 주문 라인 id(D18). null = 파일 모드
  */
 interface ShipmentConfirmModalProps {
   isOpen: boolean;
   /** true = 업로드가 한 번이라도 성공했다 → 부모가 목록을 다시 불러와야 한다(PLAN D16). */
   onClose: (didSucceed: boolean) => void;
   useCase: ShippingLabelUseCase;
+  defaultExecuteAt: string | null;
+  storedOrderItemIds: number[] | null;
 }
 
-export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfirmModalProps) {
+export function ShipmentConfirmModal({
+  isOpen,
+  onClose,
+  useCase,
+  defaultExecuteAt,
+  storedOrderItemIds,
+}: ShipmentConfirmModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -111,12 +125,23 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
   const [error, setError] = useState('');
   const [hasSucceeded, setHasSucceeded] = useState(false);
   const [selected, setSelected] = useState<ResultBucket | null>(null);
+  // 예약 발송(FEATURE_2609_75 / D20). 입력칸 값은 datetime-local 형식('yyyy-MM-ddTHH:mm', KST).
+  const [executeAt, setExecuteAt] = useState(() => (defaultExecuteAt ? toDateTimeLocal(defaultExecuteAt) : ''));
+  const [isReserving, setIsReserving] = useState(false);
+  const [reserveResult, setReserveResult] = useState<ReservationCreateResult | null>(null);
+
+  const isBusy = isUploading || isReserving;
+  // 저장된 송장 모드(D18) — 파일 없이 선택 주문의 저장된 송장으로 보낸다.
+  const isStored = storedOrderItemIds != null;
+  const canSend = isStored || file != null;
 
   const reset = () => {
     setFile(null);
     setResult(null);
+    setReserveResult(null);
     setError('');
     setIsUploading(false);
+    setIsReserving(false);
     // This component is never unmounted (only Modal's panel is), so a stale selection would open
     // a table for the next result.
     setSelected(null);
@@ -135,21 +160,31 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
     const selectedFile = e.target.files?.[0] ?? null;
     setFile(selectedFile);
     setResult(null);
+    setReserveResult(null);
     setError('');
   };
 
+  // [지금 발송] = 기존 업로드 요청 그대로. 내부 단계 주문의 발주처리 → 송장 등록은 서버가 한다(D27).
+  // 저장된 송장 모드는 E16(발주처리 → 송장 등록, D18) — 결과 모양이 같아 아래 화면을 그대로 쓴다.
   const handleUpload = async () => {
-    if (!file) return;
+    if (!canSend) return;
     try {
       setIsUploading(true);
       setError('');
-      const res = await useCase.confirmShipment(file);
+      const res = storedOrderItemIds != null
+        ? await useCase.shipStoredNow(storedOrderItemIds)
+        : await useCase.confirmShipment(file as File);
       setResult(res);
       // Second upload on the same screen: the previous selection would open a table of new numbers.
       setSelected(null);
       // Never reset to false: a second upload that skips everything must not drop the refetch.
       if (res.succeeded > 0) setHasSucceeded(true);
     } catch (err) {
+      // 저장된 송장 모드(E16)에는 파일이 없다 — 서버 문구를 그대로 보인다(D18).
+      if (isStored) {
+        setError(extractErrorMessage(err, '발송처리에 실패했습니다. 다시 시도해주세요.'));
+        return;
+      }
       // 400 = 빈 파일/파싱 실패. 그 외 서버 오류도 동일 고정 메시지(스코프 상 단순화).
       const status = axios.isAxiosError(err) ? err.response?.status : undefined;
       setError(
@@ -159,6 +194,25 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
       );
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  // [예약 발송] = 송장만 저장하고 발송대기중으로 둔다(D20·D27). 사유(지난 시각 등)는 서버 문구 그대로.
+  // 저장된 송장 모드는 E15(D18) — 파일 없이 보관된 송장으로 예약한다.
+  const handleReserve = async () => {
+    if (!canSend || executeAt === '') return;
+    try {
+      setIsReserving(true);
+      setError('');
+      const res = storedOrderItemIds != null
+        ? await useCase.reserveStored(storedOrderItemIds, fromDateTimeLocal(executeAt))
+        : await useCase.reserveShipment(file as File, fromDateTimeLocal(executeAt));
+      setReserveResult(res);
+      if (res.reservedShipments > 0 || res.updatedInvoices > 0) setHasSucceeded(true);
+    } catch (err) {
+      setError(extractErrorMessage(err, '예약에 실패했습니다. 다시 시도해주세요.'));
+    } finally {
+      setIsReserving(false);
     }
   };
 
@@ -180,30 +234,43 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
     .map(({ status, count }) => `${statusLabel(status)} ${count}`)
     .join(' · ');
 
-  const footer =
-    result == null ? (
+  const showForm = result == null && reserveResult == null;
+
+  const footer = showForm ? (
+    <>
       <Button
-        onClick={handleUpload}
-        disabled={!file || isUploading}
+        variant="confirm"
+        onClick={() => void handleReserve()}
+        disabled={!canSend || executeAt === '' || isBusy}
       >
-        {isUploading ? <Spinner label="처리 중..." /> : '업로드'}
+        {isReserving ? <Spinner label="예약 중..." /> : '예약 발송'}
       </Button>
-    ) : (
-      <>
+      <Button
+        onClick={() => void handleUpload()}
+        disabled={!canSend || isBusy}
+      >
+        {isUploading ? <Spinner label="처리 중..." /> : '지금 발송'}
+      </Button>
+    </>
+  ) : (
+    <>
+      {/* 저장된 송장 모드는 파일이 없다 — [다른 파일 업로드]를 그리지 않는다(D18). */}
+      {!isStored && (
         <button
           onClick={reset}
           className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
         >
           다른 파일 업로드
         </button>
-        <button
-          onClick={handleClose}
-          className="px-6 py-2 bg-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-400 transition-colors"
-        >
-          닫기
-        </button>
-      </>
-    );
+      )}
+      <button
+        onClick={handleClose}
+        className="px-6 py-2 bg-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-400 transition-colors"
+      >
+        닫기
+      </button>
+    </>
+  );
 
   return (
     /* Upload screen sizes to its content; the result screen is pinned to 85vh (`fullHeight`) so
@@ -211,39 +278,65 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="발송처리 (운송장 업로드)"
-      fullHeight={result != null}
-      disableClose={isUploading}
+      title={isStored ? '발송처리 (저장된 송장)' : '발송처리 (운송장 업로드)'}
+      fullHeight={!showForm}
+      disableClose={isBusy}
       footer={footer}
     >
       <div className="flex flex-1 min-h-0 flex-col">
-        {result == null ? (
+        {showForm ? (
           /* Only band that scrolls. */
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                택배사가 운송장번호를 채운 결과 xlsx를 업로드하세요. 서버가 주문번호로 매칭해 쿠팡에 송장을 등록합니다.
-              </p>
-              <p className="text-sm text-gray-500">이미 발송처리된 주문은 자동으로 제외됩니다.</p>
+              {isStored ? (
+                <p className="text-sm text-gray-600">
+                  선택한 주문의 저장된 송장으로 보냅니다. 송장이 없는 주문은 제외됩니다.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-600">
+                    택배사가 운송장번호를 채운 결과 xlsx를 업로드하세요. 서버가 주문번호로 매칭해 쿠팡에 송장을 등록합니다.
+                  </p>
+                  <p className="text-sm text-gray-500">이미 발송처리된 주문은 자동으로 제외됩니다.</p>
 
-              <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+                    >
+                      <Upload size={16} />
+                      파일 선택
+                    </button>
+                    <span className="text-sm text-gray-600 truncate">
+                      {file ? file.name : '선택된 파일 없음'}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {/* 예약 발송 시각(D20) — 기본값 = 주문관리 설정의 다음 도래 시각(D12). 한국시간. */}
+              <div>
+                <label htmlFor="reserved-execute-at" className="block text-sm font-medium text-gray-700 mb-1">
+                  예약 시각 (한국시간)
+                </label>
                 <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  onChange={handleFileChange}
-                  className="hidden"
+                  id="reserved-execute-at"
+                  type="datetime-local"
+                  value={executeAt}
+                  onChange={(e) => setExecuteAt(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
-                >
-                  <Upload size={16} />
-                  파일 선택
-                </button>
-                <span className="text-sm text-gray-600 truncate">
-                  {file ? file.name : '선택된 파일 없음'}
-                </span>
+                <p className="mt-1 text-xs text-gray-500">
+                  [예약 발송]은 「내부 상품준비중」 주문의 송장만 저장하고, 이 시각에 쿠팡 발주처리와 송장 등록을 합니다.
+                  [지금 발송]은 바로 전송합니다(「내부 상품준비중」·「발송대기중」 주문은 발주처리 후 송장 등록).
+                </p>
               </div>
 
               {error && (
@@ -253,7 +346,25 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
               )}
             </div>
           </div>
-        ) : (
+        ) : reserveResult != null ? (
+          /* 예약 결과 — 제외된 주문은 사유와 함께 표로(서버 문구 그대로). */
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 text-sm">
+              예약 {reserveResult.reservedShipments}건 · 송장 수정 {reserveResult.updatedInvoices}건 · 제외{' '}
+              {reserveResult.excluded.length}건
+              <p className="mt-1">예약 시각 {formatKstWallClock(reserveResult.executeAt)}</p>
+            </div>
+            {reserveResult.excluded.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 mb-2">예약 제외</h4>
+                <ResultTable
+                  headers={['주문번호', '사유']}
+                  rows={reserveResult.excluded.map((row) => [row.orderId, row.reason])}
+                />
+              </div>
+            )}
+          </div>
+        ) : result != null ? (
           <>
             {/* Chip row stays out of the scroller — the summary must remain visible while the
                 detail table below scrolls. */}
@@ -322,7 +433,11 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
               {selected === 'unmatched' && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 mb-2">미매칭 주문번호</h4>
-                  <p className="text-xs text-gray-500 mb-2">order_item 없거나 쿠팡이 아니라 스킵됨</p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    {isStored
+                      ? '저장된 송장이 없거나 내부 단계 주문이 아니라 제외됨'
+                      : 'order_item 없거나 쿠팡이 아니라 스킵됨'}
+                  </p>
                   <ResultTable
                     headers={['#', '주문번호']}
                     rows={result.unmatched.map((orderId, i) => [i + 1, orderId])}
@@ -343,7 +458,7 @@ export function ShipmentConfirmModal({ isOpen, onClose, useCase }: ShipmentConfi
               )}
             </div>
           </>
-        )}
+        ) : null}
 
       </div>
     </Modal>

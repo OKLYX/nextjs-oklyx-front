@@ -5,8 +5,8 @@ import type { OrderRepository } from '@/domain/repositories/OrderRepository';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  CancelReasonOption, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult, OrderMonth,
-  OrderRefreshResult, OrderSyncResponse, OrderSyncResult, SyncTarget,
+  CancelReasonOption, InternalStageResult, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
+  OrderMonth, OrderRefreshResult, OrderSetting, OrderSyncResponse, OrderSyncResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
 export class OrderRepositoryImpl implements OrderRepository {
@@ -74,6 +74,27 @@ export class OrderRepositoryImpl implements OrderRepository {
   // 라인 + 수량만 보낸다 — 박스 분할·상태 필터·수량 상한은 서버가 판정한다(PLAN 2609_25 D1·D2·D3).
   async cancelOrders(lines: OrderCancelLine[], reason: string): Promise<OrderCancelResult> {
     const response = await axiosInstance.post('/api/admin/orders/cancel', { lines, reason });
+    return response.data.data;
+  }
+
+  // 쿠팡에 보내지 않는다 — 우리 DB 의 내부 단계만 바꾼다(FEATURE_2609_75 / D1). 대상 판정은 서버가 한다.
+  async markInternal(orderItemIds: number[]): Promise<InternalStageResult> {
+    const response = await axiosInstance.post('/api/admin/orders/internal-acknowledge', { orderItemIds });
+    return response.data.data;
+  }
+
+  async releaseInternal(orderItemIds: number[]): Promise<InternalStageResult> {
+    const response = await axiosInstance.post('/api/admin/orders/internal-acknowledge/release', { orderItemIds });
+    return response.data.data;
+  }
+
+  async getOrderSetting(): Promise<OrderSetting> {
+    const response = await axiosInstance.get('/api/admin/order-settings');
+    return response.data.data;
+  }
+
+  async updateOrderSetting(reservedShipmentTime: string): Promise<OrderSetting> {
+    const response = await axiosInstance.put('/api/admin/order-settings', { reservedShipmentTime });
     return response.data.data;
   }
 }

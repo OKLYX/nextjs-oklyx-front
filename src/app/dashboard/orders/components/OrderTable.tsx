@@ -3,6 +3,7 @@
 import { getCustomerName } from '@/domain/entities/OrderEntity';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { InternalStageBadge } from './InternalStageBadge';
 
 interface OrderTableProps {
   orders: OrderItem[];
@@ -16,6 +17,11 @@ interface OrderTableProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  /**
+   * 내부 단계 주문 줄의 [송장 수정](FEATURE_2609_75 / D18). 미전달 = 버튼 없음(주문내역).
+   * 출고관리에서 ADMIN 일 때만 넘긴다.
+   */
+  onEditInvoice?: (order: OrderItem) => void;
   /**
    * 선택 열을 그릴지. 미전달 = 주문내역과 완전히 같은 표(열 추가 없음).
    * 출고관리 발주처리에서만 넘긴다(PLAN 2609_17 D7).
@@ -74,6 +80,7 @@ export function OrderTable({
   totalPages,
   onPageChange,
   selection,
+  onEditInvoice,
 }: OrderTableProps) {
   if (error) {
     return (
@@ -136,7 +143,20 @@ export function OrderTable({
                   />
                 </td>
               )}
-              <td className="px-6 py-3 text-sm text-gray-700">{order.externalOrderId}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                {order.externalOrderId}
+                <InternalStageBadge stage={order.internalStage} />
+                {onEditInvoice && order.internalStage != null && (
+                  <button
+                    type="button"
+                    // 행 클릭(주문 상세)이 새지 않게 막는다 — 체크박스 칸과 같은 이유.
+                    onClick={(e) => { e.stopPropagation(); onEditInvoice(order); }}
+                    className="ml-2 text-xs text-blue-600 hover:underline"
+                  >
+                    송장 수정
+                  </button>
+                )}
+              </td>
               <td className="px-6 py-3 text-sm text-gray-700">{getCustomerName(order)}</td>
               <td className="px-6 py-3 text-sm text-gray-700">{order.itemName || '-'}</td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">{order.orderCount}</td>
