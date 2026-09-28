@@ -35,6 +35,8 @@ interface ShipmentFilterCardProps {
   /** ADMIN 전용 액션 2개(접수시트·발송처리)의 권한 게이트. */
   canDownload: boolean;
   onDownload: () => void;
+  /** 「내부 상품준비중」 접수시트(FEATURE_2609_75 / D25·D26) — 기존 [송장 접수시트]와 별개 버튼. */
+  onDownloadInternal: () => void;
   onOpenConfirm: () => void;
   /** 주문내역과 같은 클라이언트 검색(칩 4종 + 검색어) — 서버를 부르지 않는다. */
   searchField: OrderSearchField;
@@ -57,6 +59,7 @@ export function ShipmentFilterCard({
   resultCount,
   canDownload,
   onDownload,
+  onDownloadInternal,
   onOpenConfirm,
   searchField,
   onSearchFieldChange,
@@ -105,6 +108,15 @@ export function ShipmentFilterCard({
               >
                 <Download size={16} />
                 송장 접수시트
+              </button>
+            )}
+            {canDownload && (
+              <button
+                onClick={onDownloadInternal}
+                className="flex items-center gap-2 whitespace-nowrap px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+              >
+                <Download size={16} />
+                내부 상품준비중 접수시트
               </button>
             )}
             {canDownload && (

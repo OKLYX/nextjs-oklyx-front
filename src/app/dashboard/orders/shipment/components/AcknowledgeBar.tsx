@@ -32,8 +32,15 @@ interface AcknowledgeBarProps {
   releaseCount: number;
   onInternalAcknowledge: () => void;
   onReleaseInternal: () => void;
-  /** 진행 중인 내부 작업. 버튼 두 개가 같은 요청 자리를 쓴다. */
-  internalBusy: 'mark' | 'release' | null;
+  /** 선택 중 「발송대기중」 건수 — [예약 취소] 대상(D18 행2). */
+  cancelCount: number;
+  onCancelReservation: () => void;
+  /** 선택 중 내부 단계(「내부 상품준비중」·「발송대기중」) 건수 — [저장된 송장으로 발송] 대상(D18 🔁). */
+  storedCount: number;
+  /** 발송처리 모달을 저장된 송장 모드로 연다(요청은 모달이 보낸다). */
+  onShipStored: () => void;
+  /** 진행 중인 내부 작업. 버튼 세 개가 같은 요청 자리를 쓴다. */
+  internalBusy: 'mark' | 'release' | 'cancel' | null;
   /** 선택한 주문을 마켓에서 다시 읽어 상태를 맞춘다(PLAN 2609_50). */
   onRefresh: () => void;
   isRefreshing: boolean;
@@ -52,6 +59,10 @@ export function AcknowledgeBar({
   releaseCount,
   onInternalAcknowledge,
   onReleaseInternal,
+  cancelCount,
+  onCancelReservation,
+  storedCount,
+  onShipStored,
   internalBusy,
   onRefresh,
   isRefreshing,
@@ -111,6 +122,27 @@ export function AcknowledgeBar({
               disabled={releaseCount === 0 || internalBusy !== null}
             >
               {internalBusy === 'release' ? <Spinner label="처리 중..." /> : '내부 발주 해제'}
+            </Button>
+          )}
+
+          {canAcknowledge && (
+            <Button
+              variant="secondary"
+              onClick={onCancelReservation}
+              disabled={cancelCount === 0 || internalBusy !== null}
+            >
+              {internalBusy === 'cancel' ? <Spinner label="처리 중..." /> : '예약 취소'}
+            </Button>
+          )}
+
+          {/* D18 🔁 — 파일 없이 저장된 송장으로 [예약 발송]/[지금 발송]. 요청·결과는 발송처리 모달(저장된 송장 모드)이 한다. */}
+          {canAcknowledge && (
+            <Button
+              variant="secondary"
+              onClick={onShipStored}
+              disabled={storedCount === 0 || internalBusy !== null}
+            >
+              저장된 송장으로 발송
             </Button>
           )}
 

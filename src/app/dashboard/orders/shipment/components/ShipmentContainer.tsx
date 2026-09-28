@@ -29,6 +29,8 @@ import { channelOptionLabel } from '../../components/OrderSearchCard';
 import type { ChannelOption } from '../../components/OrderSearchCard';
 import { ShipmentFilterCard } from './ShipmentFilterCard';
 import { AcknowledgeBar } from './AcknowledgeBar';
+import { ReservedShipmentPanel } from './ReservedShipmentPanel';
+import { StoredInvoiceModal } from './StoredInvoiceModal';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
@@ -119,6 +121,17 @@ export function ShipmentContainer() {
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  // 「내부 상품준비중」 접수시트(D26)와 기존 시트를 같은 모달로 연다 — 어느 쪽인지.
+  const [previewSource, setPreviewSource] = useState<'instruct' | 'internal'>('instruct');
+  // [예약 발송] 기본 시각(D12)과 업로드 모달 재마운트 키 — 열 때마다 설정을 새로 읽는다.
+  const [defaultExecuteAt, setDefaultExecuteAt] = useState<string | null>(null);
+  const [confirmKey, setConfirmKey] = useState(0);
+  // 발송처리 모달의 저장된 송장 모드 대상(D18 🔁). null = 파일 모드.
+  const [storedConfirmIds, setStoredConfirmIds] = useState<number[] | null>(null);
+  // 내부 단계 주문 줄의 [송장 수정] 대상 주문번호(D18 🔁). null = 닫힘.
+  const [invoiceOrderId, setInvoiceOrderId] = useState<string | null>(null);
+  // 예약 발송 현황 재조회 신호(업로드·예약 취소 뒤).
+  const [panelReloadKey, setPanelReloadKey] = useState(0);
   // 페이지 크기는 판매상품 마스터와 같은 25/50/100 (PLAN 2609_17 D16).
   const [pageSize, setPageSize] = useState(25);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -127,7 +140,7 @@ export function ShipmentContainer() {
   // 발주처리와 별도 state 다 — 하나로 묶으면 상태 갱신 중에 발주처리 버튼까지 '처리 중' 으로 보인다.
   const [isRefreshing, setIsRefreshing] = useState(false);
   // 내부 발주처리·해제 진행 표시. 발주처리(`isAcknowledging`)와 따로 둔다 — 버튼이 서로의 스피너를 켜지 않게.
-  const [internalBusy, setInternalBusy] = useState<'mark' | 'release' | null>(null);
+  const [internalBusy, setInternalBusy] = useState<'mark' | 'release' | 'cancel' | null>(null);
   // 떠 있는 확인창. 'acknowledge' = D14 안내 Modal, 'release' = 내부 발주 해제 경고(D18 행1).
   const [confirmKind, setConfirmKind] = useState<'acknowledge' | 'release' | null>(null);
   // 자동 소멸 타이머. 연속 전송 시 이전 타이머가 새 메시지를 지우지 않게 ref 로 붙잡는다.
@@ -362,6 +375,16 @@ export function ShipmentContainer() {
     [orders, selectedIds, isReleaseTarget]
   );
   // D14 — 발주처리로 보낼 주문 중 내부 단계가 있는 것이 하나라도 있으면 안내 Modal 을 1회 띄운다.
+  // 예약 취소 대상 = 「발송대기중」(D18 행2).
+  const cancelTargetIds = useMemo(
+    () => orders.filter((o) => selectedIds.has(o.id) && o.internalStage === 'AWAITING_SHIPMENT').map((o) => o.id),
+    [orders, selectedIds]
+  );
+  // 저장된 송장으로 발송 대상 = 내부 단계 주문(D18 🔁). 송장 유무·단계는 서버가 다시 판정한다.
+  const storedTargetIds = useMemo(
+    () => orders.filter((o) => selectedIds.has(o.id) && o.internalStage != null).map((o) => o.id),
+    [orders, selectedIds]
+  );
   const ackIncludesInternal = useMemo(
     () => orders.some((o) => ackTargetIds.includes(o.id) && o.internalStage != null),
     [orders, ackTargetIds]
@@ -453,6 +476,44 @@ export function ShipmentContainer() {
     } finally {
       setInternalBusy(null);
     }
+  };
+
+  /** [예약 취소] — 발송대기중 → 「내부 상품준비중」, 송장은 예약 결과에 남는다(D18 행2). 쿠팡 호출 없음. */
+  const runCancelReservation = async () => {
+    if (cancelTargetIds.length === 0) return;
+    if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
+    try {
+      setInternalBusy('cancel');
+      const result = await shippingLabelUseCase.cancelReservedItems(cancelTargetIds);
+      setAckMessage(buildInternalMessage('예약 취소 완료', result));
+      setSelectedIds(new Set());
+      await load();
+      setPanelReloadKey((k) => k + 1);
+      if (result.skippedOrderIds.length === 0 && result.unsupported.length === 0) {
+        ackTimerRef.current = setTimeout(() => setAckMessage(null), ACK_MESSAGE_TTL);
+      }
+    } catch (err) {
+      setAckMessage({ text: extractErrorMessage(err, '예약 취소에 실패했습니다. 다시 시도해주세요.'), detail: [] });
+    } finally {
+      setInternalBusy(null);
+    }
+  };
+
+  /**
+   * 업로드 모달 열기 — 기본 예약 시각(D12)을 새로 읽고(실패하면 빈 칸) 모달을 다시 마운트한다.
+   * `storedIds` = 저장된 송장 모드의 주문 라인 id(D18 🔁). null = 파일 모드([발송처리] 버튼).
+   */
+  const openConfirm = async (storedIds: number[] | null) => {
+    let next: string | null = null;
+    try {
+      next = (await orderUseCase.getOrderSetting()).nextExecuteAt;
+    } catch {
+      next = null;
+    }
+    setDefaultExecuteAt(next);
+    setStoredConfirmIds(storedIds);
+    setConfirmKey((k) => k + 1);
+    setIsConfirmOpen(true);
   };
 
   /**
@@ -573,13 +634,22 @@ export function ShipmentContainer() {
         isSyncing={isSyncing}
         resultCount={visible.length}
         canDownload={isAdmin}
-        onDownload={() => setIsPreviewOpen(true)}
-        onOpenConfirm={() => setIsConfirmOpen(true)}
+        onDownload={() => { setPreviewSource('instruct'); setIsPreviewOpen(true); }}
+        onDownloadInternal={() => { setPreviewSource('internal'); setIsPreviewOpen(true); }}
+        onOpenConfirm={() => void openConfirm(null)}
         searchField={searchField}
         onSearchFieldChange={handleSearchFieldChange}
         searchTerm={searchTerm}
         onSearchTermChange={handleSearchTermChange}
       />
+
+      {isAdmin && (
+        <ReservedShipmentPanel
+          useCase={shippingLabelUseCase}
+          reloadKey={panelReloadKey}
+          onChanged={() => void load()}
+        />
+      )}
 
       <OrderStatusFilter
         selectedStatus={selectedStatus}
@@ -600,6 +670,10 @@ export function ShipmentContainer() {
         releaseCount={releaseTargetIds.length}
         onInternalAcknowledge={() => void runInternal('mark')}
         onReleaseInternal={() => setConfirmKind('release')}
+        cancelCount={cancelTargetIds.length}
+        onCancelReservation={() => void runCancelReservation()}
+        storedCount={storedTargetIds.length}
+        onShipStored={() => void openConfirm(storedTargetIds)}
         internalBusy={internalBusy}
         onRefresh={() => void handleRefresh()}
         isRefreshing={isRefreshing}
@@ -626,6 +700,8 @@ export function ShipmentContainer() {
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
+          // 내부 단계 주문 줄의 [송장 수정](D18 🔁) — ADMIN 만. 모달은 아래 `StoredInvoiceModal`.
+          onEditInvoice={isAdmin ? (order) => setInvoiceOrderId(order.externalOrderId) : undefined}
           // 비-ADMIN 에게는 선택 열 자체를 만들지 않는다(서버가 403 인 체크박스를 그리지 않는다).
           selection={isAdmin
             ? { selectedIds, isSelectable, onToggle: toggleOne, onTogglePage: togglePage, isPageAllSelected }
@@ -654,14 +730,35 @@ export function ShipmentContainer() {
       />
 
       <ShipmentConfirmModal
+        key={confirmKey}
         isOpen={isConfirmOpen}
         onClose={(didSucceed) => {
           setIsConfirmOpen(false);
-          // 발송처리에 성공하면 배송지시로 바뀐 행이 목록에서 빠져야 한다.
-          if (didSucceed) void load();
+          // 발송처리에 성공하면 배송지시로 바뀐 행이 목록에서 빠져야 한다. 예약이면 배지·현황이 바뀐다.
+          if (didSucceed) {
+            // 저장된 송장 모드는 선택한 주문을 보냈다 — 선택을 비운다(파일 모드는 선택을 쓰지 않는다).
+            if (storedConfirmIds != null) setSelectedIds(new Set());
+            void load();
+            setPanelReloadKey((k) => k + 1);
+          }
         }}
         useCase={shippingLabelUseCase}
+        defaultExecuteAt={defaultExecuteAt}
+        storedOrderItemIds={storedConfirmIds}
       />
+
+      {isAdmin && (
+        <StoredInvoiceModal
+          key={invoiceOrderId ?? 'none'}
+          externalOrderId={invoiceOrderId}
+          useCase={shippingLabelUseCase}
+          onClose={(didChange) => {
+            setInvoiceOrderId(null);
+            // 송장이 바뀌면 현황 카드의 송장 칸도 바뀐다(발송대기중 주문).
+            if (didChange) setPanelReloadKey((k) => k + 1);
+          }}
+        />
+      )}
 
       <ShippingLabelPreviewModal
         open={isPreviewOpen}
@@ -669,6 +766,7 @@ export function ShipmentContainer() {
         sellerId={selectedSellerId || undefined}
         isAdmin={isAdmin}
         useCase={shippingLabelUseCase}
+        source={previewSource}
       />
 
       <SyncProgressModal
