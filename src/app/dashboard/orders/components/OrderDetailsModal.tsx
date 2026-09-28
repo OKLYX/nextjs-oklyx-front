@@ -26,6 +26,8 @@ import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { InternalStageBadge } from './InternalStageBadge';
+import { ReservedShipmentHistory } from './ReservedShipmentHistory';
+import { StoredInvoiceEditor } from './StoredInvoiceEditor';
 
 /**
  * 주문 상세 모달 — 읽기전용 정보 + (ADMIN·쿠팡) 단건 송장 접수시트 조회·다운로드
@@ -136,6 +138,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const [internalResult, setInternalResult] = useState<InternalStageResult | null>(null);
   const [isMarkingInternal, setIsMarkingInternal] = useState(false);
   const [internalError, setInternalError] = useState('');
+  // 예약 발송 기록에서 행 작업이 성공했다 → 닫을 때 부모가 목록을 다시 불러온다(FEATURE_2609_75 / D30).
+  const [reservationChanged, setReservationChanged] = useState(false);
   // D14 안내 Modal — 내부 단계 주문에 [발주처리]를 눌렀을 때.
   const [ackConfirmOpen, setAckConfirmOpen] = useState(false);
   // 주문 상태 갱신(쿠팡에서 이 주문을 다시 읽어 상태를 맞춘다, PLAN 2609_50). 읽기라 탭 밖에 둔다(D12).
@@ -276,7 +280,9 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     // Only a real success justifies the parent's refetch (PLAN 2609_11 D13).
     // 발주처리 성공도 같은 채널로 올린다(2609_17) — 호출부가 갈리지 않게 새 콜백을 만들지 않는다.
     // 취소 성공도 같은 채널로 올린다 — 부모 재조회가 stale 재취소 경로를 없앤다(PLAN 2609_25 D14).
-    onClose((result != null && result.succeeded > 0) || ackSucceeded || cancelSucceeded || internalMarked);
+    onClose(
+      (result != null && result.succeeded > 0) || ackSucceeded || cancelSucceeded || internalMarked || reservationChanged
+    );
   };
 
   const handlePreview = async () => {
@@ -541,6 +547,28 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             ))}
           </dl>
 
+          {/* 송장(FEATURE_2609_75 / D18 🔁) — 내부 단계 동안 언제나 배송 묶음별 택배사·송장번호를 고친다.
+              택배사 목록은 이 모달이 이미 불러온 `carrierOptions` 를 넘긴다(새로 부르지 않는다). */}
+          {isAdmin && isCoupang && shownStage != null && (
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <StoredInvoiceEditor
+                useCase={useCase}
+                externalOrderId={order.externalOrderId}
+                carrierOptions={carrierOptions}
+                onChanged={() => setReservationChanged(true)}
+              />
+            </div>
+          )}
+
+          {/* 예약 발송 기록(FEATURE_2609_75 / D30) — 이 주문의 예정·실행 시각과 결과 + 행 작업. 기록이 없으면 그리지 않는다. */}
+          {isAdmin && isCoupang && (
+            <ReservedShipmentHistory
+              useCase={useCase}
+              externalOrderId={order.externalOrderId}
+              onChanged={() => setReservationChanged(true)}
+            />
+          )}
+
           {/* 송장시트 · 발송처리 · 주문 취소 — 좌우 탭(기본 선택은 발송처리).
               세로로 쌓으면 모달이 길어져 뒤 액션이 스크롤 밖으로 밀린다. 어차피 한 번에 하나만
               쓰는 배타적 선택이라 탭이 맞다. 쓸 수 없는 탭은 지우지 않고 비활성으로 남긴다 —
@@ -659,7 +687,14 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                   입력 잠금은 200 응답을 받은 뒤에만(요청 실패는 열어둔다, D14). */}
               {/* 전량취소면 남은 액션이 없다. 숨김 조건은 `fullyCanceled` 뿐 — `cancelSucceeded` 로 숨기면
                   부분취소 후 잔여 발송이 막힌다(PLAN 2609_25 D19). */}
-              {activeTab === 'shipment' && canShip && (
+              {/* 내부 단계 주문(FEATURE_2609_75 / D27) — 새 입력을 막고 「송장」 + [저장된 송장으로 발송]으로 안내한다.
+                  판정 = 주문번호 옆 배지와 같은 `shownStage`. 서버도 같은 문구로 거절한다(400, PLAN §4-4). */}
+              {activeTab === 'shipment' && canShip && shownStage != null && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
+                  내부 단계 주문은 여기서 발송처리할 수 없습니다. 「송장」에 송장을 저장한 뒤 출고관리의 [저장된 송장으로 발송]을 누르세요
+                </div>
+              )}
+              {activeTab === 'shipment' && canShip && shownStage == null && (
                 <div className="mt-4">
                   <p className="mt-1 text-sm text-gray-500">
                     박스 {order.externalBoxId ?? '-'} 의 모든 옵션에 같은 운송장번호가 적용됩니다.

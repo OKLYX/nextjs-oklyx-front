@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Spinner } from '@/presentation/components/Spinner';
 import { addressHead } from '@/infrastructure/utils/address';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
-import type { ShippingLabelExportRow } from '@/application/dto/ShippingLabelDTOs';
+import type { InternalLabelPreview, ShippingLabelExportRow } from '@/application/dto/ShippingLabelDTOs';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
 
@@ -31,6 +31,8 @@ interface ShippingLabelPreviewModalProps {
   sellerId?: number;
   isAdmin: boolean;
   useCase: ShippingLabelUseCase;
+  /** 'internal' = 「내부 상품준비중」 접수시트(FEATURE_2609_75 / D26). 생략 = 기존 쿠팡 상품준비중 시트(D25 무변경). */
+  source?: 'instruct' | 'internal';
 }
 
 const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
@@ -41,6 +43,7 @@ export function ShippingLabelPreviewModal({
   sellerId,
   isAdmin,
   useCase,
+  source = 'instruct',
 }: ShippingLabelPreviewModalProps) {
   const [rows, setRows] = useState<ShippingLabelExportRow[]>([]);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -49,6 +52,8 @@ export function ShippingLabelPreviewModal({
   const [exportError, setExportError] = useState('');
   const [invalidRowKey, setInvalidRowKey] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  // 내부 시트에서 쿠팡 결제완료 목록에 없던 주문 수(D26) — 기존 시트에서는 늘 0.
+  const [notAcceptedCount, setNotAcceptedCount] = useState(0);
 
   // On open: fetch preview rows on demand. Full rows go into state; the table renders a subset.
   useEffect(() => {
@@ -61,9 +66,12 @@ export function ShippingLabelPreviewModal({
         setExportError('');
         setInvalidRowKey(null);
         setHasLoaded(false);
-        const result = await useCase.previewRows(sellerId);
+        const result: InternalLabelPreview = source === 'internal'
+          ? await useCase.previewInternalRows(sellerId)
+          : { rows: await useCase.previewRows(sellerId), notAcceptedOrderIds: [] };
         if (!active) return;
-        setRows(result);
+        setRows(result.rows);
+        setNotAcceptedCount(result.notAcceptedOrderIds.length);
         setHasLoaded(true);
       } catch {
         if (!active) return;
@@ -76,7 +84,7 @@ export function ShippingLabelPreviewModal({
     return () => {
       active = false;
     };
-  }, [open, isAdmin, sellerId, useCase]);
+  }, [open, isAdmin, sellerId, useCase, source]);
 
   if (!open || !isAdmin) return null;
 
@@ -87,6 +95,7 @@ export function ShippingLabelPreviewModal({
     setInvalidRowKey(null);
     setHasLoaded(false);
     setIsExporting(false);
+    setNotAcceptedCount(0);
     onOpenChange(false);
   };
 
@@ -114,7 +123,7 @@ export function ShippingLabelPreviewModal({
       // Same filename convention as the V1 download (OrderContainer) — keep both in sync.
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       anchor.href = url;
-      anchor.download = `주문목록_${today}.xlsx`;
+      anchor.download = source === 'internal' ? `내부발주_${today}.xlsx` : `주문목록_${today}.xlsx`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -142,8 +151,13 @@ export function ShippingLabelPreviewModal({
     <Modal
       isOpen
       onClose={handleClose}
-      title="주문목록 확인"
+      title={source === 'internal' ? '내부 상품준비중 접수시트' : '주문목록 확인'}
     >
+      {source === 'internal' && notAcceptedCount > 0 && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
+          쿠팡에서 결제완료 상태가 아님 {notAcceptedCount}건
+        </div>
+      )}
       {isPreviewing ? (
         <div className="flex items-center justify-center py-16">
           <Spinner size={28} label="불러오는 중..." />

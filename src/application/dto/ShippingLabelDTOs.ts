@@ -1,4 +1,4 @@
-import type { OrderStatus } from '@/domain/entities/OrderEntity';
+import type { InternalStage, OrderStatus } from '@/domain/entities/OrderEntity';
 
 export interface FailedBox {
   shipmentBoxId: string;
@@ -74,4 +74,57 @@ export interface ManualShipmentResult {
   succeeded: number;
   failed: FailedBox[];
   resultStatus: OrderStatus | null;
+}
+
+// --- Reserved shipment (FEATURE_2609_75) ---
+
+export type ReservedShipmentStatus = 'SCHEDULED' | 'RUNNING' | 'DONE' | 'STOPPED' | 'CANCELLED';
+export type ReservedItemResult = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'EXTERNAL' | 'RELEASED';
+
+/** [예약 발송] 결과 (POST /api/admin/reserved-shipments). 시각은 KST 벽시계 문자열 — Date 로 바꾸지 않는다. */
+export interface ReservationCreateResult {
+  reservationId: number | null;
+  executeAt: string;
+  reservedShipments: number;
+  updatedInvoices: number;
+  excluded: { orderId: string; reason: string }[];
+}
+
+/**
+ * 예약 발송 현황 1행 = 주문(배송 묶음) 1개 (GET /api/admin/reserved-shipments · /orders/{externalOrderId}, D30).
+ * `id` = 결과 행 id — 행 작업(시각 변경·다시 시도)의 경로 변수. `orderShipmentId` = [송장 수정] 경로 변수(D18).
+ * `orderItemIds` = [예약 취소] 입력. `status` = 그 행이 속한 예약의 상태. 시각은 KST 벽시계 문자열 — Date 로 바꾸지 않는다.
+ */
+export interface ReservedShipmentRow {
+  id: number;
+  orderShipmentId: number;
+  externalOrderId: string;
+  externalShipmentId: string;
+  orderItemIds: number[];
+  executeAt: string;
+  lastRunAt: string | null;
+  status: ReservedShipmentStatus;
+  firstRunKind: 'ON_TIME' | 'DELAYED' | null;
+  carrierCode: string;
+  invoiceNumber: string | null;
+  result: ReservedItemResult;
+  failureReason: string | null;
+}
+
+/** 「내부 상품준비중」 접수시트 미리보기 (GET /api/admin/shipping-labels/v2/preview/internal, D26). */
+export interface InternalLabelPreview {
+  rows: ShippingLabelPreviewRow[];
+  notAcceptedOrderIds: string[];
+}
+
+/**
+ * 내부 단계 배송 묶음 1개의 현재 송장 (GET /api/admin/reserved-shipments/orders/{externalOrderId}/invoices ·
+ * PUT /api/admin/reserved-shipments/shipments/{orderShipmentId}/invoice, D18). 송장이 없으면 carrierCode·invoiceNumber 가 null.
+ */
+export interface StoredInvoice {
+  orderShipmentId: number;
+  externalShipmentId: string;
+  internalStage: InternalStage;
+  carrierCode: string | null;
+  invoiceNumber: string | null;
 }
