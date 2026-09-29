@@ -92,7 +92,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       toggle: toggleSalesProductsMenu,
       items: [
         { href: ROUTES.MASTER_PRODUCTS, label: '판매상품 마스터' },
-        { href: ROUTES.MASTER_PRODUCT_NEW, label: '판매상품 마스터 추가' },
+        { href: ROUTES.MASTER_PRODUCT_NEW, label: '판매 상품 관리 마스터' },
         { href: ROUTES.MASTER_PRODUCT_NEW_FROM_CHANNEL, label: '플랫폼 상품으로 마스터 추가' },
         { href: ROUTES.SALES_PRODUCTS_RETRIEVE, label: '판매상품 조회' },
         { href: ROUTES.MARGIN_POLICIES, label: '마진 프리셋' },

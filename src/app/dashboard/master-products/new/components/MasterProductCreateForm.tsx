@@ -90,10 +90,11 @@ interface MasterProductCreateFormProps {
   /** 후속 저장 일부가 실패해 "생성은 됐지만 미완" 인 경우. 상세로 직행시킨다. */
   onCreatedWithWarning: (masterId: number, warning: string) => void;
   /**
-   * 처음부터 구성상품으로 골라 둘 물품 id(2609_77/D44 — 물품 등록 완료 창에서 들어올 때).
+   * 처음부터 구성상품으로 골라 둘 물품 id 목록(2609_77/D44 물품 등록 완료 창 · 2609_78/D49 마스터 바구니).
    * 골라 두기만 한다 — [설정 적용]은 사용자가 누른다(같은 조합 중복 확인이 거기 있다).
+   * 🔴 호출부가 memo 한 배열을 넘긴다(아래 후보 로드 effect 의 의존성이다).
    */
-  initialProductId?: number;
+  initialProductIds?: number[];
 }
 
 /**
@@ -127,7 +128,7 @@ export function MasterProductCreateForm({
   onCreated,
   onCancel,
   onCreatedWithWarning,
-  initialProductId,
+  initialProductIds,
 }: MasterProductCreateFormProps) {
   // 이미지 그룹 카탈로그(공용 목록)는 이 모달이 직접 만든다 — 부모 props 계약을 넓히지 않는다.
   const groupUseCase = useMemo(
@@ -417,21 +418,22 @@ export function MasterProductCreateForm({
           packageUseCase.getPackages('PURCHASED'),
         ]);
         if (!alive) return;
-        // 2609_77/D44: 물품 등록 완료 창에서 들어왔으면 그 물품을 구성상품으로 골라 둔다.
-        // 🔴 목록은 첫 1000개뿐이라 방금 만든 물품이 없을 수 있다 → 없으면 단건 조회로 앞에 붙인다.
+        // 2609_77/D44 · 2609_78/D49: 완료 창·마스터 바구니에서 들어왔으면 그 물품들을 구성상품으로 골라 둔다.
+        // 🔴 목록은 첫 1000개뿐이라 없는 물품이 있을 수 있다 → 없는 것만 단건 조회로 앞에 붙인다.
         let productList = prod.content;
-        if (initialProductId != null && !productList.some((p) => p.id === initialProductId)) {
-          try {
-            productList = [await productDetailUseCase.getProduct(initialProductId), ...productList];
-          } catch {
-            // 못 가져오면 골라 두지 않는다 — 빈 폼으로 시작한다.
-          }
+        const wanted = initialProductIds ?? [];
+        const missing = wanted.filter((id) => !productList.some((p) => p.id === id));
+        if (missing.length > 0) {
+          const fetched = await Promise.all(
+            missing.map((id) => productDetailUseCase.getProduct(id).catch(() => null)),
+          );
           if (!alive) return;
+          // 못 가져온 물품은 골라 두지 않는다(나머지는 그대로 골라 둔다).
+          productList = [...fetched.filter((p): p is Product => p != null), ...productList];
         }
         setProducts(productList);
-        if (initialProductId != null && productList.some((p) => p.id === initialProductId)) {
-          setSelectedIds([initialProductId]);
-        }
+        const preselected = wanted.filter((id) => productList.some((p) => p.id === id));
+        if (preselected.length > 0) setSelectedIds(preselected);
         setCarrierRates(rates);
         setPackages(boxes);
         // 기본 택배/상자 프리셀렉트(83B): isDefault 항목이 있으면 초기 선택값. 없으면 미선택으로 두고
@@ -458,7 +460,7 @@ export function MasterProductCreateForm({
     carrierRateUseCase,
     packageUseCase,
     thumbnailTemplateUseCase,
-    initialProductId,
+    initialProductIds,
     productDetailUseCase,
   ]);
 
@@ -590,15 +592,48 @@ export function MasterProductCreateForm({
     [defaultDeliveryId, defaultPackageId],
   );
 
-  // 저장 차단 사유(있으면 [저장] disabled + 푸터 인라인 표시). 기본 택배/상자는 생성 시 필수(83B).
+  // 2609_78/S4: 저장 차단 사유 = **필수 항목 전부**를 저장 순서대로 검사해 **첫 번째로 빠진 것 하나**.
+  // 있으면 [저장] disabled + 버튼 옆 글자(플랫폼 상품 경로 `MasterFromChannelForm` 의 blockReason 과 같은 방식).
+  // 🔴 handleSubmit 도 이 값 하나로 막는다 — 검사 순서·문구를 두 곳에 두지 않는다.
   // 2609_46: 구성상품 확정이 첫 관문 — 확정 전에는 나머지 입력 자체가 비활성이다.
+  const missingZoneKey = requiredZoneKeys.find(
+    (zoneKey) =>
+      (imageBuffer.assignments[zoneKey]?.length ?? 0) +
+        (imageBuffer.productAssignments?.[zoneKey]?.length ?? 0) <
+      1,
+  );
+  // 2609_78/S7: 구역 코드 대신 이미지 칸 제목과 같은 구역 이름(카탈로그 이름). 카탈로그에 없으면 코드.
+  const missingZoneLabel =
+    missingZoneKey == null
+      ? null
+      : (imageFields.find((f) => f.key === missingZoneKey)?.label ?? missingZoneKey);
+  const coupangMetaForGate = metaByPlatform['COUPANG'];
   const saveBlockReason = !componentsLocked
     ? '구성상품을 먼저 선택하고 [설정 적용]을 누르세요.'
-    : options.length === 0
-      ? '저장하려면 옵션을 1개 이상 추가하세요.'
-      : defaultDeliveryId === '' || defaultPackageId === ''
-        ? '기본 택배비와 기본 상자비를 선택하세요.'
-        : null;
+    : !name.trim()
+      ? '이름을 입력하세요.'
+      : selectedCategoryId === ''
+        ? '세부 카테고리를 선택하세요.'
+        : computeMissingRequired(
+              coupangMetaForGate?.attributes ?? [],
+              coupangMetaForGate?.attrValues ?? {},
+              coupangMetaForGate?.notices ?? [],
+              coupangMetaForGate?.noticeValues ?? {},
+              hideCategoryAttrs,
+              coupangMetaForGate?.noticeGroup ?? null,
+            )
+          ? '필수 카테고리 속성을 입력하세요.'
+          : options.length === 0
+            ? '저장하려면 옵션을 1개 이상 추가하세요.'
+            : options.some((opt) => !opt.name.trim())
+              ? '옵션 이름을 입력하세요.'
+              : options.some((opt) => opt.items.length === 0)
+                ? '각 옵션에 구성상품 수량을 입력하세요.'
+                : defaultDeliveryId === '' || defaultPackageId === ''
+                  ? '기본 택배비와 기본 상자비를 선택하세요.'
+                  : missingZoneLabel != null
+                    ? `상세 이미지(${missingZoneLabel})를 1장 이상 넣어 주세요.`
+                    : null;
 
   // BOM components → { id, name } for the reference-import picker (backend 40).
   // Empty (no components selected) → import button stays hidden (graceful degrade).
@@ -646,69 +681,11 @@ export function MasterProductCreateForm({
 
   const handleSubmit = async () => {
     setError('');
-    if (selectedIds.length === 0) {
-      setError('구성상품을 1개 이상 선택하세요.');
-      return;
-    }
-    // 2609_46: 화면 게이트가 이미 막지만, 확정 전 저장이 새어나가지 않게 한 번 더 막는다.
+    // [저장] 이 이미 disabled 지만, 막힌 상태의 저장이 새어나가지 않게 같은 사유로 한 번 더 막는다(S4).
     // (서버도 같은 조합의 마스터가 있으면 400 으로 거절한다 — 화면은 최종 방어선이 아니다.)
-    if (!componentsLocked) {
-      setError('구성상품을 확정한 뒤 저장하세요. [설정 적용]을 눌러 주세요.');
+    if (saveBlockReason != null) {
+      setError(saveBlockReason);
       return;
-    }
-    if (!name.trim()) {
-      setError('이름을 입력하세요.');
-      return;
-    }
-    // 기본 택배/상자는 생성 시 필수(83B). 아래 [저장] 이 이미 disabled 지만 방어적으로 한 번 더 막는다.
-    if (defaultDeliveryId === '' || defaultPackageId === '') {
-      setError('기본 택배비와 기본 상자비를 선택하세요.');
-      return;
-    }
-    // A leaf standard category is mandatory (front-end gate; no API call).
-    if (selectedCategoryId === '') {
-      setError('세부 카테고리를 선택하세요.');
-      return;
-    }
-    // Required category attributes/notices for COUPANG (other platforms are not saved on create).
-    const coupangMeta = metaByPlatform['COUPANG'];
-    if (
-      computeMissingRequired(
-        coupangMeta?.attributes ?? [],
-        coupangMeta?.attrValues ?? {},
-        coupangMeta?.notices ?? [],
-        coupangMeta?.noticeValues ?? {},
-        hideCategoryAttrs,
-        coupangMeta?.noticeGroup ?? null,
-      )
-    ) {
-      setError('필수 카테고리 속성을 입력하세요.');
-      return;
-    }
-    // Options are created atomically with the master → at least one, each with a name + items.
-    if (options.length === 0) {
-      setError('옵션을 1개 이상 추가하세요.');
-      return;
-    }
-    for (const opt of options) {
-      if (!opt.name.trim()) {
-        setError('옵션 이름을 입력하세요.');
-        return;
-      }
-      if (opt.items.length === 0) {
-        setError('각 옵션에 구성상품 수량을 입력하세요.');
-        return;
-      }
-    }
-    // Only the default template's zones are required; other templates' zones are optional.
-    // A zone is satisfied by uploaded files OR mapped product-image references.
-    for (const zoneKey of requiredZoneKeys) {
-      const fileCount = imageBuffer.assignments[zoneKey]?.length ?? 0;
-      const productCount = imageBuffer.productAssignments?.[zoneKey]?.length ?? 0;
-      if (fileCount + productCount < 1) {
-        setError(`상세 이미지(${zoneKey})를 1장 이상 매핑하세요.`);
-        return;
-      }
     }
     setIsSubmitting(true);
     // Omit blank values so the backend falls back to product/template defaults.

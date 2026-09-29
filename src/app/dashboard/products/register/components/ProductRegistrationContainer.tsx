@@ -102,10 +102,11 @@ export function ProductRegistrationContainer() {
     router.push(ROUTES.PRODUCTS_RETRIEVE);
   }, [router]);
 
-  // 2609_77/D44·D38(가): 판매상품 마스터 추가 화면을 이 물품이 구성상품으로 골라진 채로 연다.
+  // 2609_77/D44·D38(가): 판매 상품 관리 마스터 화면을 이 물품이 구성상품으로 골라진 채로 연다.
+  // 2609_78: 주소 키는 `productIds`(쉼표 목록) 하나다 — 마스터 바구니도 같은 키를 쓴다.
   const handleCreateMaster = useCallback(() => {
     if (createdProductId == null) return;
-    router.push(`${ROUTES.MASTER_PRODUCT_NEW}?productId=${createdProductId}`);
+    router.push(`${ROUTES.MASTER_PRODUCT_NEW}?productIds=${createdProductId}`);
   }, [router, createdProductId]);
 
   const handleRegisterAnother = useCallback(() => {
