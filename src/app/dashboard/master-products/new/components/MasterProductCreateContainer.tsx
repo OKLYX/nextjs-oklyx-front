@@ -3,9 +3,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
-import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
 import { ROUTES } from '@/config/routes';
+import { toast } from '@/infrastructure/stores/toastStore';
 import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
 import { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
@@ -25,28 +25,24 @@ import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRe
 import { MasterProductCreateForm } from './MasterProductCreateForm';
 
 /**
- * 판매상품 마스터 **생성 페이지** 진입점.
+ * 「판매 상품 관리 마스터」 = 판매상품 마스터 **새로 만들기** 페이지 진입점 (2609_78 / UX D41·D46·D61).
  * File: src/app/dashboard/master-products/new/components/MasterProductCreateContainer.tsx
  *
- * ⚠️ 2026-09-11: 생성 폼이 목록 페이지의 모달이었다가 이 페이지로 나왔다. 목록(`MasterProductList`)에
- * [마스터 추가] 버튼을 다시 넣지 말 것 — 진입점은 좌측 네비 `판매상품 > 판매상품 마스터 추가` 하나다.
+ * 진입점 3곳: 좌측 네비 `판매상품 > 판매 상품 관리 마스터` · 물품 등록 완료 창 [이 물품으로 마스터 만들기] ·
+ * 마스터 바구니 [마스터 만들기]. 뒤의 둘은 `?productIds=1,2,3` 으로 구성상품을 골라 둔 채 들어온다.
+ * ⚠️ 목록(`MasterProductList`)에 [마스터 추가] 버튼을 다시 넣지 말 것.
  *
- * ⚠️ 완료 후 경로는 **3지선다이되 동등하지 않다**. 기본(primary)은 **상세로 이동**이다:
- * 생성 마법사는 수정을 하지 않으므로(편집 지점 = 상세) 생성 직후 할 일이 전부 상세에 있다.
- * 후속 저장이 일부 실패한 경우엔 3지선다를 건너뛰고 **상세로 직행**한다 — 무엇을 마저 채워야
- * 하는지 알 수 있는 화면이 상세뿐이기 때문이다.
- *
- * ⚠️ [새 마스터 추가]는 `formKey` 를 올려 폼을 **통째로 재마운트**한다. 상태를 하나씩 되돌리면
- * 이미지 풀 업로드 버퍼가 남아 다음 마스터에 섞인다.
+ * ⚠️ 완료 화면이 없다(2609_78 / UX S3): 저장하면 「마스터를 만들었습니다」 알림과 함께 **그 마스터 상세로
+ * 바로 간다** — `?overview=1` 로 [상품 관계 한눈에 보기]가 열린 채로(UX D69). 후속 저장 일부 실패는
+ * 지금처럼 `?notice=` 배너로 넘긴다. 연달아 만들 때는 메뉴에서 다시 연다.
  */
 export function MasterProductCreateContainer() {
   const router = useRouter();
-  // 2609_77/D44: 물품 등록 완료 창의 [이 물품으로 마스터 만들기] 가 `?productId=` 로 들어온다.
-  // 양의 정수가 아니면 무시한다(빈 폼).
   const searchParams = useSearchParams();
-  const productIdParam = Number(searchParams.get('productId'));
-  const initialProductId =
-    Number.isInteger(productIdParam) && productIdParam > 0 ? productIdParam : undefined;
+  // `?productIds=` = 골라 둘 구성상품 id 목록(쉼표). 양의 정수만 · 중복 제거 · 첫 등장 순서.
+  // 🔴 문자열로 memo 한다 — 매 렌더 새 배열을 넘기면 폼의 후보 로드 effect 가 매번 다시 돈다.
+  const productIdsParam = searchParams.get('productIds') ?? '';
+  const initialProductIds = useMemo(() => parseProductIds(productIdsParam), [productIdsParam]);
 
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   const productsUseCase = useMemo(() => new GetProductsUseCase(new ProductRepositoryImpl()), []);
@@ -68,20 +64,24 @@ export function MasterProductCreateContainer() {
     [],
   );
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
+  // 2609_78/D50·D52: [상품 관계 한눈에 보기] — 기본은 가운데(폼)만, 누르면 왼쪽 물품 패널이 열린다.
+  const [overviewOpen, setOverviewOpen] = useState(false);
 
-  // 생성 완료된 마스터 id. null 이면 폼, 값이 있으면 완료 화면.
-  const [createdId, setCreatedId] = useState<number | null>(null);
-  // 폼 재마운트 키 — [새 마스터 추가]가 올린다(버퍼까지 확실히 비우기 위해).
-  const [formKey, setFormKey] = useState(0);
-
-  const handleCreated = useCallback((masterId: number) => {
-    setCreatedId(masterId);
-  }, []);
+  const handleCreated = useCallback(
+    (masterId: number) => {
+      toast.success('마스터를 만들었습니다.');
+      router.push(`${ROUTES.MASTER_PRODUCT_DETAIL(masterId)}?overview=1`);
+    },
+    [router],
+  );
 
   const handleCreatedWithWarning = useCallback(
     (masterId: number, warning: string) => {
-      // 미완 상태 — 완료 화면을 거치지 않고 상세로 보낸다. 경고는 상세에서 배너로 보여준다.
-      router.push(`${ROUTES.MASTER_PRODUCT_DETAIL(masterId)}?notice=${encodeURIComponent(warning)}`);
+      // 마스터는 만들어졌다 — 알림은 같고, 무엇을 마저 채울지는 상세 배너(`?notice=`)가 말한다.
+      toast.success('마스터를 만들었습니다.');
+      router.push(
+        `${ROUTES.MASTER_PRODUCT_DETAIL(masterId)}?notice=${encodeURIComponent(warning)}&overview=1`,
+      );
     },
     [router],
   );
@@ -90,39 +90,21 @@ export function MasterProductCreateContainer() {
     router.push(ROUTES.MASTER_PRODUCTS);
   }, [router]);
 
-  const handleAddAnother = useCallback(() => {
-    setCreatedId(null);
-    setFormKey((k) => k + 1);
-  }, []);
-
-  if (createdId != null) {
-    return (
-      <PageContainer title="판매상품 마스터 추가">
-        <Card>
-          <p className="text-sm text-gray-900">마스터가 생성되었습니다.</p>
-          <p className="mt-1 text-sm text-gray-500">
-            이름·옵션·이미지·배송 설정 수정과 채널 연결은 상세 페이지에서 이어서 합니다.
-          </p>
-          <div className="mt-6 flex flex-wrap items-center gap-2">
-            <Button onClick={() => router.push(ROUTES.MASTER_PRODUCT_DETAIL(createdId))}>
-              상세 페이지로 이동
-            </Button>
-            <Button variant="secondary" onClick={() => router.push(ROUTES.MASTER_PRODUCTS)}>
-              마스터 목록으로
-            </Button>
-            <Button variant="secondary" onClick={handleAddAnother}>
-              새 마스터 추가
-            </Button>
-          </div>
-        </Card>
-      </PageContainer>
-    );
-  }
-
   return (
-    <PageContainer title="판매상품 마스터 추가">
+    <PageContainer
+      title="판매 상품 관리 마스터"
+      action={
+        <Button
+          size="sm"
+          variant={overviewOpen ? 'primary' : 'secondary'}
+          aria-pressed={overviewOpen}
+          onClick={() => setOverviewOpen((open) => !open)}
+        >
+          상품 관계 한눈에 보기
+        </Button>
+      }
+    >
       <MasterProductCreateForm
-        key={formKey}
         useCase={useCase}
         productsUseCase={productsUseCase}
         carrierRateUseCase={carrierRateUseCase}
@@ -131,12 +113,22 @@ export function MasterProductCreateContainer() {
         detailUseCase={detailUseCase}
         productImageUseCase={productImageUseCase}
         categoryUseCase={categoryUseCase}
-        // [새 마스터 추가](formKey > 0) 는 빈 폼이어야 한다 — 처음 들어온 물품을 다시 채우지 않는다.
-        initialProductId={formKey === 0 ? initialProductId : undefined}
+        initialProductIds={initialProductIds}
+        overviewOpen={overviewOpen}
         onCreated={handleCreated}
         onCreatedWithWarning={handleCreatedWithWarning}
         onCancel={handleCancel}
       />
     </PageContainer>
   );
+}
+
+/** `"3,1,3,x,-2"` → `[3, 1]` — 양의 정수만 · 첫 등장 순서 · 중복 제거. 빈 문자열이면 `[]`. */
+function parseProductIds(raw: string): number[] {
+  const ids: number[] = [];
+  for (const part of raw.split(',')) {
+    const n = Number(part.trim());
+    if (Number.isInteger(n) && n > 0 && !ids.includes(n)) ids.push(n);
+  }
+  return ids;
 }

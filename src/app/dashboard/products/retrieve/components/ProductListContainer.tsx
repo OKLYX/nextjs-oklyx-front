@@ -14,6 +14,9 @@ import { BarcodeExtractionUseCase } from '@/application/usecases/BarcodeExtracti
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
 import { BarcodeExtractionRepositoryImpl } from '@/infrastructure/repositories/BarcodeExtractionRepositoryImpl';
 import { tokenStorage } from '@/infrastructure/auth/tokenStorage';
+import { toast } from '@/infrastructure/stores/toastStore';
+import { useMasterBasketStore } from '@/infrastructure/stores/masterBasketStore';
+import { MasterBasketControls } from '../../components/MasterBasketControls';
 import { ROUTES } from '@/config/routes';
 import type { Product } from '@/domain/entities/Product';
 import type { BarcodeExtractionResult } from '@/domain/entities/BarcodeExtraction';
@@ -91,6 +94,7 @@ export function ProductListContainer() {
   const [extractResult, setExtractResult] = useState<BarcodeExtractionResult | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractNotice, setExtractNotice] = useState('');
+  const addToBasket = useMasterBasketStore((state) => state.add);
 
   // 🔴 페이지·검색어가 바뀌면 선택을 비운다. 안 비우면 화면에 보이지 않는 물품의 바코드를 건드린다.
   // 조회 조건이 바뀐 것을 렌더 중에 알아채 그 자리에서 버린다 — `useEffect` 로 비우면 한 번 더
@@ -195,6 +199,17 @@ export function ProductListContainer() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }, []);
 
+  // 2609_78/D68: 체크로 고른 물품을 마스터 바구니에 담는다. 담은 뒤 선택은 비운다(모으는 곳은 바구니다).
+  const handleAddToBasket = useCallback(() => {
+    addToBasket(
+      products
+        .filter((p) => selectedIds.includes(p.id))
+        .map((p) => ({ productId: p.id, productName: p.productName })),
+    );
+    setSelectedIds([]);
+    toast.success('바구니에 담았습니다.');
+  }, [addToBasket, products, selectedIds]);
+
   const handleToggleAll = useCallback(
     (checked: boolean) => setSelectedIds(checked ? products.map((p) => p.id) : []),
     [products]
@@ -225,7 +240,7 @@ export function ProductListContainer() {
   }, [barcodeUseCase, selectedIds]);
 
   return (
-    <PageContainer title="상품 목록">
+    <PageContainer title="상품 목록" action={<MasterBasketControls allowClear />}>
       <ProductSearchCard
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
@@ -239,6 +254,9 @@ export function ProductListContainer() {
           <span className="text-sm text-gray-700">{selectedIds.length}개 선택</span>
           <Button size="sm" onClick={handleExtract} disabled={isExtracting}>
             {isExtracting ? '추출 중… (사진을 여러 장 읽어 오래 걸릴 수 있습니다)' : '바코드 추출'}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={handleAddToBasket}>
+            바구니에 담기
           </Button>
           <Button size="sm" variant="secondary" onClick={() => setSelectedIds([])}>
             선택 해제

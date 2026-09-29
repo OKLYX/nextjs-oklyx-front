@@ -56,6 +56,7 @@ import {
   type ChannelPreviewData,
 } from '@/presentation/components/DetailHtmlPreview';
 import { MasterOptionEditor } from '../../components/MasterOptionEditor';
+import { ProductRelationPanel } from '../../components/ProductRelationPanel';
 import {
   MasterImagePool,
   type ImageField,
@@ -81,6 +82,7 @@ import { ListingOptionPickerDialog } from './ListingOptionPickerDialog';
 import { ListingRow, cellActionCount } from './ListingRow';
 import { MARKET_OPTION_LOCK_REASON } from './ListingDetailPanel';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface CoverageMatrixProps {
   id: string;
@@ -287,6 +289,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const searchParams = useSearchParams();
   const createNotice = searchParams.get('notice');
   const shownBanner = banner ?? (createNotice ? { text: createNotice, tone: 'amber' as const } : null);
+  // 2609_78/D50·D52 🔁·D69: [상품 관계 한눈에 보기] — 기본은 닫힘(= 지금 화면 그대로). 판매 상품 관리 마스터에서 방금
+  // 만들고 넘어온 경우(`?overview=1`)만 **처음 한 번** 열린 채로 시작한다. 그 뒤 켜고 끄는 것은 이 화면 상태다.
+  // ⚠️ URL 은 다시 쓰지 않는다(그 주소로 새로고침하면 다시 열린 채로 시작한다 — 수용).
+  const [overviewOpen, setOverviewOpen] = useState(() => searchParams.get('overview') === '1');
+  // 한 번 연 물품 패널은 닫아도 마운트를 유지한다(`hidden`) — 검색 결과·보던 상세가 끄고 켜기만으로 사라지지 않게.
+  const [panelMounted, setPanelMounted] = useState(overviewOpen);
+  if (overviewOpen && !panelMounted) setPanelMounted(true);
   // 반영 전 미리보기(90). null = 미로드/조회 중/실패/비-ADMIN → 아무것도 주장하지 않는다
   // (배너 숨김 + 버튼은 기존대로 활성). 로딩 전용 스피너를 두지 않는 이유이기도 하다.
   const [syncPreview, setSyncPreview] = useState<ChannelSyncPreview | null>(null);
@@ -518,6 +527,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       packageId: master?.defaultPackageId ?? undefined,
     }),
     [master?.defaultDeliveryId, master?.defaultPackageId],
+  );
+
+  // 2609_78: 왼쪽 물품 패널의 구성상품 id. `master` 로드 전에는 null(패널이 「불러오는 중」을 그린다).
+  const relationComponentIds = useMemo(
+    () => (master ? master.components.map((c) => c.productId) : null),
+    [master],
   );
 
   // 이미지 풀의 "제품 이미지" 탭 소스 = 이 마스터의 구성상품(BOM).
@@ -889,6 +904,14 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           <h1 className="text-xl font-semibold text-gray-900">
             {matrix ? matrix.masterName : '커버리지 매트릭스'}
           </h1>
+          <Button
+            size="sm"
+            variant={overviewOpen ? 'primary' : 'secondary'}
+            aria-pressed={overviewOpen}
+            onClick={() => setOverviewOpen((open) => !open)}
+          >
+            상품 관계 한눈에 보기
+          </Button>
         </div>
         {isAdmin && (
           <div className="flex gap-2">
@@ -1085,6 +1108,31 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         }
       />
 
+      {/* 2609_78/D50·D52: [상품 관계 한눈에 보기]가 켜지면 3단 = 왼쪽 물품 패널 · 가운데 마스터(편집 탭) ·
+          오른쪽 판매채널(아래 채널 목록). 꺼져 있으면 지금과 같다(채널 목록 → 편집 탭, 위아래).
+          🔴 켜고 꺼도 채널 목록·편집 탭이 **다시 마운트되지 않게** 트리 모양을 그대로 두고 클래스·order 만 바꾼다
+             (`MasterSectionTabs` 가 본 탭을 마운트 유지해 지키는 미저장 입력이 날아가지 않게).
+          🔴 3단 배치는 **컨테이너 폭** 기준(`@container` + `@5xl:`) — 도구 패널이 열려 본문이 좁아지면 위아래로 쌓인다.
+          ⚠️ 칸에 overflow 를 걸지 말 것 — ⋯ 메뉴(z-30 드롭다운)가 잘린다.
+          ⚠️ `@container` 는 켜졌을 때만 붙인다 — 레이아웃 격리(쌓임 맥락)가 생기므로 꺼져 있을 때는 지금과 똑같게 둔다. */}
+      <div className={overviewOpen ? '@container' : undefined}>
+        <div
+          className={
+            overviewOpen
+              ? 'grid grid-cols-1 gap-4 @5xl:grid-cols-[18rem_minmax(0,1fr)_20rem]'
+              : 'space-y-6'
+          }
+        >
+          {panelMounted && (
+            <div hidden={!overviewOpen} className="min-w-0 @5xl:order-1">
+              <ProductRelationPanel
+                mode="view"
+                componentIds={relationComponentIds}
+                masterId={masterId}
+              />
+            </div>
+          )}
+          <div className={overviewOpen ? 'min-w-0 space-y-2 @5xl:order-3' : 'space-y-6'}>
       {/* 채널 매트릭스 = **계정 헤더 + 판매상품 행(기본 접힘)** 목록(2026-09-26). 종전 표(계정 × 셀 행,
           10열)는 가로 스크롤이 생기고 행마다 판매자·플랫폼·계정이 반복됐다.
           🔴 폭을 고정하는 칸이 없다 — 가로 스크롤을 만들지 말 것(`list-table-scroll`·min-width 금지).
@@ -1290,6 +1338,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       <p className="text-[11px] text-amber-700">
         {`${MARKET_OPTION_LOCK_REASON} 옵션 추가는 언제든 가능합니다.`}
       </p>
+          </div>
+          <div className={overviewOpen ? 'min-w-0 @5xl:order-2' : undefined}>
 
       {/* 목록 아래 편집 섹션 = 탭(`MasterSectionTabs`). 예전엔 `DetailSection` 토글 7개를 세로로 쌓았다.
           탭 4개 = 상품 기본 정보 | 이미지 | 배송 설정 | 채널별 옵션 설정 (사용자 결정 2026-09-26).
@@ -1460,6 +1510,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           }
         />
       )}
+          </div>
+        </div>
+      </div>
 
       {detachedTarget && (
         <DetachedListingPickerModal

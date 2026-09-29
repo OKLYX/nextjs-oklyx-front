@@ -46,6 +46,16 @@ interface ProductRegistrationFormProps {
   /** 전역 도구 패널에서 끌어다 놓은 마켓 사진 URL. 컨테이너가 소유한다(`imageBuffer` 와 같은 모양). */
   pickedImageUrls: string[];
   onPickedImageUrlsChange: (urls: string[]) => void;
+  /**
+   * 판매 상품 관리 마스터의 왼쪽 물품 패널 안에 넣을 때 `true`(2609_78 / UX D62).
+   * 제출 줄을 페이지 바닥 고정(sticky · 음수 여백) 대신 폼 끝에 두고, 부피 그림을 세로로 쌓는다.
+   */
+  embedded?: boolean;
+  /**
+   * 작성 흔적(react-hook-form `isDirty`)이 바뀔 때마다 알린다(2609_78 — 패널 [새 물품 등록] 의 [취소] 확인용).
+   * 도구 패널 [채우기]·구매처 체크(`setValue(…, { shouldDirty: true })`)도 포함된다.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export function ProductRegistrationForm({
@@ -59,6 +69,8 @@ export function ProductRegistrationForm({
   // 🔴 컨테이너가 소유한다 — 폼은 갤러리로 내려보내기만 하고, 저장 직후 서버로 보내는 것도 컨테이너다.
   pickedImageUrls,
   onPickedImageUrlsChange,
+  embedded = false,
+  onDirtyChange,
 }: ProductRegistrationFormProps) {
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
 
@@ -81,7 +93,7 @@ export function ProductRegistrationForm({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     watch,
     reset,
     setValue,
@@ -118,6 +130,11 @@ export function ProductRegistrationForm({
     // 🔴 나갈 때 반드시 지운다 — 남으면 죽은 폼에 setValue 한다.
     return () => setFillTarget(null);
   }, [setFillTarget, setValue]);
+
+  // 2609_78: 작성 흔적을 부모(패널 [새 물품 등록])에 알린다 — [채우기]처럼 DOM 입력 없이 들어온 값도 잡힌다.
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const barcodeValue = watch('barcodeId');
   const purchasePlaceIds = watch('purchasePlaceIds');
@@ -428,8 +445,8 @@ export function ProductRegistrationForm({
 
           <div className="border-t border-gray-200 pt-4 space-y-4">
             <h3 className="text-base font-semibold text-gray-900">부피</h3>
-            <div className="flex flex-col sm:flex-row gap-6">
-              <VolumeDiagram />
+            <div className={embedded ? 'flex flex-col gap-6' : 'flex flex-col sm:flex-row gap-6'}>
+              <VolumeDiagram embedded={embedded} />
               <div className="flex-1 space-y-4">
                 <div>
                   <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
@@ -502,8 +519,14 @@ export function ProductRegistrationForm({
         onUrlRemove={handleUrlRemove}
       />
 
-      {/* Submit Button (sticky - 스크롤해도 하단에 고정) */}
-      <div className="sticky bottom-0 -mb-6 bg-page border-t border-gray-200 p-4 -mx-6 px-6">
+      {/* Submit Button (페이지 = sticky 하단 고정 · 패널 안(embedded) = 폼 끝) */}
+      <div
+        className={
+          embedded
+            ? 'border-t border-gray-200 pt-4'
+            : 'sticky bottom-0 -mb-6 bg-page border-t border-gray-200 p-4 -mx-6 px-6'
+        }
+      >
         <Button
           type="submit"
           size="lg"
@@ -524,9 +547,11 @@ export function ProductRegistrationForm({
  * 정면(흰 면) 기준: 너비 = 정면 가로, 높이 = 정면 세로, 깊이 = 앞에서 뒤로 들어가는 변.
  * 색은 Tailwind 유틸(fill/stroke/text)로만 준다 — hex 하드코딩 금지(다크모드·브랜드 리맵 규칙).
  */
-function VolumeDiagram() {
+function VolumeDiagram({ embedded }: { embedded: boolean }) {
   return (
-    <div className="shrink-0 sm:w-72 rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col items-center justify-center">
+    <div
+      className={`shrink-0 ${embedded ? 'w-full' : 'sm:w-72'} rounded-lg border border-gray-200 bg-gray-50 p-4 flex flex-col items-center justify-center`}
+    >
       <svg viewBox="0 0 220 160" className="w-full max-w-[240px]" role="img" aria-label="너비·깊이·높이 안내 그림">
         <defs>
           <marker id="volArrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
