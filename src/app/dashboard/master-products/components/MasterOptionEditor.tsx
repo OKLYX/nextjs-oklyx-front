@@ -725,10 +725,9 @@ export function MasterOptionEditor({
     onOptionsChange?.((options ?? []).filter((_, i) => i !== index));
   };
 
-  const summaryOf = (items: { productId: number; quantity: number; productName?: string }[]) =>
-    items
-      .map((it) => `${it.productName ?? nameById.get(it.productId) ?? `#${it.productId}`}×${it.quantity}`)
-      .join(', ');
+  // 옵션 줄의 물품 이름(응답에 없으면 구성상품 목록 → `#id` 순으로 대체).
+  const itemName = (it: { productId: number; productName?: string }) =>
+    it.productName ?? nameById.get(it.productId) ?? `#${it.productId}`;
 
   // 마스터의 마지막 옵션은 삭제 불가(옵션 >= 1 불변식, 84 가 서버에서도 강제).
   const isLastServerOption = isEdit && (master?.options.length ?? 0) <= 1;
@@ -741,7 +740,7 @@ export function MasterOptionEditor({
           // 2609_61: 밖에서 이 줄로 보내기 위한 앵커 id 의 원본. 생성 모드 버퍼 옵션엔 없다.
           optionId: opt.id as number | undefined,
           name: opt.name,
-          summary: summaryOf(opt.items),
+          items: opt.items,
           busy: busyOptionId === opt.id,
           locked,
           deleteBlockedReason: locked
@@ -758,7 +757,7 @@ export function MasterOptionEditor({
         // 생성 모드 버퍼 옵션은 서버 id 가 없다 → 앵커를 달지 않는다.
         optionId: undefined as number | undefined,
         name: opt.name,
-        summary: summaryOf(opt.items),
+        items: opt.items,
         busy: false,
         // 생성 모드(버퍼 옵션)는 어디에도 등록돼 있지 않다 → 잠금 없음.
         locked: false,
@@ -854,14 +853,28 @@ export function MasterOptionEditor({
                     : 'border-gray-200'
                 }`}
               >
-                <span>
+                <span className="min-w-0">
                   <span className="font-medium">{row.name}</span>{' '}
                   {row.locked && (
                     <span className="mr-1" title={LOCKED_ROW_TITLE}>
                       🔒
                     </span>
                   )}
-                  <span className="text-gray-500">({row.summary})</span>
+                  {/* 2609_78/D48: 세트(구성상품 2개 이상) = 물품별 수량 칸 · 물품 1개짜리 = 「옵션명 · 수량」 한 줄. */}
+                  {components.length >= 2 ? (
+                    <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+                      {row.items.map((it) => (
+                        <span
+                          key={it.productId}
+                          className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700"
+                        >
+                          {itemName(it)} {it.quantity}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">· 수량 {row.items[0]?.quantity ?? 0}</span>
+                  )}
                 </span>
                 <span className="flex gap-2">
                   <button
