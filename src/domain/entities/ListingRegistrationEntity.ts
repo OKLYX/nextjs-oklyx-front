@@ -364,9 +364,10 @@ export interface ChannelApplyOptionNamesResponse {
   skippedAwaitingId: string[];
 }
 
-// ── 마켓 상품으로 마스터 만들기 (2609_45) ────────────────────────────────────
-// 마켓 상품 id 하나로 마스터 + 옵션 + 채널 셀을 한 번에 만든다. 위의 가져오기(2609_22)와
-// 출발점이 다르다 — 저쪽은 "기존 마스터에 채널을 붙인다", 이쪽은 "마스터가 그 상품에서 태어난다".
+// ── 마켓 상품으로 시작 — 미리보기 (2609_45 → 2609_79) ─────────────────────────────
+// 마스터가 아직 없을 때 마켓 상품 id 하나로 옵션·카테고리·속성을 읽는다(쓰기 0회).
+// 🔁 2609_79 / UX D70: 「마스터 + 옵션 + 셀 한 번에 만들기」 커밋은 없어졌다 — 「새 마스터」 는 3단 페이지가
+// 마스터를 만든 뒤 위의 가져오기(importListing)로 판매상품을 붙인다.
 // 🔴 이름·경로는 플랫폼 중립(D17). 쿠팡은 메뉴 라벨·화면 문구에만 남는다.
 
 export interface MasterFromChannelPreviewRequest {
@@ -406,32 +407,3 @@ export interface MasterFromChannelPreview {
   reusesExistingListing: boolean;
 }
 
-/** 커밋 요청 = 마켓에 없는 정보만(D3). 가격·재고·옵션 id·옵션명·상태·태그는 보내지 않는다. */
-export interface MasterFromChannelRequest extends MasterFromChannelPreviewRequest {
-  masterName: string;
-  categoryId: number;
-  componentProductIds: number[];
-  options: MasterFromChannelOptionSpec[];
-  /** 2609_47/D6: 마스터 기본 택배. 화면이 필수로 막고 서버는 optional 로 받는다. */
-  defaultDeliveryId?: number;
-  /** 2609_47/D6: 마스터 기본 상자. `defaultDeliveryId` 와 같은 규칙. */
-  defaultPackageId?: number;
-}
-
-export interface MasterFromChannelOptionSpec {
-  platformOptionId: string | null; // 미승인 옵션은 null → 서버가 itemName 으로 매칭
-  itemName: string;
-  components: { productId: number; quantity: number }[];
-}
-
-export interface MasterFromChannelResult {
-  masterProductId: number;
-  productListingId: number;
-  optionCount: number;
-  status: string;
-  /**
-   * 2609_47/D4: 서버가 생성 직후 돌린 자동생성(썸네일·상세)의 성공 여부. 실패해도 마스터·셀은
-   * 남는다(D2) — 화면은 이 값으로 **사진을 붙인 뒤 재생성할지**만 판단한다.
-   */
-  assetsGenerated?: boolean;
-}

@@ -31,8 +31,6 @@ import type {
   ListingStatusOption,
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
-  MasterFromChannelRequest,
-  MasterFromChannelResult,
   ChannelApplyOptionNamesResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
@@ -130,8 +128,6 @@ export interface ListingRegistrationRepository {
    * (실제 반영은 다음 [수정 요청]). `useMasterCategory=false` 는 백엔드가 400 으로 막는다.
    */
   setCategorySource(listingId: number, useMasterCategory: boolean): Promise<void>;
-  /** 2609_45: 마켓 상품으로 마스터 만들기 미리보기 — 쓰기 없음(masterId 가 아직 없다). */
+  /** 2609_45 → 2609_79: 「마켓 상품으로 시작」 미리보기 — 쓰기 없음(masterId 가 아직 없다). */
   masterFromChannelPreview(body: MasterFromChannelPreviewRequest): Promise<MasterFromChannelPreview>;
-  /** 2609_45: 마스터 + 옵션 + 채널 셀 생성 커밋. */
-  createMasterFromChannel(body: MasterFromChannelRequest): Promise<MasterFromChannelResult>;
 }

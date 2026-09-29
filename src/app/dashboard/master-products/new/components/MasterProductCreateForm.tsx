@@ -689,7 +689,7 @@ export function MasterProductCreateForm({
   );
 
   // 2609_78/S4: 저장 차단 사유 = **필수 항목 전부**를 저장 순서대로 검사해 **첫 번째로 빠진 것 하나**.
-  // 있으면 [저장] disabled + 버튼 옆 글자(플랫폼 상품 경로 `MasterFromChannelForm` 의 blockReason 과 같은 방식).
+  // 있으면 [저장] disabled + 버튼 옆 글자(2609_78 / UX S4).
   // 🔴 handleSubmit 도 이 값 하나로 막는다 — 검사 순서·문구를 두 곳에 두지 않는다.
   // 2609_46: 구성상품 확정이 첫 관문 — 확정 전에는 나머지 입력 자체가 비활성이다.
   const missingZoneKey = requiredZoneKeys.find(

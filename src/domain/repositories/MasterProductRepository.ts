@@ -3,6 +3,7 @@ import type {
   MasterProductListParams,
   MasterProductPageResponse,
   MasterProductRequest,
+  MasterProductByAnyComponent,
   MasterProductByComponents,
   MasterProductUpdateRequest,
   MasterCompositionRequest,
@@ -27,6 +28,8 @@ export interface MasterProductRepository {
   getById(id: number): Promise<MasterProductResponse>;
   // 같은 구성상품 조합을 쓰는 마스터 (2609_46). 정확히 같은 집합만 — 부분집합·상위집합은 다른 마스터.
   findByComponents(productIds: number[]): Promise<MasterProductByComponents[]>;
+  // 고른 물품이 하나라도 들어간 마스터 + 구성상품 조합 (2609_79 / UX D74·D79). 부분 겹침 포함.
+  findByAnyComponent(productIds: number[]): Promise<MasterProductByAnyComponent[]>;
   create(data: MasterProductRequest): Promise<MasterProductResponse>;
   update(id: number, data: MasterProductUpdateRequest): Promise<MasterProductResponse>;
   // 2609_64: 구성상품 집합 + 옵션 전체를 한 트랜잭션에서 교체한다. 요청에 없는 기존 옵션은 삭제된다.
