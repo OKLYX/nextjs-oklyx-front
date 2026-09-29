@@ -219,7 +219,7 @@ export function ChannelShippingOverrideModal({
             {placesMissingAfterReset && (
               <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
                 계정에 출고지/반품지가 지정돼 있지 않습니다. 초기화하면 이 채널의 출고지·반품지가 비어
-                배송 설정 미완료가 되고 [마켓 등록]이 비활성화됩니다.
+                배송 설정 미완료가 되고 [쿠팡에 올리기]가 비활성화됩니다.
               </p>
             )}
           </div>

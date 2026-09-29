@@ -46,6 +46,7 @@ import type {
 } from '@/domain/entities/ListingRegistrationEntity';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { toast } from '@/infrastructure/stores/toastStore';
 import {
   ChannelPreviewModal,
   type ChannelPreviewData,
@@ -72,6 +73,7 @@ import { MasterRegistrationSuffixPanel } from './MasterRegistrationSuffixPanel';
 import { MasterShippingOverridePanel } from './MasterShippingOverridePanel';
 import { ImportCoupangProductModal } from './ImportCoupangProductModal';
 import { DetachedListingPickerModal } from './DetachedListingPickerModal';
+import { ListingOptionPickerDialog } from './ListingOptionPickerDialog';
 import { ListingRow, cellActionCount } from './ListingRow';
 import { MARKET_OPTION_LOCK_REASON } from './ListingDetailPanel';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
@@ -278,8 +280,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [syncPreview, setSyncPreview] = useState<ChannelSyncPreview | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // Per-channel option activation (43): the listing id currently saving an active-set change.
-  const [optionBusyId, setOptionBusyId] = useState<number | null>(null);
+  // 2609_77/D43: 쿠팡 계정 헤더의 [쿠팡에 올리기]가 방금 만든 판매상품 줄. null = 확인창 닫힘.
+  const [uploadTarget, setUploadTarget] = useState<{ listingId: number; channelLabel: string } | null>(
+    null,
+  );
   // 2609_61: 옵션×채널 표 → 「상품 기본 정보 > 옵션」 이동. `sectionOpenTab` 은 바깥 탭을 고르는 신호,
   // `focusOption` 은 옵션 에디터가 반응할 대상이다. ⚠️ 초기값 undefined — 객체를 처음부터 넘기면 마운트
   // 때 그 탭이 켜진다(기본 = 첫 탭).
@@ -698,6 +702,26 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     }
   };
 
+  // 2609_77/D43: 쿠팡 계정의 [쿠팡에 올리기] = 판매상품 줄을 만들고(판매가 계산) → 옵션 고르기 확인창을 연다.
+  // 🔴 이 단계에서는 쿠팡에 아무것도 보내지 않는다 — 확인창의 [올리기]가 보낸다(D29).
+  const handleRowUpload = async (
+    accountId: number,
+    sellerId: number,
+    platform: string,
+    channelLabel: string,
+  ) => {
+    setRowBusyId(accountId);
+    try {
+      const res = await listingUseCase.addChannel(masterId, { sellerId, platform });
+      await load();
+      setUploadTarget({ listingId: res.productListingId, channelLabel });
+    } catch (e: unknown) {
+      toast.error(extractErrorMessage(e, '판매상품 줄을 만들지 못했습니다.'));
+    } finally {
+      setRowBusyId(null);
+    }
+  };
+
   // [채널에 반영하기] = 확인 모달만 연다. ConfirmDialog 은 선언형이라 window.confirm 처럼
   // 한 줄로 치환할 수 없어 핸들러를 열기/실행 둘로 쪼갠다.
   const handlePropagateClick = () => setConfirmOpen(true);
@@ -735,6 +759,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   // 2609_22: 가져오기 성공 → 매트릭스 재조회 + 커밋에서 처음 온 카테고리 경고를 그대로 노출.
   const handleImportDone = async (categoryWarning: string | null) => {
+    toast.success('쿠팡 상품을 가져왔습니다.');
     setBanner(categoryWarning ? { text: categoryWarning, tone: 'amber' } : null);
     await load();
   };
@@ -789,79 +814,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       setIsDeleting(false);
       setDeleteOpen(false);
       setError(extractErrorMessage(e, '삭제에 실패했습니다.'));
-    }
-  };
-
-  // Toggle one option's per-channel active flag inline (43). Sends the full active set (backend
-  // requires ≥1 active). On success we patch just this cell's optionPrices in place — no full
-  // reload — so the row doesn't flash. needsResync (already-pushed cell) shows the re-register hint.
-  const handleToggleOption = async (listingId: number, optionId: number) => {
-    const prices = generated[listingId]?.optionPrices ?? [];
-    const currentActive = prices.filter((p) => p.active !== false).map((p) => p.optionId);
-    const isActive = currentActive.includes(optionId);
-    if (isActive && currentActive.length === 1) {
-      setError('최소 1개 옵션은 활성 상태여야 합니다.');
-      return;
-    }
-    const nextActive = isActive
-      ? currentActive.filter((id) => id !== optionId)
-      : [...currentActive, optionId];
-    setOptionBusyId(listingId);
-    setError('');
-    try {
-      const res = await listingUseCase.setActiveOptions(listingId, { activeOptionIds: nextActive });
-      const activeById = new Map(res.options.map((o) => [o.optionId, o.active]));
-      setGenerated((prev) => {
-        const gen = prev[listingId];
-        if (!gen) return prev;
-        return {
-          ...prev,
-          [listingId]: {
-            ...gen,
-            optionPrices: gen.optionPrices.map((p) => ({
-              ...p,
-              active: activeById.get(p.optionId) ?? p.active,
-            })),
-          },
-        };
-      });
-      // Registration name is auto-recomputed from the active option set (67/68). Patch just
-      // this cell's registrationName from the response — no full reload (avoids thumbnail re-flash).
-      // ⚠️ `cell`(첫 셀 호환 필드)과 `cells`(전 셀)를 **함께** 갱신한다 — 화면은 `cells` 를 그리고
-      // 백엔드 계약인 `cell` 은 그대로 두므로, 하나만 고치면 둘이 어긋난다.
-      if (res.registrationName != null) {
-        const patchCell = (c: MatrixCell): MatrixCell =>
-          c.productListingId === listingId
-            ? { ...c, registrationName: res.registrationName! }
-            : c;
-        setMatrix((prev) =>
-          prev && {
-            ...prev,
-            rows: prev.rows.map((r) =>
-              rowCellsOf(r).some((c) => c.productListingId === listingId)
-                ? {
-                    ...r,
-                    cell: r.cell ? patchCell(r.cell) : r.cell,
-                    cells: r.cells ? r.cells.map(patchCell) : r.cells,
-                  }
-                : r,
-            ),
-          },
-        );
-      }
-      if (res.needsResync) {
-        setBanner({
-          text: '활성 옵션이 변경되었습니다. 마켓에 반영하려면 해당 채널의 [재생성]/[마켓 등록]으로 재등록하세요.',
-          tone: 'amber',
-        });
-      }
-      // 활성 토글은 고아 판정을 바꾸므로 미리보기만 새로 받는다. ⚠️ load() 를 부르면 안 된다
-      // (썸네일 재조회로 셀이 깜빡인다 — 43 이 일부러 피한 것).
-      void fetchSyncPreview().catch(() => setSyncPreview(null));
-    } catch (e) {
-      setError(extractErrorMessage(e, '옵션 활성 상태 변경에 실패했습니다.'));
-    } finally {
-      setOptionBusyId(null);
     }
   };
 
@@ -1176,7 +1128,31 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           조치 필요 {actionCount}
                         </span>
                       )}
-                      {isAdmin && canRegister && (
+                      {isAdmin && canRegister && row.platform === 'COUPANG' && (
+                        // 2609_77/D43: 쿠팡은 [등록]+[마켓 등록] 을 하나로 — 줄을 만든 뒤 옵션 고르기 확인창을 연다.
+                        // 🔴 미등록 계정 전용이다(계정당 1셀 가드 409).
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleRowUpload(
+                              row.accountId,
+                              row.sellerId,
+                              row.platform,
+                              `${row.sellerName} · ${row.platform}`,
+                            )
+                          }
+                          disabled={busy || isShippingBlocked(row.accountId)}
+                          title={isShippingBlocked(row.accountId) ? SHIPPING_BLOCK_REASON : undefined}
+                          className="flex items-center gap-1 rounded border border-blue-300 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                        >
+                          {rowBusyId === row.accountId ? (
+                            <Spinner size={12} label="만드는 중" />
+                          ) : (
+                            '쿠팡에 올리기'
+                          )}
+                        </button>
+                      )}
+                      {isAdmin && canRegister && row.platform !== 'COUPANG' && (
                         // 🔴 [등록] = 채널 셀 **생성**이라 미등록 계정 전용이다(계정당 1셀 가드 409).
                         <button
                           type="button"
@@ -1249,8 +1225,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       channelLabel={cellLabel(cell)}
                       accountId={row.accountId}
                       platform={row.platform}
-                      optionBusy={optionBusyId === cell.productListingId}
-                      onToggleOption={handleToggleOption}
                       onEditMasterOption={handleEditMasterOption}
                       onReload={load}
                       onPreview={openPreview}
@@ -1451,6 +1425,23 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           onPick={(platformProductId) => {
             setImportTarget({ ...detachedTarget, initialProductId: platformProductId });
             setDetachedTarget(null);
+          }}
+        />
+      )}
+
+      {uploadTarget && (
+        <ListingOptionPickerDialog
+          mode="upload"
+          listingId={uploadTarget.listingId}
+          channelLabel={uploadTarget.channelLabel}
+          onClose={() => {
+            setUploadTarget(null);
+            // D43 대가: 취소해도 만든 줄은 「미전송」으로 남는다 — 사라진 게 아님을 알린다.
+            toast.success('판매상품 줄을 만들었습니다. 아직 쿠팡에 올리지 않았습니다.');
+          }}
+          onDone={() => {
+            setUploadTarget(null);
+            void load();
           }}
         />
       )}

@@ -15,6 +15,7 @@ import { ChannelStockModal } from './ChannelStockModal';
 import { ChannelPriceModal } from './ChannelPriceModal';
 import { ChannelOptionNameModal } from './ChannelOptionNameModal';
 import { ChannelShippingOverrideModal } from './ChannelShippingOverrideModal';
+import { ListingOptionPickerDialog, SHIPPING_BLOCKED_REASON } from './ListingOptionPickerDialog';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type {
   ListingStatus,
@@ -105,8 +106,9 @@ type Busy =
  * 판매상품(셀) 한 줄의 액션 = **주 버튼 하나 + ⋯ 메뉴**.
  * File: src/app/dashboard/master-products/[id]/components/CellActions.tsx
  *
- * - 주 버튼: 미전송(DRAFT) = [마켓 등록] · 변경 미반영(`needsMarketSync`) = [수정 요청] · 그 외 없음.
- * - ⋯ 메뉴: 편집(필드값·상세·가격·재고·옵션명·배송) / 동기화(수정 요청·승인 새로고침·재생성) /
+ * - 주 버튼: 미전송(DRAFT) = 쿠팡 [쿠팡에 올리기](옵션 고르기 확인창, 2609_77/D43) · 그 밖의 플랫폼 [마켓 등록]
+ *   · 변경 미반영(`needsMarketSync`) = [수정 요청] · 그 외 없음.
+ * - ⋯ 메뉴: 편집(필드값·상세·가격·재고·옵션명·배송·올릴 옵션 고르기) / 동기화(수정 요청·승인 새로고침·재생성) /
  *   연결(쿠팡에서 보기·마스터 카테고리로 변경) / 구분선 아래 빨간 [마스터 연결 해제]·[채널 삭제].
  * - 결과 알림(성공·실패·승인 결과)은 행 아래 한 줄(`basis-full`)로 나온다 — 부모 행이 flex-wrap 이어야 한다.
  *
@@ -150,6 +152,9 @@ export function CellActions({
   const [showPrice, setShowPrice] = useState(false);
   const [showOptionName, setShowOptionName] = useState(false);
   const [showCategorySource, setShowCategorySource] = useState(false);
+  // 2609_77/D43·D57: [쿠팡에 올리기] 확인창(upload) · [⋯ > 올릴 옵션 고르기](select). 같은 창이다.
+  const [showUpload, setShowUpload] = useState(false);
+  const [showOptionPicker, setShowOptionPicker] = useState(false);
   // 2609_74/D15: 「마스터 옵션명 반영」 확인창.
   const [showApplyNames, setShowApplyNames] = useState(false);
   // 2609_63: boolean 이 아니라 **대상 셀**을 담는다 — 한 계정에 셀이 여럿일 수 있어(D10-1)
@@ -329,12 +334,17 @@ export function CellActions({
 
   // Guard the register action only (77). Strict false — undefined/null means "not judged" → allow.
   const shippingBlocked = shippingReady === false;
-  const shippingBlockedReason = '배송 설정 미완료 — 마스터/채널/계정 중 한 곳에서 배송 설정 필요';
 
-  // 주 버튼은 상태에 따라 **하나만**: 미전송 = [마켓 등록], 변경 미반영 = [수정 요청], 그 외 = 없음.
-  // 나머지 동작은 전부 ⋯ 메뉴로 간다(동작 자체는 무변경 — 위치와 묶음만 바뀌었다).
-  const primary: 'register' | 'update' | null =
-    status === 'DRAFT' ? 'register' : needsMarketSync ? 'update' : null;
+  // 주 버튼은 상태에 따라 **하나만**: 미전송 = 쿠팡은 [쿠팡에 올리기](2609_77/D43), 그 밖의 플랫폼은
+  // [마켓 등록] · 변경 미반영 = [수정 요청] · 그 외 = 없음. 나머지 동작은 전부 ⋯ 메뉴로 간다.
+  const primary: 'upload' | 'register' | 'update' | null =
+    status === 'DRAFT'
+      ? platform === 'COUPANG'
+        ? 'upload'
+        : 'register'
+      : needsMarketSync
+        ? 'update'
+        : null;
 
   const menuGroups: MenuGroup[] = [
     {
@@ -356,6 +366,10 @@ export function CellActions({
           label: `채널 배송 설정${hasShippingOverride ? ' ✓' : ''}`,
           onClick: () => setShowShipping(true),
         },
+        // 2609_77/D57: 올린 뒤 옵션을 끄고 켜는 곳. 미전송은 [쿠팡에 올리기] 확인창에서 고른다.
+        ...(status !== 'DRAFT'
+          ? [{ key: 'option-picker', label: '올릴 옵션 고르기', onClick: () => setShowOptionPicker(true) }]
+          : []),
       ],
     },
     {
@@ -428,12 +442,23 @@ export function CellActions({
     // 액션은 행 오른쪽 끝, 알림 줄은 `basis-full` 로 행 아래 한 줄을 차지한다.
     <div className="contents">
       <div className="flex shrink-0 items-center gap-1.5">
+        {primary === 'upload' && (
+          <button
+            type="button"
+            onClick={() => setShowUpload(true)}
+            disabled={busy !== null || shippingBlocked}
+            title={shippingBlocked ? SHIPPING_BLOCKED_REASON : undefined}
+            className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+          >
+            쿠팡에 올리기
+          </button>
+        )}
         {primary === 'register' && (
           <button
             type="button"
             onClick={handleRegister}
             disabled={busy !== null || shippingBlocked}
-            title={shippingBlocked ? shippingBlockedReason : undefined}
+            title={shippingBlocked ? SHIPPING_BLOCKED_REASON : undefined}
             className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
           >
             {busy === 'register' ? <Spinner size={12} label="요청 중..." /> : '마켓 등록'}
@@ -527,7 +552,7 @@ export function CellActions({
         <div className="basis-full space-y-1 pl-9">
           {/* disabled 버튼의 title 은 hover 가 안 뜨는 브라우저가 있어 보이는 안내 1줄을 함께 둔다. */}
           {status === 'DRAFT' && shippingBlocked && (
-            <p className="text-[11px] text-gray-500">{shippingBlockedReason}</p>
+            <p className="text-[11px] text-gray-500">{SHIPPING_BLOCKED_REASON}</p>
           )}
           {pushedBanner && <p className="text-[11px] text-green-700">{pushedBanner}</p>}
           {statusResult && (
@@ -699,6 +724,32 @@ export function CellActions({
         onConfirm={() => deleteTarget && handleDeleteCell(deleteTarget)}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {showUpload && (
+        <ListingOptionPickerDialog
+          mode="upload"
+          listingId={listing.id}
+          channelLabel={channelLabel}
+          onClose={() => setShowUpload(false)}
+          onDone={() => {
+            setShowUpload(false);
+            onReload();
+          }}
+        />
+      )}
+
+      {showOptionPicker && (
+        <ListingOptionPickerDialog
+          mode="select"
+          listingId={listing.id}
+          channelLabel={channelLabel}
+          onClose={() => setShowOptionPicker(false)}
+          onDone={() => {
+            setShowOptionPicker(false);
+            onReload();
+          }}
+        />
+      )}
 
       {showOptionName && (
         <ChannelOptionNameModal
