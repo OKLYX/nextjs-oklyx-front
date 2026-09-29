@@ -35,6 +35,7 @@ import { BUILTIN_FIELD_KEYS, type TemplateField } from '@/domain/entities/Thumbn
 import { CategoryTreeColumns } from '@/presentation/components/CategoryTreeColumns';
 import { ROUTES } from '@/config/routes';
 import { MasterOptionEditor } from '../../components/MasterOptionEditor';
+import { ProductRelationPanel } from '../../components/ProductRelationPanel';
 import {
   MasterImagePool,
   type ImageField,
@@ -95,6 +96,8 @@ interface MasterProductCreateFormProps {
    * 🔴 호출부가 memo 한 배열을 넘긴다(아래 후보 로드 effect 의 의존성이다).
    */
   initialProductIds?: number[];
+  /** [상품 관계 한눈에 보기]가 켜졌는지(2609_78 / UX D50·D52). 켜지면 폼 왼쪽에 물품 패널을 그린다. */
+  overviewOpen?: boolean;
 }
 
 /**
@@ -129,6 +132,7 @@ export function MasterProductCreateForm({
   onCancel,
   onCreatedWithWarning,
   initialProductIds,
+  overviewOpen = false,
 }: MasterProductCreateFormProps) {
   // 이미지 그룹 카탈로그(공용 목록)는 이 모달이 직접 만든다 — 부모 props 계약을 넓히지 않는다.
   const groupUseCase = useMemo(
@@ -541,6 +545,37 @@ export function MasterProductCreateForm({
     doToggle();
   };
 
+  // 2609_78: 한 번 연 물품 패널은 닫아도 마운트를 유지한다(`hidden`) — 패널 안 [새 물품 등록]에 쓰던 내용이
+  // [상품 관계 한눈에 보기]를 끄는 것만으로 사라지지 않게(UX D32 — 저장 전 입력을 말없이 버리지 않는다).
+  const [panelMounted, setPanelMounted] = useState(false);
+  if (overviewOpen && !panelMounted) setPanelMounted(true);
+
+  /**
+   * 왼쪽 물품 패널의 [구성상품에 넣기] · [새 물품 등록] 저장 직후(2609_78 / UX D67).
+   * 이미 [설정 적용]으로 잠겼으면 잠금을 풀고 넣는다(조합이 바뀌면 중복 확인을 다시 해야 한다).
+   * 옵션이 있으면 가운데 [수정]·✕ 와 같은 「옵션 삭제 확인」을 거친다(UX S9 — 확인창 유지).
+   */
+  const addComponent = (product: Product) => {
+    if (optionFormOpen || selectedIds.includes(product.id)) return;
+    const doAdd = () => {
+      // 첫 1000개 목록 밖의 물품(검색·새로 등록)도 가운데 목록·옵션 수량 행에 이름이 보이게 앞에 붙인다.
+      setProducts((prev) => (prev.some((p) => p.id === product.id) ? prev : [product, ...prev]));
+      unlockComponents();
+      setSelectedIds((prev) => (prev.includes(product.id) ? prev : [...prev, product.id]));
+    };
+    if (options.length > 0) {
+      setConfirmDialog({
+        message: '구성상품을 변경할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
+        onConfirm: () => {
+          setOptions([]);
+          doAdd();
+        },
+      });
+      return;
+    }
+    doAdd();
+  };
+
   const handleProductSearch = () => {
     if (!productFilter.trim()) return;
     setProductQuery(productFilter);
@@ -766,6 +801,33 @@ export function MasterProductCreateForm({
 
   return (
     <>
+      {/* 2609_78/D50·D52: [상품 관계 한눈에 보기]가 켜지면 왼쪽 = 물품 패널, 가운데 = 이 폼.
+          새로 만들 때는 오른쪽 판매채널 패널이 없다(UX D69 — 저장 뒤 상세에서 열린 채로 이어진다).
+          🔴 켜고 꺼도 폼(Card)이 다시 마운트되지 않게 트리 모양을 그대로 둔다. 한 번 연 패널은 닫혀도 `hidden` 으로 남는다.
+          🔴 두 칸 배치는 **컨테이너 폭** 기준(`@container` + `@4xl:`) — 오른쪽 도구 패널이 열려 본문이
+          좁아지면 위아래로 쌓인다(화면 폭 기준 `xl:` 을 쓰면 가운데가 0 폭으로 찌그러진다).
+          ⚠️ `@container` 는 켜졌을 때만 붙인다 — 레이아웃 격리(쌓임 맥락)가 생기므로 꺼져 있을 때는 지금과 똑같게 둔다. */}
+      <div className={overviewOpen ? '@container' : undefined}>
+        <div
+          className={
+            overviewOpen ? 'grid grid-cols-1 gap-4 @4xl:grid-cols-[20rem_minmax(0,1fr)]' : undefined
+          }
+        >
+          {panelMounted && (
+            <div hidden={!overviewOpen}>
+              <ProductRelationPanel
+                mode="create"
+                componentIds={selectedIds}
+                onAddComponent={addComponent}
+                addBlockedReason={
+                  optionFormOpen
+                    ? '옵션을 추가하는 동안에는 구성상품을 넣을 수 없습니다. 옵션 편집을 닫은 뒤 넣으세요.'
+                    : null
+                }
+              />
+            </div>
+          )}
+          <div className="min-w-0">
       <Card>
         {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
@@ -1258,6 +1320,9 @@ export function MasterProductCreateForm({
           </Button>
         </div>
       </Card>
+          </div>
+        </div>
+      </div>
 
       {detailProduct && (
         <Modal
