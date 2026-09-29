@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
@@ -41,6 +41,12 @@ import { MasterProductCreateForm } from './MasterProductCreateForm';
  */
 export function MasterProductCreateContainer() {
   const router = useRouter();
+  // 2609_77/D44: 물품 등록 완료 창의 [이 물품으로 마스터 만들기] 가 `?productId=` 로 들어온다.
+  // 양의 정수가 아니면 무시한다(빈 폼).
+  const searchParams = useSearchParams();
+  const productIdParam = Number(searchParams.get('productId'));
+  const initialProductId =
+    Number.isInteger(productIdParam) && productIdParam > 0 ? productIdParam : undefined;
 
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   const productsUseCase = useMemo(() => new GetProductsUseCase(new ProductRepositoryImpl()), []);
@@ -125,6 +131,8 @@ export function MasterProductCreateContainer() {
         detailUseCase={detailUseCase}
         productImageUseCase={productImageUseCase}
         categoryUseCase={categoryUseCase}
+        // [새 마스터 추가](formKey > 0) 는 빈 폼이어야 한다 — 처음 들어온 물품을 다시 채우지 않는다.
+        initialProductId={formKey === 0 ? initialProductId : undefined}
         onCreated={handleCreated}
         onCreatedWithWarning={handleCreatedWithWarning}
         onCancel={handleCancel}

@@ -56,7 +56,7 @@ export const cellActionCount = (cell: MatrixCell): number =>
 /**
  * 옵션 표의 한 줄 = `optionPrices`(활성·잠금·가격·재고) 를 기준으로, 있으면 `channel-options`
  * (옵션 ID·마스터 옵션 연결)를 옵션 id 로 겹친다. 둘은 같은 **채널 옵션 id** 공간이다.
- * ⚠️ 활성 여부는 `optionPrices` 가 이긴다 — 토글(43)이 그쪽만 제자리 패치하기 때문이다.
+ * ⚠️ 활성 여부는 `optionPrices` 가 이긴다(올릴 옵션을 저장하면 매트릭스를 다시 읽는다 — 2609_77/D57).
  */
 const buildOptionViews = (
   gen: GeneratedProductResponse | null | undefined,
@@ -117,8 +117,6 @@ interface ListingRowProps {
   channelLabel: string;
   accountId: number;
   platform: string;
-  optionBusy: boolean;
-  onToggleOption: (listingId: number, optionId: number) => void;
   onEditMasterOption: (masterOptionId: number) => void;
   onReload: () => void;
   onPreview: (
@@ -155,8 +153,6 @@ export function ListingRow({
   channelLabel,
   accountId,
   platform,
-  optionBusy,
-  onToggleOption,
   onEditMasterOption,
   onReload,
   onPreview,
@@ -333,8 +329,6 @@ export function ListingRow({
           onMarket={cell.platformProductId != null}
           options={views}
           optionsLoading={pending || (isAdmin && channelOptionsLoading)}
-          optionBusy={optionBusy}
-          onToggleOption={(optionId) => onToggleOption(listingId, optionId)}
           onEditMasterOption={onEditMasterOption}
           onSaved={onReload}
           thumbnail={bigThumb}

@@ -6,6 +6,7 @@ import { TopBar } from './components/TopBar';
 import { Navbar } from './components/Navbar';
 import { ToolRail } from './components/ToolRail';
 import { ToolPanel } from './components/ToolPanel';
+import { ToastViewport } from '@/presentation/components/ToastViewport';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
@@ -199,6 +200,8 @@ export default function DashboardLayout({
           도구 목록(플랫폼 상품 조회 · 클립보드)은 `components/toolRegistry.tsx` 한 곳에 있다. */}
       <ToolPanel />
       <ToolRail />
+      {/* 웹 공용 잠깐 알림(FEATURE_2609_77). 🔴 이 한 곳에서만 마운트한다. */}
+      <ToastViewport />
     </div>
   );
 }
