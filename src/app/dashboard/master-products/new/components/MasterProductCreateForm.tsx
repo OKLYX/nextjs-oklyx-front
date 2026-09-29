@@ -63,6 +63,16 @@ import { Input } from '@/presentation/components/ui/Input';
 import { Card } from '@/presentation/components/ui/Card';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
+import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
+import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
+import {
+  MARKET_ATTACH_FAIL_PREFIX,
+  MARKET_NOT_ATTACHED_SUFFIX,
+  MARKET_OPTION_RESET_MESSAGE,
+  importOptionsOf,
+  marketOptionsOf,
+  type MarketSource,
+} from './marketSource';
 
 // Per-platform create-mode meta: user values + the loaded schema (for the submit gate).
 type MetaEntry = { attributes: CategoryAttribute[]; notices: CategoryNotice[] } & CategoryMetaCreateValue;
@@ -98,6 +108,12 @@ interface MasterProductCreateFormProps {
   initialProductIds?: number[];
   /** [상품 관계 한눈에 보기]가 켜졌는지(2609_78 / UX D50·D52). 켜지면 폼 왼쪽에 물품 패널을 그린다. */
   overviewOpen?: boolean;
+  /**
+   * 2609_79 / UX D70·D71·D77: 「마켓 상품으로 시작」 [새 마스터로] 의 출발 상품. 있으면 이름·카테고리·옵션·
+   * 필수속성/고시를 마켓 값으로 채우고(사진 제외), 옵션 추가·삭제·이름 변경을 막고, 저장 뒤 판매상품을 붙인다.
+   * 🔴 초기값으로만 읽는다 — 호출부는 조회가 끝난 뒤에 이 폼을 그린다.
+   */
+  market?: MarketSource;
 }
 
 /**
@@ -133,6 +149,7 @@ export function MasterProductCreateForm({
   onCreatedWithWarning,
   initialProductIds,
   overviewOpen = false,
+  market,
 }: MasterProductCreateFormProps) {
   // 이미지 그룹 카탈로그(공용 목록)는 이 모달이 직접 만든다 — 부모 props 계약을 넓히지 않는다.
   const groupUseCase = useMemo(
@@ -144,7 +161,16 @@ export function MasterProductCreateForm({
     () => new GetProductDetailUseCase(new ProductRepositoryImpl()),
     [],
   );
-  const [name, setName] = useState('');
+  // 2609_79 / UX D70: 저장 뒤 판매상품 붙이기(기존 마스터에 붙이기와 같은 처리).
+  const listingUseCase = useMemo(
+    () => new ListingRegistrationUseCase(new ListingRegistrationRepositoryImpl()),
+    [],
+  );
+  // 2609_79 / UX D71: 마켓 모드의 옵션 원형(이름 = 마켓 옵션명, 구성 수량 비움). 초기화도 이 값으로 돌아간다.
+  const marketOptions = useMemo(() => (market ? marketOptionsOf(market.preview) : null), [market]);
+  const [name, setName] = useState(
+    market ? (market.preview.suggestedMasterName ?? market.preview.productName ?? '') : '',
+  );
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   // 모달이던 시절엔 ✕ 하나로만 닫혔지만, 페이지가 된 뒤로는 브라우저 뒤로가기·주소창·탭 닫기로도
@@ -170,7 +196,13 @@ export function MasterProductCreateForm({
   const hideCategoryAttrs = coupangSelected && isBundle;
 
   // Create mode: options are entered in the wizard and created atomically with the master.
-  const [options, setOptions] = useState<MasterOptionRequest[]>([]);
+  const [options, setOptions] = useState<MasterOptionRequest[]>(() => marketOptions ?? []);
+  // 옵션을 버려야 하는 순간(구성상품·카테고리 변경): 보통 = 전부 삭제, 마켓 모드 = 옵션은 남기고 원형으로 되돌림(수량 비움 · 옵션 속성 = 마켓 값).
+  const discardOptions = useCallback(() => setOptions(marketOptions ?? []), [marketOptions]);
+  // 버릴 입력이 있는가 — 마켓 모드의 옵션은 처음부터 있으므로 구성 수량이 들어간 옵션이 있을 때만 확인한다.
+  const hasOptionInput = marketOptions
+    ? options.some((opt) => opt.items.length > 0)
+    : options.length > 0;
   // Confirm dialog (replaces window.confirm): the pending action runs on confirm.
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
   // True while the option add/edit form is open → component selection is locked.
@@ -178,8 +210,15 @@ export function MasterProductCreateForm({
 
   // Create mode: a leaf standard category must be picked (miller-columns drilldown) before
   // save (assigned via setCategory right after create). Edit mode uses MasterCategoryPanel.
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>('');
-  const [selectedCategoryName, setSelectedCategoryName] = useState('');
+  // 2609_79 / UX D77: 마켓 카테고리를 역조회로 찾았으면 채우고 [설정적용]까지 끝난 상태로 연다.
+  const marketCategoryId =
+    market?.preview.categoryResolved && market.preview.suggestedCategoryId != null
+      ? market.preview.suggestedCategoryId
+      : null;
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>(marketCategoryId ?? '');
+  const [selectedCategoryName, setSelectedCategoryName] = useState(
+    marketCategoryId != null ? (market?.preview.suggestedCategoryName ?? '') : '',
+  );
   // Stable browse reference so CategoryTreeColumns' mount effect doesn't re-run every render.
   const browseTree = useCallback(
     (parentId?: number) => categoryUseCase.browseTree(parentId),
@@ -200,7 +239,7 @@ export function MasterProductCreateForm({
   const [catTotalMatches, setCatTotalMatches] = useState(0);
   const [catExpandChain, setCatExpandChain] = useState<number[] | null>(null);
   // Once applied, the category is frozen (search + tree hidden) until 수정 is pressed.
-  const [categoryLocked, setCategoryLocked] = useState(false);
+  const [categoryLocked, setCategoryLocked] = useState(marketCategoryId != null);
   const allCategoriesRef = useRef<Category[] | null>(null);
 
   const runCategorySearch = useCallback(
@@ -270,11 +309,13 @@ export function MasterProductCreateForm({
         setSelectedCategoryId(id);
         setSelectedCategoryName(name);
       };
-      if (selectedCategoryId !== id && options.length > 0) {
+      if (selectedCategoryId !== id && hasOptionInput) {
         setConfirmDialog({
-          message: '카테고리를 변경할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
+          message: market
+            ? MARKET_OPTION_RESET_MESSAGE
+            : '카테고리를 변경할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
           onConfirm: () => {
-            setOptions([]);
+            discardOptions();
             doSelect();
           },
         });
@@ -282,7 +323,7 @@ export function MasterProductCreateForm({
       }
       doSelect();
     },
-    [selectedCategoryId, options],
+    [selectedCategoryId, hasOptionInput, market, discardOptions],
   );
 
   // Apply the picked category: clear the search UI and freeze the section (수정 to reopen).
@@ -296,11 +337,13 @@ export function MasterProductCreateForm({
 
   // Unlock the category for editing; if options exist, confirm they will be discarded.
   const editCategory = () => {
-    if (options.length > 0) {
+    if (hasOptionInput) {
       setConfirmDialog({
-        message: '카테고리를 수정할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
+        message: market
+          ? MARKET_OPTION_RESET_MESSAGE
+          : '카테고리를 수정할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
         onConfirm: () => {
-          setOptions([]);
+          discardOptions();
           setCategoryLocked(false);
         },
       });
@@ -338,7 +381,19 @@ export function MasterProductCreateForm({
 
   // Create mode: per-platform category required-attributes/notices (58). Values + loaded
   // schema are buffered here; saved (COUPANG only) after create via setCategoryAttributes.
-  const [metaByPlatform, setMetaByPlatform] = useState<Record<string, MetaEntry>>({});
+  // 2609_79 / UX D77: 마켓의 공통 속성·고시·품목군을 입력칸에 미리 채운다(사람이 확인·수정).
+  const [metaByPlatform, setMetaByPlatform] = useState<Record<string, MetaEntry>>(() =>
+    market
+      ? {
+          [market.platform]: {
+            ...EMPTY_META_ENTRY,
+            attrValues: { ...market.preview.commonAttributes },
+            noticeValues: { ...market.preview.notices },
+            noticeGroup: market.preview.noticeGroup,
+          },
+        }
+      : {},
+  );
   // 옵션 고시 노출·검증 범위 = 마스터가 전송할 품목군과 같은 값(submitNoticeGroup 단일 해석).
   const coupangMetaEntry = metaByPlatform['COUPANG'];
   const masterNoticeGroup = coupangMetaEntry
@@ -509,11 +564,13 @@ export function MasterProductCreateForm({
   }, []);
 
   const editComponents = () => {
-    if (options.length > 0) {
+    if (hasOptionInput) {
       setConfirmDialog({
-        message: '구성상품을 수정할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
+        message: market
+          ? MARKET_OPTION_RESET_MESSAGE
+          : '구성상품을 수정할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
         onConfirm: () => {
-          setOptions([]);
+          discardOptions();
           unlockComponents();
         },
       });
@@ -532,11 +589,13 @@ export function MasterProductCreateForm({
       setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
     };
     // Editing the component set invalidates existing options → confirm before dropping them.
-    if (options.length > 0) {
+    if (hasOptionInput) {
       setConfirmDialog({
-        message: '구성상품을 변경할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
+        message: market
+          ? MARKET_OPTION_RESET_MESSAGE
+          : '구성상품을 변경할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
         onConfirm: () => {
-          setOptions([]);
+          discardOptions();
           doToggle();
         },
       });
@@ -563,11 +622,13 @@ export function MasterProductCreateForm({
       unlockComponents();
       setSelectedIds((prev) => (prev.includes(product.id) ? prev : [...prev, product.id]));
     };
-    if (options.length > 0) {
+    if (hasOptionInput) {
       setConfirmDialog({
-        message: '구성상품을 변경할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
+        message: market
+          ? MARKET_OPTION_RESET_MESSAGE
+          : '구성상품을 변경할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
         onConfirm: () => {
-          setOptions([]);
+          discardOptions();
           doAdd();
         },
       });
@@ -728,6 +789,9 @@ export function MasterProductCreateForm({
     for (const [k, v] of Object.entries(fieldValues)) {
       if (v.trim() !== '') cleaned[k] = v;
     }
+    // 2609_79 / UX D70: 마켓 모드에서 판매상품을 붙이기 전에 멈추면 그 사실을 배너 끝에 덧붙인다.
+    const warnBeforeAttach = (masterId: number, warning: string) =>
+      onCreatedWithWarning(masterId, market ? `${warning}${MARKET_NOT_ATTACHED_SUFFIX}` : warning);
     try {
       // Create the master first to obtain an id, then upload the image override.
       const created = await useCase.create({
@@ -743,7 +807,7 @@ export function MasterProductCreateForm({
       try {
         await useCase.setCategory(created.id, { categoryId: Number(selectedCategoryId) });
       } catch {
-        onCreatedWithWarning(created.id, '마스터는 생성되었습니다. 카테고리 지정에 실패했습니다(상세에서 재지정).');
+        warnBeforeAttach(created.id, '마스터는 생성되었습니다. 카테고리 지정에 실패했습니다(상세에서 재지정).');
         setIsSubmitting(false);
         return;
       }
@@ -764,7 +828,7 @@ export function MasterProductCreateForm({
             noticeGroup: group,
           });
         } catch {
-          onCreatedWithWarning(created.id, '마스터는 생성되었습니다. 카테고리 속성 저장에 실패했습니다(상세에서 재입력).');
+          warnBeforeAttach(created.id, '마스터는 생성되었습니다. 카테고리 속성 저장에 실패했습니다(상세에서 재입력).');
           setIsSubmitting(false);
           return;
         }
@@ -775,7 +839,7 @@ export function MasterProductCreateForm({
         try {
           await useCase.updateShippingOverride(created.id, { override: shippingMap });
         } catch {
-          onCreatedWithWarning(created.id, '마스터는 생성되었습니다. 배송 설정 저장에 실패했습니다(상세에서 재지정).');
+          warnBeforeAttach(created.id, '마스터는 생성되었습니다. 배송 설정 저장에 실패했습니다(상세에서 재지정).');
           setIsSubmitting(false);
           return;
         }
@@ -786,9 +850,33 @@ export function MasterProductCreateForm({
       try {
         await commitMasterImageBuffer(detailUseCase, created.id, imageBuffer);
       } catch {
-        onCreatedWithWarning(created.id, '마스터·옵션은 생성되었습니다. 이미지 일부 업로드/매핑에 실패했습니다.');
+        warnBeforeAttach(created.id, '마스터·옵션은 생성되었습니다. 이미지 일부 업로드/매핑에 실패했습니다.');
         setIsSubmitting(false);
         return;
+      }
+      // 2609_79 / UX D70: 마스터를 다 만든 뒤(사진 반영까지 — 붙이기가 자동생성을 돌린다) 판매상품을 붙인다.
+      // 실패해도 마스터는 남긴다 — 상세 배너가 사유와 다시 붙이는 곳을 알린다.
+      if (market) {
+        try {
+          const attached = await listingUseCase.importListing(created.id, {
+            sellerId: market.sellerId,
+            platform: market.platform,
+            platformProductId: market.platformProductId,
+            options: importOptionsOf(market.preview, options),
+          });
+          if (attached.categoryWarning) {
+            onCreatedWithWarning(created.id, attached.categoryWarning);
+            setIsSubmitting(false);
+            return;
+          }
+        } catch (e) {
+          onCreatedWithWarning(
+            created.id,
+            `${MARKET_ATTACH_FAIL_PREFIX}${extractErrorMessage(e, '알 수 없는 오류')} — 판매채널 줄의 [마켓 상품 추가하기]로 다시 붙이세요.`,
+          );
+          setIsSubmitting(false);
+          return;
+        }
       }
       onCreated(created.id);
     } catch (e: unknown) {
@@ -924,9 +1012,11 @@ export function MasterProductCreateForm({
                 옵션을 추가하는 동안에는 구성상품을 수정할 수 없습니다. 옵션 편집을 닫은 뒤 수정하세요.
               </p>
             )}
-            {!optionFormOpen && options.length > 0 && (
+            {!optionFormOpen && hasOptionInput && (
               <p className="mb-1 text-[11px] text-amber-700">
-                구성상품을 수정하면 기존에 추가한 옵션이 모두 삭제됩니다.
+                {market
+                  ? '구성상품을 수정하면 옵션별 구성 수량이 지워집니다.'
+                  : '구성상품을 수정하면 기존에 추가한 옵션이 모두 삭제됩니다.'}
               </p>
             )}
 
@@ -1295,6 +1385,7 @@ export function MasterProductCreateForm({
               masterNoticeGroup={masterNoticeGroup}
               hideCategoryAttrs={hideCategoryAttrs}
               onFormOpenChange={setOptionFormOpen}
+              marketLocked={market != null}
             />
           </div>
         </fieldset>
@@ -1400,9 +1491,9 @@ export function MasterProductCreateForm({
 
       <ConfirmDialog
         isOpen={confirmDialog != null}
-        title="옵션 삭제 확인"
+        title={market ? '구성 수량 지우기 확인' : '옵션 삭제 확인'}
         message={confirmDialog?.message ?? ''}
-        confirmText="삭제하고 계속"
+        confirmText={market ? '지우고 계속' : '삭제하고 계속'}
         cancelText="취소"
         isDangerous
         onConfirm={() => {
