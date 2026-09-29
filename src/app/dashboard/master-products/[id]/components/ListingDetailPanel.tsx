@@ -15,7 +15,8 @@ const OPTION_ID_PENDING_HINT = '승인 후 부여';
 
 /**
  * 마켓에 이미 올라간 옵션은 끌 수 없는 이유(사용자 결정 2026-08-29). 승인된 마켓 옵션은 물리적으로
- * 삭제되지 않아 백엔드(87)가 해제를 400 으로 막는다 → 체크박스를 먼저 잠근다.
+ * 삭제되지 않아 백엔드(87)가 해제를 400 으로 막는다 → 올릴 옵션 고르기 창(`ListingOptionPickerDialog`)이
+ * 체크를 먼저 잠근다.
  */
 export const MARKET_OPTION_LOCK_REASON = '마켓에 등록된 옵션은 뺄 수 없습니다.';
 
@@ -56,9 +57,6 @@ interface ListingDetailPanelProps {
   options: ListingOptionView[];
   /** 옵션 조회가 아직 안 끝났다 — 빈 목록("옵션 없음")과 구분해 스피너를 보여준다. */
   optionsLoading: boolean;
-  /** 이 셀의 활성 옵션 저장 중(43) → 체크박스 잠금. */
-  optionBusy: boolean;
-  onToggleOption: (optionId: number) => void;
   /** 옵션 행 [수정] — 지금은 「상품 기본 정보 > 옵션」의 그 옵션으로 보낸다(추후 옵션 상세 페이지). */
   onEditMasterOption: (masterOptionId: number) => void;
   onSaved: () => void;
@@ -74,8 +72,9 @@ interface ListingDetailPanelProps {
  * - 노출상품명: [수정] 으로 조회↔편집(빈값 저장 불가). 로컬 저장뿐 — 마켓 반영은 [수정 요청].
  * - 등록상품명(67/68): 채널 활성옵션 기준 자동값 → 읽기 전용.
  * - 옵션 표: 옵션명 / 가격 / 재고 / 옵션 ID / [수정]. 🔴 **옵션·가격·재고를 보여주는 곳은 여기 한 곳**이다
- *   (예전 매트릭스 「판매가」 열은 없앴다). 체크박스 = 이 채널에서 마켓에 보낼지(43), 미사용 옵션은 흐리게.
- *   마켓에 올라간 옵션은 끌 수 없다(🔒, 87). [수정]은 옵션을 편집하지 않고 편집 지점으로 보낸다(2609_61/D7).
+ *   (예전 매트릭스 「판매가」 열은 없앴다). 🔴 사용/미사용 체크 칸은 없다(2609_77/D57) — 올릴 옵션은
+ *   [쿠팡에 올리기] 확인창·[⋯ > 올릴 옵션 고르기] 한 창에서만 고르고, 여기는 미사용 옵션을 흐리게 +
+ *   「(미사용)」 으로만 보여준다. [수정]은 옵션을 편집하지 않고 편집 지점으로 보낸다(2609_61/D7).
  *   옵션 ID 가 비어 있고 판매상품이 쿠팡에 올라가 있으면 그 칸에 [쿠팡 옵션 연결]이 뜬다(2609_74/D13).
  * - 태그: 채널 raw 태그(33). 현재값은 매트릭스가 이미 받은 `generated[].tags`(추가 호출 없음).
  *
@@ -90,8 +89,6 @@ export function ListingDetailPanel({
   onMarket,
   options,
   optionsLoading,
-  optionBusy,
-  onToggleOption,
   onEditMasterOption,
   onSaved,
   thumbnail,
@@ -228,7 +225,6 @@ export function ListingDetailPanel({
           <table className="w-full table-fixed text-xs">
             <thead className="border-b border-gray-200 bg-gray-100 text-left text-gray-600">
               <tr>
-                {isAdmin && <th className="w-8 px-2 py-1.5" aria-label="사용" />}
                 <th className="px-2 py-1.5 font-medium">옵션명</th>
                 <th className="w-28 px-2 py-1.5 text-right font-medium">가격</th>
                 <th className="w-16 px-2 py-1.5 text-right font-medium">재고</th>
@@ -241,29 +237,6 @@ export function ListingDetailPanel({
                 const dim = o.active ? '' : 'text-gray-400';
                 return (
                   <tr key={o.optionId} className="border-t border-gray-100">
-                    {isAdmin && (
-                      <td className="px-2 py-1.5">
-                        {/* 툴팁은 label 에 — disabled input 은 hover 이벤트를 쏘지 않는다. */}
-                        <label
-                          className="flex items-center gap-0.5"
-                          title={
-                            o.lockedOff
-                              ? `${MARKET_OPTION_LOCK_REASON} 판매를 멈추려면 쿠팡 WING 에서 처리하세요.`
-                              : o.active
-                                ? '마켓에 보내는 옵션'
-                                : '이 채널에서 쓰지 않는 옵션'
-                          }
-                        >
-                          <input
-                            type="checkbox"
-                            checked={o.active}
-                            disabled={optionBusy || o.lockedOff}
-                            onChange={() => onToggleOption(o.optionId)}
-                          />
-                          {o.lockedOff && <span className="text-[10px] text-gray-400">🔒</span>}
-                        </label>
-                      </td>
-                    )}
                     <td className={`truncate px-2 py-1.5 ${o.active ? 'text-gray-900' : dim}`} title={o.name}>
                       {o.name}
                       {!o.active && <span className="ml-1 text-[10px]">(미사용)</span>}

@@ -169,7 +169,7 @@ export function ChannelPriceModal({
           )}
           {result.skipped.length > 0 && (
             <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
-              아직 마켓에 없는 옵션은 저장만 했습니다: {result.skipped.join(', ')}. [마켓 등록] 시
+              아직 마켓에 없는 옵션은 저장만 했습니다: {result.skipped.join(', ')}. [쿠팡에 올리기] 시
               이 가격으로 올라갑니다.
             </p>
           )}
