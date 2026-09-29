@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
+import { Button } from '@/presentation/components/ui/Button';
 import { ROUTES } from '@/config/routes';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
@@ -63,6 +64,8 @@ export function MasterProductCreateContainer() {
     [],
   );
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
+  // 2609_78/D50·D52: [상품 관계 한눈에 보기] — 기본은 가운데(폼)만, 누르면 왼쪽 물품 패널이 열린다.
+  const [overviewOpen, setOverviewOpen] = useState(false);
 
   const handleCreated = useCallback(
     (masterId: number) => {
@@ -88,7 +91,19 @@ export function MasterProductCreateContainer() {
   }, [router]);
 
   return (
-    <PageContainer title="판매 상품 관리 마스터">
+    <PageContainer
+      title="판매 상품 관리 마스터"
+      action={
+        <Button
+          size="sm"
+          variant={overviewOpen ? 'primary' : 'secondary'}
+          aria-pressed={overviewOpen}
+          onClick={() => setOverviewOpen((open) => !open)}
+        >
+          상품 관계 한눈에 보기
+        </Button>
+      }
+    >
       <MasterProductCreateForm
         useCase={useCase}
         productsUseCase={productsUseCase}
@@ -99,6 +114,7 @@ export function MasterProductCreateContainer() {
         productImageUseCase={productImageUseCase}
         categoryUseCase={categoryUseCase}
         initialProductIds={initialProductIds}
+        overviewOpen={overviewOpen}
         onCreated={handleCreated}
         onCreatedWithWarning={handleCreatedWithWarning}
         onCancel={handleCancel}
