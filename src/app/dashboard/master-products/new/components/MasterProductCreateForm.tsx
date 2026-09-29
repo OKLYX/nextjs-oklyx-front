@@ -45,6 +45,8 @@ import { deriveMasterImageFields } from '../../components/masterImageFields';
 import { commitMasterImageBuffer } from '../../components/masterImageCommit';
 import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
 import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/DetailImageGroupRepositoryImpl';
+import { GetProductDetailUseCase } from '@/application/usecases/GetProductDetailUseCase';
+import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
 import { MetaPlatformTabs } from '../../[id]/components/MetaPlatformTabs';
 import {
   CategoryMetaCreateFields,
@@ -87,6 +89,11 @@ interface MasterProductCreateFormProps {
   onCancel: () => void;
   /** 후속 저장 일부가 실패해 "생성은 됐지만 미완" 인 경우. 상세로 직행시킨다. */
   onCreatedWithWarning: (masterId: number, warning: string) => void;
+  /**
+   * 처음부터 구성상품으로 골라 둘 물품 id(2609_77/D44 — 물품 등록 완료 창에서 들어올 때).
+   * 골라 두기만 한다 — [설정 적용]은 사용자가 누른다(같은 조합 중복 확인이 거기 있다).
+   */
+  initialProductId?: number;
 }
 
 /**
@@ -120,10 +127,16 @@ export function MasterProductCreateForm({
   onCreated,
   onCancel,
   onCreatedWithWarning,
+  initialProductId,
 }: MasterProductCreateFormProps) {
   // 이미지 그룹 카탈로그(공용 목록)는 이 모달이 직접 만든다 — 부모 props 계약을 넓히지 않는다.
   const groupUseCase = useMemo(
     () => new DetailImageGroupUseCase(new DetailImageGroupRepositoryImpl()),
+    [],
+  );
+  // 2609_77/D44: 골라 둘 물품이 첫 1000개 목록 밖이면 단건으로 가져온다(부모 props 계약은 넓히지 않는다).
+  const productDetailUseCase = useMemo(
+    () => new GetProductDetailUseCase(new ProductRepositoryImpl()),
     [],
   );
   const [name, setName] = useState('');
@@ -404,7 +417,21 @@ export function MasterProductCreateForm({
           packageUseCase.getPackages('PURCHASED'),
         ]);
         if (!alive) return;
-        setProducts(prod.content);
+        // 2609_77/D44: 물품 등록 완료 창에서 들어왔으면 그 물품을 구성상품으로 골라 둔다.
+        // 🔴 목록은 첫 1000개뿐이라 방금 만든 물품이 없을 수 있다 → 없으면 단건 조회로 앞에 붙인다.
+        let productList = prod.content;
+        if (initialProductId != null && !productList.some((p) => p.id === initialProductId)) {
+          try {
+            productList = [await productDetailUseCase.getProduct(initialProductId), ...productList];
+          } catch {
+            // 못 가져오면 골라 두지 않는다 — 빈 폼으로 시작한다.
+          }
+          if (!alive) return;
+        }
+        setProducts(productList);
+        if (initialProductId != null && productList.some((p) => p.id === initialProductId)) {
+          setSelectedIds([initialProductId]);
+        }
         setCarrierRates(rates);
         setPackages(boxes);
         // 기본 택배/상자 프리셀렉트(83B): isDefault 항목이 있으면 초기 선택값. 없으면 미선택으로 두고
@@ -426,7 +453,14 @@ export function MasterProductCreateForm({
     return () => {
       alive = false;
     };
-  }, [productsUseCase, carrierRateUseCase, packageUseCase, thumbnailTemplateUseCase]);
+  }, [
+    productsUseCase,
+    carrierRateUseCase,
+    packageUseCase,
+    thumbnailTemplateUseCase,
+    initialProductId,
+    productDetailUseCase,
+  ]);
 
   /**
    * [설정 적용] — 구성상품 조합을 확정한다 (2609_46).
