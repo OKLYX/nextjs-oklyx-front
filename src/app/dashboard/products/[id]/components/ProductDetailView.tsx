@@ -18,6 +18,7 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { useClipboardStore, newClipId } from '@/infrastructure/stores/clipboardStore';
 import type { ClipValues } from '@/domain/entities/ClipItem';
 import { barcodeResultText } from '@/infrastructure/utils/barcodeExtraction';
+import { MasterBasketControls } from '../../components/MasterBasketControls';
 
 interface ProductDetailViewProps {
   product: Product;
@@ -200,6 +201,11 @@ export function ProductDetailView({
           <Button variant="secondary" onClick={handlePickProduct} disabled={isPicking}>
             클립보드에 담기
           </Button>
+          {/* 2609_78/D49·D51: 마스터 바구니 — [바구니에 담기] + 「바구니 N개」(누르면 말풍선). */}
+          <MasterBasketControls
+            addTarget={{ productId: product.id, productName: product.productName }}
+            allowClear={false}
+          />
           <Button variant="secondary" onClick={handleExtractClick} disabled={isExtracting}>
             {isExtracting ? '추출 중…' : '바코드 추출'}
           </Button>
