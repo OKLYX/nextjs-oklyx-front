@@ -1263,7 +1263,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           disabled={busy}
                           className="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                         >
-                          {canRegister ? '가져오기' : '쿠팡 상품 추가'}
+                          마켓 상품 추가하기
                         </button>
                       )}
                       {/* 2609_74/D14: 마스터 연결이 끊긴 판매상품을 이 계정 범위에서 찾아 다시 붙인다. */}

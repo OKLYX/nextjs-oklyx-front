@@ -71,6 +71,16 @@ export interface MasterProductByComponents {
   optionCount: number;
 }
 
+/**
+ * 고른 물품이 **하나라도** 들어간 마스터 + 그 마스터의 구성상품 조합 (2609_79 / UX D74·D79).
+ * `GET /api/admin/master-products/by-any-component?productIds=` 응답 한 줄.
+ */
+export interface MasterProductByAnyComponent {
+  id: number;
+  name: string;
+  components: { productId: number; productName: string }[];
+}
+
 // Tags PATCH body, shared by master pool and channel raw endpoints.
 export interface TagsUpdateRequest {
   tags: string[];

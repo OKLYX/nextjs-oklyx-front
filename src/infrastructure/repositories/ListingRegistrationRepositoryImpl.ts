@@ -35,8 +35,6 @@ import type {
   ListingStatusOption,
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
-  MasterFromChannelRequest,
-  MasterFromChannelResult,
   ChannelApplyOptionNamesResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
@@ -306,11 +304,6 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     body: MasterFromChannelPreviewRequest,
   ): Promise<MasterFromChannelPreview> {
     const response = await axiosInstance.post(`${masterBase}/from-channel/preview`, body);
-    return response.data.data;
-  }
-
-  async createMasterFromChannel(body: MasterFromChannelRequest): Promise<MasterFromChannelResult> {
-    const response = await axiosInstance.post(`${masterBase}/from-channel`, body);
     return response.data.data;
   }
 }

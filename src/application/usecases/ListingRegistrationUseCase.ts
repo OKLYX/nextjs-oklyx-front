@@ -32,8 +32,6 @@ import type {
   ListingStatusOption,
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
-  MasterFromChannelRequest,
-  MasterFromChannelResult,
   ChannelApplyOptionNamesResponse,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
@@ -226,9 +224,5 @@ export class ListingRegistrationUseCase {
     body: MasterFromChannelPreviewRequest,
   ): Promise<MasterFromChannelPreview> {
     return this.repository.masterFromChannelPreview(body);
-  }
-
-  createMasterFromChannel(body: MasterFromChannelRequest): Promise<MasterFromChannelResult> {
-    return this.repository.createMasterFromChannel(body);
   }
 }
