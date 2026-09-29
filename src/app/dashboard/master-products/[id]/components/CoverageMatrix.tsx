@@ -13,6 +13,10 @@ import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegist
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 import { ShippingRepositoryImpl } from '@/infrastructure/repositories/ShippingRepositoryImpl';
+import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAccountUseCase';
+import { MarketplaceAccountRepositoryImpl } from '@/infrastructure/repositories/MarketplaceAccountRepositoryImpl';
+import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
+import { ShippingConfigModal } from '@/app/dashboard/sellers/list/components/ShippingConfigModal';
 import { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
 import { CarrierRateRepositoryImpl } from '@/infrastructure/repositories/CarrierRateRepositoryImpl';
 import { PackageUseCase } from '@/application/usecases/PackageUseCase';
@@ -173,6 +177,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // Shipping lookup (outbound/return) for the channel override modal — parent-owned,
   // injected into CellActions (never created inside the modal).
   const shippingUseCase = useMemo(() => new ShippingUseCase(new ShippingRepositoryImpl()), []);
+  // 2609_77/S6: 막힌 계정의 [배송 설정하기] — 배송관리 창이 받을 계정 객체를 판매자 계정 목록에서 찾는다.
+  const marketplaceUseCase = useMemo(
+    () => new MarketplaceAccountUseCase(new MarketplaceAccountRepositoryImpl()),
+    [],
+  );
   // Carrier/box candidates + template fields for the inline detail panels (83A) — parent-owned and
   // injected, so a panel never re-fetches what this container already holds.
   const carrierRateUseCase = useMemo(
@@ -240,6 +249,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // ⚠️ This checks 출고지·반품지 only; the authority on *market* registerability stays the backend
   // `shippingReady` (78 guard on the cell). Do not grow this into a client-side ShippingReadiness mirror.
   const [placesUnset, setPlacesUnset] = useState<Record<number, boolean>>({});
+  // 2609_77/S6: 열려 있는 배송관리 창의 계정(null = 닫힘) · 그 계정을 불러오는 중인 계정 줄.
+  const [shippingAccount, setShippingAccount] = useState<MarketplaceAccount | null>(null);
+  const [shippingLoadingId, setShippingLoadingId] = useState<number | null>(null);
   const [preview, setPreview] = useState<ChannelPreviewData | null>(null);
 
   // Open the tabbed preview modal for a channel cell, on the given initial tab.
@@ -719,6 +731,25 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       toast.error(extractErrorMessage(e, '판매상품 줄을 만들지 못했습니다.'));
     } finally {
       setRowBusyId(null);
+    }
+  };
+
+  // 2609_77/S6: 출고지·반품지가 없어 막힌 계정 → 그 계정의 배송관리 창(판매자 화면의 기존 창)을 여기서 연다.
+  // 창은 계정 객체를 받으므로 그 판매자의 계정 목록에서 찾는다(계정 단건 조회 API 는 없다).
+  const openShippingConfig = async (accountId: number, sellerId: number) => {
+    setShippingLoadingId(accountId);
+    try {
+      const accounts = await marketplaceUseCase.getBySeller(sellerId);
+      const account = accounts.find((a) => a.id === accountId);
+      if (!account) {
+        toast.error('판매채널 정보를 찾지 못했습니다.');
+        return;
+      }
+      setShippingAccount(account);
+    } catch (e: unknown) {
+      toast.error(extractErrorMessage(e, '판매채널 정보를 불러오지 못했습니다.'));
+    } finally {
+      setShippingLoadingId(null);
     }
   };
 
@@ -1206,9 +1237,24 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       )}
                     </div>
                     {isAdmin && canRegister && isShippingBlocked(row.accountId) && (
-                      <p className="basis-full text-[11px] text-amber-700" title={SHIPPING_BLOCK_REASON}>
-                        배송 설정 필요 — 판매채널 관리 &gt; 배송관리에서 출고지·반품지를 먼저 지정하세요.
-                      </p>
+                      <div className="flex basis-full flex-wrap items-center gap-2">
+                        <p className="text-[11px] text-amber-700" title={SHIPPING_BLOCK_REASON}>
+                          배송 설정 필요 — 판매채널 관리 &gt; 배송관리에서 출고지·반품지를 먼저 지정하세요.
+                        </p>
+                        {/* 2609_77/S6: 다른 메뉴로 가지 않고 이 계정의 배송관리 창을 바로 연다. */}
+                        <button
+                          type="button"
+                          onClick={() => openShippingConfig(row.accountId, row.sellerId)}
+                          disabled={shippingLoadingId !== null}
+                          className="rounded border border-amber-300 bg-white px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                        >
+                          {shippingLoadingId === row.accountId ? (
+                            <Spinner size={10} label="여는 중" />
+                          ) : (
+                            '배송 설정하기'
+                          )}
+                        </button>
+                      </div>
                     )}
                   </div>
                   {rowCells.map((cell) => (
@@ -1458,6 +1504,18 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           onDone={handleImportDone}
         />
       )}
+
+      {/* 2609_77/S6: 판매자 화면의 배송관리 창을 그대로 쓴다. 저장·취소 모두 onClose 로 끝나므로
+          닫힐 때마다 다시 읽는다 — 출고지·반품지가 채워졌으면 [쿠팡에 올리기] 막힘이 풀린다. */}
+      <ShippingConfigModal
+        isOpen={shippingAccount !== null}
+        account={shippingAccount}
+        useCase={shippingUseCase}
+        onClose={() => {
+          setShippingAccount(null);
+          void load();
+        }}
+      />
 
       <ChannelPreviewModal data={preview} onClose={() => setPreview(null)} />
     </PageContainer>

@@ -157,6 +157,8 @@ export function CellActions({
   const [showOptionPicker, setShowOptionPicker] = useState(false);
   // 2609_74/D15: 「마스터 옵션명 반영」 확인창.
   const [showApplyNames, setShowApplyNames] = useState(false);
+  // 2609_77/S10: [수정 요청] 확인창(공용 ConfirmDialog — 예전엔 브라우저 기본 확인창이었다).
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   // 2609_63: boolean 이 아니라 **대상 셀**을 담는다 — 한 계정에 셀이 여럿일 수 있어(D10-1)
   // "열려 있다"만으로는 어느 셀을 떼는지 알 수 없다.
   const [unlinkTarget, setUnlinkTarget] = useState<CellRef | null>(null);
@@ -203,18 +205,19 @@ export function CellActions({
       onReload();
     });
 
-  // Forced re-push of an already-registered cell (109).
+  // Forced re-push of an already-registered cell (109). 확인은 공용 확인창이 먼저 받는다(2609_77/S10).
   const handleUpdateRequest = async () => {
-    if (!window.confirm('수정한 값을 마켓에 다시 보내고 재심사를 요청합니다. 계속하시겠습니까?')) return;
     setBusy('update');
     setError('');
     setPushedBanner('');
     try {
       await useCase.updateRequest(listing.id); // response unused: the reload is the source of truth
+      setShowUpdateConfirm(false);
       setPushedBanner('승인 대기중으로 전환됨');
       setStatusResult(null); // the previous fetch-status result is stale now
       onReload();
     } catch (e) {
+      setShowUpdateConfirm(false);
       const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
       setError(msg ?? '수정 요청에 실패했습니다.');
     } finally {
@@ -376,7 +379,7 @@ export function CellActions({
       label: '동기화',
       items: [
         ...(status !== 'DRAFT' && primary !== 'update'
-          ? [{ key: 'update', label: '수정 요청', onClick: handleUpdateRequest }]
+          ? [{ key: 'update', label: '수정 요청', onClick: () => setShowUpdateConfirm(true) }]
           : []),
         // ⚠️ 반려는 막다른 길이 아니라 재확인이 가능해야 한다 → REJECTED 에도 노출.
         ...(status === 'SUBMITTED' || status === 'SELLING' || status === 'REJECTED'
@@ -467,7 +470,7 @@ export function CellActions({
         {primary === 'update' && (
           <button
             type="button"
-            onClick={handleUpdateRequest}
+            onClick={() => setShowUpdateConfirm(true)}
             disabled={busy !== null}
             className="flex items-center gap-1 rounded border border-amber-300 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
           >
@@ -628,6 +631,17 @@ export function CellActions({
           onClose={() => setShowPrice(false)}
         />
       )}
+
+      {/* 2609_77/S10: 쿠팡 반영이라 확인창을 둔다(D29). 문구는 브라우저 기본 확인창 시절 그대로. */}
+      <ConfirmDialog
+        isOpen={showUpdateConfirm}
+        title="수정 요청"
+        message="수정한 값을 마켓에 다시 보내고 재심사를 요청합니다. 계속하시겠습니까?"
+        confirmText="수정 요청"
+        onConfirm={handleUpdateRequest}
+        onCancel={() => setShowUpdateConfirm(false)}
+        isLoading={busy === 'update'}
+      />
 
       {/* 되돌릴 수 있는 조작이고 파괴가 아니라 isDangerous 를 쓰지 않는다(2609_45/D13). */}
       <ConfirmDialog
