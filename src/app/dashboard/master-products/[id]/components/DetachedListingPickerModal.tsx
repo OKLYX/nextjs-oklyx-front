@@ -32,7 +32,7 @@ const STATUS_LABEL: Record<string, string> = {
  * File: src/app/dashboard/master-products/[id]/components/DetachedListingPickerModal.tsx
  *
  * 마스터 연결이 끊긴 판매상품 중 **이 계정(판매자·플랫폼)의 것만** 보여주고, 하나를 고르면 부모가
- * 그 쿠팡 상품 ID 로 [쿠팡 상품 가져오기] 모달을 연다. 다시 붙이는 처리는 가져오기가 한다 — 이 모달은
+ * 그 쿠팡 상품 ID 로 「마켓 상품 추가하기」 창을 연다. 다시 붙이는 처리는 가져오기가 한다 — 이 모달은
  * 쿠팡 상품 ID 를 손으로 입력하는 단계를 없앨 뿐이다.
  *
  * - 열리면 바로 조회한다(검색어 없음 = 최근 20건). [검색] 은 이름 부분일치 · 쿠팡 상품 ID 완전일치.

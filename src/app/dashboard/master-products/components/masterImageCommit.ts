@@ -17,7 +17,6 @@ import type { MasterImageBuffer } from './MasterImagePool';
  *
  * **호출부**:
  *   - 마스터 생성 폼 `MasterProductCreateForm`
- *   - 플랫폼 상품 생성 폼 `MasterFromChannelForm`
  *
  * @example
  * try {

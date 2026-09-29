@@ -34,6 +34,9 @@ const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 // 옵션 잠금 안내 문구 (85). 잠금 판정은 백엔드 플래그(marketRegistered) 하나만 쓴다.
 const LOCKED_ROW_TITLE = '쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다 (이름·구성 수량은 수정 가능)';
 const LOCKED_DELETE_REASON = '쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다.';
+// 2609_79 / UX D71: 「새 마스터」(마켓 모드) — 옵션은 마켓 상품 그대로, 구성 수량만 입력한다.
+const MARKET_DELETE_REASON = '마켓 상품의 옵션이라 삭제할 수 없습니다.';
+const MARKET_ADD_REASON = '옵션은 마켓 상품 그대로 만듭니다 — 옵션을 추가할 수 없습니다.';
 const LAST_OPTION_DELETE_REASON =
   '옵션은 1개 이상 있어야 합니다. 모든 옵션을 제거하기 위해서는 마스터 상품을 삭제해야 합니다.';
 
@@ -246,6 +249,11 @@ interface MasterOptionEditorProps {
    * ⚠️ edit 모드(master 있음)에서만 의미가 있다. 생성 모드의 버퍼 옵션은 서버 id 가 없다.
    */
   focusOption?: { optionId: number; nonce: number };
+  /**
+   * 2609_79 / UX D71: 「새 마스터」(마켓 모드) 생성 폼. 옵션 추가·삭제·이름 변경을 막고, 재고는 비운 채 둔다
+   * (2609_45 D3-1 — 마켓 재고는 판매상품 옵션에만). ⚠️ create 모드에서만 의미가 있다.
+   */
+  marketLocked?: boolean;
 }
 
 /**
@@ -276,6 +284,7 @@ export function MasterOptionEditor({
   hideCategoryAttrs = false,
   onFormOpenChange,
   focusOption,
+  marketLocked = false,
 }: MasterOptionEditorProps) {
   const isEdit = master != null;
   const components = master?.components ?? propComponents ?? [];
@@ -759,9 +768,9 @@ export function MasterOptionEditor({
         name: opt.name,
         items: opt.items,
         busy: false,
-        // 생성 모드(버퍼 옵션)는 어디에도 등록돼 있지 않다 → 잠금 없음.
+        // 생성 모드(버퍼 옵션)는 어디에도 등록돼 있지 않다 → 잠금 없음. 마켓 모드만 삭제를 막는다(UX D71).
         locked: false,
-        deleteBlockedReason: undefined as string | undefined,
+        deleteBlockedReason: (marketLocked ? MARKET_DELETE_REASON : undefined) as string | undefined,
         onEdit: () => openEditBuffer(opt, index),
         onDelete: () => handleDeleteBuffer(index),
       }));
@@ -782,9 +791,11 @@ export function MasterOptionEditor({
   // Create mode requires both a component set and a category before options can be added.
   // Edit mode's master already carries a category (edited elsewhere), so only components matter.
   const categoryRequired = !isEdit;
-  const canAddOption = components.length > 0 && (!categoryRequired || categoryId != null);
-  const addBlockedReason =
-    components.length === 0
+  const canAddOption =
+    !marketLocked && components.length > 0 && (!categoryRequired || categoryId != null);
+  const addBlockedReason = marketLocked
+    ? MARKET_ADD_REASON
+    : components.length === 0
       ? '구성상품을 먼저 선택하면 옵션을 추가할 수 있습니다.'
       : '카테고리를 먼저 선택하면 옵션을 추가할 수 있습니다.';
 
@@ -920,10 +931,14 @@ export function MasterOptionEditor({
             <div className="mb-3">
               <label className="mb-1 block text-xs font-medium text-gray-600">옵션 이름 *</label>
               <input
-                className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                className="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100"
                 value={optName}
+                disabled={marketLocked}
                 onChange={(e) => setOptName(e.target.value)}
               />
+              {marketLocked && (
+                <p className="mt-1 text-[11px] text-gray-500">마켓 상품의 옵션명이라 바꿀 수 없습니다.</p>
+              )}
             </div>
             <div className="mb-3">
               <label className="mb-1 block text-xs font-medium text-gray-600">재고수량</label>
@@ -933,12 +948,15 @@ export function MasterOptionEditor({
                 min={0}
                 max={99999}
                 step={1}
-                className="w-32 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                className="w-32 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900 disabled:bg-gray-100"
                 value={optStock}
+                disabled={marketLocked}
                 onChange={(e) => setOptStock(e.target.value === '' ? '' : Number(e.target.value))}
               />
               <p className="mt-1 text-[11px] text-gray-500">
-                비우면 9999개, 0은 품절로 전송됩니다. 채널에서 더 낮게 조정할 수 있습니다.
+                {marketLocked
+                  ? '마켓 상품의 재고는 판매상품 옵션에만 들어갑니다 — 마스터 옵션 재고는 비워 둡니다.'
+                  : '비우면 9999개, 0은 품절로 전송됩니다. 채널에서 더 낮게 조정할 수 있습니다.'}
               </p>
             </div>
             <div className="space-y-2">

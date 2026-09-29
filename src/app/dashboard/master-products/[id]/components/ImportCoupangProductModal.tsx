@@ -116,7 +116,9 @@ const isPositiveInt = (raw: string) => {
 };
 
 /**
- * 쿠팡 상품 가져오기 모달 (2609_22).
+ * 「마켓 상품 추가하기」 창 (2609_22 → 2609_79 / UX D42·D78) — 이미 마켓에 있는 상품을 **기존 마스터**에 붙이는
+ * 공유 창. 여는 곳 셋: 마스터 상세 판매채널 줄 [마켓 상품 추가하기] · [미연결 판매상품 연결] ·
+ * 「마켓 상품으로 시작」 [이 마스터에 붙이기]. ❌ 여는 곳마다 창을 따로 만들지 말 것.
  * File: src/app/dashboard/master-products/[id]/components/ImportCoupangProductModal.tsx
  *
  * 이미 쿠팡에 올라가 있는 상품을 이 마스터의 채널 셀로 편입한다. 2단계 — ① 상품 ID 로 조회
@@ -257,7 +259,7 @@ export function ImportCoupangProductModal({
     <Modal
       isOpen
       onClose={onClose}
-      title="쿠팡 상품 가져오기"
+      title="마켓 상품 추가하기"
       disableClose={busy}
     >
       <p className="truncate text-xs text-gray-500">

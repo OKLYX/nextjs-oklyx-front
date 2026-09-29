@@ -7,6 +7,7 @@ import type {
   MasterProductListParams,
   MasterProductPageResponse,
   MasterProductRequest,
+  MasterProductByAnyComponent,
   MasterProductByComponents,
   MasterProductUpdateRequest,
   MasterCompositionRequest,
@@ -54,6 +55,15 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
     if (productIds.length === 0) return [];
     const response = await axiosInstance.get(`${base}/by-components`, {
       // 백엔드가 `List<Long>` 으로 받으므로 콤마 한 줄로 보낸다(axios 기본 배열 직렬화 회피).
+      params: { productIds: productIds.join(',') },
+    });
+    return response.data.data;
+  }
+
+  // 2609_79 / UX D74·D79: 고른 물품이 하나라도 들어간 마스터. findByComponents 와 같은 규칙으로 부른다.
+  async findByAnyComponent(productIds: number[]): Promise<MasterProductByAnyComponent[]> {
+    if (productIds.length === 0) return [];
+    const response = await axiosInstance.get(`${base}/by-any-component`, {
       params: { productIds: productIds.join(',') },
     });
     return response.data.data;

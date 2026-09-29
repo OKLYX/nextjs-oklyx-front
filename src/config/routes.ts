@@ -27,6 +27,7 @@ export const ROUTES = {
   MASTER_PRODUCTS: '/dashboard/master-products' as const,
   MASTER_PRODUCT_NEW: '/dashboard/master-products/new' as const,
   // 2609_45/D17: 경로·메뉴 라벨 모두 플랫폼 중립. 플랫폼 이름은 화면의 `PLATFORMS` 표에서만 나온다.
+  // 2609_79 / UX D64: 화면·메뉴 이름 = 「마켓 상품으로 시작」. 주소·상수 이름은 그대로 둔다.
   MASTER_PRODUCT_NEW_FROM_CHANNEL: '/dashboard/master-products/new-from-channel' as const,
   MASTER_PRODUCT_DETAIL: (id: number | string) => `/dashboard/master-products/${id}` as const,
   MASTER_PRODUCT_DETAIL_EDIT: (masterId: number | string, listingId: number | string) =>
