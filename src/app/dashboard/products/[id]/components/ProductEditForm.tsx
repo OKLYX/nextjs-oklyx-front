@@ -14,6 +14,7 @@ import { useClipboardStore } from '@/infrastructure/stores/clipboardStore';
 import type { ClipValues } from '@/domain/entities/ClipItem';
 import { ClipboardFillModal, CLIP_FIELD_LABELS, type ProductClip } from './ClipboardFillModal';
 import { PurchasePlaceCheckboxes } from './PurchasePlaceCheckboxes';
+import { VolumeDiagram } from './VolumeDiagram';
 import { usePurchasePlaces } from '@/presentation/hooks/usePurchasePlaces';
 
 interface ProductEditFormValues {
@@ -220,22 +221,10 @@ export function ProductEditForm({
         </Button>
       </div>
 
+      {/* 칸 배치는 등록 화면(`ProductRegistrationForm`)과 같다 — 필수(상품명) → 선택(바코드 · 브랜드/가격 ·
+          구매처 · 중량/수량 · 부피 · 설명). ⚠️ 한쪽만 바꾸지 말 것. */}
       <Card title="필수 항목">
         <div className="space-y-4">
-          <div>
-            <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
-              바코드 ID
-            </label>
-            <Input
-              id="barcodeId"
-              type="text"
-              placeholder="바코드 ID를 입력해주세요 (선택)"
-              {...register('barcodeId')}
-              onBlur={handleBarcodeBlur}
-            />
-            {barcodeError && <p className="text-red-600 text-sm mt-1">{barcodeError}</p>}
-          </div>
-
           <div>
             <label htmlFor="productName" className="block text-sm font-medium text-gray-900 mb-1">
               상품명
@@ -252,6 +241,21 @@ export function ProductEditForm({
 
       <Card title="선택 항목">
         <div className="space-y-4">
+          <div>
+            <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
+              바코드 ID
+            </label>
+            <Input
+              id="barcodeId"
+              type="text"
+              placeholder="바코드 ID를 입력해주세요 (선택)"
+              {...register('barcodeId')}
+              onBlur={handleBarcodeBlur}
+            />
+            {isCheckingBarcode && <p className="text-gray-500 text-sm mt-1">확인 중...</p>}
+            {barcodeError && <p className="text-red-600 text-sm mt-1">{barcodeError}</p>}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="brand" className="block text-sm font-medium text-gray-900 mb-1">
@@ -280,7 +284,7 @@ export function ProductEditForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div>
             <PurchasePlaceCheckboxes
               places={places}
               loading={placesLoading}
@@ -288,147 +292,156 @@ export function ProductEditForm({
               value={purchasePlaceIds}
               onChange={(ids) => setValue('purchasePlaceIds', ids, { shouldDirty: true })}
             />
+          </div>
 
-            <div>
-              <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
-                단위
-              </label>
-              {/* 내용물 양과 단위는 함께 넣거나 둘 다 비운다(서버가 400 으로 거절한다, FEATURE_2609_76 / D18).
-                  🔴 단위만 저장돼 있던 옛 물품은 이 검사에 걸린다 — 양을 넣거나 단위를 비워야 저장된다. */}
-              <select
-                id="netContentUnit"
-                {...register('netContentUnit', {
-                  validate: (value, values) => {
-                    if (values.netContent.trim() !== '' && !value.trim()) {
-                      return '내용물 양을 입력하면 단위를 함께 선택해주세요';
-                    }
-                    if (values.netContent.trim() === '' && value.trim() !== '') {
-                      return '단위를 고르면 내용물 양을 함께 입력해주세요';
-                    }
-                    return true;
-                  },
-                })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">단위 선택</option>
-                <option value="G">g</option>
-                <option value="KG">kg</option>
-                <option value="L">l</option>
-                <option value="ML">ml</option>
-              </select>
-              {errors.netContentUnit && (
-                <p className="text-red-600 text-sm mt-1">{errors.netContentUnit.message}</p>
-              )}
+          <div className="border-t border-gray-200 pt-4 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">중량 / 수량</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
+                  내용물 양
+                </label>
+                <Input
+                  id="netContent"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]+([.][0-9]+)?"
+                  placeholder="0"
+                  {...register('netContent', { deps: ['netContentUnit'] })}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="netContentUnit" className="block text-sm font-medium text-gray-900 mb-1">
+                  단위
+                </label>
+                {/* 내용물 양과 단위는 함께 넣거나 둘 다 비운다(서버가 400 으로 거절한다, FEATURE_2609_76 / D18).
+                    🔴 단위만 저장돼 있던 옛 물품은 이 검사에 걸린다 — 양을 넣거나 단위를 비워야 저장된다. */}
+                <select
+                  id="netContentUnit"
+                  {...register('netContentUnit', {
+                    validate: (value, values) => {
+                      if (values.netContent.trim() !== '' && !value.trim()) {
+                        return '내용물 양을 입력하면 단위를 함께 선택해주세요';
+                      }
+                      if (values.netContent.trim() === '' && value.trim() !== '') {
+                        return '단위를 고르면 내용물 양을 함께 입력해주세요';
+                      }
+                      return true;
+                    },
+                  })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">단위 선택</option>
+                  <option value="G">g</option>
+                  <option value="KG">kg</option>
+                  <option value="L">l</option>
+                  <option value="ML">ml</option>
+                </select>
+                {errors.netContentUnit && (
+                  <p className="text-red-600 text-sm mt-1">{errors.netContentUnit.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="countQuantity" className="block text-sm font-medium text-gray-900 mb-1">
+                  개수
+                </label>
+                <Input
+                  id="countQuantity"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  error={errors.countQuantity?.message}
+                  {...register('countQuantity', {
+                    deps: ['countUnit'],
+                    validate: (value) =>
+                      value.trim() === '' || /^[1-9][0-9]*$/.test(value.trim())
+                        ? true
+                        : '개수는 1 이상의 정수로 입력해주세요',
+                  })}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="countUnit" className="block text-sm font-medium text-gray-900 mb-1">
+                  개수 단위
+                </label>
+                {/* 개수와 개수 단위는 함께 넣거나 둘 다 비운다(D6). 무게·부피 단위와 섞지 않는다(D7). */}
+                <select
+                  id="countUnit"
+                  {...register('countUnit', {
+                    validate: (value, values) => {
+                      if (values.countQuantity.trim() !== '' && value === '') {
+                        return '개수를 입력하면 개수 단위를 함께 선택해주세요';
+                      }
+                      if (values.countQuantity.trim() === '' && value !== '') {
+                        return '개수 단위를 고르면 개수를 함께 입력해주세요';
+                      }
+                      return true;
+                    },
+                  })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">개수 단위 선택</option>
+                  {COUNT_UNITS.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unit}
+                    </option>
+                  ))}
+                </select>
+                {errors.countUnit && <p className="text-red-600 text-sm mt-1">{errors.countUnit.message}</p>}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
-                높이
-              </label>
-              <Input
-                id="packageHeight"
-                type="text"
-                placeholder="예: 160mm"
-                {...register('packageHeight')}
-              />
-            </div>
+          <div className="border-t border-gray-200 pt-4 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">부피</h3>
+            <div className="flex flex-col sm:flex-row gap-6">
+              <VolumeDiagram embedded={false} />
+              <div className="flex-1 space-y-4">
+                <div>
+                  <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
+                    너비
+                  </label>
+                  <Input
+                    id="packageWidth"
+                    type="text"
+                    placeholder="예: 8.9mm"
+                    {...register('packageWidth')}
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
-                길이
-              </label>
-              <Input
-                id="packageLength"
-                type="text"
-                placeholder="예: 75mm"
-                {...register('packageLength')}
-              />
-            </div>
-          </div>
+                <div>
+                  <label htmlFor="packageLength" className="block text-sm font-medium text-gray-900 mb-1">
+                    깊이
+                  </label>
+                  <Input
+                    id="packageLength"
+                    type="text"
+                    placeholder="예: 75mm"
+                    {...register('packageLength')}
+                  />
+                </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="packageWidth" className="block text-sm font-medium text-gray-900 mb-1">
-                너비
-              </label>
-              <Input
-                id="packageWidth"
-                type="text"
-                placeholder="예: 8.9mm"
-                {...register('packageWidth')}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
-                내용물 양
-              </label>
-              <Input
-                id="netContent"
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9]+([.][0-9]+)?"
-                placeholder="0"
-                {...register('netContent', { deps: ['netContentUnit'] })}
-              />
+                <div>
+                  <label htmlFor="packageHeight" className="block text-sm font-medium text-gray-900 mb-1">
+                    높이
+                  </label>
+                  <Input
+                    id="packageHeight"
+                    type="text"
+                    placeholder="예: 160mm"
+                    {...register('packageHeight')}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="countQuantity" className="block text-sm font-medium text-gray-900 mb-1">
-                개수
-              </label>
-              <Input
-                id="countQuantity"
-                type="text"
-                inputMode="numeric"
-                placeholder="0"
-                error={errors.countQuantity?.message}
-                {...register('countQuantity', {
-                  deps: ['countUnit'],
-                  validate: (value) =>
-                    value.trim() === '' || /^[1-9][0-9]*$/.test(value.trim())
-                      ? true
-                      : '개수는 1 이상의 정수로 입력해주세요',
-                })}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="countUnit" className="block text-sm font-medium text-gray-900 mb-1">
-                개수 단위
-              </label>
-              {/* 개수와 개수 단위는 함께 넣거나 둘 다 비운다(D6). 무게·부피 단위와 섞지 않는다(D7). */}
-              <select
-                id="countUnit"
-                {...register('countUnit', {
-                  validate: (value, values) => {
-                    if (values.countQuantity.trim() !== '' && value === '') {
-                      return '개수를 입력하면 개수 단위를 함께 선택해주세요';
-                    }
-                    if (values.countQuantity.trim() === '' && value !== '') {
-                      return '개수 단위를 고르면 개수를 함께 입력해주세요';
-                    }
-                    return true;
-                  },
-                })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">개수 단위 선택</option>
-                {COUNT_UNITS.map((unit) => (
-                  <option key={unit} value={unit}>
-                    {unit}
-                  </option>
-                ))}
-              </select>
-              {errors.countUnit && <p className="text-red-600 text-sm mt-1">{errors.countUnit.message}</p>}
-            </div>
-          </div>
-
-          <div>
+          <div className="border-t border-gray-200 pt-4">
             <label htmlFor="description" className="block text-sm font-medium text-gray-900 mb-1">
               설명
             </label>
