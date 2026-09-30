@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import type { TemplateElement, FontAsset, TemplateField } from '@/domain/entities/ThumbnailEntity';
+import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity';
 import { AngleDial } from './AngleDial';
 
 /**
@@ -16,6 +17,10 @@ interface ElementPropertyPanelProps {
   fields: TemplateField[];
   fonts: FontAsset[];
   assetNames: Record<string, string>; // storageKey → display name for fixed images
+  // Image-processing presets for the product-photo base layer (FEATURE_2609_81). Secondary data.
+  presets: ProcessingPreset[];
+  presetsLoading: boolean;
+  isBaseLayer: boolean; // true only for the FIRST productImage element (the one the backend reads)
   onChange: (patch: Partial<TemplateElement>) => void;
   onUploadFont: (file: File) => Promise<void>;
   onDelete: () => void;
@@ -30,6 +35,9 @@ export function ElementPropertyPanel({
   fields,
   fonts,
   assetNames,
+  presets,
+  presetsLoading,
+  isBaseLayer,
   onChange,
   onUploadFont,
   onDelete,
@@ -90,6 +98,29 @@ export function ElementPropertyPanel({
           </p>
         )}
       </div>
+
+      {/* Product-photo preset (FEATURE_2609_81) — base layer only; the backend ignores other elements. */}
+      {isBaseLayer && (
+        <div>
+          <span className={labelCls}>이미지 처리</span>
+          <select
+            value={element.processingPresetId != null ? String(element.processingPresetId) : ''}
+            onChange={(e) =>
+              onChange({ processingPresetId: e.target.value ? Number(e.target.value) : null })
+            }
+            disabled={presetsLoading}
+            className={inputCls}
+          >
+            <option value="">없음 (합성 안 함)</option>
+            {presets.map((p) => (
+              <option key={p.id} value={String(p.id)}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-gray-400">상품 사진에만 적용됩니다.</span>
+        </div>
+      )}
 
       {/* alignment */}
       <div className="grid grid-cols-2 gap-3">

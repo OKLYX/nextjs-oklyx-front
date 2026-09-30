@@ -55,6 +55,7 @@ export interface TemplateElement {
   outlineWidth?: number | null; // text: glyph outline width px; null/0 -> no outline
   borderColor?: string | null; // any element: region border color '#RRGGBB'; null -> no border
   borderWidth?: number | null; // any element: region border width px; null/0 -> no border
+  processingPresetId?: number | null; // image: processing preset id; the backend reads it from the FIRST productImage element only; null -> no processing
 }
 
 export interface ThumbnailTemplate {

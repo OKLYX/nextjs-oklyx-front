@@ -7,9 +7,12 @@ import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
+import { ProcessingPresetUseCase } from '@/application/usecases/ProcessingPresetUseCase';
+import { ProcessingPresetRepositoryImpl } from '@/infrastructure/repositories/ProcessingPresetRepositoryImpl';
 import type { BackgroundMode, TemplateElement, FontAsset, TemplateField, TemplateAsset } from '@/domain/entities/ThumbnailEntity';
 import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
 import type { ThumbnailTemplateRequest } from '@/application/dto/ThumbnailDTOs';
+import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity';
 import { TemplateCanvas } from './TemplateCanvas';
 import { ElementPropertyPanel } from './ElementPropertyPanel';
 import { PreviewPanel } from './PreviewPanel';
@@ -128,6 +131,7 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
   const router = useRouter();
 
   const useCase = useMemo(() => new ThumbnailTemplateUseCase(new ThumbnailTemplateRepositoryImpl()), []);
+  const presetUseCase = useMemo(() => new ProcessingPresetUseCase(new ProcessingPresetRepositoryImpl()), []);
 
   const [name, setName] = useState('');
   const [canvasWidth, setCanvasWidth] = useState(1000);
@@ -149,6 +153,9 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
   // storageKey → asset display name, so placed fixed-image elements (which only
   // store src) show a friendly name instead of the raw storage key.
   const [assetNames, setAssetNames] = useState<Record<string, string>>({});
+  // Image-processing presets for the product-photo select (secondary data — never blocks the editor).
+  const [presets, setPresets] = useState<ProcessingPreset[]>([]);
+  const [presetsLoading, setPresetsLoading] = useState(true);
 
   const [isLoading, setIsLoading] = useState(mode === 'edit');
   const [isSaving, setIsSaving] = useState(false);
@@ -190,6 +197,25 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
       active_ = false;
     };
   }, [useCase, applyAssetNames]);
+
+  // Preset list is secondary data: failure falls back to [] and never blocks the editor.
+  useEffect(() => {
+    let active_ = true;
+    (async () => {
+      setPresetsLoading(true);
+      try {
+        const list = await presetUseCase.list();
+        if (active_) setPresets(list);
+      } catch {
+        if (active_) setPresets([]);
+      } finally {
+        if (active_) setPresetsLoading(false);
+      }
+    })();
+    return () => {
+      active_ = false;
+    };
+  }, [presetUseCase]);
 
   // Load existing template in edit mode.
   useEffect(() => {
@@ -597,6 +623,9 @@ export function TemplateEditor({ mode, id }: TemplateEditorProps) {
               fields={fields}
               fonts={fonts}
               assetNames={assetNames}
+              presets={presets}
+              presetsLoading={presetsLoading}
+              isBaseLayer={selectedIndex === elements.findIndex(isProductBase)}
               onChange={(patch) => handleElementPatch(selectedIndex!, patch)}
               onUploadFont={handleUploadFont}
               onDelete={() => handleDeleteElement(selectedIndex!)}
