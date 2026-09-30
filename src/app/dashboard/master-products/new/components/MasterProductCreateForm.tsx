@@ -94,7 +94,7 @@ interface MasterProductCreateFormProps {
   productImageUseCase: ProductImageUseCase;
   // Create-mode standard-category step: miller-columns tree drilldown (browseTree).
   categoryUseCase: CategoryUseCase;
-  /** 생성 성공 시 호출 — 새 마스터 id 를 넘긴다. 완료 화면 표시는 호출부가 정한다. */
+  /** 생성 성공 시 호출 — 새 마스터 id 를 넘긴다. 다음 화면(알림 + 상세 `?overview=1`)은 호출부가 정한다. */
   onCreated: (masterId: number) => void;
   /** 폼을 떠날 때(취소). 호출부가 목록으로 보낸다. */
   onCancel: () => void;
@@ -132,8 +132,8 @@ interface MasterProductCreateFormProps {
  * 카테고리 메타 → 배송 설정 → 태그 → 이미지 풀 업로드·매핑을 순차 적용한다(각 단계 실패는 graceful
  * 배너, 롤백 없음 — 마스터는 이미 존재하므로 상세에서 이어서 채운다).
  *
- * ⚠️ 후속 단계가 실패하면 `onCreatedWithWarning` 으로 **상세 페이지에 직행**시킨다. 완료 화면의
- * 3지선다를 보여주면 안 된다 — 무엇을 마저 채워야 하는지 알 수 있는 곳이 상세뿐이다.
+ * ⚠️ 후속 단계가 실패하면 `onCreatedWithWarning` 으로 **상세 페이지에 직행**시켜 배너(`?notice=`)로 알린다 —
+ * 무엇을 마저 채워야 하는지 알 수 있는 곳이 상세뿐이다. (완료 화면은 2609_78 / UX S3 에서 없어졌다.)
  */
 export function MasterProductCreateForm({
   useCase,
