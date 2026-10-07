@@ -25,7 +25,11 @@ import {
 } from '../[id]/components/measureAttributes';
 import { deriveMeasured, derivedAxis } from '../[id]/components/netContentUnit';
 import { composeMeasureNotice, isMeasureNotice } from '../[id]/components/optionNoticeCompose';
-import { isTotalQuantityName } from '../[id]/components/optionMetaFields';
+import {
+  PER_UNIT_QUANTITY_NAME,
+  isGrandTotalQuantityName,
+  isTotalQuantityName,
+} from '../[id]/components/optionMetaFields';
 import { CategoryMetaOverrideFields } from '../[id]/components/CategoryMetaOverrideFields';
 import { computeMissingOptionRequired } from '../[id]/components/categoryMetaValidation';
 
@@ -110,7 +114,15 @@ function applyQtyToMeta(
   if (attrNames.length > 0 || injectMeasure) {
     setAttr((prev) => {
       const next = { ...prev };
-      for (const k of attrNames) next[k] = value; // 수량 속성 — 가드 없음
+      // 수량 속성 — 가드 없음. `총 수량` 만은 개당 수량 × 수량(쿠팡이 세 값을 맞춰 본다).
+      const perUnit = Number((next[PER_UNIT_QUANTITY_NAME] ?? '').trim());
+      for (const k of attrNames) {
+        next[k] = isGrandTotalQuantityName(k)
+          ? total > 0 && Number.isInteger(perUnit) && perUnit > 0
+            ? String(perUnit * total)
+            : ''
+          : value;
+      }
       if (injectMeasure) next[measureName] = measured;
       return next;
     });
@@ -603,7 +615,8 @@ export function MasterOptionEditor({
     const nextValues = { ...optAttrValues, [name]: value };
     setOptAttrValues(nextValues);
     setTouchedAttrs((prev) => (prev.has(name) ? prev : new Set([...prev, name])));
-    if (axisOfAttrName(name)) {
+    // 계량값·개당 수량이 바뀌면 파생값(계량 고시 · 총 수량)을 다시 계산한다.
+    if (axisOfAttrName(name) || name === PER_UNIT_QUANTITY_NAME) {
       applyItemQtyToMeta(sumQuantities(quantities), {
         values: nextValues,
         skipAttrs: new Set([...touchedAttrs, name]),

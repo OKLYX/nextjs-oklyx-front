@@ -63,3 +63,12 @@ export function isOptionNotice(notice: CategoryNotice): boolean {
 export function isTotalQuantityName(name: string): boolean {
   return name.includes('수량') && !name.includes('개당');
 }
+
+/**
+ * `총 수량` = 개당 수량 × 수량 (Coupang ties the three together: 12개입 × 2 → 24). It is still auto-filled and
+ * read-only (a subset of isTotalQuantityName), but from that product — not from the item-quantity sum.
+ */
+export const PER_UNIT_QUANTITY_NAME = '개당 수량';
+export function isGrandTotalQuantityName(name: string): boolean {
+  return isTotalQuantityName(name) && name.includes('총');
+}
