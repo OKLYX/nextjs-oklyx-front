@@ -66,6 +66,8 @@ export function CategoryMappingModal({
       setPickerPlatform(null);
       onChanged();
     } catch (e) {
+      // Close the picker on failure too, so the banner below is not hidden behind it (2610_05/D39).
+      setPickerPlatform(null);
       setError(extractErrorMessage(e, '매핑 저장에 실패했습니다.'));
     } finally {
       setBusyPlatform(null);

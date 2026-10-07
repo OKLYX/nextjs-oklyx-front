@@ -16,10 +16,17 @@ import { CategoryMappingRepositoryImpl } from '@/infrastructure/repositories/Cat
 import { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
 import { CategoryLookupRepositoryImpl } from '@/infrastructure/repositories/CategoryLookupRepositoryImpl';
 import { CategoryMappingModal } from './CategoryMappingModal';
+import { CategoryLookupPickerModal } from './CategoryLookupPickerModal';
 import { RenameCategoryModal } from './RenameCategoryModal';
 
 // Cap how many matches are rendered/mapping-fetched per search (the imported tree is huge).
 const RESULT_LIMIT = 50;
+
+// 2610_05/D32: a new standard category is saved only together with a platform category. Closing the
+// picker without choosing one cancels the create with the same text the backend returns for that case.
+const MAPPING_REQUIRED_MESSAGE = '플랫폼 카테고리를 함께 선택해야 합니다.';
+
+type PlatformCategoryPick = { platformCategoryId: string; name: string; namePath: string };
 
 /**
  * 표준 카테고리 관리 컨테이너.
@@ -59,6 +66,12 @@ export function CategoryContainer() {
   const [mappingTarget, setMappingTarget] = useState<Category | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // 2610_05/D32: the Coupang picker opened by a tree add; the ref holds the create waiting for the pick.
+  const [isCreatePickerOpen, setIsCreatePickerOpen] = useState(false);
+  const pendingPickRef = useRef<{
+    resolve: (sel: PlatformCategoryPick) => void;
+    reject: (e: Error) => void;
+  } | null>(null);
 
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
   const mappingUseCase = useMemo(
@@ -209,17 +222,50 @@ export function CategoryContainer() {
     if (hasSearched) await runSearch(committedQuery);
   }, [hasSearched, committedQuery, runSearch]);
 
-  // Create a category under a tree column's parent (or root). Backend 55 accepts { name, parentId }.
+  // Open the Coupang picker and wait for the choice (2610_05/D32). Resolves with the picked platform
+  // category; rejects with MAPPING_REQUIRED_MESSAGE when the picker is closed without one.
+  const pickPlatformCategory = useCallback(
+    () =>
+      new Promise<PlatformCategoryPick>((resolve, reject) => {
+        pendingPickRef.current = { resolve, reject };
+        setIsCreatePickerOpen(true);
+      }),
+    []
+  );
+
+  const handleCreatePickerSelect = (sel: PlatformCategoryPick) => {
+    pendingPickRef.current?.resolve(sel);
+    pendingPickRef.current = null;
+    setIsCreatePickerOpen(false);
+  };
+
+  const handleCreatePickerClose = () => {
+    pendingPickRef.current?.reject(new Error(MAPPING_REQUIRED_MESSAGE));
+    pendingPickRef.current = null;
+    setIsCreatePickerOpen(false);
+  };
+
+  // Create a category under a tree column's parent (or root): pick its Coupang category first, then
+  // send { name, parentId, mapping } in one request — the backend saves both together (2610_05/D32).
   // The tree refreshes its own affected column; here we only invalidate the search cache (and
   // re-run the last search so the list reflects the new node). Throws on failure → tree shows it.
   const handleCreateInTree = useCallback(
     async (parentId: number | undefined, name: string) => {
       setError('');
-      await categoryUseCase.createCategory({ name, parentId: parentId ?? null });
+      const sel = await pickPlatformCategory();
+      await categoryUseCase.createCategory({
+        name,
+        parentId: parentId ?? null,
+        mapping: {
+          platform: 'COUPANG',
+          platformCategoryId: sel.platformCategoryId,
+          platformCategoryName: sel.namePath || sel.name,
+        },
+      });
       allCategoriesRef.current = null;
       if (hasSearched) await runSearch(committedQuery);
     },
-    [categoryUseCase, hasSearched, committedQuery, runSearch]
+    [categoryUseCase, hasSearched, committedQuery, runSearch, pickPlatformCategory]
   );
 
   const handleRename = async (name: string) => {
@@ -430,6 +476,16 @@ export function CategoryContainer() {
           lookupUseCase={lookupUseCase}
           onChanged={() => void reloadMappings(mappingTarget.id)}
           onClose={() => setMappingTarget(null)}
+        />
+      )}
+
+      {isCreatePickerOpen && (
+        <CategoryLookupPickerModal
+          open={isCreatePickerOpen}
+          platform="COUPANG"
+          lookupUseCase={lookupUseCase}
+          onSelect={handleCreatePickerSelect}
+          onClose={handleCreatePickerClose}
         />
       )}
 
