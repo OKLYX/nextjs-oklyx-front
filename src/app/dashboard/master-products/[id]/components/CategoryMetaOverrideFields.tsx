@@ -41,6 +41,20 @@ interface CategoryMetaOverrideFieldsProps {
 // One attribute cell in the grid: a weight/volume pair (택1) or a single attribute.
 type AttrCell = { kind: 'pair'; p: MeasurePair } | { kind: 'single'; a: CategoryAttribute };
 
+// Help text for quantity attributes whose meaning is easy to mix up. Keyed by the exact Coupang
+// attribute name; `총 수량` shares the `수량` text (both are filled from the item quantities).
+const QUANTITY_HELP: Record<string, { body: string; example: string }> = {
+  '개당 수량': {
+    body: '포장 1개(1봉·1박스) 안에 들어 있는 낱개 수입니다. 묶음으로 몇 개를 파는지가 아닙니다.',
+    example: '예) 티백 20개입 1박스 → 20 · 낱개 포장 1개 → 1',
+  },
+  수량: {
+    body: '이 옵션으로 고객이 받는 포장 개수입니다. 위 구성상품 수량의 합으로 자동 계산됩니다.',
+    example: '예) 20개입 박스 2개 묶음 → 수량 2, 개당 수량 20',
+  },
+};
+const helpOf = (name: string) => QUANTITY_HELP[name] ?? (name === '총 수량' ? QUANTITY_HELP['수량'] : undefined);
+
 /**
  * 옵션별 카테고리 필수 항목 입력 — 프레젠테이션 (렌더 전용).
  * File: src/app/dashboard/master-products/[id]/components/CategoryMetaOverrideFields.tsx
@@ -80,6 +94,8 @@ export function CategoryMetaOverrideFields({
   const [amountDraft, setAmountDraft] = useState<Record<string, string>>({});
   // 상세입력: 기본은 카테고리 필수(MANDATORY) 항목만, 체크하면 선택 항목(옵션 속성·고시)까지 노출.
   const [showAll, setShowAll] = useState(false);
+  // Which attribute's help line is open (inline text under the label, not a popup).
+  const [openHelp, setOpenHelp] = useState<string | null>(null);
 
   // Only option-owned fields (용량/중량/수량). Filter attributes before pairing so pairs
   // and singles both come from the option layer. hideCategoryAttrs → 속성부 전체 숨김(빈 목록).
@@ -154,7 +170,7 @@ export function CategoryMetaOverrideFields({
       return (
         <input
           type="text"
-          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+          className="w-full min-w-0 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
           title="숫자와 단위로 나눌 수 없는 값입니다. 숫자만 남기면 단위를 선택할 수 있습니다."
           value={raw}
           onChange={(e) => onAttrChange(name, e.target.value)}
@@ -173,7 +189,7 @@ export function CategoryMetaOverrideFields({
         <input
           type="text"
           inputMode="decimal"
-          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+          className="w-full min-w-0 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
           placeholder="숫자만 (예: 200, 23.9)"
           value={shownAmount}
           onChange={(e) => {
@@ -213,7 +229,7 @@ export function CategoryMetaOverrideFields({
       // `g` 를 보이면 거짓 안내).
       const activeAttr = unit === '용량' ? p.volume : unit === '중량' ? p.weight : undefined;
       return (
-        <div key={`p-${p.base}`} className="flex flex-col">
+        <div key={`p-${p.base}`} className="flex min-w-0 flex-col sm:col-span-2">
           <label className="mb-1 block text-xs font-medium text-gray-600">
             {p.base || '중량/용량'}
             {isPairRequired(p) && <span className="text-red-600"> *</span>}
@@ -251,8 +267,10 @@ export function CategoryMetaOverrideFields({
     // (위 구성상품 수량 칸에서만 바꾼다). 판정은 자동채움과 **같은 술어**(isTotalQuantityName) —
     // 갈라지면 "잠겼는데 아무도 안 채우는" 칸이 생긴다. ⚠️ `개당 수량` 은 도출 불가라 제외된다.
     const autoQty = isTotalQuantityName(a.name);
+    const help = helpOf(a.name);
+    const helpOpen = openHelp === a.name;
     return (
-      <div key={`a-${a.name}`} className="flex flex-col">
+      <div key={`a-${a.name}`} className="flex min-w-0 flex-col">
         <label className="mb-1 block text-xs font-medium text-gray-600">
           {a.name}
           {unitSuffix(a) && <span className="ml-1 font-normal text-gray-400">{unitSuffix(a)}</span>}
@@ -260,7 +278,25 @@ export function CategoryMetaOverrideFields({
           {autoQty && (
             <span className="ml-1 font-normal text-gray-400">(구성상품 수량에서 자동)</span>
           )}
+          {help && (
+            <button
+              type="button"
+              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 align-middle text-[10px] leading-none text-gray-500 hover:bg-gray-100"
+              aria-label={`${a.name} 설명`}
+              aria-expanded={helpOpen}
+              onClick={() => setOpenHelp(helpOpen ? null : a.name)}
+            >
+              ?
+            </button>
+          )}
         </label>
+        {help && helpOpen && (
+          <p className="mb-1 rounded bg-gray-50 px-2 py-1.5 text-[11px] leading-relaxed text-gray-600">
+            {help.body}
+            <br />
+            <span className="text-gray-500">{help.example}</span>
+          </p>
+        )}
         {a.inputType === 'SELECT' ? (
           <select
             className="mt-auto w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
