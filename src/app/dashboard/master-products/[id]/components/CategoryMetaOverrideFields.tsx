@@ -94,8 +94,6 @@ export function CategoryMetaOverrideFields({
   const [amountDraft, setAmountDraft] = useState<Record<string, string>>({});
   // 상세입력: 기본은 카테고리 필수(MANDATORY) 항목만, 체크하면 선택 항목(옵션 속성·고시)까지 노출.
   const [showAll, setShowAll] = useState(false);
-  // Which attribute's help line is open (inline text under the label, not a popup).
-  const [openHelp, setOpenHelp] = useState<string | null>(null);
 
   // Only option-owned fields (용량/중량/수량). Filter attributes before pairing so pairs
   // and singles both come from the option layer. hideCategoryAttrs → 속성부 전체 숨김(빈 목록).
@@ -229,7 +227,7 @@ export function CategoryMetaOverrideFields({
       // `g` 를 보이면 거짓 안내).
       const activeAttr = unit === '용량' ? p.volume : unit === '중량' ? p.weight : undefined;
       return (
-        <div key={`p-${p.base}`} className="flex min-w-0 flex-col sm:col-span-2">
+        <div key={`p-${p.base}`} className="flex min-w-0 flex-col @sm:col-span-2">
           <label className="mb-1 block text-xs font-medium text-gray-600">
             {p.base || '중량/용량'}
             {isPairRequired(p) && <span className="text-red-600"> *</span>}
@@ -268,7 +266,6 @@ export function CategoryMetaOverrideFields({
     // 갈라지면 "잠겼는데 아무도 안 채우는" 칸이 생긴다. ⚠️ `개당 수량` 은 도출 불가라 제외된다.
     const autoQty = isTotalQuantityName(a.name);
     const help = helpOf(a.name);
-    const helpOpen = openHelp === a.name;
     return (
       <div key={`a-${a.name}`} className="flex min-w-0 flex-col">
         <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -279,24 +276,27 @@ export function CategoryMetaOverrideFields({
             <span className="ml-1 font-normal text-gray-400">(구성상품 수량에서 자동)</span>
           )}
           {help && (
-            <button
-              type="button"
-              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 align-middle text-[10px] leading-none text-gray-500 hover:bg-gray-100"
-              aria-label={`${a.name} 설명`}
-              aria-expanded={helpOpen}
-              onClick={() => setOpenHelp(helpOpen ? null : a.name)}
-            >
-              ?
-            </button>
+            // Floating help: shown on hover or while the button has focus (tap on touch screens),
+            // so the input below never moves. Absolute box, not a popup — no backdrop or z-50.
+            <span className="group relative ml-1 inline-block align-middle">
+              <button
+                type="button"
+                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-[10px] leading-none text-gray-500 hover:bg-gray-100"
+                aria-label={`${a.name} 설명`}
+              >
+                ?
+              </button>
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-0 top-5 z-20 hidden w-64 rounded bg-gray-800 px-2.5 py-2 text-[11px] font-normal leading-relaxed text-white shadow-lg group-hover:block group-focus-within:block"
+              >
+                {help.body}
+                <br />
+                <span className="text-gray-300">{help.example}</span>
+              </span>
+            </span>
           )}
         </label>
-        {help && helpOpen && (
-          <p className="mb-1 rounded bg-gray-50 px-2 py-1.5 text-[11px] leading-relaxed text-gray-600">
-            {help.body}
-            <br />
-            <span className="text-gray-500">{help.example}</span>
-          </p>
-        )}
         {a.inputType === 'SELECT' ? (
           <select
             className="mt-auto w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
@@ -335,7 +335,9 @@ export function CategoryMetaOverrideFields({
   };
 
   return (
-    <div className="space-y-4">
+    // `@container`: columns follow this block's own width, not the viewport — the relation panel or the
+    // half-width option editor narrow it while the viewport stays wide.
+    <div className="@container space-y-4">
       {/* 선택 채널이 속성을 요구하지 않으면(혼합구성) 속성 그리드 대신 안내만(값은 보존). */}
       {hideCategoryAttrs && (
         <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-500">
@@ -361,7 +363,7 @@ export function CategoryMetaOverrideFields({
 
       {/* 필수속성(개당 용량/중량·수량) — 상단 그리드. 셀은 flex-col + mt-auto 로 input 하단 정렬. */}
       {requiredCells.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @2xl:grid-cols-3">
           {requiredCells.map(renderAttrCell)}
         </div>
       )}
@@ -370,7 +372,7 @@ export function CategoryMetaOverrideFields({
       {optionalCells.length > 0 && (
         <div className="border-t border-gray-100 pt-3">
           <p className="mb-2 text-[11px] text-gray-400">상세 항목 (선택)</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @2xl:grid-cols-3">
             {optionalCells.map(renderAttrCell)}
           </div>
         </div>
@@ -380,7 +382,7 @@ export function CategoryMetaOverrideFields({
       {hasNoticeFields && (
         <div className="border-t border-gray-100 pt-3">
           <p className="mb-2 text-xs text-gray-500">상품정보제공고시 (옵션 소유)</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @2xl:grid-cols-3">
             {visibleNoticeFields.map((n) => {
               const auto = autoMeasureNotice && isMeasureNotice(n.key);
               return (
