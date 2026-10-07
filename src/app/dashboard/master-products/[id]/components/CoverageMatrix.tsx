@@ -870,6 +870,24 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     setGenerated((prev) => ({ ...prev, [listingId]: updated }));
   };
 
+  // Display name saved from the upload dialog: patch just that cell's name in
+  // place (cell + cells together) — a full load() would unmount the rows and close the dialog.
+  const handleNameSaved = (listingId: number, name: string) => {
+    const patch = (c: MatrixCell): MatrixCell => (c.productListingId === listingId ? { ...c, name } : c);
+    setMatrix((prev) =>
+      prev
+        ? {
+            ...prev,
+            rows: prev.rows.map((r) => ({
+              ...r,
+              cell: r.cell ? patch(r.cell) : r.cell,
+              cells: r.cells ? r.cells.map(patch) : r.cells,
+            })),
+          }
+        : prev,
+    );
+  };
+
   const busy = isBatchAdding || rowBusyId !== null;
 
   // 조치가 필요한 계정이 먼저(있다/없다 두 무리, 무리 안은 응답 순서).
@@ -1322,6 +1340,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       platform={row.platform}
                       onEditMasterOption={handleEditMasterOption}
                       onReload={load}
+                      onNameSaved={handleNameSaved}
                       onPreview={openPreview}
                       shippingUseCase={shippingUseCase}
                       onShippingSaved={handleShippingSaved}
@@ -1534,6 +1553,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           mode="upload"
           listingId={uploadTarget.listingId}
           channelLabel={uploadTarget.channelLabel}
+          displayName={
+            matrix?.rows
+              .flatMap(rowCellsOf)
+              .find((c) => c.productListingId === uploadTarget.listingId)?.name ?? ''
+          }
+          onNameSaved={(name) => handleNameSaved(uploadTarget.listingId, name)}
           onClose={() => {
             setUploadTarget(null);
             // D43 대가: 취소해도 만든 줄은 「미전송」으로 남는다 — 사라진 게 아님을 알린다.

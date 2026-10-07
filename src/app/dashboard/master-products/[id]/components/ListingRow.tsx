@@ -119,6 +119,7 @@ interface ListingRowProps {
   platform: string;
   onEditMasterOption: (masterOptionId: number) => void;
   onReload: () => void;
+  onNameSaved: (listingId: number, name: string) => void;
   onPreview: (
     gen: GeneratedProductResponse | null,
     title: string,
@@ -155,6 +156,7 @@ export function ListingRow({
   platform,
   onEditMasterOption,
   onReload,
+  onNameSaved,
   onPreview,
   shippingUseCase,
   onShippingSaved,
@@ -299,9 +301,10 @@ export function ListingRow({
         {isAdmin && (
           <CellActions
             masterId={masterId}
-            listing={{ id: listingId, status }}
+            listing={{ id: listingId, status, name: cell.name }}
             options={masterOptions}
             onReload={onReload}
+            onNameSaved={(name) => onNameSaved(listingId, name)}
             accountId={accountId}
             platform={platform}
             channelLabel={channelLabel}
