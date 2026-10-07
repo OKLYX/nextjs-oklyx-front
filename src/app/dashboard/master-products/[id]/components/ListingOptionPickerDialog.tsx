@@ -23,6 +23,14 @@ interface ListingOptionPickerDialogProps {
   listingId: number;
   /** 제목 꼬리표(`판매자 · 플랫폼[ · 상품ID]`). */
   channelLabel: string;
+  /** Upload mode only: initial value of the display-name field (the listing's current name). */
+  displayName?: string;
+  /**
+   * Upload mode only: called with the saved name after a successful display-name save.
+   * The parent patches that cell's name in place. Do not call `load()` here — the loading
+   * state unmounts the listing rows, which would also close this dialog (owned by CellActions).
+   */
+  onNameSaved?: (name: string) => void;
   /** [취소] · ✕ · ESC. 아무것도 저장하지 않는다. */
   onClose: () => void;
   /** 성공한 뒤. 부모가 창을 닫고 매트릭스를 다시 읽는다. */
@@ -36,6 +44,9 @@ interface ListingOptionPickerDialogProps {
  * - upload: 옵션을 고르고 판매가를 본 뒤 [올리기] → (고른 옵션이 바뀌었으면) 활성 옵션 저장 → 쿠팡 등록.
  *   🔴 이 창이 쿠팡 반영의 확인창이다(D29) — [올리기]를 누르기 전에는 쿠팡에 아무것도 보내지 않는다.
  * - select: [저장] → 활성 옵션만 저장(쿠팡 전송 없음). 이미 올린 판매상품이면 [수정 요청]이 필요하다.
+ * - Upload mode display-name field: [저장] uses the same `updateDisplayName` path as
+ *   `ListingDetailPanel` (empty value is not saved). It is independent of [올리기]; the saved
+ *   name is what registration sends to Coupang as `displayProductName`.
  *
  * ⚠️ 옵션·판매가·마켓 잠금은 열 때 `getGenerated` 한 번으로 읽는다(두 모드 같은 경로).
  * ⚠️ 마켓에 올라간 옵션(`onMarket && active`)은 끌 수 없다 — 체크 잠금 + 🔒(87).
@@ -46,8 +57,10 @@ export function ListingOptionPickerDialog({
   mode,
   listingId,
   channelLabel,
+  displayName = '',
   onClose,
   onDone,
+  onNameSaved,
 }: ListingOptionPickerDialogProps) {
   const useCase = useMemo(
     () => new ListingRegistrationUseCase(new ListingRegistrationRepositoryImpl()),
@@ -57,6 +70,13 @@ export function ListingOptionPickerDialog({
   const [loadError, setLoadError] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
+
+  // Display name (노출상품명) — upload mode only; same save path as ListingDetailPanel.
+  const [nameDraft, setNameDraft] = useState(displayName);
+  const [savedName, setSavedName] = useState(displayName);
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState('');
+  const trimmedName = nameDraft.trim();
 
   useEffect(() => {
     let alive = true;
@@ -92,6 +112,21 @@ export function ListingOptionPickerDialog({
       else next.add(optionId);
       return next;
     });
+  };
+
+  const saveName = async () => {
+    if (!trimmedName) return;
+    setSavingName(true);
+    setNameError('');
+    try {
+      await useCase.updateDisplayName(listingId, { name: trimmedName });
+      setSavedName(trimmedName);
+      onNameSaved?.(trimmedName);
+    } catch {
+      setNameError('노출상품명 저장에 실패했습니다.');
+    } finally {
+      setSavingName(false);
+    }
   };
 
   const handleConfirm = async () => {
@@ -160,6 +195,28 @@ export function ListingOptionPickerDialog({
             ? '고른 옵션으로 쿠팡에 상품을 올립니다. 올린 뒤 승인 결과는 ⋯ 메뉴의 [승인 새로고침]으로 확인합니다.'
             : '쿠팡에 올릴 옵션을 고릅니다. 이미 쿠팡에 올린 판매상품은 저장한 뒤 [수정 요청]을 눌러야 쿠팡에 반영됩니다.'}
         </p>
+        {mode === 'upload' && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="w-16 shrink-0 text-xs font-semibold text-gray-500">노출상품명</span>
+            <input
+              type="text"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              disabled={savingName || busy}
+              aria-label="노출상품명"
+              className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+            />
+            <button
+              type="button"
+              onClick={saveName}
+              disabled={savingName || busy || !trimmedName || trimmedName === savedName}
+              className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+            >
+              {savingName ? <Spinner size={12} label="저장 중" /> : '저장'}
+            </button>
+            {nameError && <span className="basis-full text-xs text-red-600">{nameError}</span>}
+          </div>
+        )}
         {gen === null ? (
           loadError ? (
             <p className="rounded bg-red-50 px-3 py-2 text-red-700">{loadError}</p>

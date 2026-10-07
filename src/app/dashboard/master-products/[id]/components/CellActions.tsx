@@ -27,6 +27,8 @@ import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 interface CellListing {
   id: number;
   status: ListingStatus;
+  /** Display name — initial value of the name field in the upload dialog. */
+  name: string;
 }
 
 /**
@@ -42,6 +44,8 @@ interface CellActionsProps {
   listing: CellListing;
   options: MasterOptionResponse[];
   onReload: () => void;
+  /** After a display-name save: patch this cell's name in place (no reload, so the dialog stays open). */
+  onNameSaved: (name: string) => void;
   // Channel shipping override (75): the cell's account + current override for the modal.
   accountId: number;
   platform: string;
@@ -121,6 +125,7 @@ export function CellActions({
   listing,
   options,
   onReload,
+  onNameSaved,
   accountId,
   platform,
   channelLabel,
@@ -744,6 +749,8 @@ export function CellActions({
           mode="upload"
           listingId={listing.id}
           channelLabel={channelLabel}
+          displayName={listing.name}
+          onNameSaved={onNameSaved}
           onClose={() => setShowUpload(false)}
           onDone={() => {
             setShowUpload(false);
