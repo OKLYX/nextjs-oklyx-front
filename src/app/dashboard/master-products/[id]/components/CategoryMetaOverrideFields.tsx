@@ -18,7 +18,12 @@ import {
   normalizeAmount,
   splitMeasured,
 } from './netContentUnit';
-import { isOptionField, isOptionNotice, isTotalQuantityName } from './optionMetaFields';
+import {
+  isGrandTotalQuantityName,
+  isOptionField,
+  isOptionNotice,
+  isTotalQuantityName,
+} from './optionMetaFields';
 import { noticeGroupName } from './noticeTemplates';
 import { unitPlaceholder, unitSuffix } from './basicUnit';
 
@@ -52,8 +57,12 @@ const QUANTITY_HELP: Record<string, { body: string; example: string }> = {
     body: '이 옵션으로 고객이 받는 포장 개수입니다. 위 구성상품 수량의 합으로 자동 계산됩니다.',
     example: '예) 20개입 박스 2개 묶음 → 수량 2, 개당 수량 20',
   },
+  '총 수량': {
+    body: '고객이 받는 낱개의 전체 개수 = 개당 수량 × 수량. 자동 계산됩니다.',
+    example: '예) 12개입 2개 묶음 → 총 수량 24',
+  },
 };
-const helpOf = (name: string) => QUANTITY_HELP[name] ?? (name === '총 수량' ? QUANTITY_HELP['수량'] : undefined);
+const helpOf = (name: string) => QUANTITY_HELP[name];
 
 /**
  * 옵션별 카테고리 필수 항목 입력 — 프레젠테이션 (렌더 전용).
@@ -273,7 +282,9 @@ export function CategoryMetaOverrideFields({
           {unitSuffix(a) && <span className="ml-1 font-normal text-gray-400">{unitSuffix(a)}</span>}
           {a.required && <span className="text-red-600"> *</span>}
           {autoQty && (
-            <span className="ml-1 font-normal text-gray-400">(구성상품 수량에서 자동)</span>
+            <span className="ml-1 font-normal text-gray-400">
+              {isGrandTotalQuantityName(a.name) ? '(개당 수량 × 수량 자동)' : '(구성상품 수량에서 자동)'}
+            </span>
           )}
           {help && (
             // Floating help: shown on hover or while the button has focus (tap on touch screens),
@@ -320,9 +331,19 @@ export function CategoryMetaOverrideFields({
           <input
             type={a.inputType === 'NUMBER' ? 'number' : 'text'}
             className="mt-auto w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-            placeholder={autoQty ? '위 구성상품 수량에서 자동' : unitPlaceholder(a) || '값 입력'}
+            placeholder={
+              autoQty
+                ? isGrandTotalQuantityName(a.name)
+                  ? '개당 수량 × 수량 자동'
+                  : '위 구성상품 수량에서 자동'
+                : unitPlaceholder(a) || '값 입력'
+            }
             title={
-              autoQty ? '구성상품 수량 합으로 자동 계산됩니다. 위 구성상품 수량을 수정하세요.' : undefined
+              autoQty
+                ? isGrandTotalQuantityName(a.name)
+                  ? '개당 수량 × 수량으로 자동 계산됩니다. 개당 수량이나 구성상품 수량을 수정하세요.'
+                  : '구성상품 수량 합으로 자동 계산됩니다. 위 구성상품 수량을 수정하세요.'
+                : undefined
             }
             value={attrValues[a.name] ?? ''}
             onChange={(e) => onAttrChange(a.name, e.target.value)}
