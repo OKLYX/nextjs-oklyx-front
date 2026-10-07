@@ -59,12 +59,22 @@ export interface GetProductsResponse {
   last: boolean;
 }
 
+/**
+ * Result of reading a barcode from an uploaded photo (POST /api/admin/products/barcode-scan).
+ * `barcode === null` means the server found no readable barcode in the image. The image is not stored.
+ */
+export interface BarcodeScanResult {
+  barcode: string | null;
+  format: string | null;
+}
+
 export interface ProductRepository {
   getProducts(params: GetProductsParams): Promise<GetProductsResponse>;
   getProductDetail(id: number): Promise<Product>;
   createProduct(data: CreateProductRequest): Promise<Product>;
   uploadProductImage(id: number, file: File): Promise<Product>;
   checkBarcodeExists(barcodeId: string): Promise<boolean>;
+  scanBarcodeFromImage(file: File): Promise<BarcodeScanResult>;
   updateProduct(id: number, data: UpdateProductRequest): Promise<Product>;
   deleteProductImage(id: number): Promise<void>;
 }

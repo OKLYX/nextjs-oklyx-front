@@ -14,6 +14,9 @@ import type { Product } from '@/domain/entities/Product';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { toast } from '@/infrastructure/stores/toastStore';
 
+/** Outcome of `scanBarcode` — either the read value or a message to show under the barcode input. */
+export type BarcodeScanOutcome = { ok: true; barcode: string } | { ok: false; message: string };
+
 /**
  * 물품 등록 한 건의 상태·저장 흐름 (2609_78 에서 `ProductRegistrationContainer` 에서 추출).
  * File: src/app/dashboard/products/register/components/useProductRegistration.ts
@@ -56,6 +59,30 @@ export function useProductRegistration() {
       }
     },
     [useCase],
+  );
+
+  /**
+   * Reads a barcode from a photo on the server (the image is not stored).
+   * Returns the value, or a user-facing message when nothing could be read.
+   * 401 goes to login like `submit`.
+   */
+  const scanBarcode = useCallback(
+    async (file: File): Promise<BarcodeScanOutcome> => {
+      try {
+        const result = await useCase.scanBarcodeFromImage(file);
+        if (!result.barcode) {
+          return { ok: false, message: '바코드를 읽지 못했습니다. 바코드가 잘 보이는 사진으로 다시 시도해 주세요.' };
+        }
+        return { ok: true, barcode: result.barcode };
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 401) {
+          tokenStorage.removeToken();
+          router.push(ROUTES.LOGIN);
+        }
+        return { ok: false, message: extractErrorMessage(err, '이미지를 확인하지 못했습니다.') };
+      }
+    },
+    [useCase, router],
   );
 
   const submit = useCallback(
@@ -118,6 +145,7 @@ export function useProductRegistration() {
     setPickedImageUrls,
     imageUseCase,
     checkBarcode,
+    scanBarcode,
     submit,
     resetBuffers,
   };
