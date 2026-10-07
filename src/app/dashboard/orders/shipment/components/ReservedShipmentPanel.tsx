@@ -6,7 +6,16 @@ import { StateBlock } from '@/presentation/components/ui/StateBlock';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { CarrierOption, ReservedShipmentRow } from '@/application/dto/ShippingLabelDTOs';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
-import { ReservedShipmentRows } from '../../components/ReservedShipmentRows';
+import { ReservedShipmentRows, isOpen } from '../../components/ReservedShipmentRows';
+
+// Card chips (FEATURE_2610_07 / D1·D2): 'open' = rows where isOpen is true, 'done' = the rest, 'all' = every row.
+type ReservedFilter = 'open' | 'done' | 'all';
+
+const RESERVED_FILTERS: { key: ReservedFilter; label: string }[] = [
+  { key: 'open', label: '처리 필요' },
+  { key: 'done', label: '완료' },
+  { key: 'all', label: '전체' },
+];
 
 interface ReservedShipmentPanelProps {
   useCase: ShippingLabelUseCase;
@@ -29,6 +38,8 @@ export function ReservedShipmentPanel({ useCase, reloadKey, onChanged }: Reserve
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [tick, setTick] = useState(0);
+  // Lives as long as the card is mounted — reloads and row actions keep the chip (FEATURE_2610_07 / D8).
+  const [filter, setFilter] = useState<ReservedFilter>('open');
 
   useEffect(() => {
     let alive = true;
@@ -63,6 +74,14 @@ export function ReservedShipmentPanel({ useCase, reloadKey, onChanged }: Reserve
 
   const completed = rows.filter((row) => row.result === 'SUCCEEDED' || row.result === 'EXTERNAL').length;
   const failed = rows.filter((row) => row.result === 'FAILED').length;
+  // Chip counts use every received row, whichever chip is on; the summary line above stays as is (FEATURE_2610_07 / D3·D6).
+  const openCount = rows.filter(isOpen).length;
+  const filterCounts: Record<ReservedFilter, number> = {
+    open: openCount,
+    done: rows.length - openCount,
+    all: rows.length,
+  };
+  const shownRows = rows.filter((row) => filter === 'all' || isOpen(row) === (filter === 'open'));
 
   return (
     <Card title="예약 발송">
@@ -77,15 +96,47 @@ export function ReservedShipmentPanel({ useCase, reloadKey, onChanged }: Reserve
           <p className="text-sm text-gray-700">
             {rows.length}건 중 {completed}건 완료, 실패 {failed}건
           </p>
-          <ReservedShipmentRows
-            rows={rows}
-            useCase={useCase}
-            carrierOptions={carrierOptions}
-            onChanged={() => {
-              setTick((t) => t + 1);
-              onChanged();
-            }}
-          />
+          <div className="flex flex-wrap gap-2">
+            {RESERVED_FILTERS.map(({ key, label }) => {
+              const isActive = filter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key)}
+                  className={`px-4 py-2 text-sm font-medium rounded-full border transition-colors ${
+                    isActive
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  {label}
+                  <span
+                    className={`ml-2 inline-flex items-center justify-center min-w-5 px-1.5 text-xs font-semibold rounded-full ${
+                      isActive ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {filterCounts[key]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {shownRows.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              {filter === 'open' ? '처리할 예약 발송이 없습니다.' : '완료된 예약 발송이 없습니다.'}
+            </p>
+          ) : (
+            <ReservedShipmentRows
+              rows={shownRows}
+              useCase={useCase}
+              carrierOptions={carrierOptions}
+              onChanged={() => {
+                setTick((t) => t + 1);
+                onChanged();
+              }}
+            />
+          )}
         </div>
       )}
     </Card>

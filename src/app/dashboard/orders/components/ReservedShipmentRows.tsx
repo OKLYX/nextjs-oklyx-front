@@ -33,7 +33,7 @@ const RESULT_LABEL: Record<ReservedItemResult, string> = {
 
 type Action = 'time' | 'invoice' | 'retry' | 'cancel';
 
-const isOpen = (row: ReservedShipmentRow) => row.result === 'PENDING' || row.result === 'FAILED';
+export const isOpen = (row: ReservedShipmentRow) => row.result === 'PENDING' || row.result === 'FAILED';
 const isEditable = (row: ReservedShipmentRow) =>
   row.status === 'SCHEDULED' && row.firstRunKind == null && row.result === 'PENDING';
 // D18 🔁 — 송장은 실행 중(RUNNING)만 막는다.

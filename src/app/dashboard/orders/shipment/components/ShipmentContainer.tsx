@@ -30,6 +30,8 @@ import type { ChannelOption } from '../../components/OrderSearchCard';
 import { ShipmentFilterCard } from './ShipmentFilterCard';
 import { AcknowledgeBar } from './AcknowledgeBar';
 import { ReservedShipmentPanel } from './ReservedShipmentPanel';
+import { PaidStageFilter, matchesPaidStage } from './PaidStageFilter';
+import type { PaidStage } from './PaidStageFilter';
 import { StoredInvoiceModal } from './StoredInvoiceModal';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
@@ -109,6 +111,8 @@ export function ShipmentContainer() {
   const [syncTargets, setSyncTargets] = useState<SyncTarget[]>([]);
   const [orders, setOrders] = useState<OrderItem[]>([]);   // 서버 응답 원본(필터 전)
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  // 2nd-row chip under PAID. Every 1st-row click resets it to 'ALL' (FEATURE_2610_07 / D10·D14).
+  const [paidStage, setPaidStage] = useState<PaidStage>('ALL');
   // 주문내역과 같은 클라이언트 검색(칩 4종). 서버를 부르지 않으므로 [조회] 없이 즉시 반영된다.
   const [searchField, setSearchField] = useState<OrderSearchField>('customer');
   const [searchTerm, setSearchTerm] = useState('');
@@ -280,16 +284,18 @@ export function ShipmentContainer() {
     [syncTargets]
   );
 
-  // 필터 → 정렬 → 페이지. 표시 목록은 파생값으로만 만든다(별도 state 금지 — 두 벌이 되면 어긋난다).
-  // 전량취소는 서버 판정(`cancelled`)으로 뺀다(PLAN 2609_26 D26) — 출고중지로만 전량이 빠진 건도 걸린다.
-  // 순서는 주문내역과 같다: 채널 → 검색 → 상태. 배지 건수도 검색 결과를 센다.
+  // Filter → sort → page. The shown list is derived only (no separate state — two copies drift apart).
+  // Fully-cancelled orders go out by the server's `cancelled` (PLAN 2609_26 D26) — this also catches orders emptied by holds only.
+  // Order: channel → search → status → paid stage (FEATURE_2610_07 / D16); the paid stage applies only while PAID is on.
+  // Chip counts also count the search result.
   const visible = useMemo(() => orders
     .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
     .filter((o) => !o.cancelled)
     .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
     .filter((o) => matchesOrderSearch(o, searchField, searchTerm))
-    .filter((o) => !selectedStatus || o.status === selectedStatus),
-    [orders, selectedAccountId, selectedStatus, searchField, searchTerm]);
+    .filter((o) => !selectedStatus || o.status === selectedStatus)
+    .filter((o) => selectedStatus !== 'PAID' || matchesPaidStage(o, paidStage)),
+    [orders, selectedAccountId, selectedStatus, paidStage, searchField, searchTerm]);
 
   // 칩 카운트는 탭 선택 전 목록으로 센다(선택해도 다른 칩 건수가 0 이 되지 않게).
   const statusCounts = useMemo(() => orders
@@ -301,6 +307,14 @@ export function ShipmentContainer() {
       acc[order.status] = (acc[order.status] ?? 0) + 1;
       return acc;
     }, {}),
+    [orders, selectedAccountId, searchField, searchTerm]);
+
+  // 2nd-row chip counts: the same list as the 1st-row counts, narrowed to PAID (FEATURE_2610_07 / D13).
+  const paidScoped = useMemo(() => orders
+    .filter((o) => o.status === 'PAID')
+    .filter((o) => !o.cancelled)
+    .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
+    .filter((o) => matchesOrderSearch(o, searchField, searchTerm)),
     [orders, selectedAccountId, searchField, searchTerm]);
 
   const sorted = useMemo(() => {
@@ -594,6 +608,14 @@ export function ShipmentContainer() {
 
   const handleStatusChange = (status: string | null) => {
     setSelectedStatus(status);
+    setPaidStage('ALL');
+    setCurrentPage(0);
+    clearSelection();
+  };
+
+  // Same as a 1st-row change: back to page 1 and drop the selection (FEATURE_2610_07 / D15).
+  const handlePaidStageChange = (stage: PaidStage) => {
+    setPaidStage(stage);
     setCurrentPage(0);
     clearSelection();
   };
@@ -651,14 +673,19 @@ export function ShipmentContainer() {
         />
       )}
 
-      <OrderStatusFilter
-        selectedStatus={selectedStatus}
-        onStatusChange={handleStatusChange}
-        counts={statusCounts}
-        canceledCount={0}
-        statuses={SHIPMENT_STATUSES}
-        showCanceledChip={false}
-      />
+      <div className="space-y-2">
+        <OrderStatusFilter
+          selectedStatus={selectedStatus}
+          onStatusChange={handleStatusChange}
+          counts={statusCounts}
+          canceledCount={0}
+          statuses={SHIPMENT_STATUSES}
+          showCanceledChip={false}
+        />
+        {selectedStatus === 'PAID' && (
+          <PaidStageFilter orders={paidScoped} selected={paidStage} onChange={handlePaidStageChange} />
+        )}
+      </div>
 
       {/* 바는 showEmpty 분기 밖에 둔다 — 결과 0건이어도 페이지 크기 select 는 남아야 한다. */}
       <AcknowledgeBar
