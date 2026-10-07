@@ -20,6 +20,7 @@ export function ProductRegistrationContainer() {
     setPickedImageUrls,
     imageUseCase,
     checkBarcode,
+    scanBarcode,
     submit,
     resetBuffers,
   } = useProductRegistration();
@@ -63,6 +64,7 @@ export function ProductRegistrationContainer() {
         imageBuffer={imageBuffer}
         onImageBufferChange={setImageBuffer}
         onCheckBarcode={checkBarcode}
+        onScanBarcode={scanBarcode}
         onSubmitSuccess={resetBuffers}
         pickedImageUrls={pickedImageUrls}
         onPickedImageUrlsChange={setPickedImageUrls}

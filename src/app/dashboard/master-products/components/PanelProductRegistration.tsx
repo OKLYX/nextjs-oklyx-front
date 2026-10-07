@@ -36,6 +36,7 @@ export function PanelProductRegistration({ onCreated, onCancel }: PanelProductRe
     setPickedImageUrls,
     imageUseCase,
     checkBarcode,
+    scanBarcode,
     submit,
     resetBuffers,
   } = useProductRegistration();
@@ -73,6 +74,7 @@ export function PanelProductRegistration({ onCreated, onCancel }: PanelProductRe
         imageBuffer={imageBuffer}
         onImageBufferChange={setImageBuffer}
         onCheckBarcode={checkBarcode}
+        onScanBarcode={scanBarcode}
         onSubmitSuccess={resetBuffers}
         pickedImageUrls={pickedImageUrls}
         onPickedImageUrlsChange={setPickedImageUrls}
