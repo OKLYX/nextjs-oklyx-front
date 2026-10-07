@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
+import type { ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
@@ -13,6 +14,7 @@ import { Input } from '@/presentation/components/ui/Input';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
 import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
+import type { BarcodeScanOutcome } from './useProductRegistration';
 
 /**
  * 등록 폼의 칸 = 값 타입. 🔴 `export` 다 — 폼 자신이 `useForm<…>` 에서 쓰고, 전역 도구 패널의
@@ -43,6 +45,8 @@ interface ProductRegistrationFormProps {
   imageBuffer: File[];
   onImageBufferChange: (files: File[]) => void;
   onCheckBarcode: (barcodeId: string) => Promise<boolean>;
+  /** Reads a barcode from a photo on the server ([이미지로 스캔]). Provided by `useProductRegistration`. */
+  onScanBarcode: (file: File) => Promise<BarcodeScanOutcome>;
   onSubmitSuccess: () => void;
   /** 전역 도구 패널에서 끌어다 놓은 마켓 사진 URL. 컨테이너가 소유한다(`imageBuffer` 와 같은 모양). */
   pickedImageUrls: string[];
@@ -66,6 +70,7 @@ export function ProductRegistrationForm({
   imageBuffer,
   onImageBufferChange,
   onCheckBarcode,
+  onScanBarcode,
   onSubmitSuccess,
   // 🔴 컨테이너가 소유한다 — 폼은 갤러리로 내려보내기만 하고, 저장 직후 서버로 보내는 것도 컨테이너다.
   pickedImageUrls,
@@ -90,6 +95,8 @@ export function ProductRegistrationForm({
   );
   const [isCheckingBarcode, setIsCheckingBarcode] = useState(false);
   const [validatedBarcode, setValidatedBarcode] = useState<string | null>(null);
+  const [isScanningBarcode, setIsScanningBarcode] = useState(false);
+  const barcodeFileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -169,6 +176,32 @@ export function ProductRegistrationForm({
     setBarcodeError(null);
     setValidatedBarcode(null);
   }, [setValue]);
+
+  // A scanned value replaces the input and drops any earlier 중복 확인 result, exactly like typing a new
+  // value — the user must run 중복 확인 again before saving.
+  const handleScanFileChange = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // Clear so picking the same file again still fires onChange.
+      e.target.value = '';
+      if (!file) return;
+
+      setIsScanningBarcode(true);
+      try {
+        const outcome = await onScanBarcode(file);
+        if (outcome.ok) {
+          setValidatedBarcode(null);
+          setBarcodeError(null);
+          setValue('barcodeId', outcome.barcode, { shouldDirty: true, shouldValidate: false });
+        } else {
+          setBarcodeError(outcome.message);
+        }
+      } finally {
+        setIsScanningBarcode(false);
+      }
+    },
+    [onScanBarcode, setValue],
+  );
 
   const handleFormSubmit = useCallback(
     async (data: ProductRegistrationFormValues) => {
@@ -283,6 +316,22 @@ export function ProductRegistrationForm({
                   {isCheckingBarcode ? '확인 중...' : '중복 확인'}
                 </button>
               )}
+              <Button
+                variant="secondary"
+                onClick={() => barcodeFileInputRef.current?.click()}
+                isLoading={isScanningBarcode}
+                loadingText="읽는 중..."
+                disabled={isCheckingBarcode}
+              >
+                이미지로 스캔
+              </Button>
+              <input
+                ref={barcodeFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                className="hidden"
+                onChange={handleScanFileChange}
+              />
             </div>
             {barcodeError && (
               <div className="flex items-center gap-2 mt-1">
