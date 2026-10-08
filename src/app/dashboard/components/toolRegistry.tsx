@@ -1,10 +1,11 @@
 'use client';
 
 import type { ComponentType, ReactNode } from 'react';
-import { Clipboard, Search } from 'lucide-react';
+import { Clipboard, PackageSearch, Store } from 'lucide-react';
 import type { ToolKey } from '@/infrastructure/stores/toolPanelStore';
 import { ChannelProductTool } from './ChannelProductTool';
 import { ClipboardRailSlot, ClipboardTool } from './ClipboardTool';
+import { RegisteredProductTool } from './RegisteredProductTool';
 
 /**
  * 오른쪽 도구 **목록 한 곳** (FEATURE_2609_68 · 클립보드 편입으로 두 번째 도구가 생김).
@@ -37,9 +38,15 @@ export interface DashboardTool {
 export const TOOLS: readonly DashboardTool[] = [
   {
     key: 'channel-product',
-    label: '플랫폼 상품 조회',
-    Icon: Search,
+    label: '판매 상품 조회',
+    Icon: Store,
     Body: ChannelProductTool,
+  },
+  {
+    key: 'registered-product',
+    label: '등록 상품 조회',
+    Icon: PackageSearch,
+    Body: RegisteredProductTool,
   },
   {
     key: 'clipboard',

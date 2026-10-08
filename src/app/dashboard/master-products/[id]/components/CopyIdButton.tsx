@@ -3,28 +3,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * 마스터 상세에서 마켓 식별자(상품 ID · 옵션 ID)를 클립보드로 복사하는 공용 버튼.
+ * Shared button that copies one value to the clipboard.
  * File: src/app/dashboard/master-products/[id]/components/CopyIdButton.tsx
  *
- * **용도**: WING 과 눈으로 대조하는 숫자 ID 옆에 붙여, 값만 정확히(공백·줄바꿈 없이) 복사한다.
+ * **Purpose**: placed next to a value, it copies the value exactly (no spaces or line breaks added) —
+ *   market IDs (product ID · option ID) on the master detail page, compared by eye with WING, and the
+ *   field values of the 「등록 상품 조회」 tool.
  *
- * **사용처**
- * - 커버리지 매트릭스 「상품 ID」 열 (`CoverageMatrix.tsx`)
- * - 옵션×채널 표의 옵션 ID 칸
+ * **Where it is used**
+ * - Coverage matrix 「상품 ID」 column (`CoverageMatrix.tsx`)
+ * - Option ID cells of the option × channel table
+ * - Field rows of the 「등록 상품 조회」 tool (`dashboard/components/RegisteredProductTool.tsx`, FEATURE_2610_08)
  *
- * **사용 예제**
+ * **Usage**
  * ```tsx
  * <CopyIdButton value={cell.platformProductId} />
  * <CopyIdButton value={String(option.platformOptionId)} />
  * ```
  *
- * ⚠️ 복사 실패는 **조용히 넘긴다** — 클립보드 권한이 없는 브라우저가 있고, 이 버튼은
- *    보조 수단이라 에러 토스트를 띄울 만한 일이 아니다(값은 화면에 그대로 보인다).
- * ⚠️ 표 안에서 쓰이므로 행 클릭 핸들러로 이벤트가 새지 않도록 `stopPropagation` 한다.
+ * ⚠️ A failed copy is **ignored silently** — some browsers deny clipboard access, and this button is a
+ *    helper, not worth an error toast (the value stays on screen).
+ * ⚠️ It is used inside tables, so it calls `stopPropagation` to keep the click from reaching row handlers.
  *
- * ❌ 인라인으로 다시 구현하지 말 것 — 같은 동작이 두 벌이 되면 한쪽만 고쳐진다
- *    (루트 CLAUDE.md 공통 Component 규칙).
- * ❌ `value` 를 가공(trim 외 포맷·접두사)하지 말 것 — 대조용 원문 그대로여야 한다.
+ * ❌ Do not re-implement it inline — two copies of one behavior drift apart
+ *    (root CLAUDE.md shared Component rule).
+ * ❌ Do not transform `value` (no formatting or prefix beyond trim) — it must stay the original text for comparison.
  */
 export function CopyIdButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
