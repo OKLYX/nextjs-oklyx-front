@@ -28,7 +28,7 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
  * <PurchaseGroupDetail item={item} sellers={sellers} onRecorded={refresh} />
  *
  * ⚠️ 입고는 물품 × 판매자 단위다(D3) — 주문 라인에 붙지 않는다.
- * ⚠️ 채널 칩은 표시 필터일 뿐 헤더 숫자(필요·구매·잔여)를 바꾸지 않는다(D10).
+ * ⚠️ 채널 칩은 표시 필터일 뿐 헤더 숫자(필요 수량·매입 완료 수량·매입 필요 수량)를 바꾸지 않는다(D10).
  * ❌ 주문 줄에 구매수량·입력 컨트롤을 두지 않는다(D7).
  *    예외: 수동 줄(source=MANUAL)의 [제거] — manualQty 를 0 으로 되돌릴 뿐 구매수량 입력이 아니다.
  */
@@ -443,7 +443,7 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
             <tr className="text-gray-600">
               <th className="px-4 py-2 text-left font-medium">채널</th>
               <th className="px-4 py-2 text-left font-medium">주문번호</th>
-              <th className="px-4 py-2 text-right font-medium">필요</th>
+              <th className="px-4 py-2 text-right font-medium">필요 수량</th>
               <th className="px-4 py-2 w-16" aria-label="작업" />
             </tr>
           </thead>
