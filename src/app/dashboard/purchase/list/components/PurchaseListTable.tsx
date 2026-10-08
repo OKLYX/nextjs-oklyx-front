@@ -32,7 +32,7 @@ export function PurchaseListTable({
     <TableCard>
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900">구매 목록</h2>
-        <p className="mt-1 text-xs text-gray-500">잔여 수량이 남은 구성품만 표시됩니다.</p>
+        <p className="mt-1 text-xs text-gray-500">매입 필요 수량이 남은 구성품만 표시됩니다.</p>
       </div>
 
       <table className="w-full text-sm">
@@ -40,15 +40,16 @@ export function PurchaseListTable({
           <tr className="text-gray-600">
             <th className="w-10 px-4 py-3"></th>
             <th className="px-4 py-3 text-left font-medium">구성품</th>
-            <th className="px-4 py-3 text-right font-medium">필요</th>
-            <th className="px-4 py-3 text-right font-medium">구매</th>
-            <th className="px-4 py-3 text-right font-medium">잔여</th>
+            <th className="px-4 py-3 text-left font-medium">브랜드</th>
+            <th className="px-4 py-3 text-right font-medium">필요 수량</th>
+            <th className="px-4 py-3 text-right font-medium">매입 완료 수량</th>
+            <th className="px-4 py-3 text-right font-medium">매입 필요 수량</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {isLoading && (
             <tr>
-              <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
+              <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
                 불러오는 중...
               </td>
             </tr>
@@ -56,7 +57,7 @@ export function PurchaseListTable({
 
           {!isLoading && error && (
             <tr>
-              <td colSpan={5} className="px-4 py-10 text-center text-red-600">
+              <td colSpan={6} className="px-4 py-10 text-center text-red-600">
                 {error}
               </td>
             </tr>
@@ -64,7 +65,7 @@ export function PurchaseListTable({
 
           {!isLoading && !error && items.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
+              <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
                 구매할 항목이 없습니다.
               </td>
             </tr>
@@ -100,6 +101,7 @@ export function PurchaseListTable({
                         <span className="text-gray-900">{item.productName}</span>
                       </div>
                     </td>
+                    <td className="px-4 py-3 text-gray-700">{item.brand?.trim() || '-'}</td>
                     <td className="px-4 py-3 text-right text-gray-700">{item.neededQty}</td>
                     <td className="px-4 py-3 text-right text-gray-700">{item.purchasedQty}</td>
                     <td className="px-4 py-3 text-right font-semibold text-blue-600">
@@ -109,7 +111,7 @@ export function PurchaseListTable({
 
                   {isExpanded && (
                     <tr className="bg-gray-50">
-                      <td colSpan={5} className="px-4 py-4">
+                      <td colSpan={6} className="px-4 py-4">
                         <PurchaseGroupDetail
                           item={item}
                           sellers={sellers}
