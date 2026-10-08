@@ -196,8 +196,8 @@ export default function DashboardLayout({
         <main className="flex-1 p-4 md:p-6 min-w-0 overflow-x-clip">{children}</main>
       </div>
 
-      {/* 전역 도구(FEATURE_2609_68). 🔴 도구는 화면에 속하지 않는다 — 레이아웃이 직접 그린다.
-          도구 목록(플랫폼 상품 조회 · 클립보드)은 `components/toolRegistry.tsx` 한 곳에 있다. */}
+      {/* Global tools (FEATURE_2609_68). 🔴 Tools do not belong to a screen — the layout renders them directly.
+          The tool list (「판매 상품 조회」 · 「등록 상품 조회」 · 「클립보드」) lives in one place: `components/toolRegistry.tsx`. */}
       <ToolPanel />
       <ToolRail />
       {/* 웹 공용 잠깐 알림(FEATURE_2609_77). 🔴 이 한 곳에서만 마운트한다. */}
