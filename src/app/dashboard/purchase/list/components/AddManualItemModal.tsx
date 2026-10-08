@@ -1,20 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { AddManualItemRequest } from '@/application/dto/PurchaseListDTOs';
 import { Input } from '@/presentation/components/ui/Input';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { ProductPicker } from '@/presentation/components/ProductPicker';
 
 const isIntStr = (v: string) => v.trim() !== '' && Number.isInteger(Number(v));
 
 const schema = z.object({
-  productId: z
-    .string()
-    .refine(isIntStr, '정수만 입력 가능합니다.')
-    .refine((v) => Number(v) > 0, '상품 ID를 입력하세요.'),
+  productId: z.string().refine((v) => v !== '', '상품을 검색해 선택하세요.'),
+  productName: z.string(),
   quantity: z
     .string()
     .refine(isIntStr, '정수만 입력 가능합니다.')
@@ -36,16 +35,20 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
     register,
     handleSubmit,
     reset,
+    setValue,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { productId: '', quantity: '1' },
+    defaultValues: { productId: '', productName: '', quantity: '1' },
   });
+  const productId = useWatch({ control, name: 'productId' });
+  const productName = useWatch({ control, name: 'productName' });
 
   useEffect(() => {
     if (!isOpen) return;
     const initForm = async () => {
-      reset({ productId: '', quantity: '1' });
+      reset({ productId: '', productName: '', quantity: '1' });
       setSubmitError('');
     };
     initForm();
@@ -59,7 +62,7 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
     try {
       await onSubmit({ productId: Number(data.productId), quantity: Number(data.quantity) });
     } catch {
-      setSubmitError('수동 항목 추가에 실패했습니다. 상품 ID를 확인하세요.');
+      setSubmitError('수동 항목 추가에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
     }
@@ -80,11 +83,19 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
 
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">구성품(Product) ID</label>
-          <Input
-            {...register('productId')}
-            type="number"
-            placeholder="예: 100"
+          <label className="block text-sm font-medium text-gray-700 mb-1">상품</label>
+          <ProductPicker
+            productId={productId === '' ? null : Number(productId)}
+            productName={productName}
+            onSelect={(id, name) => {
+              setValue('productId', String(id), { shouldValidate: true, shouldDirty: true });
+              setValue('productName', name, { shouldDirty: true });
+            }}
+            onClear={() => {
+              setValue('productId', '', { shouldDirty: true });
+              setValue('productName', '', { shouldDirty: true });
+            }}
+            disabled={isSubmitting}
           />
           {errors.productId && (
             <p className="mt-1 text-xs text-red-600">{errors.productId.message}</p>

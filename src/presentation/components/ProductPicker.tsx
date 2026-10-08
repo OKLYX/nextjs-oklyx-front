@@ -15,10 +15,25 @@ interface ProductPickerProps {
 }
 
 /**
- * 입고·조정 폼의 물품 선택 (FEATURE_2609_28).
+ * 물품(Product) 한 개를 상품명 검색으로 고르는 공통 선택기.
  *
- * 원장은 <b>물품(Product)</b> 단위다 — 판매 옵션이 아니라 창고에 실물로 있는 것이다.
- * 선택 전에는 검색 입력, 선택 후에는 이름 + [변경] 만 보인다.
+ * 선택 전에는 검색 입력(Enter 또는 [검색], 상위 10건), 선택 후에는 이름 #ID + [변경] 만 보인다.
+ * 선택 상태는 호출부가 가진다(제어 컴포넌트) — `productId` 가 null 이 아니면 선택 상태로 그린다.
+ *
+ * 사용처:
+ * - 입출고 폼 `stock/in-out/StockInOutForm` (FEATURE_2609_28)
+ * - 구매목록 수동 항목 추가 `purchase/list/AddManualItemModal`
+ *
+ * @example
+ * <ProductPicker
+ *   productId={selected?.id ?? null}
+ *   productName={selected?.name ?? ''}
+ *   onSelect={(id, name) => setSelected({ id, name })}
+ *   onClear={() => setSelected(null)}
+ * />
+ *
+ * ⚠️ 판매 옵션·마스터 상품이 아니라 물품(Product) 을 고른다.
+ * ❌ 물품 ID 를 숫자로 직접 입력받는 칸을 새로 만들지 말고 이 컴포넌트를 쓴다.
  */
 export function ProductPicker({
   productId,
