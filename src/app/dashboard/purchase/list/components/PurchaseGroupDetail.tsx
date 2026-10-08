@@ -13,6 +13,9 @@ import type {
   PurchaseRecord,
 } from '@/domain/entities/PurchaseListEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { toast } from '@/infrastructure/stores/toastStore';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 
 /**
  * 구매목록 탭과 구매완료 탭이 <b>같이 쓰는</b> 그룹 토글 내용물 (PLAN 2609_29 D21).
@@ -27,6 +30,7 @@ import type { Seller } from '@/domain/entities/SellerEntity';
  * ⚠️ 입고는 물품 × 판매자 단위다(D3) — 주문 라인에 붙지 않는다.
  * ⚠️ 채널 칩은 표시 필터일 뿐 헤더 숫자(필요·구매·잔여)를 바꾸지 않는다(D10).
  * ❌ 주문 줄에 구매수량·입력 컨트롤을 두지 않는다(D7).
+ *    예외: 수동 줄(source=MANUAL)의 [제거] — manualQty 를 0 으로 되돌릴 뿐 구매수량 입력이 아니다.
  */
 
 const PLATFORM_LABEL: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버' };
@@ -112,6 +116,26 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
   const [historyError, setHistoryError] = useState('');
 
   const [activeChannel, setActiveChannel] = useState<string>('ALL');
+
+  const [removeTarget, setRemoveTarget] = useState<PurchaseListLine | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  // Removing a manual line = absolute manualQty 0. The server keeps the row but it
+  // contributes nothing, so the group drops out of the list once nothing is left to buy.
+  const removeManualLine = useCallback(async () => {
+    if (!removeTarget || isRemoving) return;
+    setIsRemoving(true);
+    try {
+      await purchaseListUseCase.adjustManualQty(removeTarget.itemId, { manualQty: 0 });
+      toast.success('수동 추가를 제거했습니다.');
+      setRemoveTarget(null);
+      await onRecorded();
+    } catch (err) {
+      toast.error(extractErrorMessage(err, '수동 추가를 제거하지 못했습니다.'));
+    } finally {
+      setIsRemoving(false);
+    }
+  }, [removeTarget, isRemoving, purchaseListUseCase, onRecorded]);
 
   // watch() 대신 useWatch — watch() 는 React Compiler 메모이제이션을 통째로 끈다.
   const [sellerId, amountMode, amountInput, quantityInput, reflectToBasePrice] = useWatch({
@@ -420,12 +444,13 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
               <th className="px-4 py-2 text-left font-medium">채널</th>
               <th className="px-4 py-2 text-left font-medium">주문번호</th>
               <th className="px-4 py-2 text-right font-medium">필요</th>
+              <th className="px-4 py-2 w-16" aria-label="작업" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {visibleLines.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
                   표시할 주문이 없습니다.
                 </td>
               </tr>
@@ -435,11 +460,37 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
                 <td className="px-4 py-2 text-gray-700">{channelLabel(line)}</td>
                 <td className="px-4 py-2 text-gray-500">{line.externalOrderId ?? '—'}</td>
                 <td className="px-4 py-2 text-right text-gray-900">{line.neededQty}</td>
+                <td className="px-4 py-2 text-right">
+                  {line.source === 'MANUAL' && line.manualQty > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setRemoveTarget(line)}
+                      className="px-2 py-0.5 text-xs border border-gray-300 rounded text-red-600 hover:bg-red-50"
+                    >
+                      제거
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        isOpen={removeTarget !== null}
+        title="수동 추가 제거"
+        message={
+          removeTarget
+            ? `${item.productName} 수동 추가 ${removeTarget.manualQty}개를 구매목록에서 제거합니다. 주문에서 온 수량과 구매 기록은 그대로입니다.`
+            : ''
+        }
+        confirmText="제거"
+        onConfirm={removeManualLine}
+        onCancel={() => setRemoveTarget(null)}
+        isDangerous
+        isLoading={isRemoving}
+      />
     </div>
   );
 }
