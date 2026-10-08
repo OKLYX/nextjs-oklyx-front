@@ -15,7 +15,7 @@ import {
   STOCK_MOVEMENT_TYPE_LABELS,
   STOCK_REASON_LABELS,
 } from '@/domain/entities/StockEntity';
-import { ProductPicker } from './ProductPicker';
+import { ProductPicker } from '@/presentation/components/ProductPicker';
 
 /**
  * 후보 목록(입고 대기 · 반품 대기)이 폼을 채울 때 쓰는 값.
