@@ -35,7 +35,7 @@ import { ProductImageRepositoryImpl } from '@/infrastructure/repositories/Produc
  *
  * **Usage** (`toolRegistry.tsx`)
  * ```tsx
- * { key: 'registered-product', label: '등록 상품 조회', Icon: PackageSearch, Body: RegisteredProductTool }
+ * { key: 'registered-product', label: '등록 상품 조회', Icon: DatabaseSearch, Body: RegisteredProductTool }
  * ```
  *
  * ⚠️ A search goes out on [조회] or Enter; Enter calls `preventDefault` because the panel can sit over a form.

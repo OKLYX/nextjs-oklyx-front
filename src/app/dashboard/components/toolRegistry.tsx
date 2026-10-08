@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentType, ReactNode } from 'react';
-import { Clipboard, PackageSearch, Store } from 'lucide-react';
+import { Clipboard, DatabaseSearch, PackageSearch } from 'lucide-react';
 import type { ToolKey } from '@/infrastructure/stores/toolPanelStore';
 import { ChannelProductTool } from './ChannelProductTool';
 import { ClipboardRailSlot, ClipboardTool } from './ClipboardTool';
@@ -39,13 +39,13 @@ export const TOOLS: readonly DashboardTool[] = [
   {
     key: 'channel-product',
     label: '판매 상품 조회',
-    Icon: Store,
+    Icon: PackageSearch,
     Body: ChannelProductTool,
   },
   {
     key: 'registered-product',
     label: '등록 상품 조회',
-    Icon: PackageSearch,
+    Icon: DatabaseSearch,
     Body: RegisteredProductTool,
   },
   {
