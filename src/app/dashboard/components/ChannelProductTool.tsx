@@ -21,23 +21,24 @@ import { setSmallDragImage } from '@/infrastructure/utils/dragGhost';
 import { MarketImagePreviewModal } from './MarketImagePreviewModal';
 
 /**
- * 전역 도구 패널의 도구 1개 — **플랫폼 상품 조회**(FEATURE_2609_67 · 2609_68 에서 전역으로 옮김).
+ * One tool in the global tool panel — **「판매 상품 조회」** (FEATURE_2609_67 · moved to the global panel in 2609_68).
  *
- * **용도**: 판매자의 마켓 상품을 이름 또는 상품 ID 로 찾아, 보면서 물품 등록 칸을 채운다.
- *   값은 전부 **사람이 버튼을 눌러야** 들어간다(자동 채우기 없음).
- * **파일**: src/app/dashboard/components/ChannelProductTool.tsx
- * **엮는 곳**: `toolRegistry.tsx` **한 곳뿐**이다(`ToolPanel` 본문) — 도구는 화면에 속하지 않는다.
+ * **Purpose**: find a seller's market product by product name or product ID and fill the product
+ *   registration fields while looking at it. Values go in when a person presses a button (no auto-fill).
+ * **File**: src/app/dashboard/components/ChannelProductTool.tsx
+ * **Wired in**: `toolRegistry.tsx`, one place (the `ToolPanel` body) — tools do not belong to a screen.
  *
- * **[채우기] 는 `toolPanelStore.fillTarget` 을 통해 나간다**: 값을 받을 화면(물품 등록 폼)이 마운트될
- *   때 손을 내밀고, 없으면(`fillTarget == null`) **버튼 자체를 그리지 않는다**. 값 줄은 그대로 보인다.
+ * **[채우기] goes out through `toolPanelStore.fillTarget`**: the screen that receives values (the product
+ *   registration form) offers a target on mount; with no target (`fillTarget == null`) the button itself is
+ *   not rendered. The value rows stay visible.
  *
- * ⚠️ 이 컴포넌트는 `<form>` 밖(전역 레이아웃)에 살지만, 버튼은 계속 `type="button"` 으로 두고
- *    검색 입력의 **Enter 가드**도 유지한다 — 어느 화면 위에 떠 있을지 알 수 없다.
- * ⚠️ 조회는 [조회] 를 누를 때만 나간다(타이핑 중 자동 검색 금지 — 쿠팡 호출 예산).
- * 🔴 사진은 **끌어서** 물품에 넣는다(담기 체크박스 없음, 2609_68). 드롭 지점은 툴바의 클립보드와
- *    물품 이미지 등록 영역 두 곳이다. **누르면 확대**된다 — 브라우저가 클릭과 드래그를 가르므로
- *    거리·시간을 재는 코드를 만들지 않는다.
- * 🔴 마켓 URL 은 절대 주소다 — `resolveThumbUrl`·`getImageUrl` 을 태우면 404 가 난다.
+ * ⚠️ This component lives outside `<form>` (global layout), yet its buttons stay `type="button"` and the
+ *    search input keeps its **Enter guard** — it cannot know which screen it sits on.
+ * ⚠️ A lookup goes out when [조회] is pressed (no auto-search while typing — Coupang call budget).
+ * 🔴 Photos go into a product by **dragging** (no pick checkbox, 2609_68). The drop targets are two: the
+ *    clipboard on the toolbar and the product image area. **A click zooms** — the browser tells a click from
+ *    a drag, so do not write code that measures distance or time.
+ * 🔴 Market URLs are absolute — passing them through `resolveThumbUrl`·`getImageUrl` gives a 404.
  */
 
 /** 오늘 지원하는 플랫폼은 쿠팡 하나다 — select 를 만들지 않는다. */

@@ -1,47 +1,48 @@
 import { create } from 'zustand';
 
 /**
- * 대시보드 전역 도구 패널의 상태 (FEATURE_2609_68).
+ * State of the dashboard-wide tool panel (FEATURE_2609_68).
  *
- * **용도**: 오른쪽 세로 툴바(`ToolRail`)에서 고른 도구가 무엇인지, 패널(`ToolPanel`)이 열려 있는지를
- *   한 곳에서 들고 있다. 경로가 바뀌어도 열린 채로 따라온다.
- * **파일**: src/infrastructure/stores/toolPanelStore.ts
- * **쓰는 곳**: `dashboard/layout.tsx` · `ToolRail` · `ToolPanel` · `toolRegistry` · 도구
- *   컴포넌트(`ChannelProductTool` · `ClipboardTool`) · 손을 내미는 화면(`ProductRegistrationForm`).
+ * **Purpose**: holds, in one place, which tool was picked on the right-hand toolbar (`ToolRail`) and
+ *   whether the panel (`ToolPanel`) is open. It stays open when the route changes.
+ * **File**: src/infrastructure/stores/toolPanelStore.ts
+ * **Where it is used**: `dashboard/layout.tsx` · `ToolRail` · `ToolPanel` · `toolRegistry` · the tool
+ *   `ChannelProductTool` (reads `fillTarget`) · the screen that offers a fill target (`ProductRegistrationForm`).
+ *   The tools `RegisteredProductTool` · `ClipboardTool` are listed in `toolRegistry` and do not read this store.
  *
- * **`fillTarget` 이 있는 이유**: 도구가 화면 밖(전역 레이아웃)에 살기 때문에 폼의 `setValue` 를 직접
- *   부를 수 없다. 값을 받겠다는 화면이 마운트될 때 콜백 하나를 등록하고, 언마운트하면 지운다.
+ * **Why `fillTarget` exists**: tools live outside the screen (in the global layout), so they cannot call a
+ *   form's `setValue` directly. A screen that wants values registers one callback on mount and clears it on unmount.
  *
- * **사용 예제**
+ * **Usage**
  * ```tsx
- * // 툴바에서 열고 닫기
+ * // Open and close from the toolbar
  * const toggle = useToolPanelStore((s) => s.toggle);
  * <button onClick={() => toggle('channel-product')} />
  *
- * // 값을 받을 화면에서 손을 내민다
+ * // The screen that wants values offers a target
  * const setFillTarget = useToolPanelStore((s) => s.setFillTarget);
  * useEffect(() => {
  *   setFillTarget((patch) => { ... });
  *   return () => setFillTarget(null);
  * }, [setFillTarget]);
  *
- * // 도구에서 값을 넘긴다 (없으면 [채우기] 버튼 자체를 그리지 않는다)
+ * // A tool passes values (with no target, the [채우기] button is not rendered)
  * const fillTarget = useToolPanelStore((s) => s.fillTarget);
  * fillTarget?.({ productName: '…' });
  * ```
  *
- * ⚠️ `setFillTarget` 은 반드시 `set({ fillTarget: fn })` 형태로 쓴다. `set(fn)` 으로 넘기면 zustand 가
- *    함수를 updater 로 읽어 상태가 통째로 날아간다.
- * ⚠️ 손을 내민 화면은 언마운트에서 **반드시** `setFillTarget(null)` 한다 — 남으면 죽은 폼에 값을 쓴다.
- * ❌ `persist` 금지 — 새로고침하면 닫힌 상태로 시작한다. 마켓 값은 스냅샷이라 굳히면 낡은 값이 샌다.
- * ❌ `navigationStore` 에 끼워 넣지 말 것 — 그쪽은 `persist` 라 도구 상태까지 굳는다.
+ * ⚠️ Write `setFillTarget` as `set({ fillTarget: fn })`. With `set(fn)`, zustand reads the function as an
+ *    updater and the whole state is lost.
+ * ⚠️ The screen that offered a target must call `setFillTarget(null)` on unmount — a leftover target writes into a dead form.
+ * ❌ No `persist` — a reload starts closed. Market values are snapshots; persisting them leaks stale values.
+ * ❌ Do not fold this into `navigationStore` — that store uses `persist`, so tool state would be persisted too.
  */
 
 /**
  * 도구 키. 🔴 목록(이름·아이콘·본문)은 `dashboard/components/toolRegistry.tsx` 한 곳에 있다 —
  * 키를 더하면 거기도 한 줄 더한다. 플러그인·동적 로딩으로 키우지 말 것.
  */
-export type ToolKey = 'channel-product' | 'clipboard';
+export type ToolKey = 'channel-product' | 'registered-product' | 'clipboard';
 
 type FillTarget = ((patch: Record<string, string>) => void) | null;
 
