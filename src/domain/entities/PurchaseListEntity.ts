@@ -38,6 +38,8 @@ export interface PurchaseListLine {
 export interface PurchaseListItem {
   productId: number;
   productName: string;
+  /** Product brand; null when the product has none (absent on older servers). */
+  brand?: string | null;
   neededQty: number;
   purchasedQty: number;
   remainingQty: number;
