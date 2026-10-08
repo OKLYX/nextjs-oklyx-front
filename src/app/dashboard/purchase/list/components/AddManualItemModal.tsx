@@ -85,6 +85,7 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">상품</label>
           <ProductPicker
+            fixedResults
             productId={productId === '' ? null : Number(productId)}
             productName={productName}
             onSelect={(id, name) => {
@@ -97,9 +98,8 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
             }}
             disabled={isSubmitting}
           />
-          {errors.productId && (
-            <p className="mt-1 text-xs text-red-600">{errors.productId.message}</p>
-          )}
+          {/* Reserved line so a validation message does not resize the popup. */}
+          <p className="mt-1 h-4 text-xs text-red-600">{errors.productId?.message}</p>
         </div>
 
         <div>
