@@ -213,8 +213,10 @@ export function ListingDetailPanel({
         <span className="min-w-0 break-words text-gray-900">{registrationName}</span>
       </div>
 
-      {/* 옵션 표 — 옵션·가격·재고를 보여주는 유일한 자리. */}
-      <div className="rounded border border-gray-200 bg-white">
+      {/* 옵션 표 — 옵션·가격·재고를 보여주는 유일한 자리.
+          ⚠️ 열 폭이 고정이라 좁은 칸([상품 관계 한눈에 보기] 오른쪽 20rem)에서는 옵션명 칸이 눌려 깨진다 →
+          표에 최소폭을 주고 이 상자 안에서만 가로 스크롤한다(사용자 결정 2026-10-08). 표 안에 드롭다운 없음. */}
+      <div className="overflow-x-auto rounded border border-gray-200 bg-white">
         {optionsLoading && options.length === 0 ? (
           <div className="px-3 py-2">
             <Spinner size={12} label="옵션 불러오는 중" />
@@ -222,7 +224,7 @@ export function ListingDetailPanel({
         ) : options.length === 0 ? (
           <p className="px-3 py-2 text-xs text-gray-400">옵션 없음</p>
         ) : (
-          <table className="w-full table-fixed text-xs">
+          <table className="w-full min-w-[34rem] table-fixed text-xs">
             <thead className="border-b border-gray-200 bg-gray-100 text-left text-gray-600">
               <tr>
                 <th className="px-2 py-1.5 font-medium">옵션명</th>
