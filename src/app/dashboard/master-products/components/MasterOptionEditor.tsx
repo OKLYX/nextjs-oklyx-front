@@ -28,6 +28,7 @@ import { composeMeasureNotice, isMeasureNotice } from '../[id]/components/option
 import {
   PER_UNIT_QUANTITY_NAME,
   isGrandTotalQuantityName,
+  isAutoQuantityAttr,
   isTotalQuantityName,
 } from '../[id]/components/optionMetaFields';
 import { CategoryMetaOverrideFields } from '../[id]/components/CategoryMetaOverrideFields';
@@ -75,7 +76,7 @@ function filledKeys(map: Record<string, string>): Set<string> {
  * 구성상품 수량·개당 계량값을 카테고리 필드에 자동 반영하는 **단일 주입 지점**(101).
  * 호출부마다 복제하지 말 것 — 호출부는 값을 계산해 인자로만 넘긴다.
  *
- * - 수량 속성(이름에 "수량"): 구성상품 수량 합. **가드 없음**(수량 합이 SSOT).
+ * - 수량 속성(isAutoQuantityAttr — `총 수량`, 필수 `수량`): 구성상품 수량 합. **가드 없음**(수량 합이 SSOT).
  * - 개당 계량 속성(중량/용량): `measured` 를 `axis` 쪽 속성 하나에만. `skipAttrs` 로 보호.
  * - 계량 고시(수량 ∩ 계량): `${measured} ${total}개` 로 조합. `skipNotices` 로 보호.
  * - 수량 전용 고시: 수량 합(현행 유지, 가드 없음).
@@ -107,7 +108,7 @@ function applyQtyToMeta(
   const autoMeasureNotice = !hideCategoryAttrs && hasMeasureAttr(attrs);
   const attrNames = hideCategoryAttrs
     ? []
-    : attrs.filter((a) => isTotalQuantityName(a.name)).map((a) => a.name);
+    : attrs.filter(isAutoQuantityAttr).map((a) => a.name);
   const measureName =
     !hideCategoryAttrs && measured && axis ? findMeasureAttrName(attrs, axis) : '';
   const injectMeasure = measureName !== '' && !skipAttrs.has(measureName);
@@ -115,7 +116,9 @@ function applyQtyToMeta(
     setAttr((prev) => {
       const next = { ...prev };
       // 수량 속성 — 가드 없음. `총 수량` 만은 개당 수량 × 수량(쿠팡이 세 값을 맞춰 본다).
-      const perUnit = Number((next[PER_UNIT_QUANTITY_NAME] ?? '').trim());
+      // An empty 개당 수량 counts as 1 — otherwise a required, locked 총 수량 stays empty.
+      const perUnitRaw = (next[PER_UNIT_QUANTITY_NAME] ?? '').trim();
+      const perUnit = perUnitRaw === '' ? 1 : Number(perUnitRaw);
       for (const k of attrNames) {
         next[k] = isGrandTotalQuantityName(k)
           ? total > 0 && Number.isInteger(perUnit) && perUnit > 0
