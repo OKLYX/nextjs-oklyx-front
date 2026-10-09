@@ -57,11 +57,14 @@ export function isOptionNotice(notice: CategoryNotice): boolean {
  * `개당 수량` 에 구성상품 수량 합을 넣으면 틀린 값이 마켓까지 간다. 개당 값은 물품에서 도출할
  * 수도 없으므로(물품은 `netContent` 만 가진다) 사용자 입력으로 남긴다.
  *
+ * `팩 수량`·`팩당 수량`(Coupang 커피·음료 카테고리) are separate pack counts, not the item-quantity sum —
+ * filling both with it sent 팩 4 × 팩당 4 next to 총 수량 4 (2026-10-09). They stay user input.
+ *
  * 🔴 **화면(읽기 전용 렌더)과 자동채움(값 주입)이 이 술어 하나를 공유**해야 한다 — 갈라지면
  * "잠겼는데 아무도 안 채우는" 칸이나 "손으로 고쳐도 덮어써지는" 칸이 생긴다.
  */
 export function isTotalQuantityName(name: string): boolean {
-  return name.includes('수량') && !name.includes('개당');
+  return name.includes('수량') && !name.includes('개당') && !name.includes('팩');
 }
 
 /**
