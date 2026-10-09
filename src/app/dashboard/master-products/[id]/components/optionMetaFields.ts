@@ -50,28 +50,34 @@ export function isOptionNotice(notice: CategoryNotice): boolean {
 }
 
 /**
- * 구성상품 수량 합을 넣어도 되는 "수량" 필드인가 = **자동채움이 소유하는 수량 속성**.
- *
- * ⚠️ 이름에 "수량" 이 들었다고 전부 채우면 안 된다 — 쿠팡 카테고리는 `수량`·`총 수량` 과
- * **`개당 수량`**(낱개 1개에 든 개수)을 **별개 속성**으로 준다(기타스낵 72900 · 72882 실측).
- * `개당 수량` 에 구성상품 수량 합을 넣으면 틀린 값이 마켓까지 간다. 개당 값은 물품에서 도출할
- * 수도 없으므로(물품은 `netContent` 만 가진다) 사용자 입력으로 남긴다.
- *
- * `팩 수량`·`팩당 수량`(Coupang 커피·음료 카테고리) are separate pack counts, not the item-quantity sum —
- * filling both with it sent 팩 4 × 팩당 4 next to 총 수량 4 (2026-10-09). They stay user input.
- *
- * 🔴 **화면(읽기 전용 렌더)과 자동채움(값 주입)이 이 술어 하나를 공유**해야 한다 — 갈라지면
- * "잠겼는데 아무도 안 채우는" 칸이나 "손으로 고쳐도 덮어써지는" 칸이 생긴다.
+ * A notice key that takes the item-quantity sum (notice auto-fill only — attributes use isAutoQuantityAttr).
+ * Excludes per-unit and pack counts, which are not the item-quantity sum.
  */
 export function isTotalQuantityName(name: string): boolean {
   return name.includes('수량') && !name.includes('개당') && !name.includes('팩');
 }
 
-/**
- * `총 수량` = 개당 수량 × 수량 (Coupang ties the three together: 12개입 × 2 → 24). It is still auto-filled and
- * read-only (a subset of isTotalQuantityName), but from that product — not from the item-quantity sum.
- */
+export const QUANTITY_NAME = '수량';
+export const GRAND_TOTAL_QUANTITY_NAME = '총 수량';
 export const PER_UNIT_QUANTITY_NAME = '개당 수량';
+
+/**
+ * 구성상품 수량에서 자동으로 채우고 화면에서 잠그는 카테고리 속성인가.
+ *
+ * - `총 수량` — 항상(= 개당 수량 × 수량, 개당 수량이 비면 1로 본다).
+ * - `수량` — 그 카테고리에서 **필수일 때만**. 커피음료(58795)처럼 선택인 카테고리에서 채우면 쿠팡이
+ *   노출 속성으로 옵션명에 붙여 `2.1L x 4개 x 4개` 가 된다(2026-10-09). 선택이면 사용자 입력으로 남긴다.
+ * - 이름 **정확히 일치**만. `박스 수량`·`박스 내 패키지 수량`·`팩 수량`·`개당 수량` 등은 별개 개념이라
+ *   구성상품 수량 합을 넣으면 틀린 값이 간다(음료 카테고리, 2026-10-09).
+ *
+ * 🔴 화면(읽기 전용 렌더)과 자동채움(값 주입)이 이 술어 하나를 공유해야 한다 — 갈라지면
+ * "잠겼는데 아무도 안 채우는" 칸이나 "손으로 고쳐도 덮어써지는" 칸이 생긴다.
+ */
+export function isAutoQuantityAttr(a: Pick<CategoryAttribute, 'name' | 'required'>): boolean {
+  return a.name === GRAND_TOTAL_QUANTITY_NAME || (a.name === QUANTITY_NAME && a.required);
+}
+
+/** `총 수량` = 개당 수량 × 수량 (Coupang ties the three together: 12개입 × 2 → 24). */
 export function isGrandTotalQuantityName(name: string): boolean {
-  return isTotalQuantityName(name) && name.includes('총');
+  return name === GRAND_TOTAL_QUANTITY_NAME;
 }

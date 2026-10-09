@@ -22,7 +22,7 @@ import {
   isGrandTotalQuantityName,
   isOptionField,
   isOptionNotice,
-  isTotalQuantityName,
+  isAutoQuantityAttr,
 } from './optionMetaFields';
 import { noticeGroupName } from './noticeTemplates';
 import { unitPlaceholder, unitSuffix } from './basicUnit';
@@ -270,10 +270,10 @@ export function CategoryMetaOverrideFields({
       );
     }
     const a = cell.a;
-    // 수량(`수량`·`총 수량`)은 **구성상품 수량 합**이 SSOT 라 여기서 직접 고치지 않는다
-    // (위 구성상품 수량 칸에서만 바꾼다). 판정은 자동채움과 **같은 술어**(isTotalQuantityName) —
-    // 갈라지면 "잠겼는데 아무도 안 채우는" 칸이 생긴다. ⚠️ `개당 수량` 은 도출 불가라 제외된다.
-    const autoQty = isTotalQuantityName(a.name);
+    // 수량(`총 수량`·필수 `수량`)은 **구성상품 수량 합**이 SSOT 라 여기서 직접 고치지 않는다
+    // (위 구성상품 수량 칸에서만 바꾼다). 판정은 자동채움과 **같은 술어**(isAutoQuantityAttr) —
+    // 갈라지면 "잠겼는데 아무도 안 채우는" 칸이 생긴다.
+    const autoQty = isAutoQuantityAttr(a);
     const help = helpOf(a.name);
     return (
       <div key={`a-${a.name}`} className="flex min-w-0 flex-col">
