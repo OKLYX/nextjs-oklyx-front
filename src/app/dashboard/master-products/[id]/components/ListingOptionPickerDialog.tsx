@@ -45,8 +45,8 @@ interface ListingOptionPickerDialogProps {
  *   🔴 이 창이 쿠팡 반영의 확인창이다(D29) — [올리기]를 누르기 전에는 쿠팡에 아무것도 보내지 않는다.
  * - select: [저장] → 활성 옵션만 저장(쿠팡 전송 없음). 이미 올린 판매상품이면 [수정 요청]이 필요하다.
  * - Upload mode display-name field: [저장] uses the same `updateDisplayName` path as
- *   `ListingDetailPanel` (empty value is not saved). It is independent of [올리기]; the saved
- *   name is what registration sends to Coupang as `displayProductName`.
+ *   `ListingDetailPanel` (empty value is not saved). While [저장] is enabled (unsaved edit) or
+ *   saving, [올리기] is disabled; the saved name is what registration sends as `displayProductName`.
  *
  * ⚠️ 옵션·판매가·마켓 잠금은 열 때 `getGenerated` 한 번으로 읽는다(두 모드 같은 경로).
  * ⚠️ 마켓에 올라간 옵션(`onMarket && active`)은 끌 수 없다 — 체크 잠금 + 🔒(87).
@@ -103,7 +103,11 @@ export function ListingOptionPickerDialog({
     selected.size !== currentActive.length || currentActive.some((id) => !selected.has(id));
   const shippingBlocked = mode === 'upload' && gen?.shippingReady === false;
   const hasLocked = prices.some((p) => p.onMarket === true && p.active !== false);
-  const canConfirm = gen !== null && !busy && selected.size > 0 && !shippingBlocked;
+  // Upload is blocked while the display-name [저장] is enabled (unsaved edit) or saving —
+  // registration sends the SAVED name, so an unsaved edit would silently not reach Coupang.
+  const nameUnsaved = mode === 'upload' && !!trimmedName && trimmedName !== savedName;
+  const canConfirm =
+    gen !== null && !busy && selected.size > 0 && !shippingBlocked && !nameUnsaved && !savingName;
 
   const toggle = (optionId: number) => {
     setSelected((prev) => {
@@ -181,6 +185,7 @@ export function ListingOptionPickerDialog({
           <Button
             onClick={handleConfirm}
             disabled={!canConfirm}
+            title={nameUnsaved ? '노출상품명을 먼저 저장하세요.' : undefined}
             isLoading={busy}
             loadingText={mode === 'upload' ? '올리는 중...' : '저장 중...'}
           >
