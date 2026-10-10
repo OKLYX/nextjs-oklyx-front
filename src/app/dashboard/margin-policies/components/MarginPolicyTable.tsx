@@ -262,6 +262,12 @@ export function MarginPolicyTable() {
                 value={formPct}
                 onChange={(e) => setFormPct(e.target.value)}
               />
+              {/* FEATURE_2610_10 / D18: the 11st price-comparison fee is not in the price calculation. */}
+              {formPlatform === 'ELEVENST' && (
+                <p className="mt-2 text-xs text-gray-500">
+                  11번가는 가격비교 사이트를 거친 주문에 수수료 2%(부가세 포함 2.2%)가 더 붙습니다. 판매가 계산에는 들어가지 않으니 목표 마진율에 2.2%p 를 더해 입력하세요.
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">표시 할인율 (0~0.5)</label>

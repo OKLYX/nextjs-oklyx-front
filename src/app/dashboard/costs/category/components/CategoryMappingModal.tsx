@@ -11,13 +11,14 @@ import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
 import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
- * 표준 카테고리의 몰별 매핑현황 + 채우기(조회 피커 재사용) 모달.
+ * Per-mall mapping status of a standard category + filling it (reuses the lookup picker) modal.
  *
- * hand-rolled `fixed inset-0`. 몰마다 현재 매핑(코드/경로) 또는 "미매핑" 표시 +
- * [조회 매핑] 버튼 → `CategoryLookupPickerModal`(그 platform) → 선택 → `upsertMapping`.
- * 삭제 = `deleteMapping`. useCase 는 **부모 인스턴스 재사용**.
+ * Built on `ui/Modal`. Per mall, the current mapping (code/path) or 「미매핑」 +
+ * a [조회 매핑] button → `CategoryLookupPickerModal` (that platform) → pick → `upsertMapping`.
+ * Delete = `deleteMapping`. The useCases are **the parent's instances**.
  *
- * ⚠️ 조회 지원 플랫폼 = 쿠팡만(45 백엔드). 네이버는 seam 자리(후속) — [조회 매핑] 미노출.
+ * ⚠️ Lookup platforms = Coupang and 11st (11st browses the imported 11st list — FEATURE_2610_10 / D21 ③).
+ *    Naver is a backend seam only (later) — no [조회 매핑] for it.
  */
 interface CategoryMappingModalProps {
   open: boolean;
@@ -29,9 +30,10 @@ interface CategoryMappingModalProps {
   onClose: () => void;
 }
 
-// 조회 피커를 붙일 수 있는 플랫폼(쿠팡만). 네이버는 백엔드 seam 자리 → 후속.
-const LOOKUP_PLATFORMS: { platform: 'COUPANG'; label: string }[] = [
+// Platforms the lookup picker can open for (Coupang, 11st). Naver is a backend seam only → later.
+const LOOKUP_PLATFORMS: { platform: 'COUPANG' | 'ELEVENST'; label: string }[] = [
   { platform: 'COUPANG', label: '쿠팡' },
+  { platform: 'ELEVENST', label: '11번가' },
 ];
 
 export function CategoryMappingModal({
@@ -45,7 +47,7 @@ export function CategoryMappingModal({
 }: CategoryMappingModalProps) {
   const [error, setError] = useState('');
   const [busyPlatform, setBusyPlatform] = useState<string | null>(null);
-  const [pickerPlatform, setPickerPlatform] = useState<'COUPANG' | 'NAVER' | null>(null);
+  const [pickerPlatform, setPickerPlatform] = useState<'COUPANG' | 'NAVER' | 'ELEVENST' | null>(null);
 
   if (!open) return null;
 
