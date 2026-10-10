@@ -8,15 +8,16 @@ import type { CategoryNode } from '@/domain/entities/CategoryLookupEntity';
 import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
- * 마켓 카테고리 조회 피커(트리 드릴다운 + 상품명 추천) — 코드 손타이핑 없이 선택.
+ * Marketplace category lookup picker (tree drill-down + product-name prediction) — pick without typing codes.
  *
- * hand-rolled `fixed inset-0` 모달(shadcn 미도입). useCase 는 **부모 인스턴스 재사용**
- * (모달 내 신규 생성 금지). 선택 확정 시 `onSelect({platformCategoryId, name, namePath})`.
- * 조회 실패(활성 계정 없음/500)는 피커 내 인라인 배너로 표시.
+ * Built on `ui/Modal` (no shadcn). The useCase is **the parent's instance**
+ * (never created inside the modal). Confirming calls `onSelect({platformCategoryId, name, namePath})`.
+ * A lookup failure (no active account / 500) shows as an inline banner in the picker.
+ * 11st (ELEVENST) has no product-name prediction (FEATURE_2610_10 / D21 ③) — its predict tab is not rendered.
  */
 interface CategoryLookupPickerModalProps {
   open: boolean;
-  platform: 'COUPANG' | 'NAVER';
+  platform: 'COUPANG' | 'NAVER' | 'ELEVENST';
   lookupUseCase: CategoryLookupUseCase;
   onSelect: (sel: { platformCategoryId: string; name: string; namePath: string }) => void;
   onClose: () => void;
@@ -129,14 +130,16 @@ export function CategoryLookupPickerModal({
           >
             트리 탐색
           </button>
-          <button
-            onClick={() => setTab('predict')}
-            className={`flex-1 px-4 py-2 text-sm font-medium ${
-              tab === 'predict' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
-            }`}
-          >
-            상품명 추천
-          </button>
+          {platform !== 'ELEVENST' && (
+            <button
+              onClick={() => setTab('predict')}
+              className={`flex-1 px-4 py-2 text-sm font-medium ${
+                tab === 'predict' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
+              }`}
+            >
+              상품명 추천
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
