@@ -17,6 +17,12 @@ export class MarketplaceAccountRepositoryImpl implements MarketplaceAccountRepos
     return response.data.data;
   }
 
+  // No sellerId = every account of the tenant (backend `list(null)` → `findAll`).
+  async getAll(): Promise<MarketplaceAccount[]> {
+    const response = await axiosInstance.get('/api/admin/marketplace-account');
+    return response.data.data;
+  }
+
   async create(data: CreateMarketplaceAccountRequest): Promise<MarketplaceAccount> {
     const response = await axiosInstance.post('/api/admin/marketplace-account', data);
     return response.data.data;

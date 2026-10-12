@@ -15,6 +15,7 @@ import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 import { CellActions } from './CellActions';
 import { CopyIdButton } from './CopyIdButton';
 import { ListingDetailPanel, formatWon, type ListingOptionView } from './ListingDetailPanel';
+import { asLookupPlatform, type LookupPlatform } from '../../components/platformCategory';
 
 // 상태 enum → 화면 문구. ⚠️ enum 원문(`SELLING` 등)을 사용자에게 노출하지 않는다(UI 용어 규칙).
 export const STATUS_LABEL: Record<ListingStatus, string> = {
@@ -129,6 +130,10 @@ interface ListingRowProps {
   onShippingSaved: (listingId: number, updated: GeneratedProductResponse) => void;
   masterCategoryName: string | null;
   onCellRemoved: (message: string) => void;
+  /** The master has a standard category (D18 (f) — no category = nothing is blocked). */
+  hasMasterCategory: boolean;
+  /** [카테고리 선택하기] on a blocked unsent row — the parent opens that platform's picker (D21 ②). */
+  onPickPlatformCategory: (platform: LookupPlatform) => void;
 }
 
 /**
@@ -162,6 +167,8 @@ export function ListingRow({
   onShippingSaved,
   masterCategoryName,
   onCellRemoved,
+  hasMasterCategory,
+  onPickPlatformCategory,
 }: ListingRowProps) {
   const [expanded, setExpanded] = useState(false);
   const status = cellStatus(cell);
@@ -175,6 +182,11 @@ export function ListingRow({
   const needsSync = cell.needsMarketSync === true;
   const categoryMismatch = cell.usesOwnCategory === true;
   const categoryLabel = cell.categoryName ?? cell.categoryCode ?? null;
+  // FEATURE_2610_11 / D19: an unsent row whose category the server could not resolve (empty
+  // `categoryCode`) hides its upload button. Coupang · 11st only (D20), and only with a master category.
+  const lookupPlatform = asLookupPlatform(platform);
+  const categoryBlocked =
+    lookupPlatform != null && hasMasterCategory && status === 'DRAFT' && !cell.categoryCode;
 
   const thumbUrl = gen?.thumbnailUrl ? resolveThumbUrl(gen.thumbnailUrl) : null;
   const pending = gen === undefined && genLoading;
@@ -319,6 +331,10 @@ export function ListingRow({
             cells={[cell]}
             onCellRemoved={onCellRemoved}
             needsMarketSync={needsSync}
+            categoryBlocked={categoryBlocked}
+            onPickCategory={() => {
+              if (lookupPlatform != null) onPickPlatformCategory(lookupPlatform);
+            }}
           />
         )}
       </div>

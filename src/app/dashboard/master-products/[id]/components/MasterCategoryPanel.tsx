@@ -9,9 +9,16 @@ import { CategoryTreeColumns } from '@/presentation/components/CategoryTreeColum
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import type { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import type { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUseCase';
+import type { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
 import type { MasterCategoryResponse } from '@/domain/entities/MasterProductEntity';
 import type { CategoryTreeNode } from '@/domain/entities/CategoryEntity';
 import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
+import { MissingPlatformCategoryModal } from '../../components/MissingPlatformCategoryModal';
+import {
+  lookupPlatformLabel,
+  missingPlatformsOf,
+  type LookupPlatform,
+} from '../../components/platformCategory';
 
 interface MasterCategoryPanelProps {
   masterId: number;
@@ -21,22 +28,34 @@ interface MasterCategoryPanelProps {
   // 지정/해제 결과를 부모 컨테이너에 통지 → 형제 섹션(카테고리 메타·옵션)이 새 카테고리 기준으로 바뀐다.
   // 지정 = setCategory 응답 그대로, 해제 = null. 패널은 계속 자기 표시 상태를 스스로 들고 있다.
   onCategoryChanged?: (next: MasterCategoryResponse | null) => void;
+  /** Parent-owned lookup use case — the missing-platform popup opens the shared picker with it. */
+  lookupUseCase: CategoryLookupUseCase;
+  /** Lookup platforms with a switched-on account (D17). Empty = none / not loaded / failed → nothing is asked. */
+  activePlatforms: LookupPlatform[];
+  /** Bumped by the parent after a mapping save elsewhere on the page → this panel re-reads (D11). */
+  mappingsVersion: number;
+  /** [카테고리 선택하기] on a missing-platform line — the parent opens the picker and saves (D21 ③). */
+  onPickPlatformCategory: (platform: LookupPlatform) => void;
 }
 
 /**
- * 표준 카테고리 지정 패널 (마스터 상세). 마스터는 표준 카테고리 하나만 지정하고,
- * 몰별 마켓 코드는 매핑(CategoryMapping)이 해석한다 (백엔드 44).
+ * Standard category assignment panel (master detail). A master points at one standard category;
+ * per-mall marketplace codes are resolved by the mappings (CategoryMapping, backend 44).
  * File: src/app/dashboard/master-products/[id]/components/MasterCategoryPanel.tsx
  *
- * 지정 = miller-columns 트리 드릴다운(공통 CategoryTreeColumns, 생성 모달과 동일). leaf
- * 선택 시 즉시 setCategory. 몰별 매핑 배지는 읽기 전용 — 매핑 채우기는 F1 관리 화면 유도.
+ * Assign = miller-columns tree drill-down (shared CategoryTreeColumns, same as the create form). Picking a
+ * leaf first checks that leaf's mappings: if a switched-on platform (Coupang · 11st) has none, the
+ * 「플랫폼 카테고리 선택」 popup opens, and the assignment runs when it closes (pick or skip — FEATURE_2610_11 / D8).
+ * Otherwise setCategory runs immediately. Badges stay read-only; a platform missing a mapping gets a
+ * 「{플랫폼} 카테고리 없음」 line + [카테고리 선택하기], which the parent handles (D23).
  *
- * ⚠️ 카테고리는 형제 섹션(카테고리 메타·옵션 상속값)의 입력이기도 하다 → 변경 시 `onCategoryChanged`
- * 로 부모에 알린다. 부모는 그 값만 갈아끼우고 **상세 전체를 재조회하지 않는다**(83A 규칙).
+ * ⚠️ The category is also the input of sibling sections (category meta, option inheritance) → every change
+ * is reported to the parent through `onCategoryChanged`. The parent swaps that value and re-reads only what
+ * depends on it (category meta · mappings · channel rows) — it **never reloads the whole detail** (83A rule).
  *
- * ⚠️ 이 패널은 [상품 기본 정보] 토글 **안의 하위 블록**이다(사용자 요청 2026-08-29) → 자체 카드
- * 껍데기(rounded/shadow) 없이 형제 블록(옵션·이미지)과 같은 `border-t + p-4`·`<h3>` 를 쓴다.
- * 단독 섹션으로 되돌리지 말 것.
+ * ⚠️ This panel is a **sub-block inside** the [상품 기본 정보] tab (user request 2026-08-29) → it draws no
+ * card shell (rounded/shadow) of its own and uses the same `border-t + p-4` · `<h3>` as its sibling blocks
+ * (options · images). Do not turn it back into a standalone section.
  */
 export function MasterCategoryPanel({
   masterId,
@@ -44,6 +63,10 @@ export function MasterCategoryPanel({
   categoryUseCase,
   mappingUseCase,
   onCategoryChanged,
+  lookupUseCase,
+  activePlatforms,
+  mappingsVersion,
+  onPickPlatformCategory,
 }: MasterCategoryPanelProps) {
   const [current, setCurrent] = useState<MasterCategoryResponse | null>(null);
   const [mappings, setMappings] = useState<CategoryMapping[]>([]);
@@ -54,6 +77,11 @@ export function MasterCategoryPanel({
   const [isTreeOpen, setIsTreeOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  // Leaf waiting for the missing-platform popup to close (null = popup closed).
+  const [pendingLeaf, setPendingLeaf] = useState<{
+    leaf: CategoryTreeNode;
+    platforms: LookupPlatform[];
+  } | null>(null);
 
   // Stable browse reference so CategoryTreeColumns' mount effect doesn't re-run every render.
   const browseTree = useCallback(
@@ -80,14 +108,15 @@ export function MasterCategoryPanel({
     }
   }, [useCase, mappingUseCase, masterId]);
 
+  // `mappingsVersion` re-runs the load after a mapping save made by the parent (D11).
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, mappingsVersion]);
 
-  // Leaf picked in the tree → assign it to this master immediately, then reload.
-  const handleSelectLeaf = async (leaf: CategoryTreeNode) => {
+  // Assign the leaf to this master, then reload.
+  const assignLeaf = async (leaf: CategoryTreeNode) => {
     setIsSaving(true);
     setError('');
     try {
@@ -100,6 +129,30 @@ export function MasterCategoryPanel({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Leaf picked in the tree → ask for missing platform categories first (D8), then assign.
+  // A failed mapping read asks nothing and assigns right away.
+  const handleSelectLeaf = async (leaf: CategoryTreeNode) => {
+    if (activePlatforms.length > 0) {
+      setIsSaving(true);
+      const leafMappings = await mappingUseCase.getMappings(leaf.id).catch(() => null);
+      setIsSaving(false);
+      const missing = leafMappings ? missingPlatformsOf(activePlatforms, leafMappings) : [];
+      if (missing.length > 0) {
+        setPendingLeaf({ leaf, platforms: missing });
+        return;
+      }
+    }
+    await assignLeaf(leaf);
+  };
+
+  // Popup closed (picked or skipped) → continue with the assignment (D8).
+  const handleMissingClose = () => {
+    if (!pendingLeaf) return;
+    const { leaf } = pendingLeaf;
+    setPendingLeaf(null);
+    void assignLeaf(leaf);
   };
 
   const handleClear = async () => {
@@ -118,6 +171,7 @@ export function MasterCategoryPanel({
   };
 
   const busy = isSaving || isClearing;
+  const missingPlatforms = current ? missingPlatformsOf(activePlatforms, mappings) : [];
 
   // 테두리·제목을 스스로 그리지 않는다 — 「상품 기본 정보」 탭의 `StackedBlock` 이 제목을, `divide-y` 가 선을 긋는다.
   // 🔴 `border-t` 나 `<h3>표준 카테고리` 를 되살리지 말 것 — 선이 두 번, 제목이 두 번 보인다.
@@ -153,6 +207,21 @@ export function MasterCategoryPanel({
               </Link>
             </p>
           )}
+          {missingPlatforms.map((platform) => (
+            <div key={platform} className="flex flex-wrap items-center gap-2">
+              <p className="text-xs text-amber-700">
+                {`${lookupPlatformLabel(platform)} 카테고리 없음 — 올릴 수 없습니다`}
+              </p>
+              <button
+                type="button"
+                onClick={() => onPickPlatformCategory(platform)}
+                disabled={busy}
+                className="rounded border border-amber-300 bg-white px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+              >
+                카테고리 선택하기
+              </button>
+            </div>
+          ))}
         </div>
       ) : (
         <p className="mb-3 text-sm text-gray-500">
@@ -201,6 +270,17 @@ export function MasterCategoryPanel({
             </div>
           )}
         </div>
+      )}
+
+      {pendingLeaf && (
+        <MissingPlatformCategoryModal
+          categoryId={pendingLeaf.leaf.id}
+          categoryName={pendingLeaf.leaf.name}
+          platforms={pendingLeaf.platforms}
+          mappingUseCase={mappingUseCase}
+          lookupUseCase={lookupUseCase}
+          onClose={handleMissingClose}
+        />
       )}
     </div>
   );
