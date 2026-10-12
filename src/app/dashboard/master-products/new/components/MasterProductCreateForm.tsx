@@ -65,6 +65,19 @@ import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
+import { useAuthStore } from '@/infrastructure/stores/authStore';
+import { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUseCase';
+import { CategoryMappingRepositoryImpl } from '@/infrastructure/repositories/CategoryMappingRepositoryImpl';
+import { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
+import { CategoryLookupRepositoryImpl } from '@/infrastructure/repositories/CategoryLookupRepositoryImpl';
+import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAccountUseCase';
+import { MarketplaceAccountRepositoryImpl } from '@/infrastructure/repositories/MarketplaceAccountRepositoryImpl';
+import { MissingPlatformCategoryModal } from '../../components/MissingPlatformCategoryModal';
+import {
+  activeLookupPlatformsOf,
+  missingPlatformsOf,
+  type LookupPlatform,
+} from '../../components/platformCategory';
 import {
   MARKET_ATTACH_FAIL_PREFIX,
   MARKET_NOT_ATTACHED_SUFFIX,
@@ -166,6 +179,22 @@ export function MasterProductCreateForm({
     () => new ListingRegistrationUseCase(new ListingRegistrationRepositoryImpl()),
     [],
   );
+  // FEATURE_2610_11 / D8: the missing-platform popup after [설정적용] (the parent props contract stays as is).
+  const mappingUseCase = useMemo(
+    () => new CategoryMappingUseCase(new CategoryMappingRepositoryImpl()),
+    [],
+  );
+  const lookupUseCase = useMemo(
+    () => new CategoryLookupUseCase(new CategoryLookupRepositoryImpl()),
+    [],
+  );
+  const marketplaceUseCase = useMemo(
+    () => new MarketplaceAccountUseCase(new MarketplaceAccountRepositoryImpl()),
+    [],
+  );
+  // The popup and its lookups are `/api/admin/**` → ADMIN only (D12).
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === 'ADMIN';
   // 2609_79 / UX D71: 마켓 모드의 옵션 원형(이름 = 마켓 옵션명, 구성 수량 비움). 초기화도 이 값으로 돌아간다.
   const marketOptions = useMemo(() => (market ? marketOptionsOf(market.preview) : null), [market]);
   const [name, setName] = useState(
@@ -326,14 +355,81 @@ export function MasterProductCreateForm({
     [selectedCategoryId, hasOptionInput, market, discardOptions],
   );
 
-  // Apply the picked category: clear the search UI and freeze the section (수정 to reopen).
-  const applyCategory = () => {
+  // Freeze the picked category: clear the search UI and lock the section ([수정] to reopen).
+  const lockCategory = () => {
     setCatSearchInput('');
     setCatResults([]);
     setCatHasSearched(false);
     setCatTotalMatches(0);
     setCategoryLocked(true);
   };
+
+  // FEATURE_2610_11 / D1·D17: switched-on Coupang · 11st platforms the category has no mapping for.
+  // A failed lookup asks nothing (empty list) — the category still locks.
+  const findMissingPlatforms = useCallback(
+    async (categoryId: number): Promise<LookupPlatform[]> => {
+      if (!isAdmin) return [];
+      try {
+        const [accounts, mappings] = await Promise.all([
+          marketplaceUseCase.getAll(),
+          mappingUseCase.getMappings(categoryId),
+        ]);
+        return missingPlatformsOf(activeLookupPlatformsOf(accounts), mappings);
+      } catch {
+        return [];
+      }
+    },
+    [isAdmin, marketplaceUseCase, mappingUseCase],
+  );
+  // Open missing-platform popup (null = closed). Closing it (pick or skip) locks the category (D8).
+  const [missingPrompt, setMissingPrompt] = useState<{
+    categoryId: number;
+    categoryName: string;
+    platforms: LookupPlatform[];
+  } | null>(null);
+  const [isCheckingCategory, setIsCheckingCategory] = useState(false);
+
+  // [설정적용]: ask for missing platform categories first (D8), then lock.
+  const applyCategory = async () => {
+    if (selectedCategoryId === '') return;
+    setIsCheckingCategory(true);
+    const platforms = await findMissingPlatforms(Number(selectedCategoryId));
+    setIsCheckingCategory(false);
+    if (platforms.length > 0) {
+      setMissingPrompt({
+        categoryId: Number(selectedCategoryId),
+        categoryName: selectedCategoryName,
+        platforms,
+      });
+      return;
+    }
+    lockCategory();
+  };
+
+  // Popup closed → lock. After the market-mode check on open the category is already locked, so this
+  // re-lock changes nothing there.
+  const handleMissingClose = () => {
+    setMissingPrompt(null);
+    lockCategory();
+  };
+
+  // D18 (e): market mode opens with the category already locked → check once on open.
+  useEffect(() => {
+    if (marketCategoryId == null) return;
+    let alive = true;
+    void (async () => {
+      const platforms = await findMissingPlatforms(marketCategoryId);
+      if (!alive || platforms.length === 0) return;
+      setMissingPrompt({
+        categoryId: marketCategoryId,
+        categoryName: market?.preview.suggestedCategoryName ?? '',
+        platforms,
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [marketCategoryId, market, findMissingPlatforms]);
 
   // Unlock the category for editing; if options exist, confirm they will be discarded.
   const editCategory = () => {
@@ -1185,8 +1281,8 @@ export function MasterProductCreateForm({
                 ) : (
                   <button
                     type="button"
-                    onClick={applyCategory}
-                    disabled={selectedCategoryId === ''}
+                    onClick={() => void applyCategory()}
+                    disabled={selectedCategoryId === '' || isCheckingCategory}
                     className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
                   >
                     설정적용
@@ -1503,6 +1599,17 @@ export function MasterProductCreateForm({
         onCancel={() => setConfirmDialog(null)}
         nested
       />
+
+      {missingPrompt && (
+        <MissingPlatformCategoryModal
+          categoryId={missingPrompt.categoryId}
+          categoryName={missingPrompt.categoryName}
+          platforms={missingPrompt.platforms}
+          mappingUseCase={mappingUseCase}
+          lookupUseCase={lookupUseCase}
+          onClose={handleMissingClose}
+        />
+      )}
 
       <ConfirmDialog
         isOpen={leaveConfirmOpen}
