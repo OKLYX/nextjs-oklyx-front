@@ -16,6 +16,7 @@ import { ChannelPriceModal } from './ChannelPriceModal';
 import { ChannelOptionNameModal } from './ChannelOptionNameModal';
 import { ChannelShippingOverrideModal } from './ChannelShippingOverrideModal';
 import { ListingOptionPickerDialog, SHIPPING_BLOCKED_REASON } from './ListingOptionPickerDialog';
+import { asLookupPlatform, categoryBlockReason } from '../../components/platformCategory';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type {
   ListingStatus,
@@ -70,6 +71,10 @@ interface CellActionsProps {
   onCellRemoved: (message: string) => void;
   /** 로컬 변경이 마켓에 아직 안 갔다(`MatrixCell.needsMarketSync === true`) → [수정 요청]이 주 버튼. */
   needsMarketSync: boolean;
+  /** Unsent row without a resolvable category (FEATURE_2610_11 / D19) → upload button hidden + notice. */
+  categoryBlocked: boolean;
+  /** [카테고리 선택하기] in that notice — the parent opens the picker (D21 ②). */
+  onPickCategory: () => void;
 }
 
 interface MenuItem {
@@ -107,18 +112,23 @@ type Busy =
   | null;
 
 /**
- * 판매상품(셀) 한 줄의 액션 = **주 버튼 하나 + ⋯ 메뉴**.
+ * Actions of one listing (cell) row = **one primary button + ⋯ menu**.
  * File: src/app/dashboard/master-products/[id]/components/CellActions.tsx
  *
- * - 주 버튼: 미전송(DRAFT) = 쿠팡 [쿠팡에 올리기](옵션 고르기 확인창, 2609_77/D43) · 그 밖의 플랫폼 [마켓 등록]
- *   · 변경 미반영(`needsMarketSync`) = [수정 요청] · 그 외 없음.
- * - ⋯ 메뉴: 편집(필드값·상세·가격·재고·옵션명·배송·올릴 옵션 고르기) / 동기화(수정 요청·승인 새로고침·재생성) /
- *   연결(쿠팡에서 보기·마스터 카테고리로 변경) / 구분선 아래 빨간 [마스터 연결 해제]·[채널 삭제].
- * - 결과 알림(성공·실패·승인 결과)은 행 아래 한 줄(`basis-full`)로 나온다 — 부모 행이 flex-wrap 이어야 한다.
+ * - Primary: unsent (DRAFT) = Coupang [쿠팡에 올리기] (option picker confirm, 2609_77/D43) · other
+ *   platforms [마켓 등록] · unsynced changes (`needsMarketSync`) = [수정 요청] · otherwise none. An unsent
+ *   row whose category the server could not resolve (`categoryBlocked`) shows no primary button — the
+ *   category notice + [카테고리 선택하기] take its place (FEATURE_2610_11 / D24).
+ * - ⋯ menu: 「편집」 (field values · detail · price · stock · option names · shipping · options to upload) /
+ *   「동기화」 (update request · approval refresh · regenerate) / 「연결」 ([쿠팡에서 보기] · back to the
+ *   master category) / red [마스터 연결 해제] · [채널 삭제] under a divider.
+ * - Result notices (success · failure · approval result) show as one line under the row (`basis-full`) —
+ *   the parent row must be flex-wrap.
  *
- * 마켓 호출은 비동기(즉시 반환) — 승인은 이후 [승인 새로고침]으로 확인.
- * [수정 요청](109): 등록된 셀(DRAFT 아님)의 현재 값을 마켓에 강제 재전송 → 재심사(SUBMITTED).
- * ⚠️ 동작(핸들러·확인창·모달)은 버튼 줄 시절과 같다 — 바뀐 것은 위치와 묶음뿐이다.
+ * Market calls are async (they return at once) — approval is checked later with [승인 새로고침].
+ * [수정 요청](109): force re-push of a registered cell's (not DRAFT) current values → re-review (SUBMITTED).
+ * ⚠️ Behaviour (handlers · confirms · modals) is the same as in the button-row days — only the placement
+ *    and grouping changed.
  */
 export function CellActions({
   masterId,
@@ -139,6 +149,8 @@ export function CellActions({
   cells,
   onCellRemoved,
   needsMarketSync,
+  categoryBlocked,
+  onPickCategory,
 }: CellActionsProps) {
   const router = useRouter();
   const useCase = useMemo(
@@ -443,14 +455,20 @@ export function CellActions({
   };
 
   const hasFeedback =
-    (status === 'DRAFT' && shippingBlocked) || !!pushedBanner || !!statusResult || !!error;
+    categoryBlocked ||
+    (status === 'DRAFT' && shippingBlocked) ||
+    !!pushedBanner ||
+    !!statusResult ||
+    !!error;
+  // Label source for the category notice. `categoryBlocked` is only ever true for Coupang · 11st.
+  const lookupPlatform = asLookupPlatform(platform);
 
   return (
     // `contents` = 액션 묶음과 알림 줄이 부모(판매상품 행)의 flex 흐름에 그대로 들어간다 —
     // 액션은 행 오른쪽 끝, 알림 줄은 `basis-full` 로 행 아래 한 줄을 차지한다.
     <div className="contents">
       <div className="flex shrink-0 items-center gap-1.5">
-        {primary === 'upload' && (
+        {primary === 'upload' && !categoryBlocked && (
           <button
             type="button"
             onClick={() => setShowUpload(true)}
@@ -461,7 +479,7 @@ export function CellActions({
             쿠팡에 올리기
           </button>
         )}
-        {primary === 'register' && (
+        {primary === 'register' && !categoryBlocked && (
           <button
             type="button"
             onClick={handleRegister}
@@ -558,6 +576,19 @@ export function CellActions({
 
       {hasFeedback && (
         <div className="basis-full space-y-1 pl-9">
+          {/* FEATURE_2610_11 / D24·D26: the hidden upload button's place — above the shipping line. */}
+          {categoryBlocked && lookupPlatform != null && (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[11px] text-amber-700">{categoryBlockReason(lookupPlatform)}</p>
+              <button
+                type="button"
+                onClick={onPickCategory}
+                className="rounded border border-amber-300 bg-white px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+              >
+                카테고리 선택하기
+              </button>
+            </div>
+          )}
           {/* disabled 버튼의 title 은 hover 가 안 뜨는 브라우저가 있어 보이는 안내 1줄을 함께 둔다. */}
           {status === 'DRAFT' && shippingBlocked && (
             <p className="text-[11px] text-gray-500">{SHIPPING_BLOCKED_REASON}</p>

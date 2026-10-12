@@ -33,6 +33,7 @@ export interface UpdateMarketplaceAccountRequest {
 
 export interface MarketplaceAccountRepository {
   getBySeller(sellerId: number): Promise<MarketplaceAccount[]>;
+  getAll(): Promise<MarketplaceAccount[]>;
   create(data: CreateMarketplaceAccountRequest): Promise<MarketplaceAccount>;
   update(id: number, data: UpdateMarketplaceAccountRequest): Promise<MarketplaceAccount>;
   updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;

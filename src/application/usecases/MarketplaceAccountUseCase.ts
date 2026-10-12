@@ -13,6 +13,10 @@ export class MarketplaceAccountUseCase {
     return this.repository.getBySeller(sellerId);
   }
 
+  async getAll(): Promise<MarketplaceAccount[]> {
+    return this.repository.getAll();
+  }
+
   async create(data: CreateMarketplaceAccountRequest): Promise<MarketplaceAccount> {
     return this.repository.create(data);
   }
