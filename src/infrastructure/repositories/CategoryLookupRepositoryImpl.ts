@@ -16,4 +16,11 @@ export class CategoryLookupRepositoryImpl implements CategoryLookupRepository {
     });
     return response.data.data || [];
   }
+
+  async search(platform: string, keyword: string): Promise<CategorySuggestion[]> {
+    const response = await axiosInstance.get(`/api/admin/category-lookup/${platform}/search`, {
+      params: { keyword },
+    });
+    return response.data.data || [];
+  }
 }

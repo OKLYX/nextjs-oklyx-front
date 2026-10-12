@@ -11,4 +11,8 @@ export class CategoryLookupUseCase {
   async predict(platform: string, productName: string): Promise<CategorySuggestion[]> {
     return this.repository.predict(platform, productName);
   }
+
+  async search(platform: string, keyword: string): Promise<CategorySuggestion[]> {
+    return this.repository.search(platform, keyword);
+  }
 }

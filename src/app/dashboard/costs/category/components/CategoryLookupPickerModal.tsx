@@ -1,18 +1,21 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
+import { CategoryTreeColumns, type TreeNode } from '@/presentation/components/CategoryTreeColumns';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
-import type { CategoryNode } from '@/domain/entities/CategoryLookupEntity';
+import type { CategorySuggestion } from '@/domain/entities/CategoryLookupEntity';
 import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
- * Marketplace category lookup picker (tree drill-down + product-name prediction) — pick without typing codes.
+ * Marketplace category lookup picker (name search + column tree + product-name prediction) — pick without typing codes.
  *
  * Built on `ui/Modal` (no shadcn). The useCase is **the parent's instance**
  * (never created inside the modal). Confirming calls `onSelect({platformCategoryId, name, namePath})`.
- * A lookup failure (no active account / 500) shows as an inline banner in the picker.
+ * The tree is the shared `CategoryTreeColumns` (same left→right columns as the standard category tree), keyed by
+ * the marketplace code the lookup returns. The search box reads the imported list on the server (no account).
+ * A lookup failure (no active account / 500) shows inside the tree column or under the search box.
  * 11st (ELEVENST) has no product-name prediction (FEATURE_2610_10 / D21 ③) — its predict tab is not rendered.
  */
 interface CategoryLookupPickerModalProps {
@@ -23,10 +26,8 @@ interface CategoryLookupPickerModalProps {
   onClose: () => void;
 }
 
-interface Crumb {
-  code: string;
-  name: string;
-}
+/** The server returns at most this many search results. */
+const SEARCH_LIMIT = 50;
 
 export function CategoryLookupPickerModal({
   open,
@@ -37,69 +38,61 @@ export function CategoryLookupPickerModal({
 }: CategoryLookupPickerModalProps) {
   const [tab, setTab] = useState<'tree' | 'predict'>('tree');
 
-  // Tree state
-  const [path, setPath] = useState<Crumb[]>([]);
-  const [nodes, setNodes] = useState<CategoryNode[]>([]);
-  const [treeLoading, setTreeLoading] = useState(false);
-  const [treeError, setTreeError] = useState('');
-  const [pendingLeaf, setPendingLeaf] = useState<CategoryNode | null>(null);
+  // Picked leaf (from the search results or the tree), confirmed with [이 카테고리 선택].
+  const [pendingLeaf, setPendingLeaf] = useState<CategorySuggestion | null>(null);
+
+  // Search state
+  const [keyword, setKeyword] = useState('');
+  const [results, setResults] = useState<CategorySuggestion[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [searched, setSearched] = useState(false);
 
   // Predict state
   const [productName, setProductName] = useState('');
-  const [suggestions, setSuggestions] = useState<
-    { platformCategoryId: string; name: string; namePath: string }[]
-  >([]);
+  const [suggestions, setSuggestions] = useState<CategorySuggestion[]>([]);
   const [predictLoading, setPredictLoading] = useState(false);
   const [predictError, setPredictError] = useState('');
   const [predicted, setPredicted] = useState(false);
 
-  const loadChildren = useCallback(
-    async (crumbs: Crumb[]) => {
-      setTreeLoading(true);
-      setTreeError('');
-      setPendingLeaf(null);
-      try {
-        const parentCode = crumbs.length > 0 ? crumbs[crumbs.length - 1].code : undefined;
-        const data = await lookupUseCase.browse(platform, parentCode);
-        setNodes(data);
-        setPath(crumbs);
-      } catch (e) {
-        setTreeError(extractErrorMessage(e, '카테고리 조회에 실패했습니다. 활성 계정을 확인하세요.'));
-        setNodes([]);
-      } finally {
-        setTreeLoading(false);
-      }
+  // Stable reference — the tree reloads its root whenever `browse` changes.
+  const browse = useCallback(
+    async (parentCode?: string): Promise<TreeNode<string>[]> => {
+      const nodes = await lookupUseCase.browse(platform, parentCode);
+      return nodes.map((n) => ({ id: n.platformCategoryId, name: n.name, leaf: n.leaf }));
     },
     [lookupUseCase, platform]
   );
 
-  // The modal mounts fresh on each open (parent guards with `&&`), so initial
-  // state is already the reset state — the effect only loads root children.
-  useEffect(() => {
-    void (async () => {
-      await loadChildren([]);
-    })();
-  }, [loadChildren]);
-
   if (!open) return null;
 
-  const handleNodeClick = (node: CategoryNode) => {
-    if (node.leaf) {
-      setPendingLeaf(node);
-    } else {
-      void loadChildren([...path, { code: node.platformCategoryId, name: node.name }]);
+  const handleTreeLeaf = (leaf: TreeNode<string>, path: TreeNode<string>[]) => {
+    setPendingLeaf({
+      platformCategoryId: leaf.id,
+      name: leaf.name,
+      namePath: path.map((n) => n.name).join(' > '),
+    });
+  };
+
+  const handleSearch = async () => {
+    const q = keyword.trim();
+    if (!q) return;
+    setSearching(true);
+    setSearchError('');
+    setSearched(true);
+    try {
+      setResults(await lookupUseCase.search(platform, q));
+    } catch (e) {
+      setSearchError(extractErrorMessage(e, '카테고리 검색에 실패했습니다.'));
+      setResults([]);
+    } finally {
+      setSearching(false);
     }
   };
 
-  const namePathOf = (leafName: string) => [...path.map((c) => c.name), leafName].join(' > ');
-
   const confirmLeaf = () => {
     if (!pendingLeaf) return;
-    onSelect({
-      platformCategoryId: pendingLeaf.platformCategoryId,
-      name: pendingLeaf.name,
-      namePath: namePathOf(pendingLeaf.name),
-    });
+    onSelect(pendingLeaf);
   };
 
   const handlePredict = async () => {
@@ -128,7 +121,7 @@ export function CategoryLookupPickerModal({
               tab === 'tree' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
             }`}
           >
-            트리 탐색
+            카테고리 찾기
           </button>
           {platform !== 'ELEVENST' && (
             <button
@@ -145,64 +138,72 @@ export function CategoryLookupPickerModal({
         <div className="flex-1 overflow-y-auto p-4">
           {tab === 'tree' ? (
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-1 text-sm text-gray-600">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleSearch();
+                  }}
+                  placeholder="카테고리 이름 검색 (예: 사이드테이블)"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
                 <button
-                  onClick={() => void loadChildren([])}
-                  className="hover:text-blue-600 hover:underline"
+                  onClick={() => void handleSearch()}
+                  disabled={searching || !keyword.trim()}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium whitespace-nowrap"
                 >
-                  루트
+                  {searching ? <Spinner label="검색 중..." /> : '검색'}
                 </button>
-                {path.map((crumb, idx) => (
-                  <span key={crumb.code} className="flex items-center gap-1">
-                    <span className="text-gray-400">›</span>
-                    <button
-                      onClick={() => void loadChildren(path.slice(0, idx + 1))}
-                      className="hover:text-blue-600 hover:underline"
-                    >
-                      {crumb.name}
-                    </button>
-                  </span>
-                ))}
               </div>
 
-              {treeError && (
+              {searchError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-                  {treeError}
+                  {searchError}
                 </div>
               )}
 
-              {treeLoading ? (
-                <div className="py-8 flex justify-center">
-                  <Spinner size={24} />
-                </div>
-              ) : nodes.length === 0 && !treeError ? (
-                <p className="py-6 text-center text-sm text-gray-500">하위 카테고리가 없습니다.</p>
-              ) : (
-                <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
-                  {nodes.map((node) => (
-                    <li key={node.platformCategoryId}>
-                      <button
-                        onClick={() => handleNodeClick(node)}
-                        className={`w-full flex items-center justify-between px-4 py-2 text-left text-sm hover:bg-gray-50 ${
-                          pendingLeaf?.platformCategoryId === node.platformCategoryId
-                            ? 'bg-blue-50'
-                            : ''
-                        }`}
-                      >
-                        <span className="text-gray-900">{node.name}</span>
-                        <span className="text-xs text-gray-400">
-                          {node.leaf ? '선택 가능' : '펼치기 ›'}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+              {searched && !searching && !searchError && results.length === 0 && (
+                <p className="py-2 text-center text-sm text-gray-500">검색 결과가 없습니다.</p>
               )}
+
+              {results.length > 0 && (
+                <div className="space-y-1">
+                  <ul className="max-h-48 divide-y divide-gray-100 overflow-y-auto border border-gray-200 rounded-lg">
+                    {results.map((r) => (
+                      <li key={r.platformCategoryId}>
+                        <button
+                          onClick={() => setPendingLeaf(r)}
+                          title={r.namePath}
+                          className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${
+                            pendingLeaf?.platformCategoryId === r.platformCategoryId ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <p className="text-gray-900">{r.name}</p>
+                          <p className="truncate text-xs text-gray-400">{r.namePath}</p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {results.length >= SEARCH_LIMIT && (
+                    <p className="text-xs text-gray-500">
+                      결과가 많아 {SEARCH_LIMIT}개만 보입니다. 더 구체적으로 검색하세요.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <CategoryTreeColumns
+                browse={browse}
+                onSelectLeaf={handleTreeLeaf}
+                selectedId={pendingLeaf?.platformCategoryId ?? null}
+              />
 
               {pendingLeaf && (
                 <div className="flex items-center justify-between gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="text-sm text-gray-700 min-w-0">
-                    <p className="truncate">{namePathOf(pendingLeaf.name)}</p>
+                    <p className="truncate">{pendingLeaf.namePath || pendingLeaf.name}</p>
                     <p className="text-xs text-gray-500">코드: {pendingLeaf.platformCategoryId}</p>
                   </div>
                   <button
