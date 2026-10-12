@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
-import type { CategoryTreeNode } from '@/domain/entities/CategoryEntity';
+
+/** A tree node. The id is the standard category id (number) or a marketplace code (string). */
+export interface TreeNode<TId extends string | number> {
+  id: TId;
+  name: string;
+  leaf: boolean;
+}
 
 /**
  * 카테고리 트리 miller-columns 드릴다운(Finder 컬럼뷰). 부모별 자식을 컬럼으로
@@ -36,37 +42,49 @@ import type { CategoryTreeNode } from '@/domain/entities/CategoryEntity';
  * - `onCreateCategory(parentId, name)` 는 부모가 실제 생성(+검색 캐시 무효화)을 담당한다. 성공 후
  *   컴포넌트가 해당 컬럼(과 부모 컬럼)만 재조회해 새 노드를 보여준다(전체 remount 안 함 → 위치 보존).
  * - 두 prop 모두 optional → 넘기지 않는 기존 사용처(생성 모달 등)엔 `+` UI 가 없다.
+ *
+ * ⚠️ id 타입(`TId`)은 `browse` 에서 추론된다 — 표준 카테고리 = number, 마켓 카테고리 고르는 창 = 마켓 코드
+ * string(`CategoryLookupPickerModal`). 값을 해석하지 않고 `browse` 에 그대로 돌려준다.
  */
-interface CategoryTreeColumnsProps {
-  browse: (parentId?: number) => Promise<CategoryTreeNode[]>;
-  onSelectLeaf: (leaf: CategoryTreeNode, path: CategoryTreeNode[]) => void;
-  selectedId?: number | null;
-  expandTo?: number[] | null;
+interface CategoryTreeColumnsProps<TId extends string | number> {
+  browse: (parentId?: TId) => Promise<TreeNode<TId>[]>;
+  onSelectLeaf: (leaf: TreeNode<TId>, path: TreeNode<TId>[]) => void;
+  selectedId?: TId | null;
+  expandTo?: TId[] | null;
   addMode?: boolean;
-  onCreateCategory?: (parentId: number | undefined, name: string) => Promise<void>;
+  onCreateCategory?: (parentId: TId | undefined, name: string) => Promise<void>;
 }
 
-type Column = {
-  parentId?: number;
-  nodes: CategoryTreeNode[];
+type Column<TId extends string | number> = {
+  parentId?: TId;
+  nodes: TreeNode<TId>[];
   loading: boolean;
   error: string | null;
 };
 
-export function CategoryTreeColumns({
+function errorColumn<TId extends string | number>(parentId: TId | undefined, e: unknown): Column<TId> {
+  return {
+    parentId,
+    nodes: [],
+    loading: false,
+    error: extractErrorMessage(e, '카테고리 조회에 실패했습니다.'),
+  };
+}
+
+export function CategoryTreeColumns<TId extends string | number = number>({
   browse,
   onSelectLeaf,
   selectedId,
   expandTo,
   addMode,
   onCreateCategory,
-}: CategoryTreeColumnsProps) {
+}: CategoryTreeColumnsProps<TId>) {
   // Initial state = root column in a loading state (so the spinner shows before the first
   // browse resolves without a synchronous setState in the effect).
-  const [columns, setColumns] = useState<Column[]>([
+  const [columns, setColumns] = useState<Column<TId>[]>([
     { parentId: undefined, nodes: [], loading: true, error: null },
   ]); // 좌→우 컬럼 순서
-  const [path, setPath] = useState<CategoryTreeNode[]>([]); // 선택 경로(대표→…→현재)
+  const [path, setPath] = useState<TreeNode<TId>[]>([]); // 선택 경로(대표→…→현재)
   // The horizontal column strip (overflow-x-auto), scrolled right to reveal a newly appended column.
   const containerRef = useRef<HTMLDivElement | null>(null);
   // The rendered button of the currently-selected node, scrolled into view (horizontal
@@ -80,13 +98,6 @@ export function CategoryTreeColumns({
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
-  const errorColumn = (parentId: number | undefined, e: unknown): Column => ({
-    parentId,
-    nodes: [],
-    loading: false,
-    error: extractErrorMessage(e, '카테고리 조회에 실패했습니다.'),
-  });
-
   // Load the root column, or — when expandTo is given — rebuild columns along that ancestor
   // chain so the target is revealed. Inline async IIFE avoids set-state-in-effect lint.
   useEffect(() => {
@@ -94,9 +105,9 @@ export function CategoryTreeColumns({
     void (async () => {
       if (expandTo && expandTo.length > 0) {
         try {
-          const cols: Column[] = [];
-          const pathNodes: CategoryTreeNode[] = [];
-          let parent: number | undefined = undefined;
+          const cols: Column<TId>[] = [];
+          const pathNodes: TreeNode<TId>[] = [];
+          let parent: TId | undefined = undefined;
           for (let level = 0; level < expandTo.length; level++) {
             const nodes = await browse(parent);
             cols.push({ parentId: parent, nodes, loading: false, error: null });
@@ -117,7 +128,7 @@ export function CategoryTreeColumns({
             setPath(pathNodes);
           }
         } catch (e) {
-          if (alive) setColumns([errorColumn(undefined, e)]);
+          if (alive) setColumns([errorColumn<TId>(undefined, e)]);
         }
         return;
       }
@@ -126,7 +137,7 @@ export function CategoryTreeColumns({
         const nodes = await browse(undefined);
         if (alive) setColumns([{ parentId: undefined, nodes, loading: false, error: null }]);
       } catch (e) {
-        if (alive) setColumns([errorColumn(undefined, e)]);
+        if (alive) setColumns([errorColumn<TId>(undefined, e)]);
       }
     })();
     return () => {
@@ -134,7 +145,7 @@ export function CategoryTreeColumns({
     };
   }, [browse, expandTo]);
 
-  const handleNodeClick = async (col: number, node: CategoryTreeNode) => {
+  const handleNodeClick = async (col: number, node: TreeNode<TId>) => {
     // Navigating cancels any open add-input.
     setAddingCol(null);
     // Truncate the path/columns to the right of the clicked column, then set this node.
