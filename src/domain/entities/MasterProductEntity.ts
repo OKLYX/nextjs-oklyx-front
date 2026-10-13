@@ -169,6 +169,22 @@ export interface MasterCategoryRequest {
   categoryId: number;
 }
 
+/**
+ * A master's own platform category — 「개별 지정」 (FEATURE_2610_12 / D40). At most one per platform; none =
+ * the standard category mapping is used. Same fields as `CategoryMapping` (`platformCategoryId` = mall code).
+ */
+export interface MasterPlatformCategory {
+  platform: string;
+  platformCategoryId: string;
+  platformCategoryName?: string | null;
+}
+
+export interface MasterPlatformCategoryRequest {
+  platform: string;
+  platformCategoryId: string;
+  platformCategoryName?: string | null;
+}
+
 // Category required-attributes / product-info notices (backend 47). Schema is
 // per (platform × category) and may be empty (empty = skip the input step).
 export interface CategoryAttribute {

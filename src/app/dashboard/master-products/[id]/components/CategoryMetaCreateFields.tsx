@@ -26,6 +26,8 @@ export const EMPTY_META_VALUE: CategoryMetaCreateValue = {
 interface CategoryMetaCreateFieldsProps {
   categoryId: number | null; // leaf standard category picked in the create modal
   platform?: string; // default 'COUPANG'
+  // FEATURE_2610_12 / D45: the 「개별 지정」 code picked for this tab — when set the schema is read by it.
+  platformCategoryCode?: string | null;
   value: CategoryMetaCreateValue; // controlled by the parent modal
   onChange: (next: CategoryMetaCreateValue) => void;
   // Reports the loaded attribute + notice schema up so the parent's submit gate can validate.
@@ -35,16 +37,19 @@ interface CategoryMetaCreateFieldsProps {
 }
 
 /**
- * 카테고리 필수속성 / 고시 입력 — 마스터 추가(생성) 컨테이너 (masterId 없음).
+ * Category required attributes / notices input — the master add (create) container (no masterId).
  * File: src/app/dashboard/master-products/[id]/components/CategoryMetaCreateFields.tsx
  *
- * categoryId 로 getCategorySchema(스키마만) 로드(값은 부모 controlled state). notices 는 정적이라
- * 로드 불필요. 저장 버튼 없음(부모 모달이 생성 후 setCategoryAttributes 로 저장). categoryId/platform
- * 변경 시 스키마 재로드. COUPANG 외 탭은 입력은 허용하되 "값 저장은 후속" 안내(생성 저장 = COUPANG 만).
+ * Loads the schema only via getCategorySchema — by `categoryId`, or by `platformCategoryCode` when this tab's
+ * platform has a 「개별 지정」 pick (FEATURE_2610_12 / D45); the values are the parent's controlled state. Notices
+ * are static, so nothing else is loaded. No save button (the parent modal saves with setCategoryAttributes after
+ * create). The schema reloads when categoryId / platform / platformCategoryCode changes. Tabs other than COUPANG
+ * accept input but show the "값 저장은 후속" notice (create saves COUPANG only).
  */
 export function CategoryMetaCreateFields({
   categoryId,
   platform = 'COUPANG',
+  platformCategoryCode = null,
   value,
   onChange,
   onSchemaLoad,
@@ -79,7 +84,7 @@ export function CategoryMetaCreateFields({
       setIsLoading(true);
       setError('');
       try {
-        const schema = await useCase.getCategorySchema(categoryId, platform);
+        const schema = await useCase.getCategorySchema(categoryId, platform, platformCategoryCode);
         if (!alive) return;
         setAttributes(schema.attributes);
         setNotices(schema.notices);
@@ -97,7 +102,7 @@ export function CategoryMetaCreateFields({
     return () => {
       alive = false;
     };
-  }, [categoryId, platform, useCase]);
+  }, [categoryId, platform, platformCategoryCode, useCase]);
 
   // A picked unit clears the other side of the pair (only one of weight/volume carries a value).
   const handleMeasureUnit = useCallback(

@@ -25,9 +25,11 @@ import type {
   MasterOptionRequest,
   MasterComponent,
   MasterProductByComponents,
+  MasterPlatformCategoryRequest,
   CategoryAttribute,
   CategoryNotice,
 } from '@/domain/entities/MasterProductEntity';
+import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
 import { purchasePlaceNames, type Product } from '@/domain/entities/Product';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { Package } from '@/domain/entities/PackageEntity';
@@ -73,9 +75,15 @@ import { CategoryLookupRepositoryImpl } from '@/infrastructure/repositories/Cate
 import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAccountUseCase';
 import { MarketplaceAccountRepositoryImpl } from '@/infrastructure/repositories/MarketplaceAccountRepositoryImpl';
 import { MissingPlatformCategoryModal } from '../../components/MissingPlatformCategoryModal';
+import { CategoryScopeDialog } from '../../components/CategoryScopeDialog';
+import { PlatformCategoryRows } from '../../components/PlatformCategoryRows';
+import { CategoryLookupPickerModal } from '@/app/dashboard/costs/category/components/CategoryLookupPickerModal';
 import {
   activeLookupPlatformsOf,
+  asLookupPlatform,
   missingPlatformsOf,
+  platformCategoryRowsOf,
+  promptPlatformsOf,
   type LookupPlatform,
 } from '../../components/platformCategory';
 import {
@@ -96,6 +104,12 @@ const formatWon = (v: number | null | undefined) =>
 
 // Cap category name-search results (client filter over the full list) — bounds the render.
 const CATEGORY_SEARCH_LIMIT = 50;
+
+// Option-reset confirm text of a category change — the standard category and, since FEATURE_2610_12 / D52, the
+// three platform category changes ([이 상품만 개별 지정] · [기준 카테고리 연결을 바꾸기] · [기준으로 되돌리기]).
+const CATEGORY_RESET_MESSAGE = '카테고리를 변경할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?';
+
+type PickerSelection = { platformCategoryId: string; name: string; namePath: string };
 
 interface MasterProductCreateFormProps {
   useCase: MasterProductUseCase;
@@ -248,6 +262,19 @@ export function MasterProductCreateForm({
   const [selectedCategoryName, setSelectedCategoryName] = useState(
     marketCategoryId != null ? (market?.preview.suggestedCategoryName ?? '') : '',
   );
+  // FEATURE_2610_12 / D38 · D53: 「개별 지정」 picks per platform — held here, saved after create + setCategory.
+  const [ownPicks, setOwnPicks] = useState<Partial<Record<LookupPlatform, MasterPlatformCategoryRequest>>>({});
+  // Mapping rows of the locked category for the platform lines (D50). Tagged with the category id so a line
+  // never shows another category's rows while a re-read is in flight. null = not loaded / failed / not ADMIN.
+  const [createMappings, setCreateMappings] = useState<{
+    categoryId: number;
+    mappings: CategoryMapping[];
+  } | null>(null);
+  // Bumped after a mapping save on this screen (popup · [기준 카테고리 연결을 바꾸기]) → the lines re-read.
+  const [createMappingsVersion, setCreateMappingsVersion] = useState(0);
+  // [변경] → picker platform, then the pick waiting for 「적용 범위 선택」 (D51).
+  const [pickerPlatform, setPickerPlatform] = useState<LookupPlatform | null>(null);
+  const [scopePick, setScopePick] = useState<{ platform: LookupPlatform; sel: PickerSelection } | null>(null);
   // Stable browse reference so CategoryTreeColumns' mount effect doesn't re-run every render.
   const browseTree = useCallback(
     (parentId?: number) => categoryUseCase.browseTree(parentId),
@@ -335,14 +362,14 @@ export function MasterProductCreateForm({
   const chooseCategory = useCallback(
     (id: number, name: string) => {
       const doSelect = () => {
+        // FEATURE_2610_12 / D42 · D53: another standard category drops the 「개별 지정」 picks.
+        if (selectedCategoryId !== id) setOwnPicks({});
         setSelectedCategoryId(id);
         setSelectedCategoryName(name);
       };
       if (selectedCategoryId !== id && hasOptionInput) {
         setConfirmDialog({
-          message: market
-            ? MARKET_OPTION_RESET_MESSAGE
-            : '카테고리를 변경할 경우 기존에 추가한 옵션을 제거됩니다. 계속하시겠습니까?',
+          message: market ? MARKET_OPTION_RESET_MESSAGE : CATEGORY_RESET_MESSAGE,
           onConfirm: () => {
             discardOptions();
             doSelect();
@@ -364,17 +391,18 @@ export function MasterProductCreateForm({
     setCategoryLocked(true);
   };
 
-  // FEATURE_2610_11 / D1·D17: switched-on Coupang · 11st platforms the category has no mapping for.
-  // A failed lookup asks nothing (empty list) — the category still locks.
+  // FEATURE_2610_11 / D1·D17 · 2610_12 / D35: 11st (always) and a switched-on Coupang that have neither a mapping
+  // nor a row in `present` (the 「개별 지정」 picks kept for this category, D41). A failed lookup asks nothing
+  // (empty list) — the category still locks.
   const findMissingPlatforms = useCallback(
-    async (categoryId: number): Promise<LookupPlatform[]> => {
+    async (categoryId: number, present: { platform: string }[]): Promise<LookupPlatform[]> => {
       if (!isAdmin) return [];
       try {
         const [accounts, mappings] = await Promise.all([
           marketplaceUseCase.getAll(),
           mappingUseCase.getMappings(categoryId),
         ]);
-        return missingPlatformsOf(activeLookupPlatformsOf(accounts), mappings);
+        return missingPlatformsOf(promptPlatformsOf(activeLookupPlatformsOf(accounts)), [...mappings, ...present]);
       } catch {
         return [];
       }
@@ -393,7 +421,7 @@ export function MasterProductCreateForm({
   const applyCategory = async () => {
     if (selectedCategoryId === '') return;
     setIsCheckingCategory(true);
-    const platforms = await findMissingPlatforms(Number(selectedCategoryId));
+    const platforms = await findMissingPlatforms(Number(selectedCategoryId), Object.values(ownPicks));
     setIsCheckingCategory(false);
     if (platforms.length > 0) {
       setMissingPrompt({
@@ -406,10 +434,20 @@ export function MasterProductCreateForm({
     lockCategory();
   };
 
-  // Popup closed → lock. After the market-mode check on open the category is already locked, so this
-  // re-lock changes nothing there.
-  const handleMissingClose = () => {
+  // Popup closed → keep its 「개별 지정」 picks (saved after create, D53), re-read the mappings it may have saved,
+  // lock. After the market-mode check on open the category is already locked, so this re-lock changes nothing
+  // there.
+  const handleMissingClose = (picks: MasterPlatformCategoryRequest[]) => {
     setMissingPrompt(null);
+    setOwnPicks((prev) => {
+      const next = { ...prev };
+      for (const pick of picks) {
+        const platform = asLookupPlatform(pick.platform);
+        if (platform) next[platform] = pick;
+      }
+      return next;
+    });
+    setCreateMappingsVersion((v) => v + 1);
     lockCategory();
   };
 
@@ -418,7 +456,7 @@ export function MasterProductCreateForm({
     if (marketCategoryId == null) return;
     let alive = true;
     void (async () => {
-      const platforms = await findMissingPlatforms(marketCategoryId);
+      const platforms = await findMissingPlatforms(marketCategoryId, []);
       if (!alive || platforms.length === 0) return;
       setMissingPrompt({
         categoryId: marketCategoryId,
@@ -430,6 +468,25 @@ export function MasterProductCreateForm({
       alive = false;
     };
   }, [marketCategoryId, market, findMissingPlatforms]);
+
+  // FEATURE_2610_12 / D52: a platform category change runs through the same option-reset confirm as a standard
+  // category change (no options = no confirm).
+  const runWithOptionReset = useCallback(
+    (apply: () => void) => {
+      if (!hasOptionInput) {
+        apply();
+        return;
+      }
+      setConfirmDialog({
+        message: market ? MARKET_OPTION_RESET_MESSAGE : CATEGORY_RESET_MESSAGE,
+        onConfirm: () => {
+          discardOptions();
+          apply();
+        },
+      });
+    },
+    [hasOptionInput, market, discardOptions],
+  );
 
   // Unlock the category for editing; if options exist, confirm they will be discarded.
   const editCategory = () => {
@@ -446,6 +503,86 @@ export function MasterProductCreateForm({
       return;
     }
     setCategoryLocked(false);
+  };
+
+  // FEATURE_2610_12 / D50: the locked category's mapping rows feed the platform lines. ADMIN only
+  // (`/api/admin/**`); a failure leaves the lines hidden.
+  useEffect(() => {
+    if (!categoryLocked || selectedCategoryId === '' || !isAdmin) return;
+    const categoryId = Number(selectedCategoryId);
+    let alive = true;
+    void (async () => {
+      try {
+        const mappings = await mappingUseCase.getMappings(categoryId);
+        if (alive) setCreateMappings({ categoryId, mappings });
+      } catch {
+        if (alive) setCreateMappings(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [categoryLocked, selectedCategoryId, isAdmin, mappingUseCase, createMappingsVersion]);
+
+  const handlePlatformPicked = (platform: LookupPlatform, sel: PickerSelection) => {
+    setPickerPlatform(null);
+    setScopePick({ platform, sel });
+  };
+
+  // [이 상품만 개별 지정] (D51 · D52) — held until create, then saved after setCategory (D53).
+  const handleOwnPick = () => {
+    if (!scopePick) return;
+    const { platform, sel } = scopePick;
+    setScopePick(null);
+    runWithOptionReset(() =>
+      setOwnPicks((prev) => ({
+        ...prev,
+        [platform]: {
+          platform,
+          platformCategoryId: sel.platformCategoryId,
+          platformCategoryName: sel.namePath || sel.name,
+        },
+      })),
+    );
+  };
+
+  // [기준 카테고리 연결을 바꾸기] (D51 · D52) — the mapping is saved now (2610_11 D18 (g): it stays even if the
+  // master is never saved).
+  const saveBaseMapping = async (platform: LookupPlatform, sel: PickerSelection) => {
+    if (selectedCategoryId === '') return;
+    try {
+      await mappingUseCase.upsertMapping(Number(selectedCategoryId), {
+        platform,
+        platformCategoryId: sel.platformCategoryId,
+        platformCategoryName: sel.namePath || sel.name,
+      });
+      setCreateMappingsVersion((v) => v + 1);
+    } catch (e) {
+      setError(extractErrorMessage(e, '매핑 저장에 실패했습니다.'));
+    }
+  };
+  const handleBasePick = () => {
+    if (!scopePick) return;
+    const { platform, sel } = scopePick;
+    setScopePick(null);
+    runWithOptionReset(() => void saveBaseMapping(platform, sel));
+  };
+
+  // [기준으로 되돌리기] (D52) — drop the held pick.
+  const handleRevertOwn = (platform: LookupPlatform) => {
+    runWithOptionReset(() =>
+      setOwnPicks((prev) => {
+        const next = { ...prev };
+        delete next[platform];
+        return next;
+      }),
+    );
+  };
+
+  // The 「개별 지정」 code of a meta tab / the option editor's platform (D45). null = read by the category id.
+  const ownCodeOf = (platform: string): string | null => {
+    const lookup = asLookupPlatform(platform);
+    return lookup ? (ownPicks[lookup]?.platformCategoryId ?? null) : null;
   };
 
   // Re-expand the tree to the currently selected category (after browsing elsewhere).
@@ -907,6 +1044,16 @@ export function MasterProductCreateForm({
         setIsSubmitting(false);
         return;
       }
+      // FEATURE_2610_12 / D53: the 「개별 지정」 picks go in after the category (setCategory would drop them).
+      try {
+        for (const pick of Object.values(ownPicks)) {
+          if (pick) await useCase.setPlatformCategory(created.id, pick);
+        }
+      } catch {
+        warnBeforeAttach(created.id, '마스터는 생성되었습니다. 개별 지정 카테고리 저장에 실패했습니다(상세에서 재지정).');
+        setIsSubmitting(false);
+        return;
+      }
       // Category required-attributes/notices (COUPANG values only; other platforms are follow-up).
       const coupangMeta = metaByPlatform['COUPANG'];
       if (coupangMeta) {
@@ -1246,6 +1393,20 @@ export function MasterProductCreateForm({
                   </button>
                 </p>
               )}
+              {/* FEATURE_2610_12 / D50: the platform lines appear once [설정적용] locked the category. */}
+              {categoryLocked && createMappings != null && createMappings.categoryId === selectedCategoryId && (
+                <div className="mb-2">
+                  <PlatformCategoryRows
+                    rows={platformCategoryRowsOf(
+                      createMappings.mappings,
+                      Object.values(ownPicks).filter((o): o is MasterPlatformCategoryRequest => o != null),
+                    )}
+                    onChange={setPickerPlatform}
+                    onRevert={handleRevertOwn}
+                    disabled={isSubmitting}
+                  />
+                </div>
+              )}
 
               {/* 이름 검색 → 결과 클릭 시 트리를 그 위치로 펼치고(leaf 면 바로 선택). */}
               <div className="mb-2 flex gap-2">
@@ -1351,6 +1512,7 @@ export function MasterProductCreateForm({
                     key={platform}
                     categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
                     platform={platform}
+                    platformCategoryCode={ownCodeOf(platform)}
                     value={metaByPlatform[platform] ?? EMPTY_META_VALUE}
                     onChange={(next) => handleMetaChange(platform, next)}
                     onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad(platform, attrs, notices)}
@@ -1476,6 +1638,7 @@ export function MasterProductCreateForm({
               packages={packages}
               masterDefaults={masterDefaults}
               categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
+              platformCategoryCode={ownCodeOf('COUPANG')}
               masterAttrValues={metaByPlatform['COUPANG']?.attrValues ?? {}}
               masterNoticeValues={metaByPlatform['COUPANG']?.noticeValues ?? {}}
               masterNoticeGroup={masterNoticeGroup}
@@ -1607,7 +1770,28 @@ export function MasterProductCreateForm({
           platforms={missingPrompt.platforms}
           mappingUseCase={mappingUseCase}
           lookupUseCase={lookupUseCase}
+          confirmChange={runWithOptionReset}
           onClose={handleMissingClose}
+        />
+      )}
+
+      {pickerPlatform && (
+        <CategoryLookupPickerModal
+          open={pickerPlatform !== null}
+          platform={pickerPlatform}
+          lookupUseCase={lookupUseCase}
+          onSelect={(sel) => handlePlatformPicked(pickerPlatform, sel)}
+          onClose={() => setPickerPlatform(null)}
+        />
+      )}
+
+      {scopePick && (
+        <CategoryScopeDialog
+          platform={scopePick.platform}
+          path={scopePick.sel.namePath || scopePick.sel.name}
+          onOwn={handleOwnPick}
+          onBase={handleBasePick}
+          onCancel={() => setScopePick(null)}
         />
       )}
 

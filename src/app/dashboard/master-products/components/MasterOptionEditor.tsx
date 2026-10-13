@@ -250,6 +250,8 @@ interface MasterOptionEditorProps {
   // Category attribute/notice override (60). categoryId==null hides the override section.
   categoryId?: number | null;
   platform?: string; // default 'COUPANG'
+  // FEATURE_2610_12 / D45: the master's 「개별 지정」 code for `platform` — when set the schema is read by it.
+  platformCategoryCode?: string | null;
   masterAttrValues?: Record<string, string>; // inherit-diff source (attributes)
   masterNoticeValues?: Record<string, string>; // inherit-diff source (notices)
   // 마스터가 저장/선택한 실효 품목군(부모가 submitNoticeGroup 으로 도출). 옵션 고시 노출·검증 범위.
@@ -293,6 +295,7 @@ export function MasterOptionEditor({
   masterDefaults: masterDefaultsProp,
   categoryId = null,
   platform = 'COUPANG',
+  platformCategoryCode = null,
   masterAttrValues = {},
   masterNoticeValues = {},
   masterNoticeGroup = null,
@@ -405,7 +408,7 @@ export function MasterOptionEditor({
       setAttrLoading(true);
       setAttrLoadError('');
       try {
-        const schema = await metaUseCase.getCategorySchema(categoryId, platform);
+        const schema = await metaUseCase.getCategorySchema(categoryId, platform, platformCategoryCode);
         if (!alive) return;
         setAttributes(schema.attributes);
         setNotices(schema.notices);
@@ -446,7 +449,7 @@ export function MasterOptionEditor({
     return () => {
       alive = false;
     };
-  }, [categoryId, platform, metaUseCase]);
+  }, [categoryId, platform, platformCategoryCode, metaUseCase]);
 
   const sumQuantities = (q: Record<number, string>): number => sumQuantitiesOf(components, q);
 
