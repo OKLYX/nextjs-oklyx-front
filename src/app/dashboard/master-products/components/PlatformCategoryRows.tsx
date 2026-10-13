@@ -4,7 +4,7 @@ import { Button } from '@/presentation/components/ui/Button';
 import { lookupPlatformLabel, type LookupPlatform, type PlatformCategoryRow } from './platformCategory';
 
 interface PlatformCategoryRowsProps {
-  /** From `platformCategoryRowsOf` (「쿠팡」 → 「11st」, own row first — D41). */
+  /** From `platformCategoryRowsOf` (「쿠팡」 → 「11번가」, own row first — D41). */
   rows: PlatformCategoryRow[];
   /** [변경] — the caller opens the picker for that platform, then 「적용 범위 선택」 (D51). */
   onChange: (platform: LookupPlatform) => void;
@@ -14,7 +14,7 @@ interface PlatformCategoryRowsProps {
 }
 
 /**
- * Platform category lines under the standard category — one line per platform (「쿠팡」 → 「11st」) with one
+ * Platform category lines under the standard category — one line per platform (「쿠팡」 → 「11번가」) with one
  * [변경] each (FEATURE_2610_12 / D50). Shared by the master create form and the detail 「표준 카테고리」 block.
  * File: src/app/dashboard/master-products/components/PlatformCategoryRows.tsx
  *

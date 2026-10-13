@@ -33,7 +33,7 @@ interface CategoryMappingModalProps {
 // Platforms the lookup picker can open for (Coupang, 11st). Naver is a backend seam only → later.
 const LOOKUP_PLATFORMS: { platform: 'COUPANG' | 'ELEVENST'; label: string }[] = [
   { platform: 'COUPANG', label: '쿠팡' },
-  { platform: 'ELEVENST', label: '11st' },
+  { platform: 'ELEVENST', label: '11번가' },
 ];
 
 export function CategoryMappingModal({
