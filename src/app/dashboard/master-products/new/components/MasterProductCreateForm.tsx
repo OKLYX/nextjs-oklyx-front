@@ -83,8 +83,11 @@ import {
   asLookupPlatform,
   missingPlatformsOf,
   platformCategoryRowsOf,
+  pickerReferencesOf,
   promptPlatformsOf,
+  standardCategoryPathOf,
   type LookupPlatform,
+  type PlatformCategoryRow,
 } from '../../components/platformCategory';
 import {
   MARKET_ATTACH_FAIL_PREFIX,
@@ -274,6 +277,20 @@ export function MasterProductCreateForm({
   const [createMappingsVersion, setCreateMappingsVersion] = useState(0);
   // [변경] → picker platform, then the pick waiting for 「적용 범위 선택」 (D51).
   const [pickerPlatform, setPickerPlatform] = useState<LookupPlatform | null>(null);
+  // Full path of the locked standard category — the [변경] picker's reference line (null = not loaded).
+  const [standardPath, setStandardPath] = useState<{ id: number; path: string } | null>(null);
+  useEffect(() => {
+    if (selectedCategoryId === '') return;
+    const id = selectedCategoryId;
+    let alive = true;
+    void (async () => {
+      const path = await standardCategoryPathOf(categoryUseCase, id, selectedCategoryName);
+      if (alive) setStandardPath({ id, path });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [selectedCategoryId, selectedCategoryName, categoryUseCase]);
   const [scopePick, setScopePick] = useState<{ platform: LookupPlatform; sel: PickerSelection } | null>(null);
   // Stable browse reference so CategoryTreeColumns' mount effect doesn't re-run every render.
   const browseTree = useCallback(
@@ -394,26 +411,38 @@ export function MasterProductCreateForm({
   // FEATURE_2610_11 / D1·D17 · 2610_12 / D35: 11st (always) and a switched-on Coupang that have neither a mapping
   // nor a row in `present` (the 「개별 지정」 picks kept for this category, D41). A failed lookup asks nothing
   // (empty list) — the category still locks.
+  // `current` = every platform's state for this category, shown in the popup next to the missing rows.
   const findMissingPlatforms = useCallback(
-    async (categoryId: number, present: { platform: string }[]): Promise<LookupPlatform[]> => {
-      if (!isAdmin) return [];
+    async (
+      categoryId: number,
+      categoryName: string,
+      present: MasterPlatformCategoryRequest[],
+    ): Promise<{ platforms: LookupPlatform[]; current: PlatformCategoryRow[]; path: string }> => {
+      if (!isAdmin) return { platforms: [], current: [], path: categoryName };
       try {
-        const [accounts, mappings] = await Promise.all([
+        const [accounts, mappings, path] = await Promise.all([
           marketplaceUseCase.getAll(),
           mappingUseCase.getMappings(categoryId),
+          standardCategoryPathOf(categoryUseCase, categoryId, categoryName),
         ]);
-        return missingPlatformsOf(promptPlatformsOf(activeLookupPlatformsOf(accounts)), [...mappings, ...present]);
+        return {
+          platforms: missingPlatformsOf(promptPlatformsOf(activeLookupPlatformsOf(accounts)), [...mappings, ...present]),
+          current: platformCategoryRowsOf(mappings, present),
+          path,
+        };
       } catch {
-        return [];
+        return { platforms: [], current: [], path: categoryName };
       }
     },
-    [isAdmin, marketplaceUseCase, mappingUseCase],
+    [isAdmin, marketplaceUseCase, mappingUseCase, categoryUseCase],
   );
   // Open missing-platform popup (null = closed). Closing it (pick or skip) locks the category (D8).
   const [missingPrompt, setMissingPrompt] = useState<{
     categoryId: number;
     categoryName: string;
     platforms: LookupPlatform[];
+    current: PlatformCategoryRow[];
+    path: string;
   } | null>(null);
   const [isCheckingCategory, setIsCheckingCategory] = useState(false);
 
@@ -421,13 +450,19 @@ export function MasterProductCreateForm({
   const applyCategory = async () => {
     if (selectedCategoryId === '') return;
     setIsCheckingCategory(true);
-    const platforms = await findMissingPlatforms(Number(selectedCategoryId), Object.values(ownPicks));
+    const { platforms, current, path } = await findMissingPlatforms(
+      Number(selectedCategoryId),
+      selectedCategoryName,
+      Object.values(ownPicks).filter((o): o is MasterPlatformCategoryRequest => o != null),
+    );
     setIsCheckingCategory(false);
     if (platforms.length > 0) {
       setMissingPrompt({
         categoryId: Number(selectedCategoryId),
         categoryName: selectedCategoryName,
         platforms,
+        current,
+        path,
       });
       return;
     }
@@ -456,12 +491,15 @@ export function MasterProductCreateForm({
     if (marketCategoryId == null) return;
     let alive = true;
     void (async () => {
-      const platforms = await findMissingPlatforms(marketCategoryId, []);
+      const marketCategoryName = market?.preview.suggestedCategoryName ?? '';
+      const { platforms, current, path } = await findMissingPlatforms(marketCategoryId, marketCategoryName, []);
       if (!alive || platforms.length === 0) return;
       setMissingPrompt({
         categoryId: marketCategoryId,
-        categoryName: market?.preview.suggestedCategoryName ?? '',
+        categoryName: marketCategoryName,
         platforms,
+        current,
+        path,
       });
     })();
     return () => {
@@ -1767,7 +1805,9 @@ export function MasterProductCreateForm({
         <MissingPlatformCategoryModal
           categoryId={missingPrompt.categoryId}
           categoryName={missingPrompt.categoryName}
+          categoryPath={missingPrompt.path}
           platforms={missingPrompt.platforms}
+          current={missingPrompt.current}
           mappingUseCase={mappingUseCase}
           lookupUseCase={lookupUseCase}
           confirmChange={runWithOptionReset}
@@ -1780,6 +1820,14 @@ export function MasterProductCreateForm({
           open={pickerPlatform !== null}
           platform={pickerPlatform}
           lookupUseCase={lookupUseCase}
+          references={pickerReferencesOf(
+            pickerPlatform,
+            standardPath?.id === selectedCategoryId ? standardPath.path : selectedCategoryName || null,
+            platformCategoryRowsOf(
+              createMappings?.categoryId === selectedCategoryId ? createMappings.mappings : [],
+              Object.values(ownPicks).filter((o): o is MasterPlatformCategoryRequest => o != null),
+            ),
+          )}
           onSelect={(sel) => handlePlatformPicked(pickerPlatform, sel)}
           onClose={() => setPickerPlatform(null)}
         />

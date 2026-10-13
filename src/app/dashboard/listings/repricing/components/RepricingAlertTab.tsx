@@ -7,7 +7,7 @@ import { Button } from '@/presentation/components/ui/Button';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { RepricingUseCase } from '@/application/usecases/RepricingUseCase';
 import { RepricingRepositoryImpl } from '@/infrastructure/repositories/RepricingRepositoryImpl';
-import { PLATFORMS } from '@/config/platforms';
+import { PLATFORMS, platformDisplayName } from '@/config/platforms';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import {
@@ -459,7 +459,7 @@ export function RepricingAlertTab({
               <option value="">전체 채널</option>
               {PLATFORMS.map((p) => (
                 <option key={p} value={p}>
-                  {p}
+                  {platformDisplayName(p)}
                 </option>
               ))}
             </select>

@@ -7,6 +7,7 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
 import type { CategorySuggestion } from '@/domain/entities/CategoryLookupEntity';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { platformDisplayName } from '@/config/platforms';
 
 /**
  * Marketplace category lookup picker (name search + column tree + product-name prediction) — pick without typing codes.
@@ -24,6 +25,11 @@ interface CategoryLookupPickerModalProps {
   lookupUseCase: CategoryLookupUseCase;
   onSelect: (sel: { platformCategoryId: string; name: string; namePath: string }) => void;
   onClose: () => void;
+  /**
+   * What is already chosen elsewhere (standard category · other platforms), shown above the search box so a
+   * similar category can be picked. Absent / empty = nothing shown.
+   */
+  references?: { label: string; path: string }[];
 }
 
 /** The server returns at most this many search results. */
@@ -35,6 +41,7 @@ export function CategoryLookupPickerModal({
   lookupUseCase,
   onSelect,
   onClose,
+  references,
 }: CategoryLookupPickerModalProps) {
   const [tab, setTab] = useState<'tree' | 'predict'>('tree');
 
@@ -112,7 +119,7 @@ export function CategoryLookupPickerModal({
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={`카테고리 조회 (${platform})`}>
+    <Modal isOpen onClose={onClose} title={`카테고리 조회 (${platformDisplayName(platform)})`}>
 
         <div className="flex border-b">
           <button
@@ -136,6 +143,16 @@ export function CategoryLookupPickerModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
+          {references && references.length > 0 && (
+            <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+              <p className="mb-1 text-xs font-medium text-gray-500">참고 — 지금 고른 카테고리</p>
+              {references.map((r) => (
+                <p key={r.label} className="truncate text-gray-700" title={r.path}>
+                  <span className="font-medium">{r.label}</span> : {r.path}
+                </p>
+              ))}
+            </div>
+          )}
           {tab === 'tree' ? (
             <div className="space-y-3">
               <div className="flex gap-2">

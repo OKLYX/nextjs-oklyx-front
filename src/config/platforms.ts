@@ -12,3 +12,12 @@
  *    before adding a value.
  */
 export const PLATFORMS = ['COUPANG', 'GMARKET', 'AUCTION', 'SMARTSTORE', 'ELEVENST'];
+
+/**
+ * Screen name of a platform value. The stored / API value stays `ELEVENST`; screens show 「11st」.
+ * Other platforms are returned unchanged.
+ *
+ * ❌ Do not send the returned text to the server — it is display only.
+ */
+export const platformDisplayName = (platform: string): string =>
+  platform === 'ELEVENST' ? '11st' : platform;

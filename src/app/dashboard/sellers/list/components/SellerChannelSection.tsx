@@ -20,6 +20,7 @@ import { ChannelDetailsModal } from './ChannelDetailsModal';
 import { EditChannelModal } from './EditChannelModal';
 import { DeleteChannelConfirmation } from './DeleteChannelConfirmation';
 import { ShippingConfigModal } from './ShippingConfigModal';
+import { platformDisplayName } from '@/config/platforms';
 
 interface SellerChannelSectionProps {
   sellerId: number;
@@ -227,7 +228,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
                   onClick={() => setSelectedChannel(channel)}
                   className="cursor-pointer hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-4 py-2 text-sm text-gray-700">{channel.platform}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">{platformDisplayName(channel.platform)}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">{channel.accountAlias || '-'}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">{channel.vendorId}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">{channel.accessKey}</td>

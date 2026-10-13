@@ -1,6 +1,7 @@
 'use client';
 
 import { Card } from '@/presentation/components/ui/Card';
+import { platformDisplayName } from '@/config/platforms';
 
 interface CommissionRateSearchCardProps {
   selectedPlatform: string;
@@ -40,7 +41,7 @@ export function CommissionRateSearchCard({
             <option value="">플랫폼 선택</option>
             {platforms.map(platform => (
               <option key={platform} value={platform}>
-                {platform}
+                {platformDisplayName(platform)}
               </option>
             ))}
           </select>

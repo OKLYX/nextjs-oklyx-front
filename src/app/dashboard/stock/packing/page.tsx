@@ -97,6 +97,7 @@ type MessageTone = 'info' | 'error' | 'success';
 const PLATFORM_LABEL: Record<string, string> = {
   COUPANG: '쿠팡',
   NAVER: '네이버',
+  ELEVENST: '11st',
 };
 
 const TONE_LABEL: Record<MessageTone, string> = {
