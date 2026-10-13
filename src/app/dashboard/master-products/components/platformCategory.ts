@@ -1,5 +1,6 @@
 import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
 import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
+import type { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import type { MasterPlatformCategory } from '@/domain/entities/MasterProductEntity';
 
 /**
@@ -14,14 +15,14 @@ export const LOOKUP_PLATFORMS: LookupPlatform[] = ['COUPANG', 'ELEVENST'];
 
 const LOOKUP_PLATFORM_LABEL: Record<LookupPlatform, string> = {
   COUPANG: '쿠팡',
-  ELEVENST: '11번가',
+  ELEVENST: '11st',
 };
 
 /** `platform` narrowed to a lookup platform, or null (Naver and any other platform). */
 export const asLookupPlatform = (platform: string): LookupPlatform | null =>
   LOOKUP_PLATFORMS.find((p) => p === platform) ?? null;
 
-/** Screen label of a lookup platform (「쿠팡」 · 「11번가」). */
+/** Screen label of a lookup platform (「쿠팡」 · 「11st」). */
 export const lookupPlatformLabel = (platform: LookupPlatform): string => LOOKUP_PLATFORM_LABEL[platform];
 
 /** Lookup platforms that have at least one switched-on sales-channel account (D17). */
@@ -52,12 +53,12 @@ export interface PlatformCategoryRow {
 }
 
 /**
- * The D50 lines, 「쿠팡」 → 「11번가」: the master's own row wins (D41), else the standard category mapping, else none.
+ * The D50 lines, 「쿠팡」 → 「11st」: the master's own row wins (D41), else the standard category mapping, else none.
  * Path = the cached display path, or the code when no path was cached.
  */
 export const platformCategoryRowsOf = (
   mappings: CategoryMapping[],
-  owns: MasterPlatformCategory[],
+  owns: Pick<MasterPlatformCategory, 'platform' | 'platformCategoryId' | 'platformCategoryName'>[],
 ): PlatformCategoryRow[] =>
   LOOKUP_PLATFORMS.map((platform) => {
     const own = owns.find((o) => o.platform === platform);
@@ -73,3 +74,45 @@ export const platformCategoryRowsOf = (
 /** Notice shown where the upload buttons are hidden (D18 (h)). */
 export const categoryBlockReason = (platform: LookupPlatform): string =>
   `카테고리 연결 필요 — 이 기준 카테고리에 ${lookupPlatformLabel(platform)} 카테고리가 없어 올릴 수 없습니다.`;
+
+/**
+ * Full path of a standard category (「가구 > 거실테이블 > 사이드테이블」) — climbs `parentId` with
+ * `getCategoryById` (at most 20 levels). On a failed read the leaf name alone is returned, so a caller can
+ * always show something.
+ */
+export const standardCategoryPathOf = async (
+  categoryUseCase: CategoryUseCase,
+  id: number,
+  fallbackName: string,
+): Promise<string> => {
+  try {
+    const names: string[] = [];
+    let cat = await categoryUseCase.getCategoryById(id);
+    names.unshift(cat.name);
+    for (let guard = 0; cat.parentId != null && guard < 20; guard++) {
+      cat = await categoryUseCase.getCategoryById(cat.parentId);
+      names.unshift(cat.name);
+    }
+    return names.join(' > ');
+  } catch {
+    return fallbackName;
+  }
+};
+
+/**
+ * Reference lines for the picker opened for `target`: the standard category, then every other platform's
+ * current category (「(개별 지정)」 when the master's own row). Platforms with no category are left out.
+ */
+export const pickerReferencesOf = (
+  target: LookupPlatform,
+  standardPath: string | null,
+  rows: PlatformCategoryRow[],
+): { label: string; path: string }[] => [
+  ...(standardPath ? [{ label: '기준 카테고리', path: standardPath }] : []),
+  ...rows
+    .filter((row) => row.platform !== target && row.path != null)
+    .map((row) => ({
+      label: lookupPlatformLabel(row.platform),
+      path: row.own ? `${row.path} (개별 지정)` : (row.path as string),
+    })),
+];

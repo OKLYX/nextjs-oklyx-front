@@ -9,6 +9,7 @@ import type {
 } from '@/domain/entities/MasterProductEntity';
 import type { ListingOptionSummary } from '@/domain/entities/ListingRegistrationEntity';
 import { CopyIdButton } from './CopyIdButton';
+import { platformDisplayName } from '@/config/platforms';
 
 // 매트릭스 판매가 열과 같은 표기(`12,900원`). ⚠️ 같은 화면에 두 가지 금액 표기가 섞이지 않도록
 // `CoverageMatrix.formatWon` 과 형식을 맞춘다.
@@ -99,7 +100,7 @@ export function ChannelOptionTable({
         const suffix = rowCells.length > 1 ? ` (${index + 1})` : '';
         ordered.push({
           productListingId: matrixCell.productListingId,
-          label: `${row.sellerName} · ${row.platform} · ${row.accountLabel}${suffix}`,
+          label: `${row.sellerName} · ${platformDisplayName(row.platform)} · ${row.accountLabel}${suffix}`,
           platformProductId: cell?.platformProductId ?? matrixCell.platformProductId ?? null,
           ...indexOptions(cell),
         });

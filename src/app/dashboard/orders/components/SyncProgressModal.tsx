@@ -3,6 +3,7 @@
 import { Spinner } from '@/presentation/components/Spinner';
 import type { SyncTarget } from '@/application/dto/OrderDTOs';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { platformDisplayName } from '@/config/platforms';
 
 /**
  * 채널(계정) 1개의 동기화 진행 상태. 순서 = 서버가 준 동기화 대상 순서.
@@ -49,7 +50,7 @@ interface SyncProgressModalProps {
 
 function channelLabel(target: SyncTarget): string {
   const alias = target.accountAlias ? ` · ${target.accountAlias}` : '';
-  return `${target.sellerName} · ${target.platform}${alias}`;
+  return `${target.sellerName} · ${platformDisplayName(target.platform)}${alias}`;
 }
 
 const STATE_ICON: Record<Exclude<ChannelProgress['state'], 'running'>, string> = {

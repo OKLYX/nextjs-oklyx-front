@@ -19,7 +19,7 @@ export interface MarketSource {
 }
 
 /** 플랫폼 코드 → 화면 이름. 플랫폼이 늘면 여기 한 줄만 는다(UX D64). */
-export const PLATFORM_LABEL: Record<string, string> = { COUPANG: '쿠팡' };
+export const PLATFORM_LABEL: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11st' };
 
 /** 구성상품·카테고리를 바꿀 때 뜨는 확인창 문구(마켓 모드) — 옵션은 남고 구성 수량만 지워진다(UX D71·D32). */
 export const MARKET_OPTION_RESET_MESSAGE =

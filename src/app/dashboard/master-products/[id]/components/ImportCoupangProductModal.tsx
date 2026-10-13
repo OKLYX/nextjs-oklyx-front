@@ -10,6 +10,7 @@ import type { ImportPreviewResponse } from '@/domain/entities/ListingRegistratio
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { platformDisplayName } from '@/config/platforms';
 
 interface ImportCoupangProductModalProps {
   masterId: number;
@@ -263,7 +264,7 @@ export function ImportCoupangProductModal({
       disableClose={busy}
     >
       <p className="truncate text-xs text-gray-500">
-        {sellerName} · {platform}
+        {sellerName} · {platformDisplayName(platform)}
       </p>
 
       <div className="mb-3 flex shrink-0 items-center gap-2">

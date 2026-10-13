@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { platformDisplayName } from '@/config/platforms';
 
 // Real platforms today = COUPANG only. Push here when a second mall's adapter lands;
 // the tab bar grows automatically and each tab lazily loads its own schema/values.
@@ -36,7 +37,7 @@ export function MetaPlatformTabs({ children }: MetaPlatformTabsProps) {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            {p}
+            {platformDisplayName(p)}
           </button>
         ))}
       </div>

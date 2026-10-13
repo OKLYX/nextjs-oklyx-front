@@ -32,7 +32,7 @@ interface ClaimDetailsModalProps {
 }
 
 // Platform display labels; unknown codes fall back to the raw code.
-const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡' };
+const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11st' };
 
 function formatDate(value: string | null): string {
   if (!value) return '-';

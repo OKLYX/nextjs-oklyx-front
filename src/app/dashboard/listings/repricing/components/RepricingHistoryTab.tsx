@@ -6,7 +6,7 @@ import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
 import { PriceHistoryUseCase } from '@/application/usecases/PriceHistoryUseCase';
 import { PriceHistoryRepositoryImpl } from '@/infrastructure/repositories/PriceHistoryRepositoryImpl';
-import { PLATFORMS } from '@/config/platforms';
+import { PLATFORMS, platformDisplayName } from '@/config/platforms';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import {
@@ -174,7 +174,7 @@ export function RepricingHistoryTab({
               <option value="">전체 채널</option>
               {PLATFORMS.map((p) => (
                 <option key={p} value={p}>
-                  {p}
+                  {platformDisplayName(p)}
                 </option>
               ))}
             </select>

@@ -27,6 +27,7 @@ import { OrderTable } from './OrderTable';
 import { OrderDetailsModal } from './OrderDetailsModal';
 import { SyncProgressModal } from './SyncProgressModal';
 import { PeriodBackfillDialog } from './PeriodBackfillDialog';
+import { platformDisplayName } from '@/config/platforms';
 
 const PAGE_SIZE = 20;
 
@@ -517,7 +518,7 @@ export function OrderContainer() {
                     : target.lastSyncError ?? '부분 성공';
                 return (
                   <li key={target.accountId} className="line-clamp-2" title={reason}>
-                    · {target.sellerName}·{target.platform} — {reason}
+                    · {target.sellerName}·{platformDisplayName(target.platform)} — {reason}
                   </li>
                 );
               })}

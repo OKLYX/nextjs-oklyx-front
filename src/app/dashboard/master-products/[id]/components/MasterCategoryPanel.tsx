@@ -24,8 +24,11 @@ import { PlatformCategoryRows } from '../../components/PlatformCategoryRows';
 import {
   missingPlatformsOf,
   platformCategoryRowsOf,
+  pickerReferencesOf,
   promptPlatformsOf,
+  standardCategoryPathOf,
   type LookupPlatform,
+  type PlatformCategoryRow,
 } from '../../components/platformCategory';
 
 type PickerSelection = { platformCategoryId: string; name: string; namePath: string };
@@ -96,9 +99,24 @@ export function MasterCategoryPanel({
   const [pendingLeaf, setPendingLeaf] = useState<{
     leaf: CategoryTreeNode;
     platforms: LookupPlatform[];
+    current: PlatformCategoryRow[];
+    path: string;
   } | null>(null);
   // [변경] → picker platform, then the pick waiting for 「적용 범위 선택」 (D51).
   const [pickerPlatform, setPickerPlatform] = useState<LookupPlatform | null>(null);
+  // Full path of the assigned standard category — the [변경] picker's reference line (null = not loaded).
+  const [standardPath, setStandardPath] = useState<string | null>(null);
+  useEffect(() => {
+    if (!current) return;
+    let alive = true;
+    void (async () => {
+      const path = await standardCategoryPathOf(categoryUseCase, current.categoryId, current.categoryName);
+      if (alive) setStandardPath(path);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [current, categoryUseCase]);
   const [scopePick, setScopePick] = useState<{ platform: LookupPlatform; sel: PickerSelection } | null>(null);
 
   // Stable browse reference so CategoryTreeColumns' mount effect doesn't re-run every render.
@@ -171,12 +189,19 @@ export function MasterCategoryPanel({
     setIsSaving(true);
     const leafMappings = await mappingUseCase.getMappings(leaf.id).catch(() => null);
     setIsSaving(false);
-    const present = leafMappings
-      ? [...leafMappings, ...(leaf.id === current?.categoryId ? owns : [])]
-      : null;
+    const leafOwns = leaf.id === current?.categoryId ? owns : [];
+    const present = leafMappings ? [...leafMappings, ...leafOwns] : null;
     const missing = present ? missingPlatformsOf(promptPlatformsOf(activePlatforms), present) : [];
     if (missing.length > 0) {
-      setPendingLeaf({ leaf, platforms: missing });
+      setIsSaving(true);
+      const path = await standardCategoryPathOf(categoryUseCase, leaf.id, leaf.name);
+      setIsSaving(false);
+      setPendingLeaf({
+        leaf,
+        platforms: missing,
+        current: platformCategoryRowsOf(leafMappings ?? [], leafOwns),
+        path,
+      });
       return;
     }
     await assignLeaf(leaf, []);
@@ -325,7 +350,9 @@ export function MasterCategoryPanel({
         <MissingPlatformCategoryModal
           categoryId={pendingLeaf.leaf.id}
           categoryName={pendingLeaf.leaf.name}
+          categoryPath={pendingLeaf.path}
           platforms={pendingLeaf.platforms}
+          current={pendingLeaf.current}
           mappingUseCase={mappingUseCase}
           lookupUseCase={lookupUseCase}
           onClose={handleMissingClose}
@@ -337,6 +364,11 @@ export function MasterCategoryPanel({
           open={pickerPlatform !== null}
           platform={pickerPlatform}
           lookupUseCase={lookupUseCase}
+          references={pickerReferencesOf(
+            pickerPlatform,
+            current ? (standardPath ?? current.categoryName) : null,
+            platformCategoryRowsOf(mappings, owns),
+          )}
           onSelect={(sel) => handlePicked(pickerPlatform, sel)}
           onClose={() => setPickerPlatform(null)}
         />
