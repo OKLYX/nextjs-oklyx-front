@@ -42,6 +42,7 @@ import type {
   MasterCategoryResponse,
   MasterChannelOptionCell,
   MasterOptionResponse,
+  MasterPlatformCategory,
   MasterProductResponse,
 } from '@/domain/entities/MasterProductEntity';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
@@ -214,7 +215,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new CategoryMappingUseCase(new CategoryMappingRepositoryImpl()),
     [],
   );
-  // FEATURE_2610_11: platform category picker for the [카테고리 선택하기] buttons + the missing-platform popup.
+  // FEATURE_2610_11 · 2610_12: platform category picker for the [카테고리 선택하기] buttons, the missing-platform
+  // popup and the 「표준 카테고리」 block's [변경] (D50).
   const lookupUseCase = useMemo(
     () => new CategoryLookupUseCase(new CategoryLookupRepositoryImpl()),
     [],
@@ -247,12 +249,19 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [categoryMappings, setCategoryMappings] = useState<CategoryMapping[] | null>(null);
   // Bumped after a mapping save here → MasterCategoryPanel re-reads its own mappings (D11).
   const [mappingsVersion, setMappingsVersion] = useState(0);
+  // FEATURE_2610_12 / D41: the master's own platform categories (「개별 지정」) — an own row counts as a category
+  // for the account-row block. null = not loaded / failed → nothing is blocked (an unknown state never blocks).
+  const [platformCategories, setPlatformCategories] = useState<MasterPlatformCategory[] | null>(null);
+  // Bumped after a [변경] / [기준으로 되돌리기] in the 「표준 카테고리」 block → the category meta re-reads (D45).
+  const [platformCategoriesVersion, setPlatformCategoriesVersion] = useState(0);
   // Lookup platforms with a switched-on account (D17). Empty until loaded; a failure keeps it empty.
   const [activeLookupPlatforms, setActiveLookupPlatforms] = useState<LookupPlatform[]>([]);
   // Platform whose picker the [카테고리 선택하기] buttons opened (null = closed, D21).
   const [rowPickerPlatform, setRowPickerPlatform] = useState<LookupPlatform | null>(null);
-  // Bumped by the 카테고리 메타 섹션 after a save → re-fetches the option editor's inherit baseline.
-  // ⚠️ 유일한 갱신 경로다: 탭(MasterSectionTabs)은 옮겼다 돌아와도 remount 되지 않아 스스로 낫지 않는다.
+  // Bumped by the category meta section after a save → re-fetches the option editor's inherit baseline.
+  // ⚠️ A meta save and a platform category change (platformCategoriesVersion, FEATURE_2610_12) reach the
+  // baseline only through these bumps: the tabs (MasterSectionTabs) do not remount when you leave and come
+  // back, so they never heal on their own.
   const [metaVersion, setMetaVersion] = useState(0);
   // 옵션 override diff 의 기준값 = **서버에 저장된** 마스터 카테고리 메타(쿠팡).
   const [masterAttrValues, setMasterAttrValues] = useState<Record<string, string>>({});
@@ -472,6 +481,19 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     [mappingUseCase],
   );
 
+  // FEATURE_2610_12 / D41: the master's own platform categories. Fire-and-forget; a failure = unknown (null).
+  // Only the latest request lands — same guard as the mapping read above.
+  const platformCategoryRequestRef = useRef(0);
+  const fetchPlatformCategories = useCallback(async () => {
+    const request = ++platformCategoryRequestRef.current;
+    try {
+      const next = await masterUseCase.getPlatformCategories(masterId);
+      if (request === platformCategoryRequestRef.current) setPlatformCategories(next);
+    } catch {
+      if (request === platformCategoryRequestRef.current) setPlatformCategories(null);
+    }
+  }, [masterUseCase, masterId]);
+
   // FEATURE_2610_11: re-read the channel rows only (cell categoryCode = the unsent-row block, D19).
   // 🔴 Not `load()` — the whole detail is not re-read for a mapping or category change (D11).
   const reloadChannelRows = useCallback(async () => {
@@ -502,6 +524,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       // 2609_61: 옵션·가격·재고가 바뀌는 경로는 전부 이 재조회를 지나므로 채널 옵션 갱신도 여기 한 곳에서.
       void fetchChannelOptions(); // ditto — 채널 행의 옵션 목록과 표가 뒤이어 채워진다
       void fetchCategoryMappings(cat); // ditto — the category block on account rows fills in after
+      void fetchPlatformCategories(); // ditto — own rows count for the same block (2610_12 / D41)
     } catch {
       setError('커버리지 매트릭스를 불러오지 못했습니다.');
     } finally {
@@ -515,6 +538,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     fetchSyncPreview,
     fetchChannelOptions,
     fetchCategoryMappings,
+    fetchPlatformCategories,
   ]);
 
   useEffect(() => {
@@ -547,7 +571,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   }, [carrierRateUseCase, packageUseCase]);
 
   // FEATURE_2610_11 / D17: lookup platforms with a switched-on account (tenant-wide list). ADMIN only
-  // (`/api/admin/**`). A failure keeps the list empty → no popup and no missing-platform lines.
+  // (`/api/admin/**`). A failure keeps the list empty → the popup does not ask Coupang (11st is still asked,
+  // FEATURE_2610_12 / D35).
   useEffect(() => {
     if (!isAdmin) return;
     let alive = true;
@@ -575,9 +600,23 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   // FEATURE_2610_11: the standard category changed in MasterCategoryPanel → its mappings and the channel
   // rows both follow (the block judgements read them, D19).
+  // FEATURE_2610_12 / D42: a different category also drops the own rows on the server → re-read them.
   const handleCategoryChanged = (next: MasterCategoryResponse | null) => {
     setCategory(next);
     void fetchCategoryMappings(next);
+    void fetchPlatformCategories();
+    void reloadChannelRows();
+    // Re-picking the same leaf keeps the category id, so the popup's 「개별 지정」 picks reach the category meta
+    // and the option baseline only through this bump (D45).
+    setPlatformCategoriesVersion((v) => v + 1);
+  };
+
+  // FEATURE_2610_12 / D50: a [변경] / [기준으로 되돌리기] in the 「표준 카테고리」 block → the mappings, the own rows,
+  // the channel rows and the category meta follow (the category itself did not change).
+  const handlePlatformCategoryChanged = () => {
+    setPlatformCategoriesVersion((v) => v + 1);
+    void fetchCategoryMappings(category);
+    void fetchPlatformCategories();
     void reloadChannelRows();
   };
 
@@ -655,9 +694,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     [master],
   );
 
-  // 옵션 override diff 의 기준값(서버에 저장된 마스터 카테고리 메타). 카테고리 변경·메타 저장(metaVersion)
-  // 시에만 다시 읽는다. ⚠️ CategoryMetaPanel 도 자체 useCase 로 같은 값을 읽지만(패널 내부 미수정) 둘 다
-  // 읽기 전용이라 충돌하지 않는다.
+  // The option override diff baseline (the master category meta saved on the server). Re-read only on a category
+  // change, a meta save (metaVersion) or a platform category change (platformCategoriesVersion, FEATURE_2610_12 /
+  // D45 — the notice group follows the schema). ⚠️ CategoryMetaPanel reads the same values with its own useCase
+  // (the panel internals are not edited); both are read-only, so they do not clash.
   useEffect(() => {
     let alive = true;
     // Inline async IIFE defers setState past the sync effect body (set-state-in-effect lint).
@@ -692,7 +732,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     return () => {
       alive = false;
     };
-  }, [masterUseCase, masterId, categoryId, metaVersion]);
+  }, [masterUseCase, masterId, categoryId, metaVersion, platformCategoriesVersion]);
 
   // 이미지 필드(대표사진 + 이미지 그룹 카탈로그). 생성 모달과 같은 도출 헬퍼를 쓴다.
   useEffect(() => {
@@ -774,15 +814,18 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     shippingOverrideCount > 0 ? `${shippingOverrideCount}개 항목 지정` : '기본값 사용';
   // 출고지·반품지 없는 판매자 = 채널 생성 차단. Strict true → unknown(조회 실패)은 막지 않는다.
   const isShippingBlocked = (accountId: number) => placesUnset[accountId] === true;
-  // FEATURE_2610_11 / D19·D24: no mapping row for that platform → its upload buttons are hidden.
-  // Only Coupang · 11st (D20) and only with a standard category (D18 (f)); unknown mappings never block.
+  // FEATURE_2610_11 / D19·D24 · 2610_12 / D41: no mapping row and no own row for that platform → its upload
+  // buttons are hidden. Only Coupang · 11st (D20) and only with a standard category (D18 (f)); unknown mappings
+  // or own rows never block.
   const isCategoryBlocked = (platform: string) => {
     const lookup = asLookupPlatform(platform);
     return (
       lookup != null &&
       category != null &&
       categoryMappings != null &&
-      !categoryMappings.some((m) => m.platform === lookup)
+      platformCategories != null &&
+      !categoryMappings.some((m) => m.platform === lookup) &&
+      !platformCategories.some((o) => o.platform === lookup)
     );
   };
   const isRowBlocked = (accountId: number) => {
@@ -1545,11 +1588,12 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             lookupUseCase={lookupUseCase}
                             activePlatforms={activeLookupPlatforms}
                             mappingsVersion={mappingsVersion}
-                            onPickPlatformCategory={setRowPickerPlatform}
+                            onPlatformCategoryChanged={handlePlatformCategoryChanged}
                           />
                         </StackedBlock>
                         <StackedBlock title="필수속성 · 고시">
                           <CategoryMetaPanel
+                            key={platformCategoriesVersion}
                             masterId={masterId}
                             categoryCode={category ? String(category.categoryId) : null}
                             isBundle={isBundle}
@@ -1586,6 +1630,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             packages={packages}
                             masterDefaults={optionMasterDefaults}
                             categoryId={categoryId}
+                            platformCategoryCode={
+                              platformCategories?.find((o) => o.platform === 'COUPANG')?.platformCategoryId ??
+                              null
+                            }
                             masterAttrValues={masterAttrValues}
                             masterNoticeValues={masterNoticeValues}
                             masterNoticeGroup={masterNoticeGroup}
@@ -1747,8 +1795,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         }}
       />
 
-      {/* FEATURE_2610_11 / D21: one picker for the [카테고리 선택하기] buttons of the rows and the panel line
-          (the missing-platform popup inside the panel has its own). */}
+      {/* FEATURE_2610_11 / D21: one picker for the [카테고리 선택하기] buttons of the channel rows (the 「표준 카테고리」
+          block has its own for [변경] and the missing-platform popup — 2610_12 / D50). */}
       {rowPickerPlatform && (
         <CategoryLookupPickerModal
           open={rowPickerPlatform !== null}

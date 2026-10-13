@@ -15,6 +15,8 @@ import type {
   MasterOptionResponse,
   MasterCategoryRequest,
   MasterCategoryResponse,
+  MasterPlatformCategory,
+  MasterPlatformCategoryRequest,
   CategoryMetaResponse,
   CategoryMetaSchemaResponse,
   CategoryAttributesRequest,
@@ -136,8 +138,21 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
     return response.data.data;
   }
 
-  async clearCategory(id: number): Promise<void> {
-    await axiosInstance.delete(`${base}/${id}/category`);
+  async getPlatformCategories(id: number): Promise<MasterPlatformCategory[]> {
+    const response = await axiosInstance.get(`${base}/${id}/platform-categories`);
+    return response.data.data;
+  }
+
+  async setPlatformCategory(
+    id: number,
+    data: MasterPlatformCategoryRequest,
+  ): Promise<MasterPlatformCategory> {
+    const response = await axiosInstance.put(`${base}/${id}/platform-categories`, data);
+    return response.data.data;
+  }
+
+  async deletePlatformCategory(id: number, platform: string): Promise<void> {
+    await axiosInstance.delete(`${base}/${id}/platform-categories/${platform}`);
   }
 
   async getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse> {
@@ -145,9 +160,14 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
     return response.data.data;
   }
 
-  async getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse> {
+  async getCategorySchema(
+    categoryId: number,
+    platform: string,
+    platformCategoryCode?: string | null,
+  ): Promise<CategoryMetaSchemaResponse> {
+    // FEATURE_2610_12 / D45: a picked code wins on the server; the category id stays for the no-pick case.
     const response = await axiosInstance.get(`${lookupBase}/${platform}/meta`, {
-      params: { categoryId },
+      params: platformCategoryCode ? { categoryId, platformCategoryCode } : { categoryId },
     });
     return response.data.data;
   }

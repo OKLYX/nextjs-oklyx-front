@@ -11,6 +11,8 @@ import type {
   MasterOptionResponse,
   MasterCategoryRequest,
   MasterCategoryResponse,
+  MasterPlatformCategory,
+  MasterPlatformCategoryRequest,
   CategoryMetaResponse,
   CategoryMetaSchemaResponse,
   CategoryAttributesRequest,
@@ -45,10 +47,18 @@ export interface MasterProductRepository {
   getChannelOptions(id: number): Promise<MasterChannelOptionsResponse>;
   getCategory(id: number): Promise<MasterCategoryResponse | null>;
   setCategory(id: number, data: MasterCategoryRequest): Promise<MasterCategoryResponse>;
-  clearCategory(id: number): Promise<void>;
+  // FEATURE_2610_12 / D40: the master's own platform categories (「개별 지정」).
+  getPlatformCategories(id: number): Promise<MasterPlatformCategory[]>;
+  setPlatformCategory(id: number, data: MasterPlatformCategoryRequest): Promise<MasterPlatformCategory>;
+  deletePlatformCategory(id: number, platform: string): Promise<void>;
   getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse>;
-  // Schema only, keyed by (platform × categoryId) — used before a master exists.
-  getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse>;
+  // Schema only (no values) — by (platform × categoryId), or by `platformCategoryCode` when given
+  // (a 「개별 지정」 pick, FEATURE_2610_12 / D45).
+  getCategorySchema(
+    categoryId: number,
+    platform: string,
+    platformCategoryCode?: string | null,
+  ): Promise<CategoryMetaSchemaResponse>;
   setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
   updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;

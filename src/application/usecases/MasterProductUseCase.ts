@@ -12,6 +12,8 @@ import type {
   MasterOptionResponse,
   MasterCategoryRequest,
   MasterCategoryResponse,
+  MasterPlatformCategory,
+  MasterPlatformCategoryRequest,
   CategoryMetaResponse,
   CategoryMetaSchemaResponse,
   CategoryAttributesRequest,
@@ -95,16 +97,28 @@ export class MasterProductUseCase {
     return this.repository.setCategory(id, data);
   }
 
-  clearCategory(id: number): Promise<void> {
-    return this.repository.clearCategory(id);
+  getPlatformCategories(id: number): Promise<MasterPlatformCategory[]> {
+    return this.repository.getPlatformCategories(id);
+  }
+
+  setPlatformCategory(id: number, data: MasterPlatformCategoryRequest): Promise<MasterPlatformCategory> {
+    return this.repository.setPlatformCategory(id, data);
+  }
+
+  deletePlatformCategory(id: number, platform: string): Promise<void> {
+    return this.repository.deletePlatformCategory(id, platform);
   }
 
   getCategoryMeta(id: number, platform: string): Promise<CategoryMetaResponse> {
     return this.repository.getCategoryMeta(id, platform);
   }
 
-  getCategorySchema(categoryId: number, platform: string): Promise<CategoryMetaSchemaResponse> {
-    return this.repository.getCategorySchema(categoryId, platform);
+  getCategorySchema(
+    categoryId: number,
+    platform: string,
+    platformCategoryCode?: string | null,
+  ): Promise<CategoryMetaSchemaResponse> {
+    return this.repository.getCategorySchema(categoryId, platform, platformCategoryCode);
   }
 
   setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void> {

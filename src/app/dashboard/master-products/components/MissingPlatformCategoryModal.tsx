@@ -8,53 +8,69 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { CategoryLookupPickerModal } from '@/app/dashboard/costs/category/components/CategoryLookupPickerModal';
 import type { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUseCase';
 import type { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
+import type { MasterPlatformCategoryRequest } from '@/domain/entities/MasterProductEntity';
 import { lookupPlatformLabel, type LookupPlatform } from './platformCategory';
+import { CategoryScopeDialog } from './CategoryScopeDialog';
+
+type PickerSelection = { platformCategoryId: string; name: string; namePath: string };
 
 interface MissingPlatformCategoryModalProps {
-  /** Standard category the picked platform categories are saved to (its mapping rows). */
+  /** Standard category a 「기준 카테고리 연결을 바꾸기」 pick is saved to (its mapping rows). */
   categoryId: number;
   /** Standard category name — shown in the notice line. */
   categoryName: string;
-  /** Platforms the standard category has no mapping for (one row each, in this order). */
+  /** Platforms the standard category has no category for (one row each, in this order). */
   platforms: LookupPlatform[];
   mappingUseCase: CategoryMappingUseCase;
   lookupUseCase: CategoryLookupUseCase;
-  /** Every close path ([건너뛰기] · [완료] · ✕ · ESC · outside click) — the caller continues its flow. */
-  onClose: () => void;
+  /**
+   * Wraps every scope choice before it is applied — the create form passes its option-reset confirm (D52).
+   * Absent = the choice is applied right away (master detail, D47).
+   */
+  confirmChange?: (apply: () => void) => void;
+  /**
+   * Every close path ([건너뛰기] · [완료] · ✕ · ESC · outside click). `ownPicks` = the 「이 상품만 개별 지정」
+   * picks, NOT saved here — the caller saves them after the standard category is assigned (D53).
+   */
+  onClose: (ownPicks: MasterPlatformCategoryRequest[]) => void;
 }
 
 /**
  * 「플랫폼 카테고리 선택」 popup — asks for the platform categories a just-picked standard category is missing
- * (FEATURE_2610_11 / D8 · D9 · D10 · D18).
+ * (FEATURE_2610_11 / D8 · D10 · D18 · FEATURE_2610_12 / D43 · D51).
  * File: src/app/dashboard/master-products/components/MissingPlatformCategoryModal.tsx
  *
  * **Purpose**: one row per missing platform + [카테고리 선택하기] → the shared `CategoryLookupPickerModal` →
- * the pick is saved as the standard category's mapping (`upsertMapping`, the same row the category screen's
- * 「몰별 카테고리 매핑」 writes — it applies to every master using this standard category, D2).
+ * 「적용 범위 선택」 (`CategoryScopeDialog`): [기준 카테고리 연결을 바꾸기] saves the standard category's mapping
+ * here (`upsertMapping`, the same row the category screen's 「몰별 카테고리 매핑」 writes — every master using
+ * this standard category); [이 상품만 개별 지정] is handed back through `onClose` and saved by the caller after
+ * the category assignment (D53 — assigning a different category deletes own rows, D42).
  * **Required rule**: when a standard category is picked on a master screen (detail leaf click · create
  * [설정적용]), the missing platforms are asked through this popup. The caller mounts it with `&&` (fresh
- * state per open) and continues (assign / lock the category) in `onClose` — skipping is allowed (D4).
+ * state per open) and continues (assign / lock the category, then save `ownPicks`) in `onClose` — skipping is
+ * allowed (2610_11 / D4).
  *
  * **Usage**:
  * ```tsx
- * // Master detail: before `setCategory` (D8)
+ * // Master detail: before `setCategory` (2610_11 / D8)
  * {pendingLeaf && (
  *   <MissingPlatformCategoryModal categoryId={pendingLeaf.leaf.id} categoryName={pendingLeaf.leaf.name}
  *     platforms={pendingLeaf.platforms} mappingUseCase={mappingUseCase} lookupUseCase={lookupUseCase}
  *     onClose={handleMissingClose} />
  * )}
- * // Master create: after [설정적용], before the category locks (D8)
+ * // Master create: after [설정적용], before the category locks — with the option-reset confirm (D52)
  * {missingPrompt && (
  *   <MissingPlatformCategoryModal {...missingPrompt} mappingUseCase={mappingUseCase}
- *     lookupUseCase={lookupUseCase} onClose={handleMissingClose} />
+ *     lookupUseCase={lookupUseCase} confirmChange={runWithOptionReset} onClose={handleMissingClose} />
  * )}
  * ```
  *
- * ⚠️ A failed save closes the picker too, so the banner on top of this popup is not hidden (2610_05 / D39).
+ * ⚠️ The picker closes as soon as a category is picked (the scope dialog follows), so a failed save's banner is
+ *    never hidden behind it (2610_05 / D39).
  * ⚠️ While a save is in flight the popup cannot be closed (`disableClose`) — the caller's next step
  *    (assign) must see the saved row.
- * ❌ Do not edit `CategoryLookupPickerModal` or `CategoryMappingModal` for this popup (D9).
- * ❌ Naver is never passed in — it has no category list (D18 (d)).
+ * ❌ Do not edit `CategoryLookupPickerModal` or `CategoryMappingModal` for this popup (2610_11 / D9).
+ * ❌ Naver is never passed in — it has no category list (2610_11 / D18 (d)).
  */
 export function MissingPlatformCategoryModal({
   categoryId,
@@ -62,19 +78,33 @@ export function MissingPlatformCategoryModal({
   platforms,
   mappingUseCase,
   lookupUseCase,
+  confirmChange,
   onClose,
 }: MissingPlatformCategoryModalProps) {
-  const [picked, setPicked] = useState<Partial<Record<LookupPlatform, string>>>({});
+  // Display path of the mapping saved in this popup, per platform.
+  const [savedPath, setSavedPath] = useState<Partial<Record<LookupPlatform, string>>>({});
+  // 「개별 지정」 picks, handed back on close (D53). They win over a mapping saved here for the display (D41).
+  const [ownPicks, setOwnPicks] = useState<Partial<Record<LookupPlatform, MasterPlatformCategoryRequest>>>({});
   const [pickerPlatform, setPickerPlatform] = useState<LookupPlatform | null>(null);
+  const [scopePick, setScopePick] = useState<{ platform: LookupPlatform; sel: PickerSelection } | null>(null);
   const [busyPlatform, setBusyPlatform] = useState<LookupPlatform | null>(null);
   const [error, setError] = useState('');
 
-  const remaining = platforms.filter((p) => picked[p] == null);
+  const pickedPath = (platform: LookupPlatform): string | null => {
+    const own = ownPicks[platform];
+    if (own) return `${own.platformCategoryName ?? own.platformCategoryId} (개별 지정)`;
+    return savedPath[platform] ?? null;
+  };
+  const remaining = platforms.filter((p) => pickedPath(p) == null);
+  const close = () => onClose(Object.values(ownPicks).filter((o): o is MasterPlatformCategoryRequest => o != null));
+  const apply = (run: () => void) => (confirmChange ? confirmChange(run) : run());
 
-  const handleSelect = async (
-    platform: LookupPlatform,
-    sel: { platformCategoryId: string; name: string; namePath: string },
-  ) => {
+  const handlePicked = (platform: LookupPlatform, sel: PickerSelection) => {
+    setPickerPlatform(null);
+    setScopePick({ platform, sel });
+  };
+
+  const saveBase = async (platform: LookupPlatform, sel: PickerSelection) => {
     setError('');
     setBusyPlatform(platform);
     try {
@@ -83,29 +113,45 @@ export function MissingPlatformCategoryModal({
         platformCategoryId: sel.platformCategoryId,
         platformCategoryName: sel.namePath || sel.name,
       });
-      setPicked((prev) => ({ ...prev, [platform]: sel.namePath || sel.name }));
-      setPickerPlatform(null);
+      setSavedPath((prev) => ({ ...prev, [platform]: sel.namePath || sel.name }));
     } catch (e) {
-      // Close the picker on failure too, so the banner below is not hidden behind it (2610_05/D39).
-      setPickerPlatform(null);
       setError(extractErrorMessage(e, '매핑 저장에 실패했습니다.'));
     } finally {
       setBusyPlatform(null);
     }
   };
 
+  const handleOwn = () => {
+    if (!scopePick) return;
+    const { platform, sel } = scopePick;
+    setScopePick(null);
+    apply(() =>
+      setOwnPicks((prev) => ({
+        ...prev,
+        [platform]: { platform, platformCategoryId: sel.platformCategoryId, platformCategoryName: sel.namePath || sel.name },
+      })),
+    );
+  };
+
+  const handleBase = () => {
+    if (!scopePick) return;
+    const { platform, sel } = scopePick;
+    setScopePick(null);
+    apply(() => void saveBase(platform, sel));
+  };
+
   return (
     <>
       <Modal
         isOpen
-        onClose={onClose}
+        onClose={close}
         title="플랫폼 카테고리 선택"
         closeOnOverlayClick
         disableClose={busyPlatform !== null}
         footer={
           <Button
             variant={remaining.length > 0 ? 'secondary' : 'primary'}
-            onClick={onClose}
+            onClick={close}
             disabled={busyPlatform !== null}
           >
             {remaining.length > 0 ? '건너뛰기' : '완료'}
@@ -117,7 +163,7 @@ export function MissingPlatformCategoryModal({
             <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
           )}
           <p className="text-sm text-gray-700">
-            {`${categoryName}에 맞는 카테고리가 없는 플랫폼입니다. 고르면 이 기준 카테고리를 쓰는 모든 마스터에 적용됩니다. 건너뛰면 그 플랫폼에는 올릴 수 없습니다.`}
+            {`${categoryName}에 맞는 카테고리가 없는 플랫폼입니다. 카테고리를 고른 뒤 이 상품만 개별 지정할지, 이 기준 카테고리를 쓰는 모든 마스터에 연결할지 고릅니다. 건너뛰면 그 플랫폼에는 올릴 수 없습니다.`}
           </p>
           {platforms.map((platform) => (
             <div
@@ -126,8 +172,8 @@ export function MissingPlatformCategoryModal({
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-800">{lookupPlatformLabel(platform)}</p>
-                {picked[platform] != null && (
-                  <p className="truncate text-xs text-gray-600">{picked[platform]}</p>
+                {pickedPath(platform) != null && (
+                  <p className="truncate text-xs text-gray-600">{pickedPath(platform)}</p>
                 )}
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
@@ -150,8 +196,18 @@ export function MissingPlatformCategoryModal({
           open={pickerPlatform !== null}
           platform={pickerPlatform}
           lookupUseCase={lookupUseCase}
-          onSelect={(sel) => void handleSelect(pickerPlatform, sel)}
+          onSelect={(sel) => handlePicked(pickerPlatform, sel)}
           onClose={() => setPickerPlatform(null)}
+        />
+      )}
+
+      {scopePick && (
+        <CategoryScopeDialog
+          platform={scopePick.platform}
+          path={scopePick.sel.namePath || scopePick.sel.name}
+          onOwn={handleOwn}
+          onBase={handleBase}
+          onCancel={() => setScopePick(null)}
         />
       )}
     </>
