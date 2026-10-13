@@ -68,7 +68,7 @@ const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
 // Platform display labels. COUPANG only on purpose: the sheet button is disabled for every other
 // platform (`!isCoupang`), so no other code can reach this banner. Kept as a map (not a literal
 // '쿠팡') so a second platform needs one entry, not a rewrite; unknown codes fall back to the raw code.
-const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11st' };
+const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11번가' };
 
 // 주문 상세 액션 탭. 왼쪽부터 송장시트 조회 → 발송처리 → 주문취소 순이고, **기본 선택은 발송처리**다 —
 // 주문 대부분이 발송으로 끝나고, 취소는 되돌릴 수 없어 한 번 더 누르게 두는 편이 안전하다.

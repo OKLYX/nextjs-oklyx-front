@@ -15,14 +15,14 @@ export const LOOKUP_PLATFORMS: LookupPlatform[] = ['COUPANG', 'ELEVENST'];
 
 const LOOKUP_PLATFORM_LABEL: Record<LookupPlatform, string> = {
   COUPANG: '쿠팡',
-  ELEVENST: '11st',
+  ELEVENST: '11번가',
 };
 
 /** `platform` narrowed to a lookup platform, or null (Naver and any other platform). */
 export const asLookupPlatform = (platform: string): LookupPlatform | null =>
   LOOKUP_PLATFORMS.find((p) => p === platform) ?? null;
 
-/** Screen label of a lookup platform (「쿠팡」 · 「11st」). */
+/** Screen label of a lookup platform (「쿠팡」 · 「11번가」). */
 export const lookupPlatformLabel = (platform: LookupPlatform): string => LOOKUP_PLATFORM_LABEL[platform];
 
 /** Lookup platforms that have at least one switched-on sales-channel account (D17). */
@@ -53,7 +53,7 @@ export interface PlatformCategoryRow {
 }
 
 /**
- * The D50 lines, 「쿠팡」 → 「11st」: the master's own row wins (D41), else the standard category mapping, else none.
+ * The D50 lines, 「쿠팡」 → 「11번가」: the master's own row wins (D41), else the standard category mapping, else none.
  * Path = the cached display path, or the code when no path was cached.
  */
 export const platformCategoryRowsOf = (

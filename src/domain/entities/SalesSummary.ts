@@ -128,7 +128,7 @@ export interface ProductProfit {
   uncategorized: boolean;
 }
 
-const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버', ELEVENST: '11st' };
+const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버', ELEVENST: '11번가' };
 
 /** 알 수 없는 코드는 원문 그대로 — 두 번째 마켓이 붙어도 화면이 빈칸이 되지 않는다. */
 export const platformLabel = (platform: string): string => PLATFORM_LABELS[platform] ?? platform;
