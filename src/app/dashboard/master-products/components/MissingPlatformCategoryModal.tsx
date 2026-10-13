@@ -9,7 +9,12 @@ import { CategoryLookupPickerModal } from '@/app/dashboard/costs/category/compon
 import type { CategoryMappingUseCase } from '@/application/usecases/CategoryMappingUseCase';
 import type { CategoryLookupUseCase } from '@/application/usecases/CategoryLookupUseCase';
 import type { MasterPlatformCategoryRequest } from '@/domain/entities/MasterProductEntity';
-import { lookupPlatformLabel, type LookupPlatform } from './platformCategory';
+import {
+  LOOKUP_PLATFORMS,
+  lookupPlatformLabel,
+  type LookupPlatform,
+  type PlatformCategoryRow,
+} from './platformCategory';
 import { CategoryScopeDialog } from './CategoryScopeDialog';
 
 type PickerSelection = { platformCategoryId: string; name: string; namePath: string };
@@ -17,10 +22,17 @@ type PickerSelection = { platformCategoryId: string; name: string; namePath: str
 interface MissingPlatformCategoryModalProps {
   /** Standard category a 「기준 카테고리 연결을 바꾸기」 pick is saved to (its mapping rows). */
   categoryId: number;
-  /** Standard category name — shown in the notice line. */
+  /** Standard category name — shown in the notice line when `categoryPath` is absent. */
   categoryName: string;
-  /** Platforms the standard category has no category for (one row each, in this order). */
+  /** Full path of the standard category (`standardCategoryPathOf`) — shown in the notice and the picker. */
+  categoryPath?: string;
+  /** Platforms the standard category has no category for — the rows that get [카테고리 선택하기]. */
   platforms: LookupPlatform[];
+  /**
+   * Every lookup platform's current state for this standard category (`platformCategoryRowsOf`), so the popup
+   * shows what is already chosen next to what is missing. Absent = only the missing rows are shown.
+   */
+  current?: PlatformCategoryRow[];
   mappingUseCase: CategoryMappingUseCase;
   lookupUseCase: CategoryLookupUseCase;
   /**
@@ -40,7 +52,8 @@ interface MissingPlatformCategoryModalProps {
  * (FEATURE_2610_11 / D8 · D10 · D18 · FEATURE_2610_12 / D43 · D51).
  * File: src/app/dashboard/master-products/components/MissingPlatformCategoryModal.tsx
  *
- * **Purpose**: one row per missing platform + [카테고리 선택하기] → the shared `CategoryLookupPickerModal` →
+ * **Purpose**: the platforms that already have a category are listed first with their path (「(연결됨)」 ·
+ * 「(개별 지정)」, from `current`), then one row per missing platform + [카테고리 선택하기] → the shared `CategoryLookupPickerModal` →
  * 「적용 범위 선택」 (`CategoryScopeDialog`): [기준 카테고리 연결을 바꾸기] saves the standard category's mapping
  * here (`upsertMapping`, the same row the category screen's 「몰별 카테고리 매핑」 writes — every master using
  * this standard category); [이 상품만 개별 지정] is handed back through `onClose` and saved by the caller after
@@ -75,7 +88,9 @@ interface MissingPlatformCategoryModalProps {
 export function MissingPlatformCategoryModal({
   categoryId,
   categoryName,
+  categoryPath,
   platforms,
+  current,
   mappingUseCase,
   lookupUseCase,
   confirmChange,
@@ -96,6 +111,16 @@ export function MissingPlatformCategoryModal({
     return savedPath[platform] ?? null;
   };
   const remaining = platforms.filter((p) => pickedPath(p) == null);
+  // Shown in the picker: the standard category, then every other platform's category chosen so far.
+  const referencesFor = (target: LookupPlatform): { label: string; path: string }[] => [
+    { label: '기준 카테고리', path: categoryPath ?? categoryName },
+    ...LOOKUP_PLATFORMS.filter((p) => p !== target).flatMap((p) => {
+      const path = pickedPath(p) ?? current?.find((row) => row.platform === p)?.path ?? null;
+      const own = current?.find((row) => row.platform === p)?.own;
+      if (path == null) return [];
+      return [{ label: lookupPlatformLabel(p), path: own && !pickedPath(p) ? `${path} (개별 지정)` : path }];
+    }),
+  ];
   const close = () => onClose(Object.values(ownPicks).filter((o): o is MasterPlatformCategoryRequest => o != null));
   const apply = (run: () => void) => (confirmChange ? confirmChange(run) : run());
 
@@ -163,8 +188,19 @@ export function MissingPlatformCategoryModal({
             <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
           )}
           <p className="text-sm text-gray-700">
-            {`${categoryName}에 맞는 카테고리가 없는 플랫폼입니다. 카테고리를 고른 뒤 이 상품만 개별 지정할지, 이 기준 카테고리를 쓰는 모든 마스터에 연결할지 고릅니다. 건너뛰면 그 플랫폼에는 올릴 수 없습니다.`}
+            {`기준 카테고리 「${categoryPath ?? categoryName}」에 맞는 카테고리가 없는 플랫폼이 있습니다. [카테고리 선택하기]로 고른 뒤 이 상품만 개별 지정할지, 이 기준 카테고리를 쓰는 모든 마스터에 연결할지 고릅니다. 건너뛰면 그 플랫폼에는 올릴 수 없습니다.`}
           </p>
+          {(current ?? [])
+            .filter((row) => !platforms.includes(row.platform) && row.path != null)
+            .map((row) => (
+              <div key={row.platform} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-sm font-medium text-gray-800">{lookupPlatformLabel(row.platform)}</p>
+                <p className="truncate text-xs text-gray-600" title={row.path ?? undefined}>
+                  {row.path}
+                  {row.own ? ' (개별 지정)' : ' (연결됨)'}
+                </p>
+              </div>
+            ))}
           {platforms.map((platform) => (
             <div
               key={platform}
@@ -172,9 +208,7 @@ export function MissingPlatformCategoryModal({
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-800">{lookupPlatformLabel(platform)}</p>
-                {pickedPath(platform) != null && (
-                  <p className="truncate text-xs text-gray-600">{pickedPath(platform)}</p>
-                )}
+                <p className="truncate text-xs text-gray-600">{pickedPath(platform) ?? '카테고리 없음'}</p>
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
                 {busyPlatform === platform && <Spinner size={16} />}
@@ -196,6 +230,7 @@ export function MissingPlatformCategoryModal({
           open={pickerPlatform !== null}
           platform={pickerPlatform}
           lookupUseCase={lookupUseCase}
+          references={referencesFor(pickerPlatform)}
           onSelect={(sel) => handlePicked(pickerPlatform, sel)}
           onClose={() => setPickerPlatform(null)}
         />

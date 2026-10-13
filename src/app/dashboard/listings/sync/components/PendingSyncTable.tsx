@@ -1,6 +1,7 @@
 'use client';
 
 import type { PendingSyncResponse } from '@/domain/entities/ListingRegistrationEntity';
+import { platformDisplayName } from '@/config/platforms';
 
 interface PendingSyncTableProps {
   rows: PendingSyncResponse[];
@@ -42,7 +43,7 @@ export function PendingSyncTable({ rows, selected, onToggle }: PendingSyncTableP
             </td>
             <td className="px-4 py-3">{row.masterProductName}</td>
             <td className="px-4 py-3">{row.seller}</td>
-            <td className="px-4 py-3">{row.platform}</td>
+            <td className="px-4 py-3">{platformDisplayName(row.platform)}</td>
             <td className="px-4 py-3">
               <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
                 {row.status}

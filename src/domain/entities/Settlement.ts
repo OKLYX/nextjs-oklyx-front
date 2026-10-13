@@ -245,7 +245,7 @@ export interface ReconLineQuery {
   unmatched?: boolean;
 }
 
-const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버' };
+const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버', ELEVENST: '11st' };
 
 const SETTLEMENT_TYPE_LABELS: Record<string, string> = {
   WEEKLY: '주정산',

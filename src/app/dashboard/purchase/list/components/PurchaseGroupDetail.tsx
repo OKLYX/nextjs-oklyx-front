@@ -33,7 +33,7 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
  *    예외: 수동 줄(source=MANUAL)의 [제거] — manualQty 를 0 으로 되돌릴 뿐 구매수량 입력이 아니다.
  */
 
-const PLATFORM_LABEL: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버' };
+const PLATFORM_LABEL: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버', ELEVENST: '11st' };
 
 /**
  * 채널 = 판매자 × 플랫폼. 수동 라인은 둘 다 null 이라 '수동'.

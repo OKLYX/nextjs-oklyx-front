@@ -7,6 +7,7 @@ import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegist
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { DetachedListing } from '@/domain/entities/ListingRegistrationEntity';
+import { platformDisplayName } from '@/config/platforms';
 
 interface DetachedListingPickerModalProps {
   masterId: number;
@@ -94,7 +95,7 @@ export function DetachedListingPickerModal({
   return (
     <Modal isOpen onClose={onClose} title="미연결 판매상품 연결">
       <p className="truncate text-xs text-gray-500">
-        {sellerName} · {platform}
+        {sellerName} · {platformDisplayName(platform)}
       </p>
 
       <div className="my-3 flex items-center gap-2">

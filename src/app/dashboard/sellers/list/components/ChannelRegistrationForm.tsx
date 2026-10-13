@@ -14,7 +14,7 @@ import type { TemplateOption } from '@/domain/entities/MarketplaceAccountEntity'
 const PLATFORM_OPTIONS = [
   { value: 'COUPANG', label: '쿠팡' },
   { value: 'NAVER', label: '네이버 스마트스토어' },
-  { value: 'ELEVENST', label: '11번가' },
+  { value: 'ELEVENST', label: '11st' },
   { value: 'GMARKET', label: 'G마켓' },
 ];
 

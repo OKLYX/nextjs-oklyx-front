@@ -8,7 +8,7 @@ import { MarginPolicyUseCase } from '@/application/usecases/MarginPolicyUseCase'
 import { MarginPolicyRepositoryImpl } from '@/infrastructure/repositories/MarginPolicyRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
-import { PLATFORMS } from '@/config/platforms';
+import { PLATFORMS, platformDisplayName } from '@/config/platforms';
 import type { MarginPolicyResponse } from '@/domain/entities/MarginPolicyEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { Button } from '@/presentation/components/ui/Button';
@@ -179,7 +179,7 @@ export function MarginPolicyTable() {
   };
 
   const handleDelete = async (p: MarginPolicyResponse) => {
-    if (!confirm(`${sellerName(p.sellerId)} / ${p.platform} 프리셋을 삭제하시겠습니까?`)) return;
+    if (!confirm(`${sellerName(p.sellerId)} / ${platformDisplayName(p.platform)} 프리셋을 삭제하시겠습니까?`)) return;
     setError('');
     setBusyId(p.id);
     try {
@@ -246,7 +246,7 @@ export function MarginPolicyTable() {
                 <option value="">플랫폼 선택</option>
                 {PLATFORMS.map((p) => (
                   <option key={p} value={p}>
-                    {p}
+                    {platformDisplayName(p)}
                   </option>
                 ))}
               </select>
@@ -265,7 +265,7 @@ export function MarginPolicyTable() {
               {/* FEATURE_2610_10 / D18: the 11st price-comparison fee is not in the price calculation. */}
               {formPlatform === 'ELEVENST' && (
                 <p className="mt-2 text-xs text-gray-500">
-                  11번가는 가격비교 사이트를 거친 주문에 수수료 2%(부가세 포함 2.2%)가 더 붙습니다. 판매가 계산에는 들어가지 않으니 목표 마진율에 2.2%p 를 더해 입력하세요.
+                  11st는 가격비교 사이트를 거친 주문에 수수료 2%(부가세 포함 2.2%)가 더 붙습니다. 판매가 계산에는 들어가지 않으니 목표 마진율에 2.2%p 를 더해 입력하세요.
                 </p>
               )}
             </div>
@@ -373,7 +373,7 @@ export function MarginPolicyTable() {
                 policies.map((p) => (
                   <tr key={p.id} className="border-b border-gray-100 text-sm text-gray-900">
                     <td className="px-4 py-3">{p.sellerName || sellerName(p.sellerId)}</td>
-                    <td className="px-4 py-3">{p.platform}</td>
+                    <td className="px-4 py-3">{platformDisplayName(p.platform)}</td>
                     <td className="px-4 py-3">{toPercent(p.marginRate)}%</td>
                     <td className="px-4 py-3">
                       {p.displayDiscountRate != null && p.displayDiscountRate > 0

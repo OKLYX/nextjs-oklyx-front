@@ -16,7 +16,7 @@ import { Modal } from '@/presentation/components/ui/Modal';
 const PLATFORM_LABELS: Record<string, string> = {
   COUPANG: '쿠팡',
   NAVER: '네이버 스마트스토어',
-  ELEVENST: '11번가',
+  ELEVENST: '11st',
   GMARKET: 'G마켓',
 };
 

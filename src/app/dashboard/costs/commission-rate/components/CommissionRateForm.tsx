@@ -14,6 +14,7 @@ import { CategoryRepositoryImpl } from '@/infrastructure/repositories/CategoryRe
 import type { Category } from '@/domain/entities/CategoryEntity';
 import type { CommissionRate } from '@/domain/entities/CommissionRateEntity';
 import { Button } from '@/presentation/components/ui/Button';
+import { platformDisplayName } from '@/config/platforms';
 
 interface CommissionRateFormProps {
   initialData?: CommissionRate;
@@ -145,7 +146,7 @@ export function CommissionRateForm({
               <option value="">플랫폼 선택</option>
               {platforms.map(platform => (
                 <option key={platform} value={platform}>
-                  {platform}
+                  {platformDisplayName(platform)}
                 </option>
               ))}
             </select>

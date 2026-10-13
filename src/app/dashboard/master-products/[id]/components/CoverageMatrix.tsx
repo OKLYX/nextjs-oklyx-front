@@ -94,6 +94,7 @@ import { ListingRow, cellActionCount } from './ListingRow';
 import { MARKET_OPTION_LOCK_REASON } from './ListingDetailPanel';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Button } from '@/presentation/components/ui/Button';
+import { platformDisplayName } from '@/config/platforms';
 
 interface CoverageMatrixProps {
   id: string;
@@ -765,7 +766,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         const cells = rowCellsOf(r);
         return cells.map((c) => ({
           listingId: c.productListingId,
-          label: `${r.sellerName} · ${r.platform}${cells.length > 1 ? ` · ${cellTag(c)}` : ''}`,
+          label: `${r.sellerName} · ${platformDisplayName(r.platform)}${cells.length > 1 ? ` · ${cellTag(c)}` : ''}`,
           // undefined = not loaded yet / fetch failed → excluded from the hint (never over-report).
           override: generated[c.productListingId]?.shippingOverride,
         }));
@@ -871,7 +872,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           const name = matrix?.rows.find(
             (row) => row.sellerId === r.sellerId && row.platform === r.platform,
           )?.sellerName;
-          return `${name ?? r.sellerId}/${r.platform} — ${r.errorMessage ?? '실패'}`;
+          return `${name ?? r.sellerId}/${platformDisplayName(r.platform)} — ${r.errorMessage ?? '실패'}`;
         });
       setBatchSummary({
         text: `요청 ${res.requested} · 등록 ${res.succeeded} · 실패 ${res.failed}`,
@@ -1197,13 +1198,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
               <li key={c.listingId}>
                 {channelDiffText(c) && (
                   <span>
-                    {c.sellerName} · {c.platform} — {channelDiffText(c)}
+                    {c.sellerName} · {platformDisplayName(c.platform)} — {channelDiffText(c)}
                     {c.onMarket && <span className="text-gray-500"> (반영 후 재등록 필요)</span>}
                   </span>
                 )}
                 {c.marketChannelOnlyOptions.length > 0 && (
                   <span className="text-gray-500">
-                    {channelDiffText(c) ? ' ' : `${c.sellerName} · ${c.platform} — `}
+                    {channelDiffText(c) ? ' ' : `${c.sellerName} · ${platformDisplayName(c.platform)} — `}
                     마스터에 없는데 판매 중: {c.marketChannelOnlyOptions.join(', ')} (WING에서 직접 중지)
                   </span>
                 )}
@@ -1225,7 +1226,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
               .slice(0, 5)
               .map((c) => (
                 <li key={c.listingId}>
-                  {c.sellerName} · {c.platform} — 마스터에 없는데 판매 중:{' '}
+                  {c.sellerName} · {platformDisplayName(c.platform)} — 마스터에 없는데 판매 중:{' '}
                   {c.marketChannelOnlyOptions.join(', ')} (WING에서 직접 중지)
                 </li>
               ))}
@@ -1356,7 +1357,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
               const multiCell = rowCells.length > 1;
               // 모달·확인창 제목용 라벨. 셀이 여럿이면 어느 쿠팡 페이지인지 꼬리표를 붙인다.
               const cellLabel = (c: MatrixCell) =>
-                `${row.sellerName} · ${row.platform}${multiCell ? ` · ${cellTag(c)}` : ''}`;
+                `${row.sellerName} · ${platformDisplayName(row.platform)}${multiCell ? ` · ${cellTag(c)}` : ''}`;
               const canRegister = !row.registered || rowCells.length === 0;
               const lookupPlatform = asLookupPlatform(row.platform);
               const categoryBlocked = isCategoryBlocked(row.platform);
@@ -1376,11 +1377,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                         onChange={() => toggleOne(row.accountId)}
                         disabled={busy || isShippingBlocked(row.accountId)}
                         title={isShippingBlocked(row.accountId) ? SHIPPING_BLOCK_REASON : undefined}
-                        aria-label={`${row.sellerName} ${row.platform} 선택`}
+                        aria-label={`${row.sellerName} ${platformDisplayName(row.platform)} 선택`}
                       />
                     )}
                     <span className="min-w-0 truncate text-sm font-semibold text-gray-900">
-                      {row.platform} · {row.accountLabel}
+                      {platformDisplayName(row.platform)} · {row.accountLabel}
                     </span>
                     <span className="min-w-0 truncate text-sm text-gray-600">{row.sellerName}</span>
                     {rowCells.length > 0 ? (
@@ -1409,7 +1410,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                               row.accountId,
                               row.sellerId,
                               row.platform,
-                              `${row.sellerName} · ${row.platform}`,
+                              `${row.sellerName} · ${platformDisplayName(row.platform)}`,
                             )
                           }
                           disabled={busy || isShippingBlocked(row.accountId)}
