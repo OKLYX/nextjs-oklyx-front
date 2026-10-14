@@ -9,6 +9,12 @@ import type { MasterProductUseCase } from '@/application/usecases/MasterProductU
 import type { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import { Button } from '@/presentation/components/ui/Button';
 import { Input } from '@/presentation/components/ui/Input';
+import {
+  NOTICE_TEXT_FIELDS,
+  NOTICE_TEXT_KEYS,
+  NOTICE_TEXT_TOO_LONG_MESSAGE,
+  noticeTextTooLong,
+} from '@/domain/entities/ElevenstNoticeText';
 
 interface MasterFieldValuesPanelProps {
   master: MasterProductResponse; // initial values come from the parent (no getById here)
@@ -21,17 +27,20 @@ const placeholderFor = (key: string) =>
   (BUILTIN_FIELD_KEYS as readonly string[]).includes(key) ? '등록상품값 사용' : '템플릿 기본값 사용';
 
 /**
- * 마스터 템플릿 필드값 인라인 편집 패널 (마스터 상세).
+ * Inline editor of the master's template field values (master detail).
  * File: src/app/dashboard/master-products/[id]/components/MasterFieldValuesPanel.tsx
  *
- * 필드 **목록**은 기본 썸네일 템플릿(`isDefault`)의 `fields`, 필드 **값**은 부모가 내려준
- * `master.fieldValues` 프리필이다(패널이 `getById` 를 다시 부르지 않는다).
- * 목록 로드는 이 패널이 마운트될 때 = 그 탭(`MasterSectionTabs`)을 처음 열 때 한 번 일어난다(lazy).
+ * The field **list** = the default thumbnail template's (`isDefault`) `fields` + the two 11st notice texts
+ * 「A/S 안내」 · 「반품/교환 안내」, always shown as multi-line fields (FEATURE_2610_13 / D74). The field **values**
+ * are prefilled from `master.fieldValues` handed down by the parent (the panel does not call `getById` again).
+ * The list loads when this panel mounts = the first time its tab (`MasterSectionTabs`) opens (lazy).
  *
- * 빈 값은 전송에서 제외 → 예약 필드는 등록상품값, 커스텀 필드는 템플릿 기본값으로 채워진다.
- * 저장은 **자기 필드만** PATCH(`{ fieldValues }`)하고 `onSaved(patched)` 로 부모에 통지한다
- * (매트릭스 재조회 금지). ⚠️ 백엔드는 non-null fieldValues 를 전체 교체로 다루므로 지운 필드도 반영된다.
- * 템플릿 조회 실패 = 인라인 안내 + 빈 목록(편집 불가) — 다른 섹션 저장을 막지는 않는다.
+ * Blank values are left out of the request → a reserved field takes the registered-product value, a custom field
+ * (and a notice text) the template default. Saving PATCHes **only its own fields** (`{ fieldValues }`) and tells the
+ * parent through `onSaved(patched)` (no matrix reload). ⚠️ The backend replaces the whole non-null fieldValues, so a
+ * cleared field is saved as cleared. A notice text over 4000 EUC-KR bytes stops the save (D78).
+ * A failed template read = inline notice + no template fields (only the notice texts stay editable) — it never
+ * blocks saving other sections.
  */
 export function MasterFieldValuesPanel({
   master,
@@ -55,11 +64,13 @@ export function MasterFieldValuesPanel({
       setLoadError('');
       try {
         const templates = await templateUseCase.list();
-        if (alive) setFields(templates.find((t) => t.isDefault)?.fields ?? []);
+        // The notice texts are listed on their own below — never twice.
+        const templateFields = templates.find((t) => t.isDefault)?.fields ?? [];
+        if (alive) setFields(templateFields.filter((f) => !NOTICE_TEXT_KEYS.includes(f.key)));
       } catch {
         if (alive) {
           setFields([]);
-          setLoadError('템플릿 필드를 불러오지 못했습니다. 필드값을 편집할 수 없습니다.');
+          setLoadError('템플릿 필드를 불러오지 못했습니다. A/S 안내 · 반품/교환 안내만 편집할 수 있습니다.');
         }
       } finally {
         if (alive) setIsLoading(false);
@@ -78,6 +89,11 @@ export function MasterFieldValuesPanel({
   };
 
   const handleSave = async () => {
+    // FEATURE_2610_13 / D78: a notice text over the 11st limit is not saved.
+    if (noticeTextTooLong(values)) {
+      setError(NOTICE_TEXT_TOO_LONG_MESSAGE);
+      return;
+    }
     // Omit blank values so the backend falls back to product/template defaults.
     const cleaned: Record<string, string> = {};
     for (const [k, v] of Object.entries(values)) {
@@ -111,10 +127,11 @@ export function MasterFieldValuesPanel({
         <div className="flex min-h-16 items-center justify-center">
           <Spinner size={20} label="불러오는 중..." />
         </div>
-      ) : fields.length === 0 ? (
-        <p className="text-sm text-gray-500">기본 템플릿에 정의된 필드가 없습니다.</p>
       ) : (
         <div className="space-y-3">
+          {fields.length === 0 && (
+            <p className="text-sm text-gray-500">기본 템플릿에 정의된 필드가 없습니다.</p>
+          )}
           <div className="grid grid-cols-2 gap-3">
             {fields.map((f) => (
               <div key={f.key}>
@@ -137,6 +154,34 @@ export function MasterFieldValuesPanel({
                       master.fieldValues[f.key]
                     ) : (
                       <span className="text-gray-400">{placeholderFor(f.key)}</span>
+                    )}
+                  </p>
+                )}
+              </div>
+            ))}
+            {/* FEATURE_2610_13 / D74: the two 11st notice texts, always shown, multi-line. */}
+            {NOTICE_TEXT_FIELDS.map((f) => (
+              <div key={f.key} className="col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
+                {isEditing ? (
+                  <textarea
+                    rows={4}
+                    value={values[f.key] ?? ''}
+                    placeholder="템플릿 기본값 사용"
+                    disabled={isSaving}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setValues((prev) => ({ ...prev, [f.key]: next }));
+                      setSaved(false);
+                    }}
+                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap rounded bg-gray-50 px-3 py-2 text-sm text-gray-800">
+                    {master.fieldValues?.[f.key]?.trim() ? (
+                      master.fieldValues[f.key]
+                    ) : (
+                      <span className="text-gray-400">템플릿 기본값 사용</span>
                     )}
                   </p>
                 )}

@@ -709,8 +709,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   // The option override diff baseline (the master category meta saved on the server). Re-read only on a category
   // change, a meta save (metaVersion) or a platform category change (platformCategoriesVersion, FEATURE_2610_12 /
-  // D45 — the notice group follows the schema). ⚠️ CategoryMetaPanel reads the same values with its own useCase
-  // (the panel internals are not edited); both are read-only, so they do not clash.
+  // D45 — the notice group follows the schema). ⚠️ CategoryMetaPanel reads the same values with its own useCase;
+  // both reads are read-only, so they do not clash.
   useEffect(() => {
     let alive = true;
     // Inline async IIFE defers setState past the sync effect body (set-state-in-effect lint).
@@ -1611,6 +1611,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             categoryCode={category ? String(category.categoryId) : null}
                             isBundle={isBundle}
                             onSaved={() => setMetaVersion((v) => v + 1)}
+                            elevenstActive={activeLookupPlatforms.includes('ELEVENST')}
                           />
                         </StackedBlock>
                         <div className="space-y-2 p-4">

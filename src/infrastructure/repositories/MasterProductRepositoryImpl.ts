@@ -28,6 +28,7 @@ import type {
   ShippingForceApplyResponse,
 } from '@/domain/entities/MasterProductEntity';
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
+import type { ElevenstNoticePreviewRequest, ElevenstNotification } from '@/domain/entities/ElevenstNotice';
 
 const base = '/api/admin/master-products';
 const lookupBase = '/api/admin/category-lookup';
@@ -174,6 +175,11 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
 
   async setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void> {
     await axiosInstance.patch(`${base}/${id}/category-attributes`, data);
+  }
+
+  async previewElevenstNotice(data: ElevenstNoticePreviewRequest): Promise<ElevenstNotification> {
+    const response = await axiosInstance.post('/api/admin/elevenst/notice-preview', data);
+    return response.data.data;
   }
 
   async updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {
