@@ -95,27 +95,34 @@ import { MARKET_OPTION_LOCK_REASON } from './ListingDetailPanel';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Button } from '@/presentation/components/ui/Button';
 import { platformDisplayName } from '@/config/platforms';
+import { ELEVENST_KEYS } from '@/domain/entities/ElevenstShipping';
 
 interface CoverageMatrixProps {
   id: string;
 }
 
 /**
- * 마스터 상세 = 채널 체크목록(계정 × 리스팅) + 미등록 일괄/행별 등록 + 전파 배선.
+ * Master detail = the channel checklist (account × listing) + unregistered batch / per-row registration + propagation
+ * wiring.
  * File: src/app/dashboard/master-products/[id]/components/CoverageMatrix.tsx
  *
- * 채널(판매자×플랫폼)은 판매채널 관리 화면에서 정의됨 → 여기선 다시 선택하지 않는다.
- * 매트릭스 행이 곧 테넌트 전 채널 목록(registered 플래그). 미등록 행을 체크해 일괄 등록하거나
- * 행별 [등록] 원클릭으로 등록한다(쿠팡 계정은 [쿠팡에 올리기] — 줄을 만든 뒤 옵션 고르기 확인창, 2609_77/D43).
- * 채널 추가 시 옵션은 전체 복사되고(15), 올릴 옵션은 `ListingOptionPickerDialog` 창 하나에서 고른다(2609_77/D57).
+ * Channels (seller × platform) are defined on the sales-channel screen → not picked again here.
+ * The matrix rows are the tenant's whole channel list (registered flag). Unregistered rows are registered by checking
+ * them in a batch or with the per-row one-click [등록] (Coupang and 11st accounts take [마켓에 올리기] — create the line,
+ * then the option picker confirm, 2609_77/D43 · FEATURE_2610_13 / D9 ③).
+ * On channel add every option is copied (15); the options to upload are picked in the one `ListingOptionPickerDialog`
+ * window (2609_77/D57).
  *
- * ⚠️ 머리말 오른쪽 끝에 [마스터 삭제](하드 삭제, 2609_72)가 있다. 성공하면 이 화면이 사라지므로
- * **사용자가 왔던 목록 상태로 `replace`** 한다(`listReturnHref`) — 실패는 여기 머물며 배너로 알린다.
+ * ⚠️ The far right of the header has [마스터 삭제] (hard delete, 2609_72). On success this screen is gone, so it
+ * **`replace`s to the list state the user came from** (`listReturnHref`) — a failure stays here with a banner.
  */
 /**
  * 출고지·반품지가 없는 판매자에 채널을 만들 수 없는 이유(사용자 결정 2026-08-28). 그 판매자의 채널은
  * 전부 배송 정보가 비게 되므로 생성 자체를 막고, 판매자 배송 설정을 먼저 끝내게 안내한다.
  */
+/** Platforms whose account header offers [마켓에 올리기] (2609_77/D43 · FEATURE_2610_13 / D9 ③). */
+const UPLOAD_PLATFORMS = ['COUPANG', 'ELEVENST'];
+
 const SHIPPING_BLOCK_REASON =
   '이 판매자의 출고지·반품지가 지정되지 않아 채널을 만들 수 없습니다. 판매채널 관리 > 배송관리에서 출고지·반품지를 먼저 지정하세요.';
 
@@ -338,7 +345,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [syncPreview, setSyncPreview] = useState<ChannelSyncPreview | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // 2609_77/D43: 쿠팡 계정 헤더의 [쿠팡에 올리기]가 방금 만든 판매상품 줄. null = 확인창 닫힘.
+  // 2609_77/D43: the listing line just created by [마켓에 올리기] of a Coupang or 11st account header. null = closed.
   const [uploadTarget, setUploadTarget] = useState<{ listingId: number; channelLabel: string } | null>(
     null,
   );
@@ -412,12 +419,17 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // backend's shippingReady, so they are skipped. Fire-and-forget; each failure is simply unknown.
   const fetchPlaces = useCallback(
     async (m: ListingMatrixResponse) => {
-      const accountIds = m.rows
-        .filter((r) => !r.registered || rowCellsOf(r).length === 0)
-        .map((r) => r.accountId);
+      const targets = m.rows.filter((r) => !r.registered || rowCellsOf(r).length === 0);
       const entries = await Promise.all(
-        accountIds.map(async (accountId) => {
+        targets.map(async ({ accountId, platform }) => {
           try {
+            // FEATURE_2610_13 / D84: an 11st account keeps its address numbers in its own settings map.
+            if (platform === 'ELEVENST') {
+              const { settings } = await shippingUseCase.getElevenstConfig(accountId);
+              const unset =
+                !settings[ELEVENST_KEYS.outboundSeq]?.trim() || !settings[ELEVENST_KEYS.returnSeq]?.trim();
+              return [accountId, unset] as const;
+            }
             const cfg = await shippingUseCase.getConfig(accountId);
             const unset =
               !cfg.outboundShippingPlaceCode?.trim() || !cfg.returnCenterCode?.trim();
@@ -902,8 +914,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     }
   };
 
-  // 2609_77/D43: 쿠팡 계정의 [쿠팡에 올리기] = 판매상품 줄을 만들고(판매가 계산) → 옵션 고르기 확인창을 연다.
-  // 🔴 이 단계에서는 쿠팡에 아무것도 보내지 않는다 — 확인창의 [올리기]가 보낸다(D29).
+  // 2609_77/D43: [마켓에 올리기] of a Coupang or 11st account = create the listing line (prices calculated) → open
+  // the option picker confirm. 🔴 Nothing is sent to the market at this step — the confirm's [올리기] sends it (D29).
   const handleRowUpload = async (
     accountId: number,
     sellerId: number,
@@ -1400,9 +1412,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           조치 필요 {actionCount}
                         </span>
                       )}
-                      {isAdmin && canRegister && !categoryBlocked && row.platform === 'COUPANG' && (
-                        // 2609_77/D43: 쿠팡은 [등록]+[마켓 등록] 을 하나로 — 줄을 만든 뒤 옵션 고르기 확인창을 연다.
-                        // 🔴 미등록 계정 전용이다(계정당 1셀 가드 409).
+                      {isAdmin && canRegister && !categoryBlocked && UPLOAD_PLATFORMS.includes(row.platform) && (
+                        // 2609_77/D43 · FEATURE_2610_13 / D9 ③: Coupang and 11st merge [등록] + [마켓 등록] — create the
+                        // line, then open the option picker confirm. 🔴 Unregistered accounts only (one cell per account, 409).
                         <button
                           type="button"
                           onClick={() =>
@@ -1420,11 +1432,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           {rowBusyId === row.accountId ? (
                             <Spinner size={12} label="만드는 중" />
                           ) : (
-                            '쿠팡에 올리기'
+                            '마켓에 올리기'
                           )}
                         </button>
                       )}
-                      {isAdmin && canRegister && !categoryBlocked && row.platform !== 'COUPANG' && (
+                      {isAdmin && canRegister && !categoryBlocked && !UPLOAD_PLATFORMS.includes(row.platform) && (
                         // 🔴 [등록] = 채널 셀 **생성**이라 미등록 계정 전용이다(계정당 1셀 가드 409).
                         <button
                           type="button"
@@ -1695,6 +1707,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           useCase={masterUseCase}
                           channels={forceApplyChannels}
                           onSaved={load}
+                          activePlatforms={activeLookupPlatforms}
                         />
                       </div>
                     ),
@@ -1762,7 +1775,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           onClose={() => {
             setUploadTarget(null);
             // D43 대가: 취소해도 만든 줄은 「미전송」으로 남는다 — 사라진 게 아님을 알린다.
-            toast.success('판매상품 줄을 만들었습니다. 아직 쿠팡에 올리지 않았습니다.');
+            toast.success('판매상품 줄을 만들었습니다. 아직 마켓에 올리지 않았습니다.');
           }}
           onDone={() => {
             setUploadTarget(null);
@@ -1784,8 +1797,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         />
       )}
 
-      {/* 2609_77/S6: 판매자 화면의 배송관리 창을 그대로 쓴다. 저장·취소 모두 onClose 로 끝나므로
-          닫힐 때마다 다시 읽는다 — 출고지·반품지가 채워졌으면 [쿠팡에 올리기] 막힘이 풀린다. */}
+      {/* 2609_77/S6: reuses the seller screen's shipping modal. Save and cancel both end in onClose, so it re-reads on
+          every close — once the outbound / return places are filled, the [마켓에 올리기] block lifts. */}
       <ShippingConfigModal
         isOpen={shippingAccount !== null}
         account={shippingAccount}

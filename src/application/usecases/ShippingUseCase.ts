@@ -5,6 +5,7 @@ import {
   ShippingConfig,
   ShippingConfigRequest,
 } from '@/domain/entities/ShippingEntity';
+import type { ElevenstShippingConfig, ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 
 export class ShippingUseCase {
   constructor(private repository: ShippingRepository) {}
@@ -23,5 +24,13 @@ export class ShippingUseCase {
 
   upsertConfig(accountId: number, data: ShippingConfigRequest): Promise<ShippingConfig> {
     return this.repository.upsertConfig(accountId, data);
+  }
+
+  getElevenstConfig(accountId: number): Promise<ElevenstShippingConfig> {
+    return this.repository.getElevenstConfig(accountId);
+  }
+
+  upsertElevenstConfig(accountId: number, settings: ElevenstShippingMap): Promise<ElevenstShippingConfig> {
+    return this.repository.upsertElevenstConfig(accountId, settings);
   }
 }

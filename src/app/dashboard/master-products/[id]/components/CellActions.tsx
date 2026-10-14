@@ -15,6 +15,7 @@ import { ChannelStockModal } from './ChannelStockModal';
 import { ChannelPriceModal } from './ChannelPriceModal';
 import { ChannelOptionNameModal } from './ChannelOptionNameModal';
 import { ChannelShippingOverrideModal } from './ChannelShippingOverrideModal';
+import { ElevenstChannelShippingModal } from './ElevenstChannelShippingModal';
 import { ListingOptionPickerDialog, SHIPPING_BLOCKED_REASON } from './ListingOptionPickerDialog';
 import { asLookupPlatform, categoryBlockReason } from '../../components/platformCategory';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
@@ -115,8 +116,8 @@ type Busy =
  * Actions of one listing (cell) row = **one primary button + ⋯ menu**.
  * File: src/app/dashboard/master-products/[id]/components/CellActions.tsx
  *
- * - Primary: unsent (DRAFT) = Coupang [쿠팡에 올리기] (option picker confirm, 2609_77/D43) · other
- *   platforms [마켓 등록] · unsynced changes (`needsMarketSync`) = [수정 요청] · otherwise none. An unsent
+ * - Primary: unsent (DRAFT) = Coupang · 11st [마켓에 올리기] (option picker confirm, 2609_77/D43 ·
+ *   FEATURE_2610_13 / D9 ③) · other platforms [마켓 등록] · unsynced changes (`needsMarketSync`) = [수정 요청] · otherwise none. An unsent
  *   row whose category the server could not resolve (`categoryBlocked`) shows no primary button — the
  *   category notice + [카테고리 선택하기] take its place (FEATURE_2610_11 / D24).
  * - ⋯ menu: 「편집」 (field values · detail · price · stock · option names · shipping · options to upload) /
@@ -169,7 +170,7 @@ export function CellActions({
   const [showPrice, setShowPrice] = useState(false);
   const [showOptionName, setShowOptionName] = useState(false);
   const [showCategorySource, setShowCategorySource] = useState(false);
-  // 2609_77/D43·D57: [쿠팡에 올리기] 확인창(upload) · [⋯ > 올릴 옵션 고르기](select). 같은 창이다.
+  // 2609_77/D43·D57: the [마켓에 올리기] confirm (upload) and [⋯ > 올릴 옵션 고르기] (select) are the same window.
   const [showUpload, setShowUpload] = useState(false);
   const [showOptionPicker, setShowOptionPicker] = useState(false);
   // 2609_74/D15: 「마스터 옵션명 반영」 확인창.
@@ -251,7 +252,7 @@ export function CellActions({
     try {
       await useCase.setCategorySource(listing.id, true);
       setShowCategorySource(false);
-      setPushedBanner('마스터 카테고리로 변경했습니다. 다음 수정 요청 때 쿠팡에 반영됩니다.');
+      setPushedBanner('마스터 카테고리로 변경했습니다. 다음 수정 요청 때 마켓에 반영됩니다.');
       onReload();
     } catch (e) {
       const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
@@ -355,11 +356,11 @@ export function CellActions({
   // Guard the register action only (77). Strict false — undefined/null means "not judged" → allow.
   const shippingBlocked = shippingReady === false;
 
-  // 주 버튼은 상태에 따라 **하나만**: 미전송 = 쿠팡은 [쿠팡에 올리기](2609_77/D43), 그 밖의 플랫폼은
-  // [마켓 등록] · 변경 미반영 = [수정 요청] · 그 외 = 없음. 나머지 동작은 전부 ⋯ 메뉴로 간다.
+  // **One** primary button by state: unsent = Coupang and 11st take [마켓에 올리기] (2609_77/D43 · FEATURE_2610_13 /
+  // D9 ③), other platforms [마켓 등록] · unsynced changes = [수정 요청] · otherwise none. Every other action is in ⋯.
   const primary: 'upload' | 'register' | 'update' | null =
     status === 'DRAFT'
-      ? platform === 'COUPANG'
+      ? platform === 'COUPANG' || platform === 'ELEVENST'
         ? 'upload'
         : 'register'
       : needsMarketSync
@@ -386,7 +387,7 @@ export function CellActions({
           label: `채널 배송 설정${hasShippingOverride ? ' ✓' : ''}`,
           onClick: () => setShowShipping(true),
         },
-        // 2609_77/D57: 올린 뒤 옵션을 끄고 켜는 곳. 미전송은 [쿠팡에 올리기] 확인창에서 고른다.
+        // 2609_77/D57: switch options on and off after the upload. An unsent listing picks them in the [마켓에 올리기] confirm.
         ...(status !== 'DRAFT'
           ? [{ key: 'option-picker', label: '올릴 옵션 고르기', onClick: () => setShowOptionPicker(true) }]
           : []),
@@ -476,7 +477,7 @@ export function CellActions({
             title={shippingBlocked ? SHIPPING_BLOCKED_REASON : undefined}
             className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
           >
-            쿠팡에 올리기
+            마켓에 올리기
           </button>
         )}
         {primary === 'register' && !categoryBlocked && (
@@ -637,17 +638,31 @@ export function CellActions({
       )}
 
       {showShipping && (
-        <ChannelShippingOverrideModal
-          listingId={listing.id}
-          accountId={accountId}
-          platform={platform}
-          channelLabel={channelLabel}
-          initialOverride={shippingOverride}
-          shippingUseCase={shippingUseCase}
-          listingUseCase={useCase}
-          onSaved={onShippingSaved}
-          onClose={() => setShowShipping(false)}
-        />
+        platform === 'ELEVENST' ? (
+          // FEATURE_2610_13 / D104: an 11st listing edits only the 11st keys.
+          <ElevenstChannelShippingModal
+            listingId={listing.id}
+            accountId={accountId}
+            channelLabel={channelLabel}
+            initialOverride={shippingOverride}
+            shippingUseCase={shippingUseCase}
+            listingUseCase={useCase}
+            onSaved={onShippingSaved}
+            onClose={() => setShowShipping(false)}
+          />
+        ) : (
+          <ChannelShippingOverrideModal
+            listingId={listing.id}
+            accountId={accountId}
+            platform={platform}
+            channelLabel={channelLabel}
+            initialOverride={shippingOverride}
+            shippingUseCase={shippingUseCase}
+            listingUseCase={useCase}
+            onSaved={onShippingSaved}
+            onClose={() => setShowShipping(false)}
+          />
+        )
       )}
 
       {showStock && (
@@ -691,7 +706,7 @@ export function CellActions({
               {channelCategoryLabel ?? '채널 카테고리'} → {masterCategoryName ?? '마스터 카테고리'}
             </b>
             <p>
-              지금 쿠팡에 반영되지는 않습니다. 다음 [수정 요청] 때 함께 전송되며, 그때 쿠팡에서
+              지금 마켓에 반영되지는 않습니다. 다음 [수정 요청] 때 함께 전송되며, 그때 마켓에서
               카테고리가 변경되고 재심사에 들어갑니다. 이 카테고리에 맞춰 넣어둔 필수 속성·고시 값은
               지워집니다.
             </p>
@@ -711,10 +726,10 @@ export function CellActions({
           <>
             <b>{channelLabel}</b> 채널의 옵션명을 마스터 옵션 이름으로 바꿉니다.
             <ul className="mt-2 list-disc space-y-1 pl-5 text-base">
-              <li>이 채널에서 직접 정했거나 쿠팡에서 가져온 옵션명이 마스터 이름으로 바뀝니다.</li>
-              <li>쿠팡에 올렸지만 옵션 ID 를 아직 받지 못한 옵션은 건너뜁니다(판매상품이 승인반려 상태면 바꿉니다 — 마지막 [승인 새로고침] 결과 기준).</li>
+              <li>이 채널에서 직접 정했거나 마켓에서 가져온 옵션명이 마스터 이름으로 바뀝니다.</li>
+              <li>마켓에 올렸지만 옵션 ID 를 아직 받지 못한 옵션은 건너뜁니다(판매상품이 승인반려 상태면 바꿉니다 — 마지막 [승인 새로고침] 결과 기준).</li>
               <li>
-                지금 쿠팡에 반영되지는 않습니다. 쿠팡에 올라간 옵션의 이름이 바뀌면 「변경 미반영」이
+                지금 마켓에 반영되지는 않습니다. 마켓에 올라간 옵션의 이름이 바뀌면 「변경 미반영」이
                 표시되고, [수정 요청]을 눌러야 전송됩니다.
               </li>
             </ul>
@@ -737,7 +752,7 @@ export function CellActions({
             {unlinkTarget?.platformProductId ? ` (상품 ID ${unlinkTarget.platformProductId})` : ''}을
             이 마스터에서 떼어냅니다.
             <ul className="mt-2 list-disc space-y-1 pl-5 text-base">
-              <li>쿠팡에는 아무것도 전송하지 않습니다 — 상품은 그대로 팔립니다.</li>
+              <li>마켓에는 아무것도 전송하지 않습니다 — 상품은 그대로 팔립니다.</li>
               <li>주문·고객문의·정산 기록은 이 판매상품에 그대로 남습니다.</li>
               <li>해제하면 판매상품 목록의 「마스터 미연결만」에서 볼 수 있습니다.</li>
               <li>
@@ -760,10 +775,10 @@ export function CellActions({
         title="채널 삭제"
         message={
           <>
-            <b>{channelLabel}</b> 채널 1줄을 지웁니다. 아직 쿠팡에 보낸 적이 없는 채널입니다.
+            <b>{channelLabel}</b> 채널 1줄을 지웁니다. 아직 마켓에 보낸 적이 없는 채널입니다.
             <ul className="mt-2 list-disc space-y-1 pl-5 text-base">
               <li>이 채널의 옵션·구성·자동 생성된 썸네일·상세가 함께 지워집니다.</li>
-              <li>쿠팡에는 아무것도 전송하지 않습니다.</li>
+              <li>마켓에는 아무것도 전송하지 않습니다.</li>
               <li>되돌릴 수 없습니다 — 다시 만들려면 [채널 추가] 를 쓰세요.</li>
             </ul>
           </>

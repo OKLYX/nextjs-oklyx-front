@@ -11,7 +11,7 @@ import type { MasterProductResponse } from '@/domain/entities/MasterProductEntit
 import type { Product } from '@/domain/entities/Product';
 
 // 옵션 잠금 안내 문구 (85 → 2609_74). 잠금은 삭제만 막는다. 판정은 백엔드 플래그(marketRegistered) 하나만 쓴다.
-const LOCKED_DELETE_REASON = '쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다.';
+const LOCKED_DELETE_REASON = '마켓에 등록돼 판매 중 — 삭제할 수 없습니다.';
 
 const PRODUCT_SEARCH_LIMIT = 50;
 
@@ -367,7 +367,7 @@ export function MasterCompositionForm({
             옵션 × 구성상품 수량 ({drafts.length}개 옵션)
           </h3>
           <p className="mb-2 text-[11px] text-gray-500">
-            쿠팡에 등록돼 판매 중인 옵션은 이름 수정·삭제가 막혀 있고, 구성 수량은 수정할 수 있습니다.
+            마켓에 등록돼 판매 중인 옵션은 이름 수정·삭제가 막혀 있고, 구성 수량은 수정할 수 있습니다.
           </p>
 
           <div className="overflow-x-auto rounded border border-gray-200">
@@ -531,7 +531,7 @@ export function MasterCompositionForm({
             </p>
             <p>
               이 마스터에 연결된 판매상품의 구성·원가·판매가가 다시 계산됩니다.{' '}
-              <span className="font-medium">쿠팡에는 자동으로 전송되지 않습니다</span> — 필요하면
+              <span className="font-medium">마켓에는 자동으로 전송되지 않습니다</span> — 필요하면
               상세에서 [수정 요청]을 누르세요.
             </p>
           </div>

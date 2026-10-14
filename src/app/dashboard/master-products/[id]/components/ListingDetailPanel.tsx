@@ -11,6 +11,7 @@ import { MarketOptionLinkModal } from './MarketOptionLinkModal';
 
 const CHANNEL_ONLY_REASON = '마스터 옵션이 없는 채널 전용 옵션입니다';
 const OPTION_LINK_UNKNOWN_REASON = '채널별 옵션을 불러오지 못해 연결된 마스터 옵션을 알 수 없습니다';
+const OPTION_LINK_UNSUPPORTED_REASON = '11번가 옵션 연결은 아직 지원하지 않습니다';
 const OPTION_ID_PENDING_HINT = '승인 후 부여';
 
 /**
@@ -52,8 +53,14 @@ interface ListingDetailPanelProps {
   registrationName: string;
   tags: string[];
   isAdmin: boolean;
-  /** 2609_74/D13: 이 판매상품이 쿠팡에 올라가 있다(상품 ID 있음) — 옵션 ID 가 빈 줄에 [쿠팡 옵션 연결]을 연다. */
+  /**
+   * 2609_74/D13: this listing is on a market (has a product ID) — a row with an empty option ID shows
+   * [마켓 옵션 연결]. The link window is for Coupang listings; on an 11st listing the button is disabled
+   * (FEATURE_2610_13 / D128).
+   */
   onMarket: boolean;
+  /** The listing's platform — `'ELEVENST'` disables [마켓 옵션 연결] with a reason (FEATURE_2610_13 / D128 · D130). */
+  platform: string;
   options: ListingOptionView[];
   /** 옵션 조회가 아직 안 끝났다 — 빈 목록("옵션 없음")과 구분해 스피너를 보여준다. */
   optionsLoading: boolean;
@@ -66,19 +73,21 @@ interface ListingDetailPanelProps {
 }
 
 /**
- * 판매상품 행을 펼쳤을 때의 본문 = 이름 · 옵션 표 · (한 번 더 접힌) 태그·이미지·상세페이지.
+ * Body of an expanded listing row = name · option table · (folded once more) tags · images · detail page.
  * File: src/app/dashboard/master-products/[id]/components/ListingDetailPanel.tsx
  *
- * - 노출상품명: [수정] 으로 조회↔편집(빈값 저장 불가). 로컬 저장뿐 — 마켓 반영은 [수정 요청].
- * - 등록상품명(67/68): 채널 활성옵션 기준 자동값 → 읽기 전용.
- * - 옵션 표: 옵션명 / 가격 / 재고 / 옵션 ID / [수정]. 🔴 **옵션·가격·재고를 보여주는 곳은 여기 한 곳**이다
- *   (예전 매트릭스 「판매가」 열은 없앴다). 🔴 사용/미사용 체크 칸은 없다(2609_77/D57) — 올릴 옵션은
- *   [쿠팡에 올리기] 확인창·[⋯ > 올릴 옵션 고르기] 한 창에서만 고르고, 여기는 미사용 옵션을 흐리게 +
- *   「(미사용)」 으로만 보여준다. [수정]은 옵션을 편집하지 않고 편집 지점으로 보낸다(2609_61/D7).
- *   옵션 ID 가 비어 있고 판매상품이 쿠팡에 올라가 있으면 그 칸에 [쿠팡 옵션 연결]이 뜬다(2609_74/D13).
- * - 태그: 채널 raw 태그(33). 현재값은 매트릭스가 이미 받은 `generated[].tags`(추가 호출 없음).
+ * - 「노출상품명」: [수정] toggles view ↔ edit (a blank value cannot be saved). Local save only — the market gets it with
+ *   [수정 요청].
+ * - 「등록상품명」 (67/68): automatic value from the channel's active options → read only.
+ * - Option table: option name / price / stock / option ID / [수정]. 🔴 **This is the one place that shows options,
+ *   prices and stock** (the old matrix 「판매가」 column is gone). 🔴 There is no used/unused checkbox (2609_77/D57) —
+ *   the options to upload are picked only in the [마켓에 올리기] confirm · [⋯ > 올릴 옵션 고르기] window; here unused
+ *   options are only dimmed + 「(미사용)」. [수정] does not edit the option, it goes to the editing place (2609_61/D7).
+ *   When the option ID is empty and the listing is on a market, that cell shows [마켓 옵션 연결] (2609_74/D13) —
+ *   disabled with a reason on an 11st listing (FEATURE_2610_13 / D128 · D130).
+ * - Tags: the channel's raw tags (33). The current value is `generated[].tags` the matrix already has (no extra call).
  *
- * 저장은 모두 상위 재조회(onSaved)로 갱신한다.
+ * Every save refreshes through the parent reload (onSaved).
  */
 export function ListingDetailPanel({
   listingId,
@@ -87,6 +96,7 @@ export function ListingDetailPanel({
   tags,
   isAdmin,
   onMarket,
+  platform,
   options,
   optionsLoading,
   onEditMasterOption,
@@ -269,14 +279,18 @@ export function ListingDetailPanel({
                           <CopyIdButton value={o.platformOptionId} />
                         </span>
                       ) : isAdmin && onMarket && o.masterOptionId !== undefined ? (
-                        // 2609_74/D13: 쿠팡에 올라간 판매상품인데 옵션 ID 가 비어 있다 → 사람이 잇는다.
-                        // undefined = 채널별 옵션 조회 전/실패 — 옵션 ID 유무를 모른다
+                        // 2609_74/D13: the listing is on a market but the option ID is empty → a person links it.
+                        // undefined = channel options not loaded yet / failed — whether an option ID exists is unknown.
+                        // FEATURE_2610_13 / D128 · D130: on an 11st listing the button stays visible but disabled,
+                        // with the reason in `title`.
                         <button
                           type="button"
                           onClick={() => setLinkTarget({ optionId: o.optionId, name: o.name })}
-                          className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100"
+                          disabled={platform === 'ELEVENST'}
+                          title={platform === 'ELEVENST' ? OPTION_LINK_UNSUPPORTED_REASON : undefined}
+                          className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100 disabled:text-gray-400 disabled:hover:bg-transparent"
                         >
-                          쿠팡 옵션 연결
+                          마켓 옵션 연결
                         </button>
                       ) : (
                         <span className="text-gray-400" title={OPTION_ID_PENDING_HINT}>
