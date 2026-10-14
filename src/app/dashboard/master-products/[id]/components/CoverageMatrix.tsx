@@ -72,6 +72,9 @@ import {
   activeLookupPlatformsOf,
   asLookupPlatform,
   categoryBlockReason,
+  pickerReferencesOf,
+  platformCategoryRowsOf,
+  standardCategoryPathOf,
   type LookupPlatform,
 } from '../../components/platformCategory';
 import { DetailImageGroupUseCase } from '@/application/usecases/DetailImageGroupUseCase';
@@ -216,8 +219,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new ThumbnailTemplateUseCase(new ThumbnailTemplateRepositoryImpl()),
     [],
   );
-  // Category tree + per-platform mappings for the 「표준 카테고리」 section (83B) and the channel rows'
-  // category block (FEATURE_2610_11) — parent-owned, injected.
+  // Category tree + per-platform mappings for the 「표준 카테고리」 section (83B), the channel rows' category block
+  // (FEATURE_2610_11) and the standard category path on that block's picker (FEATURE_2610_14 / D30) — parent-owned,
+  // injected.
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
   const mappingUseCase = useMemo(
     () => new CategoryMappingUseCase(new CategoryMappingRepositoryImpl()),
@@ -252,13 +256,16 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // Standard category SSOT for the whole detail page (83B): loaded once in `load()` and replaced in
   // place by MasterCategoryPanel's onCategoryChanged. 카테고리 메타 섹션과 옵션 섹션이 같은 값을 쓴다.
   const [category, setCategory] = useState<MasterCategoryResponse | null>(null);
-  // FEATURE_2610_11: mapping rows of the master's standard category (D6/D19 account-row block).
-  // null = no category / not loaded / failed → nothing is blocked (an unknown state never blocks).
+  // FEATURE_2610_11: mapping rows of the master's standard category (D6/D19 account-row block · the channel rows'
+  // picker reference lines, FEATURE_2610_14 / D29). null = no category / not loaded / failed → nothing is blocked
+  // (an unknown state never blocks) and the reference lines show no mapping (D31).
   const [categoryMappings, setCategoryMappings] = useState<CategoryMapping[] | null>(null);
   // Bumped after a mapping save here → MasterCategoryPanel re-reads its own mappings (D11).
   const [mappingsVersion, setMappingsVersion] = useState(0);
   // FEATURE_2610_12 / D41: the master's own platform categories (「개별 지정」) — an own row counts as a category
-  // for the account-row block. null = not loaded / failed → nothing is blocked (an unknown state never blocks).
+  // for the account-row block and shows as 「(개별 지정)」 on the channel rows' picker reference lines
+  // (FEATURE_2610_14 / D29). null = not loaded / failed → nothing is blocked (an unknown state never blocks) and
+  // the reference lines show no own row (D31).
   const [platformCategories, setPlatformCategories] = useState<MasterPlatformCategory[] | null>(null);
   // Bumped after a [변경] / [기준으로 되돌리기] in the 「표준 카테고리」 block → the category meta re-reads (D45).
   const [platformCategoriesVersion, setPlatformCategoriesVersion] = useState(0);
@@ -746,6 +753,24 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
       alive = false;
     };
   }, [masterUseCase, masterId, categoryId, metaVersion, platformCategoriesVersion]);
+
+  // FEATURE_2610_14 / D30: full path of the standard category — the 「기준 카테고리」 reference line of the channel
+  // rows' picker. Re-read whenever the standard category changes. Keyed by the category id it was read for, so a
+  // path read for an earlier category is not shown: until the path lands the line shows the category name, and a
+  // failed read yields the category name too (`standardCategoryPathOf`).
+  const categoryName = category?.categoryName ?? null;
+  const [standardPath, setStandardPath] = useState<{ id: number; path: string } | null>(null);
+  useEffect(() => {
+    if (categoryId == null || categoryName == null) return;
+    let alive = true;
+    void (async () => {
+      const path = await standardCategoryPathOf(categoryUseCase, categoryId, categoryName);
+      if (alive) setStandardPath({ id: categoryId, path });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [categoryId, categoryName, categoryUseCase]);
 
   // 이미지 필드(대표사진 + 이미지 그룹 카탈로그). 생성 모달과 같은 도출 헬퍼를 쓴다.
   useEffect(() => {
@@ -1817,6 +1842,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           open={rowPickerPlatform !== null}
           platform={rowPickerPlatform}
           lookupUseCase={lookupUseCase}
+          references={pickerReferencesOf(
+            rowPickerPlatform,
+            standardPath?.id === categoryId ? standardPath.path : categoryName,
+            platformCategoryRowsOf(categoryMappings ?? [], platformCategories ?? []),
+          )}
           onSelect={(sel) => void handleRowPickerSelect(rowPickerPlatform, sel)}
           onClose={() => setRowPickerPlatform(null)}
         />
