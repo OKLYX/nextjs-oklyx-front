@@ -18,6 +18,18 @@ import {
 import { isOptionField, isOptionNotice } from './optionMetaFields';
 import { unitPlaceholder, unitSuffix } from './basicUnit';
 import { Input } from '@/presentation/components/ui/Input';
+import { Spinner } from '@/presentation/components/Spinner';
+import type { ElevenstNotification } from '@/domain/entities/ElevenstNotice';
+
+/** FEATURE_2610_13 / D97 · D109: the tabs shown when a switched-on 11st channel exists. */
+type MetaTab = 'ALL' | 'COUPANG' | 'ELEVENST';
+const META_TABS: { key: MetaTab; label: string }[] = [
+  { key: 'ALL', label: '통합' },
+  { key: 'COUPANG', label: '쿠팡' },
+  { key: 'ELEVENST', label: '11번가' },
+];
+/** D99: the gray line under a read-only shared field. */
+const SHARED_NOTE = '공통 항목은 「통합」 에서 고칩니다';
 
 const GROUP_ETC = '기타';
 
@@ -59,6 +71,11 @@ interface CategoryMetaFieldsProps {
   // null 이면 실효 그룹(값 있는 그룹 → 첫 그룹)을 표시. 컨테이너가 소유·저장 시 그 그룹만 전송.
   noticeGroup?: string | null;
   onNoticeGroupChange?: (group: string) => void;
+  /**
+   * FEATURE_2610_13 / D97 · D109: given only when a switched-on 11st channel exists → 「통합」 · 「쿠팡」 · 「11번가」 tabs.
+   * Absent = the single-platform screen as before.
+   */
+  elevenstPreview?: { notification: ElevenstNotification | null; failed: boolean };
 }
 
 /**
@@ -86,9 +103,19 @@ export function CategoryMetaFields({
   hideCategoryAttrs = false,
   noticeGroup = null,
   onNoticeGroupChange,
+  elevenstPreview,
 }: CategoryMetaFieldsProps) {
   // Display-only unit pick per pair; the actual value lives in the parent's attrValues.
   const [measureUnit, setMeasureUnit] = useState<Record<string, string>>({});
+  const [metaTab, setMetaTab] = useState<MetaTab>('ALL');
+  const tabbed = elevenstPreview != null;
+  const notification = elevenstPreview?.notification ?? null;
+  // Coupang items 11st also reads (shared). null = not known yet / failed → no tags, nothing read-only.
+  const shared = notification ? new Set(notification.usedCoupangItems) : null;
+  const ownLines = notification ? notification.lines.filter((l) => l.ownKey != null) : [];
+  // D109 (b) · (c): 「통합」 shows notices only and owns the group select; the Coupang tab shows the attributes too.
+  const showAttributes = !tabbed || metaTab === 'COUPANG';
+  const coupangView = tabbed && metaTab === 'COUPANG';
 
   // Master owns only the non-option fields; 개당 용량/중량·수량 은 각 옵션에서 설정한다
   // (CategoryMetaOverrideFields). 여기선 그 필드들을 표시/검증하지 않는다.
@@ -124,6 +151,58 @@ export function CategoryMetaFields({
     onMeasureUnit(p, unit);
   };
 
+  const renderTag = (platform: string) => (
+    <span className="ml-1 rounded bg-gray-100 px-1 text-[10px] font-normal text-gray-500">{platform}</span>
+  );
+
+  // D99: on the 11st tab every item shows the value 11st receives; only 11st-only items are editable.
+  const elevenstView = (
+    <div className="mb-4 space-y-3">
+      {elevenstPreview?.failed ? (
+        <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">11번가 고시 미리보기를 불러오지 못했습니다.</p>
+      ) : notification == null ? (
+        <div className="flex min-h-16 items-center justify-center">
+          <Spinner size={20} label="불러오는 중..." />
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-gray-600">
+            11번가 고시 유형: <span className="font-medium text-gray-900">{notification.typeName}</span>
+            <span className="ml-1 text-gray-400">(쿠팡 품목군으로 정해집니다)</span>
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {notification.lines.map((line) => (
+              <div key={line.code}>
+                <label className="mb-1 block text-xs font-medium text-gray-600">{line.name}</label>
+                {line.ownKey != null ? (
+                  <input
+                    type="text"
+                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                    value={noticeValues[line.ownKey] ?? ''}
+                    placeholder="비우면 「상품 상세페이지 참조」"
+                    onChange={(e) => onNoticeChange(line.ownKey as string, e.target.value)}
+                    disabled={disabled}
+                  />
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                      value={line.value}
+                      disabled
+                      readOnly
+                    />
+                    <p className="mt-1 text-[11px] text-gray-400">{SHARED_NOTE}</p>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -139,9 +218,28 @@ export function CategoryMetaFields({
         </label>
       </div>
 
+      {tabbed && (
+        <div className="mb-3 flex gap-1 border-b border-gray-200">
+          {META_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setMetaTab(t.key)}
+              className={`-mb-px border-b-2 px-3 py-1.5 text-sm font-medium ${
+                metaTab === t.key
+                  ? 'border-blue-600 text-blue-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* 필수속성 (backend-driven). 중량/용량 페어는 택1 컨트롤로 묶어 렌더.
           선택 채널이 이 속성을 요구하지 않으면(hideCategoryAttrs) 속성부는 숨기고 안내만(값은 보존). */}
-      {hideCategoryAttrs ? (
+      {!showAttributes ? null : hideCategoryAttrs ? (
         <p className="mb-4 rounded bg-gray-50 px-3 py-2 text-sm text-gray-500">
           혼합구성(여러 상품) 상품은 쿠팡에 수량/용량/중량 등 속성을 보내지 않습니다(옵션명으로 표현).
         </p>
@@ -222,6 +320,7 @@ export function CategoryMetaFields({
 
       {/* 상품정보제공고시: 카테고리가 여러 품목군을 줄 수 있어 품목군을 하나 선택해 그 그룹만
           입력·전송한다(선택된 그룹만 마켓에 전송). */}
+      {tabbed && metaTab === 'ELEVENST' ? elevenstView : (
       <div className="mb-4 border-t border-gray-100 pt-3">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -231,7 +330,7 @@ export function CategoryMetaFields({
                 className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-900 disabled:bg-gray-100"
                 value={activeNoticeGroup}
                 onChange={(e) => onNoticeGroupChange?.(e.target.value)}
-                disabled={disabled || !onNoticeGroupChange}
+                disabled={disabled || !onNoticeGroupChange || coupangView}
                 aria-label="상품정보제공고시 품목군 선택"
               >
                 {noticeGroupNames.map((g) => (
@@ -242,7 +341,7 @@ export function CategoryMetaFields({
               </select>
             )}
           </div>
-          {activeGroupNotices.length > 0 && (
+          {activeGroupNotices.length > 0 && !coupangView && (
             <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-gray-600">
               <input
                 type="checkbox"
@@ -280,14 +379,19 @@ export function CategoryMetaFields({
                       <label className="mb-1 block text-xs font-medium text-gray-600">
                         {n.label}
                         {n.required && <span className="text-red-600"> *</span>}
+                        {tabbed && metaTab === 'ALL' && shared != null && !shared.has(n.key) && renderTag('쿠팡')}
                       </label>
                       <input
                         type="text"
                         className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
                         value={noticeValues[n.key] ?? ''}
                         onChange={(e) => onNoticeChange(n.key, e.target.value)}
-                        disabled={disabled || refAll}
+                        disabled={disabled || refAll || (coupangView && shared?.has(n.key) === true)}
                       />
+                      {/* D99: on the Coupang tab a shared item is edited in 「통합」 only. */}
+                      {coupangView && shared?.has(n.key) === true && (
+                        <p className="mt-1 text-[11px] text-gray-400">{SHARED_NOTE}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -295,7 +399,30 @@ export function CategoryMetaFields({
             ))}
           </div>
         )}
+
+        {/* D97 · D100: the 11st-only items of the 11st type, stored under ELEVENST:{code} (D101). */}
+        {tabbed && metaTab === 'ALL' && ownLines.length > 0 && (
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {ownLines.map((line) => (
+              <div key={line.code}>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  {line.name}
+                  {renderTag('11번가')}
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                  value={noticeValues[line.ownKey as string] ?? ''}
+                  placeholder="비우면 「상품 상세페이지 참조」"
+                  onChange={(e) => onNoticeChange(line.ownKey as string, e.target.value)}
+                  disabled={disabled}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+      )}
     </>
   );
 }

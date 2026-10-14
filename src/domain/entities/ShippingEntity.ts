@@ -1,6 +1,7 @@
 // Shipping management (FEATURE_2608_06 / 72·74): per-account outbound/return
 // lookup + a single shipping config. All fields nullable — the backend allows
 // partial saves and the register flow (73) guards missing required values.
+import { ELEVENST_PLACE_KEYS } from './ElevenstShipping';
 
 /** Outbound shipping place (platform lookup). */
 export interface OutboundPlace {
@@ -155,7 +156,10 @@ export function channelDivergesFromMaster(
 ): boolean {
   if (!channelOverride) return false;
   return Object.keys(channelOverride).some(
-    (key) => !PLACE_OVERRIDE_KEYS.includes(key) && channelOverride[key] !== masterMap[key],
+    (key) =>
+      !PLACE_OVERRIDE_KEYS.includes(key) &&
+      !ELEVENST_PLACE_KEYS.includes(key) &&
+      channelOverride[key] !== masterMap[key],
   );
 }
 

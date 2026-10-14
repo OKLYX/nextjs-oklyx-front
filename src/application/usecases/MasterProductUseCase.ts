@@ -25,6 +25,7 @@ import type {
   ShippingForceApplyResponse,
 } from '@/domain/entities/MasterProductEntity';
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
+import type { ElevenstNoticePreviewRequest, ElevenstNotification } from '@/domain/entities/ElevenstNotice';
 
 export class MasterProductUseCase {
   constructor(private repository: MasterProductRepository) {}
@@ -123,6 +124,10 @@ export class MasterProductUseCase {
 
   setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void> {
     return this.repository.setCategoryAttributes(id, data);
+  }
+
+  previewElevenstNotice(data: ElevenstNoticePreviewRequest): Promise<ElevenstNotification> {
+    return this.repository.previewElevenstNotice(data);
   }
 
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {

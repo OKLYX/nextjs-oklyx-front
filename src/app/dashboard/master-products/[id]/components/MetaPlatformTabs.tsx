@@ -3,8 +3,9 @@
 import { useState, type ReactNode } from 'react';
 import { platformDisplayName } from '@/config/platforms';
 
-// Real platforms today = COUPANG only. Push here when a second mall's adapter lands;
-// the tab bar grows automatically and each tab lazily loads its own schema/values.
+// Platforms with a category attribute schema = COUPANG only. 11st has an adapter but no attribute schema
+// (FEATURE_2610_13 / D93) — its notices show as tabs inside CategoryMetaFields (D109), not here.
+// Push here when a mall with its own attribute schema lands; each tab lazily loads its own schema/values.
 export const META_PLATFORMS = ['COUPANG'] as const;
 
 interface MetaPlatformTabsProps {

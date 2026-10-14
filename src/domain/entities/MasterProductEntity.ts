@@ -27,8 +27,9 @@ export interface MasterOptionResponse {
   // master value are stored; a missing/empty key inherits the master value. Nullable.
   categoryAttributes?: Record<string, string> | null;
   categoryNotices?: Record<string, string> | null;
-  // 쿠팡에 등록돼 판매 중 = 삭제 불가(2609_74 — 이름·구성 수량은 고칠 수 있다). Backend flag is the single
-  // source of truth — never recompute it on the front. legacy/미지원 응답은 undefined = 잠그지 않음.
+  // On a market and selling = cannot be deleted (2609_74 — the name and component quantities can still be
+  // changed). Backend flag is the single source of truth — never recompute it on the front. A legacy /
+  // unsupported response leaves it undefined = not locked.
   marketRegistered?: boolean;
   // Master default stock (102). null = 미지정 (channels fall back to 9999). 0 = 품절 —
   // never treat this as falsy/absent.
@@ -57,6 +58,8 @@ export interface MasterProductResponse {
   // Master-level shipping override (75; all channels). Backend key→string map;
   // place keys (outbound/return center) are dropped at the master level. null = none.
   shippingOverride?: Record<string, string> | null;
+  // FEATURE_2610_13 / D120: 11st listings whose re-price failed after the master shipping save (0 elsewhere).
+  priceRecalcFailedCount?: number;
 }
 
 /**
@@ -102,6 +105,8 @@ export interface ShippingForceApplyRequest {
 // matched the master (idempotent no-op, not a failure).
 export interface ShippingForceApplyResponse {
   affectedChannels: number;
+  // FEATURE_2610_13 / D120: changed 11st listings whose re-price failed after the copy.
+  priceRecalcFailedCount?: number;
 }
 
 // Requests

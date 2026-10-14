@@ -346,6 +346,7 @@ export function ListingRow({
           tags={gen?.tags ?? []}
           isAdmin={isAdmin}
           onMarket={cell.platformProductId != null}
+          platform={platform}
           options={views}
           optionsLoading={pending || (isAdmin && channelOptionsLoading)}
           onEditMasterOption={onEditMasterOption}

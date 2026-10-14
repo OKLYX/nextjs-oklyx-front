@@ -11,14 +11,14 @@ import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories
 import type { GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
 import { MARKET_OPTION_LOCK_REASON, formatWon } from './ListingDetailPanel';
 
-/** 배송 설정이 끝나지 않아 쿠팡에 올릴 수 없는 이유(77). [쿠팡에 올리기] 버튼과 이 창이 같은 문구를 쓴다. */
+/** Why a listing cannot be uploaded while its shipping settings are incomplete (77). The [마켓에 올리기] button and this window share it. */
 export const SHIPPING_BLOCKED_REASON = '배송 설정 미완료 — 마스터/채널/계정 중 한 곳에서 배송 설정 필요';
 
 export const UPLOAD_SUCCESS_MESSAGE =
-  '쿠팡에 올렸습니다. 승인 결과는 ⋯ 메뉴의 [승인 새로고침]으로 확인하세요.';
+  '마켓에 올렸습니다. 승인 결과는 ⋯ 메뉴의 [승인 새로고침]으로 확인하세요.';
 
 interface ListingOptionPickerDialogProps {
-  /** upload = 처음 올릴 때([쿠팡에 올리기] 확인창) · select = 올린 뒤 [⋯ > 올릴 옵션 고르기]. */
+  /** upload = the first upload (the [마켓에 올리기] confirm) · select = after the upload ([⋯ > 올릴 옵션 고르기]). */
   mode: 'upload' | 'select';
   listingId: number;
   /** 제목 꼬리표(`판매자 · 플랫폼[ · 상품ID]`). */
@@ -38,20 +38,21 @@ interface ListingOptionPickerDialogProps {
 }
 
 /**
- * 올릴 옵션 고르기 창 — **처음 올릴 때와 올린 뒤가 같은 모양**이다 (FEATURE_2609_77, UX D43·D57).
+ * Option picker window — **the same shape for the first upload and after it** (FEATURE_2609_77, UX D43·D57).
  * File: src/app/dashboard/master-products/[id]/components/ListingOptionPickerDialog.tsx
  *
- * - upload: 옵션을 고르고 판매가를 본 뒤 [올리기] → (고른 옵션이 바뀌었으면) 활성 옵션 저장 → 쿠팡 등록.
- *   🔴 이 창이 쿠팡 반영의 확인창이다(D29) — [올리기]를 누르기 전에는 쿠팡에 아무것도 보내지 않는다.
- * - select: [저장] → 활성 옵션만 저장(쿠팡 전송 없음). 이미 올린 판매상품이면 [수정 요청]이 필요하다.
+ * - upload: pick options, check the prices, [올리기] → (active options saved when the pick changed) → market
+ *   register (Coupang · 11st, FEATURE_2610_13 / D9 ③).
+ *   🔴 This window IS the confirmation for the market push (D29) — nothing is sent to the market before [올리기].
+ * - select: [저장] → saves the active options only (no market call). An uploaded listing then needs [수정 요청].
  * - Upload mode display-name field: [저장] uses the same `updateDisplayName` path as
  *   `ListingDetailPanel` (empty value is not saved). While [저장] is enabled (unsaved edit) or
  *   saving, [올리기] is disabled; the saved name is what registration sends as `displayProductName`.
  *
- * ⚠️ 옵션·판매가·마켓 잠금은 열 때 `getGenerated` 한 번으로 읽는다(두 모드 같은 경로).
- * ⚠️ 마켓에 올라간 옵션(`onMarket && active`)은 끌 수 없다 — 체크 잠금 + 🔒(87).
- * ⚠️ 최소 1개는 골라야 한다(백엔드도 400).
- * ❌ 판매가를 이 창에서 고치지 않는다 — [⋯ > 가격 설정]이 한다.
+ * ⚠️ Options, prices and market locks are read once with `getGenerated` on open (the same path in both modes).
+ * ⚠️ An option on the market (`onMarket && active`) cannot be switched off — locked checkbox + 🔒 (87).
+ * ⚠️ At least one option must be picked (the backend also answers 400).
+ * ❌ Prices are not edited in this window — [⋯ > 가격 설정] does that.
  */
 export function ListingOptionPickerDialog({
   mode,
@@ -104,7 +105,7 @@ export function ListingOptionPickerDialog({
   const shippingBlocked = mode === 'upload' && gen?.shippingReady === false;
   const hasLocked = prices.some((p) => p.onMarket === true && p.active !== false);
   // Upload is blocked while the display-name [저장] is enabled (unsaved edit) or saving —
-  // registration sends the SAVED name, so an unsaved edit would silently not reach Coupang.
+  // registration sends the SAVED name, so an unsaved edit would silently not reach the market.
   const nameUnsaved = mode === 'upload' && !!trimmedName && trimmedName !== savedName;
   const canConfirm =
     gen !== null && !busy && selected.size > 0 && !shippingBlocked && !nameUnsaved && !savingName;
@@ -152,7 +153,7 @@ export function ListingOptionPickerDialog({
       } else {
         toast.success(
           needsResync
-            ? '올릴 옵션을 저장했습니다. 쿠팡에 반영하려면 [수정 요청]을 누르세요.'
+            ? '올릴 옵션을 저장했습니다. 마켓에 반영하려면 [수정 요청]을 누르세요.'
             : '올릴 옵션을 저장했습니다.',
         );
       }
@@ -161,7 +162,7 @@ export function ListingOptionPickerDialog({
       toast.error(
         extractErrorMessage(
           e,
-          mode === 'upload' ? '쿠팡에 올리지 못했습니다.' : '올릴 옵션을 저장하지 못했습니다.',
+          mode === 'upload' ? '마켓에 올리지 못했습니다.' : '올릴 옵션을 저장하지 못했습니다.',
         ),
       );
     } finally {
@@ -169,7 +170,7 @@ export function ListingOptionPickerDialog({
     }
   };
 
-  const title = `${mode === 'upload' ? '쿠팡에 올리기' : '올릴 옵션 고르기'} — ${channelLabel}`;
+  const title = `${mode === 'upload' ? '마켓에 올리기' : '올릴 옵션 고르기'} — ${channelLabel}`;
 
   return (
     <Modal
@@ -197,8 +198,8 @@ export function ListingOptionPickerDialog({
       <div className="space-y-3 text-sm text-gray-700">
         <p>
           {mode === 'upload'
-            ? '고른 옵션으로 쿠팡에 상품을 올립니다. 올린 뒤 승인 결과는 ⋯ 메뉴의 [승인 새로고침]으로 확인합니다.'
-            : '쿠팡에 올릴 옵션을 고릅니다. 이미 쿠팡에 올린 판매상품은 저장한 뒤 [수정 요청]을 눌러야 쿠팡에 반영됩니다.'}
+            ? '고른 옵션으로 마켓에 상품을 올립니다. 올린 뒤 승인 결과는 ⋯ 메뉴의 [승인 새로고침]으로 확인합니다.'
+            : '마켓에 올릴 옵션을 고릅니다. 이미 마켓에 올린 판매상품은 저장한 뒤 [수정 요청]을 눌러야 마켓에 반영됩니다.'}
         </p>
         {mode === 'upload' && (
           <div className="flex flex-wrap items-center gap-2">

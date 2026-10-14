@@ -5,6 +5,12 @@ import axios from 'axios';
 import { AlignCenter, AlignLeft, AlignRight, Bold, Italic } from 'lucide-react';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
+import {
+  NOTICE_TEXT_FIELDS,
+  NOTICE_TEXT_KEYS,
+  NOTICE_TEXT_TOO_LONG_MESSAGE,
+  noticeTextTooLong,
+} from '@/domain/entities/ElevenstNoticeText';
 import type { DetailBlock } from '@/domain/entities/DetailTemplateEntity';
 import type { DetailImageGroup } from '@/domain/entities/DetailImageGroupEntity';
 import type { FontAsset } from '@/domain/entities/FontEntity';
@@ -110,6 +116,8 @@ export function BlockRow({
 }: BlockRowProps) {
   const controls = useMemo(() => buildTextStyleControls(fonts), [fonts]);
   const isBuiltinBind = (BUILTIN_FIELD_KEYS as readonly string[]).includes(block.bind ?? '');
+  // FEATURE_2610_13 / D110: the two 11st notice keys — a fixed key with a required multi-line default text.
+  const isNoticeBind = NOTICE_TEXT_KEYS.includes(block.bind ?? '');
   // "직접 입력" chosen but key not yet typed: bind is empty so the value can't be
   // derived from data alone, hence a local flag distinguishing it from the placeholder.
   const [customChosen, setCustomChosen] = useState(false);
@@ -119,7 +127,7 @@ export function BlockRow({
   const [newGroupName, setNewGroupName] = useState('');
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState('');
-  const bindValue = isBuiltinBind
+  const bindValue = isBuiltinBind || isNoticeBind
     ? (block.bind as string)
     : block.bind
       ? 'custom'
@@ -251,6 +259,9 @@ export function BlockRow({
                   } else if (v === '') {
                     setCustomChosen(false);
                     onChange({ bind: '' });
+                  } else if (NOTICE_TEXT_KEYS.includes(v)) {
+                    setCustomChosen(false);
+                    onChange({ bind: v, defaultValue: block.defaultValue ?? '' });
                   } else {
                     setCustomChosen(false);
                     onChange({ bind: v, defaultValue: null });
@@ -266,6 +277,11 @@ export function BlockRow({
                     {BUILTIN_FIELD_LABELS[key]}
                   </option>
                 ))}
+                {NOTICE_TEXT_FIELDS.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {f.label}
+                  </option>
+                ))}
                 <option value="custom">직접 입력</option>
               </select>
             </label>
@@ -273,6 +289,20 @@ export function BlockRow({
               <p className="text-xs text-gray-400 sm:col-span-2">
                 값은 적용 시 상품 정보에서 자동으로 채워집니다(템플릿 기본값 없음).
               </p>
+            )}
+            {isNoticeBind && (
+              <label className="sm:col-span-2">
+                <span className={labelCls}>기본 글 (필수)</span>
+                <textarea
+                  value={block.defaultValue ?? ''}
+                  onChange={(e) => onChange({ defaultValue: e.target.value })}
+                  className={`${inputCls} resize-y`}
+                  rows={6}
+                />
+                {noticeTextTooLong({ [block.bind as string]: block.defaultValue ?? '' }) && (
+                  <span className="mt-1 block text-xs text-red-600">{NOTICE_TEXT_TOO_LONG_MESSAGE}</span>
+                )}
+              </label>
             )}
             {isCustom && (
               <>

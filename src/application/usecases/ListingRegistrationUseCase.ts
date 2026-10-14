@@ -39,6 +39,7 @@ import type {
   ShippingOverrideUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
 import type { ShippingConfig } from '@/domain/entities/ShippingEntity';
+import type { ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -110,6 +111,10 @@ export class ListingRegistrationUseCase {
 
   getInheritedShipping(listingId: number): Promise<ShippingConfig> {
     return this.repository.getInheritedShipping(listingId);
+  }
+
+  getInheritedElevenstShipping(listingId: number): Promise<ElevenstShippingMap> {
+    return this.repository.getInheritedElevenstShipping(listingId);
   }
 
   propagate(masterId: number): Promise<PropagateResponse> {

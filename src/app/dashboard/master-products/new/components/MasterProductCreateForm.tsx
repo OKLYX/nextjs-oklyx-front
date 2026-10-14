@@ -6,12 +6,22 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { TagChipsInput } from '@/presentation/components/TagChipsInput';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { getImageUrl } from '@/infrastructure/utils/imageUrl';
-import { ShippingOverrideFields } from '@/presentation/components/ShippingOverrideFields';
+import { EMPTY_SHIPPING_OVERRIDE, type ShippingOverride } from '@/domain/entities/ShippingEntity';
+import { tierError, type ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
+import { elevenstOwnNotices } from '@/domain/entities/ElevenstNotice';
 import {
-  EMPTY_SHIPPING_OVERRIDE,
-  overrideToMap,
-  type ShippingOverride,
-} from '@/domain/entities/ShippingEntity';
+  NOTICE_TEXT_FIELDS,
+  NOTICE_TEXT_KEYS,
+  NOTICE_TEXT_TOO_LONG_MESSAGE,
+  noticeTextTooLong,
+} from '@/domain/entities/ElevenstNoticeText';
+import {
+  ALL_SHIPPING_TAB,
+  MasterShippingTabs,
+  masterShippingMapOf,
+  shippingPlatformsOf,
+  type MasterShippingTab,
+} from '../../[id]/components/MasterShippingTabs';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import type { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import type { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
@@ -716,6 +726,26 @@ export function MasterProductCreateForm({
   // 값을 생성 단계로 끌어올린 것 — 저장 경로는 상세 패널과 같은 updateShippingOverride.
   const [shippingOverride, setShippingOverride] =
     useState<ShippingOverride>(EMPTY_SHIPPING_OVERRIDE);
+  // FEATURE_2610_13 / D104: the 11st part of the same master map, and the 「통합」 / per-platform tab.
+  const [elevenstShipping, setElevenstShipping] = useState<ElevenstShippingMap>({});
+  const [shippingTab, setShippingTab] = useState<MasterShippingTab>(ALL_SHIPPING_TAB);
+  // D98: platforms with a switched-on sales channel (tenant-wide, ADMIN only) — Coupang alone until it loads.
+  const [activePlatforms, setActivePlatforms] = useState<LookupPlatform[]>([]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const accounts = await marketplaceUseCase.getAll();
+        if (alive) setActivePlatforms(activeLookupPlatformsOf(accounts));
+      } catch {
+        // Unknown → the Coupang fields alone.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [isAdmin, marketplaceUseCase]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
@@ -777,7 +807,9 @@ export function MasterProductCreateForm({
       // Template fields are a secondary input — a load failure must not block the form.
       try {
         const templates = await thumbnailTemplateUseCase.list();
-        if (alive) setFields(templates.find((t) => t.isDefault)?.fields ?? []);
+        // FEATURE_2610_13 / D74: the notice texts are listed on their own — never twice.
+        const templateFields = templates.find((t) => t.isDefault)?.fields ?? [];
+        if (alive) setFields(templateFields.filter((f) => !NOTICE_TEXT_KEYS.includes(f.key)));
       } catch {
         if (alive) setFields([]);
       }
@@ -1054,6 +1086,17 @@ export function MasterProductCreateForm({
       setError(saveBlockReason);
       return;
     }
+    // FEATURE_2610_13 / D106: unchained 11st quantity tiers stop the save before the master is created.
+    const tierMessage = tierError(elevenstShipping);
+    if (tierMessage) {
+      setError(tierMessage);
+      return;
+    }
+    // D78: a notice text over the 11st limit stops the save the same way.
+    if (noticeTextTooLong(fieldValues)) {
+      setError(NOTICE_TEXT_TOO_LONG_MESSAGE);
+      return;
+    }
     setIsSubmitting(true);
     // Omit blank values so the backend falls back to product/template defaults.
     const cleaned: Record<string, string> = {};
@@ -1092,7 +1135,8 @@ export function MasterProductCreateForm({
         setIsSubmitting(false);
         return;
       }
-      // Category required-attributes/notices (COUPANG values only; other platforms are follow-up).
+      // Category required-attributes/notices: the COUPANG meta map, which also carries the 11st-only
+      // ELEVENST:{code} notice values (FEATURE_2610_13 / D101). Other platforms' attributes are follow-up.
       const coupangMeta = metaByPlatform['COUPANG'];
       if (coupangMeta) {
         try {
@@ -1104,8 +1148,12 @@ export function MasterProductCreateForm({
           );
           await useCase.setCategoryAttributes(created.id, {
             attributes: coupangMeta.attrValues,
-            // Send only the selected 품목군's notices (user picks one group).
-            notices: noticesToSubmit(coupangMeta.notices, coupangMeta.noticeValues, group),
+            // Send only the selected notice group's notices (user picks one group) + the 11st-only values
+            // under their ELEVENST:{code} keys (FEATURE_2610_13 / D101).
+            notices: {
+              ...noticesToSubmit(coupangMeta.notices, coupangMeta.noticeValues, group),
+              ...elevenstOwnNotices(coupangMeta.noticeValues),
+            },
             noticeGroup: group,
           });
         } catch {
@@ -1115,7 +1163,7 @@ export function MasterProductCreateForm({
         }
       }
       // 전 채널 공통 배송 설정 — 상세 패널과 같은 PATCH. Graceful: 마스터는 이미 생성됨.
-      const shippingMap = overrideToMap(shippingOverride);
+      const shippingMap = masterShippingMapOf(shippingOverride, elevenstShipping);
       if (Object.keys(shippingMap).length > 0) {
         try {
           await useCase.updateShippingOverride(created.id, { override: shippingMap });
@@ -1544,23 +1592,39 @@ export function MasterProductCreateForm({
               <label className="mb-1 block text-xs font-medium text-gray-600">
                 필수속성 / 상품정보제공고시
               </label>
-              <MetaPlatformTabs>
-                {(platform) => (
-                  <CategoryMetaCreateFields
-                    key={platform}
-                    categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
-                    platform={platform}
-                    platformCategoryCode={ownCodeOf(platform)}
-                    value={metaByPlatform[platform] ?? EMPTY_META_VALUE}
-                    onChange={(next) => handleMetaChange(platform, next)}
-                    onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad(platform, attrs, notices)}
-                    hideCategoryAttrs={hideCategoryAttrs}
-                  />
-                )}
-              </MetaPlatformTabs>
+              {/* FEATURE_2610_13 / D109 (a): with a switched-on 11st channel the fields bring their own
+                  「통합」 · 「쿠팡」 · 「11번가」 tabs, so the single-platform tab bar is left out. */}
+              {activePlatforms.includes('ELEVENST') ? (
+                <CategoryMetaCreateFields
+                  categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
+                  platform="COUPANG"
+                  platformCategoryCode={ownCodeOf('COUPANG')}
+                  value={metaByPlatform['COUPANG'] ?? EMPTY_META_VALUE}
+                  onChange={(next) => handleMetaChange('COUPANG', next)}
+                  onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad('COUPANG', attrs, notices)}
+                  hideCategoryAttrs={hideCategoryAttrs}
+                  elevenstActive
+                />
+              ) : (
+                <MetaPlatformTabs>
+                  {(platform) => (
+                    <CategoryMetaCreateFields
+                      key={platform}
+                      categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
+                      platform={platform}
+                      platformCategoryCode={ownCodeOf(platform)}
+                      value={metaByPlatform[platform] ?? EMPTY_META_VALUE}
+                      onChange={(next) => handleMetaChange(platform, next)}
+                      onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad(platform, attrs, notices)}
+                      hideCategoryAttrs={hideCategoryAttrs}
+                    />
+                  )}
+                </MetaPlatformTabs>
+              )}
             </div>
 
-            {fields.length > 0 && (
+            {/* FEATURE_2610_13 / D74: shown even without template fields — the notice texts are always there. */}
+            {(
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
                   템플릿 필드값 (선택)
@@ -1580,6 +1644,20 @@ export function MasterProductCreateForm({
                         onChange={(e) =>
                           setFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))
                         }
+                      />
+                    </div>
+                  ))}
+                  {NOTICE_TEXT_FIELDS.map((f) => (
+                    <div key={f.key} className="col-span-2">
+                      <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
+                      <textarea
+                        rows={4}
+                        value={fieldValues[f.key] ?? ''}
+                        placeholder="템플릿 기본값 사용"
+                        onChange={(e) =>
+                          setFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))
+                        }
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
                       />
                     </div>
                   ))}
@@ -1656,12 +1734,14 @@ export function MasterProductCreateForm({
                 적용되고, 채널마다 다르게 하려면 나중에 [채널 배송 설정]에서 바꿉니다. 출고지·반품지는
                 판매채널마다 달라야 해서 여기서 지정하지 않습니다.
               </p>
-              <ShippingOverrideFields
-                level="master"
-                scope="common"
-                value={shippingOverride}
-                onChange={setShippingOverride}
-                platform="COUPANG"
+              <MasterShippingTabs
+                platforms={shippingPlatformsOf(activePlatforms)}
+                tab={shippingTab}
+                onTabChange={setShippingTab}
+                coupang={shippingOverride}
+                onCoupangChange={setShippingOverride}
+                elevenst={elevenstShipping}
+                onElevenstChange={setElevenstShipping}
                 disabled={isSubmitting}
               />
             </div>

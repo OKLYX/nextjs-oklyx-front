@@ -107,11 +107,13 @@ export function EditChannelModal({
         sellerId: channel.sellerId,
         platform: data.platform,
         accountAlias: data.accountAlias,
-        vendorId: data.vendorId,
+        // FEATURE_2610_13 / D5: an 11st channel has no Coupang fields → blank values are omitted.
+        vendorId: data.vendorId || undefined,
         vendorUserId: data.vendorUserId || undefined,
-        accessKey: data.accessKey,
-        // Blank secretKey is omitted → backend keeps the existing key.
+        accessKey: data.accessKey || undefined,
+        // Blank secretKey / apiKey is omitted → backend keeps the existing key.
         secretKey: data.secretKey ? data.secretKey : undefined,
+        apiKey: data.apiKey ? data.apiKey : undefined,
         // Blank template id = omitted → backend keeps existing (no clearing to
         // default); a value = replace.
         thumbnailTemplateId: data.thumbnailTemplateId ? Number(data.thumbnailTemplateId) : undefined,

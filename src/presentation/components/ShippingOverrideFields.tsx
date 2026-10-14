@@ -63,15 +63,6 @@ interface ShippingOverrideFieldsProps {
   inherited?: ShippingOverride;
   /** 출고지/반품지 조회 로딩 표시 (level ≠ master). */
   placesLoading?: boolean;
-  /**
-   * 렌더 범위. 기본 `'full'` = 그 level 이 허용하는 전 필드.
-   *
-   * `'common'` = **마스터 생성 폼 전용** — 전 채널에 공통으로 미리 정해두면 편한 배송설정만
-   * (도서산간·택배사·배송비 유형[+기본배송비/무료기준]·묶음배송·배송방법). 출고지/반품지·반품 배송비·
-   * 추가 안내문구는 제외한다: 앞의 둘은 계정마다 값이 달라야 하고(사용자 결정 2026-08-28), 뒤의 둘은
-   * 생성 직후 마스터 상세의 [배송 설정 (전 채널)] 패널에서 지정한다.
-   */
-  scope?: 'full' | 'common';
 }
 
 /**
@@ -100,10 +91,8 @@ export function ShippingOverrideFields({
   returns = [],
   inherited,
   placesLoading = false,
-  scope = 'full',
 }: ShippingOverrideFieldsProps) {
-  const isCommon = scope === 'common';
-  const showPlaces = level !== 'master' && !isCommon;
+  const showPlaces = level !== 'master';
   // 택배사 목록은 백엔드 카탈로그 하나에서 온다(PLAN 2609_37 D7·D8). 출고지·반품지처럼 부모 주입으로
   // 하지 않는 이유 = 호출부 4곳이 전부 같은 목록을 같은 `platform` 으로 원하기 때문이다 —
   // 주입으로 하면 같은 조회가 4벌 복사된다.
@@ -483,7 +472,7 @@ export function ShippingOverrideFields({
                 ))}
               </select>
             </div>
-            {showExtraInfo && !isCommon && (
+            {showExtraInfo && (
               <div>
                 <label className={labelClass}>추가 안내문구</label>
                 <select
@@ -688,7 +677,6 @@ export function ShippingOverrideFields({
         )}
 
         {/* Return-leg fees (master + listing key — shown at all levels) */}
-        {!isCommon && (
         <section className="space-y-2">
           <h3 className="text-sm font-semibold text-gray-900">반품 배송비</h3>
           <div className="rounded-md border border-gray-200 p-3 space-y-2">
@@ -725,7 +713,6 @@ export function ShippingOverrideFields({
             </p>
           </div>
         </section>
-        )}
       </div>
 
       {showPlaces && (

@@ -16,6 +16,7 @@ import {
   type ShippingConfig,
   type ShippingOverride,
 } from '@/domain/entities/ShippingEntity';
+import { recalcFailureNote } from '@/domain/entities/ElevenstShipping';
 import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 import type { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import type { GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
@@ -65,6 +66,8 @@ export function ChannelShippingOverrideModal({
   const [isResetting, setIsResetting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [error, setError] = useState('');
+  // FEATURE_2610_13 / D124: a save or reset the server could not re-price shows a one-button notice before closing.
+  const [recalcNotice, setRecalcNotice] = useState<{ title: string; message: string } | null>(null);
 
   const busy = isSaving || isResetting;
   // Nothing stored for this channel → resetting would be a no-op call.
@@ -114,6 +117,11 @@ export function ChannelShippingOverrideModal({
         override: diffOverride(override, configToOverride(inherited)),
       });
       onSaved(updated);
+      const note = recalcFailureNote(updated.priceRecalcFailedCount);
+      if (note) {
+        setRecalcNotice({ title: '배송 설정 저장', message: note });
+        return;
+      }
       onClose();
     } catch (err) {
       setError(extractErrorMessage(err, '배송 설정 저장에 실패했습니다.'));
@@ -132,6 +140,12 @@ export function ChannelShippingOverrideModal({
       setError('');
       const updated = await listingUseCase.updateShippingOverride(listingId, { override: {} });
       onSaved(updated);
+      const note = recalcFailureNote(updated.priceRecalcFailedCount);
+      if (note) {
+        setIsConfirmOpen(false);
+        setRecalcNotice({ title: '채널 배송 설정 초기화', message: note });
+        return;
+      }
       onClose();
     } catch (err) {
       setError(extractErrorMessage(err, '배송 설정 초기화에 실패했습니다.'));
@@ -219,7 +233,7 @@ export function ChannelShippingOverrideModal({
             {placesMissingAfterReset && (
               <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
                 계정에 출고지/반품지가 지정돼 있지 않습니다. 초기화하면 이 채널의 출고지·반품지가 비어
-                배송 설정 미완료가 되고 [쿠팡에 올리기]가 비활성화됩니다.
+                배송 설정 미완료가 되고 [마켓에 올리기]가 비활성화됩니다.
               </p>
             )}
           </div>
@@ -229,6 +243,14 @@ export function ChannelShippingOverrideModal({
         onConfirm={handleReset}
         onCancel={() => !isResetting && setIsConfirmOpen(false)}
         isDangerous
+        nested
+      />
+
+      <ConfirmDialog
+        isOpen={recalcNotice != null}
+        title={recalcNotice?.title ?? ''}
+        message={recalcNotice?.message ?? ''}
+        onConfirm={onClose}
         nested
       />
     </>
