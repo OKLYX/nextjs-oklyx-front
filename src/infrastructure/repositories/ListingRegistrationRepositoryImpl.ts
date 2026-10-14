@@ -42,6 +42,7 @@ import type {
   ShippingOverrideUpdateRequest,
 } from '@/domain/entities/MasterProductEntity';
 import type { ShippingConfig } from '@/domain/entities/ShippingEntity';
+import type { ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -139,6 +140,11 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
   async getInheritedShipping(listingId: number): Promise<ShippingConfig> {
     const response = await axiosInstance.get(`${listingBase}/${listingId}/shipping-inherited`);
     return response.data.data;
+  }
+
+  async getInheritedElevenstShipping(listingId: number): Promise<ElevenstShippingMap> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/elevenst-shipping-inherited`);
+    return response.data.data ?? {};
   }
 
   async propagate(masterId: number): Promise<PropagateResponse> {

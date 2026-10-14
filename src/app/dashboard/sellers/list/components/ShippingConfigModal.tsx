@@ -14,6 +14,7 @@ import type {
 } from '@/domain/entities/ShippingEntity';
 import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { ElevenstShippingConfigModal } from './ElevenstShippingConfigModal';
 
 const EMPTY_FORM: ShippingConfigRequest = {
   outboundShippingPlaceCode: null,
@@ -70,8 +71,17 @@ interface ShippingConfigModalProps {
  * {@link ShippingOverrideFields} (level="account") so account / master / channel
  * all render the same fields. Lookup-first: outbound/return lists drive dropdowns;
  * a lookup failure never blocks saving (each fetch is caught independently).
+ *
+ * FEATURE_2610_13 / D84: an 11st account opens {@link ElevenstShippingConfigModal} instead (its own settings map).
  */
-export function ShippingConfigModal({ isOpen, account, onClose, useCase }: ShippingConfigModalProps) {
+export function ShippingConfigModal(props: ShippingConfigModalProps) {
+  if (props.isOpen && props.account?.platform === 'ELEVENST') {
+    return <ElevenstShippingConfigModal account={props.account} onClose={props.onClose} useCase={props.useCase} />;
+  }
+  return <CoupangShippingConfigModal {...props} />;
+}
+
+function CoupangShippingConfigModal({ isOpen, account, onClose, useCase }: ShippingConfigModalProps) {
   const [form, setForm] = useState<ShippingConfigRequest>(EMPTY_FORM);
   const [outbound, setOutbound] = useState<OutboundPlace[]>([]);
   const [returns, setReturns] = useState<ReturnCenter[]>([]);

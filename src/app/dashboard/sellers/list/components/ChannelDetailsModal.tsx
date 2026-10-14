@@ -122,7 +122,7 @@ export function ChannelDetailsModal({
 
         <div>
           <label className="block text-sm font-medium mb-1">판매자(벤더) ID</label>
-          <p className="text-sm text-gray-900">{channel.vendorId}</p>
+          <p className="text-sm text-gray-900">{channel.vendorId || '-'}</p>
         </div>
 
         <div>
@@ -132,7 +132,7 @@ export function ChannelDetailsModal({
 
         <div>
           <label className="block text-sm font-medium mb-1">Access Key</label>
-          <p className="text-sm text-gray-900 break-all">{channel.accessKey}</p>
+          <p className="text-sm text-gray-900 break-all">{channel.accessKey || '-'}</p>
         </div>
 
         <div>

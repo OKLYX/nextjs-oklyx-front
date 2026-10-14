@@ -85,6 +85,8 @@ export interface GeneratedProductResponse {
   shippingReady?: boolean | null;
   // 이 셀에 지정된 상세 템플릿 id(2609_20/D12). null|undefined = 계정/테넌트 기본 상속.
   detailTemplateId?: number | null;
+  // FEATURE_2610_13 / D120: 1 when this 11st listing's re-price failed after a shipping save, else 0.
+  priceRecalcFailedCount?: number;
 }
 
 export interface ChannelAddResponse {

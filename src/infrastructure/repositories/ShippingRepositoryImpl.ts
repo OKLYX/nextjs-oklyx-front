@@ -8,6 +8,7 @@ import {
   ShippingConfig,
   ShippingConfigRequest,
 } from '@/domain/entities/ShippingEntity';
+import type { ElevenstShippingConfig, ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 
 // Base path matches backend 72 ShippingConfigController
 // (@RequestMapping("/api/admin/marketplace-account/{id}")).
@@ -31,6 +32,16 @@ export class ShippingRepositoryImpl implements ShippingRepository {
 
   async upsertConfig(accountId: number, data: ShippingConfigRequest): Promise<ShippingConfig> {
     const response = await axiosInstance.put(`${base(accountId)}/shipping-config`, data);
+    return response.data.data;
+  }
+
+  async getElevenstConfig(accountId: number): Promise<ElevenstShippingConfig> {
+    const response = await axiosInstance.get(`${base(accountId)}/elevenst-shipping-config`);
+    return response.data.data;
+  }
+
+  async upsertElevenstConfig(accountId: number, settings: ElevenstShippingMap): Promise<ElevenstShippingConfig> {
+    const response = await axiosInstance.put(`${base(accountId)}/elevenst-shipping-config`, { settings });
     return response.data.data;
   }
 }

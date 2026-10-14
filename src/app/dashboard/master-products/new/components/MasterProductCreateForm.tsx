@@ -6,12 +6,15 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { TagChipsInput } from '@/presentation/components/TagChipsInput';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { getImageUrl } from '@/infrastructure/utils/imageUrl';
-import { ShippingOverrideFields } from '@/presentation/components/ShippingOverrideFields';
+import { EMPTY_SHIPPING_OVERRIDE, type ShippingOverride } from '@/domain/entities/ShippingEntity';
+import { tierError, type ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import {
-  EMPTY_SHIPPING_OVERRIDE,
-  overrideToMap,
-  type ShippingOverride,
-} from '@/domain/entities/ShippingEntity';
+  ALL_SHIPPING_TAB,
+  MasterShippingTabs,
+  masterShippingMapOf,
+  shippingPlatformsOf,
+  type MasterShippingTab,
+} from '../../[id]/components/MasterShippingTabs';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import type { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import type { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
@@ -716,6 +719,26 @@ export function MasterProductCreateForm({
   // 값을 생성 단계로 끌어올린 것 — 저장 경로는 상세 패널과 같은 updateShippingOverride.
   const [shippingOverride, setShippingOverride] =
     useState<ShippingOverride>(EMPTY_SHIPPING_OVERRIDE);
+  // FEATURE_2610_13 / D104: the 11st part of the same master map, and the 「통합」 / per-platform tab.
+  const [elevenstShipping, setElevenstShipping] = useState<ElevenstShippingMap>({});
+  const [shippingTab, setShippingTab] = useState<MasterShippingTab>(ALL_SHIPPING_TAB);
+  // D98: platforms with a switched-on sales channel (tenant-wide, ADMIN only) — Coupang alone until it loads.
+  const [activePlatforms, setActivePlatforms] = useState<LookupPlatform[]>([]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const accounts = await marketplaceUseCase.getAll();
+        if (alive) setActivePlatforms(activeLookupPlatformsOf(accounts));
+      } catch {
+        // Unknown → the Coupang fields alone.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [isAdmin, marketplaceUseCase]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
@@ -1054,6 +1077,12 @@ export function MasterProductCreateForm({
       setError(saveBlockReason);
       return;
     }
+    // FEATURE_2610_13 / D106: unchained 11st quantity tiers stop the save before the master is created.
+    const tierMessage = tierError(elevenstShipping);
+    if (tierMessage) {
+      setError(tierMessage);
+      return;
+    }
     setIsSubmitting(true);
     // Omit blank values so the backend falls back to product/template defaults.
     const cleaned: Record<string, string> = {};
@@ -1115,7 +1144,7 @@ export function MasterProductCreateForm({
         }
       }
       // 전 채널 공통 배송 설정 — 상세 패널과 같은 PATCH. Graceful: 마스터는 이미 생성됨.
-      const shippingMap = overrideToMap(shippingOverride);
+      const shippingMap = masterShippingMapOf(shippingOverride, elevenstShipping);
       if (Object.keys(shippingMap).length > 0) {
         try {
           await useCase.updateShippingOverride(created.id, { override: shippingMap });
@@ -1656,12 +1685,14 @@ export function MasterProductCreateForm({
                 적용되고, 채널마다 다르게 하려면 나중에 [채널 배송 설정]에서 바꿉니다. 출고지·반품지는
                 판매채널마다 달라야 해서 여기서 지정하지 않습니다.
               </p>
-              <ShippingOverrideFields
-                level="master"
-                scope="common"
-                value={shippingOverride}
-                onChange={setShippingOverride}
-                platform="COUPANG"
+              <MasterShippingTabs
+                platforms={shippingPlatformsOf(activePlatforms)}
+                tab={shippingTab}
+                onTabChange={setShippingTab}
+                coupang={shippingOverride}
+                onCoupangChange={setShippingOverride}
+                elevenst={elevenstShipping}
+                onElevenstChange={setElevenstShipping}
                 disabled={isSubmitting}
               />
             </div>

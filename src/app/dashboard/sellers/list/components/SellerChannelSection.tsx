@@ -146,10 +146,12 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         sellerId,
         platform: data.platform,
         accountAlias: data.accountAlias,
-        vendorId: data.vendorId,
+        // FEATURE_2610_13 / D5: an 11st account sends apiKey alone; the Coupang fields stay blank → omitted.
+        vendorId: data.vendorId || undefined,
         vendorUserId: data.vendorUserId || undefined,
-        accessKey: data.accessKey,
-        secretKey: data.secretKey,
+        accessKey: data.accessKey || undefined,
+        secretKey: data.secretKey || undefined,
+        apiKey: data.apiKey || undefined,
         // '' = unassigned = tenant-default fallback (not sent to backend).
         thumbnailTemplateId: data.thumbnailTemplateId ? Number(data.thumbnailTemplateId) : undefined,
         detailTemplateId: data.detailTemplateId ? Number(data.detailTemplateId) : undefined,
@@ -230,8 +232,8 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
                 >
                   <td className="px-4 py-2 text-sm text-gray-700">{platformDisplayName(channel.platform)}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">{channel.accountAlias || '-'}</td>
-                  <td className="px-4 py-2 text-sm text-gray-700">{channel.vendorId}</td>
-                  <td className="px-4 py-2 text-sm text-gray-700">{channel.accessKey}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">{channel.vendorId || '-'}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">{channel.accessKey || '-'}</td>
                   <td className="px-4 py-2 text-sm">
                     <span
                       className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -242,6 +244,12 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
                     >
                       {channel.isActive ? '활성' : '비활성'}
                     </span>
+                    {/* FEATURE_2610_13 / D88: the server says the 11st key went unused for over 150 days. */}
+                    {channel.elevenstKeyRenewalNeeded && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        11번가 키가 곧 멈춥니다 — 셀러오피스 API 관리에서 갱신하세요
+                      </p>
+                    )}
                   </td>
                 </tr>
               ))}

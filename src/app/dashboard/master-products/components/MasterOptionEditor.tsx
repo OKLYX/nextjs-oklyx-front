@@ -37,8 +37,8 @@ import { computeMissingOptionRequired } from '../[id]/components/categoryMetaVal
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 // 옵션 잠금 안내 문구 (85). 잠금 판정은 백엔드 플래그(marketRegistered) 하나만 쓴다.
-const LOCKED_ROW_TITLE = '쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다 (이름·구성 수량은 수정 가능)';
-const LOCKED_DELETE_REASON = '쿠팡에 등록돼 판매 중 — 삭제할 수 없습니다.';
+const LOCKED_ROW_TITLE = '마켓에 등록돼 판매 중 — 삭제할 수 없습니다 (이름·구성 수량은 수정 가능)';
+const LOCKED_DELETE_REASON = '마켓에 등록돼 판매 중 — 삭제할 수 없습니다.';
 // 2609_79 / UX D71: 「새 마스터」(마켓 모드) — 옵션은 마켓 상품 그대로, 구성 수량만 입력한다.
 const MARKET_DELETE_REASON = '마켓 상품의 옵션이라 삭제할 수 없습니다.';
 const MARKET_ADD_REASON = '옵션은 마켓 상품 그대로 만듭니다 — 옵션을 추가할 수 없습니다.';
@@ -801,7 +801,7 @@ export function MasterOptionEditor({
     rows.find((r) => r.deleteBlockedReason)?.deleteBlockedReason ??
     '';
 
-  // 편집 중인 옵션이 쿠팡 판매 중인가(안내 표시용 — 입력은 잠그지 않는다, 2609_74/D4). 옵션 추가는 해당 없음.
+  // Is the option being edited on sale at a market? (hint only — the inputs are not locked, 2609_74/D4). Not for a new option.
   const lockedEditing =
     isEdit &&
     editingKey != null &&
@@ -940,7 +940,7 @@ export function MasterOptionEditor({
               {editingKey == null ? '옵션 추가' : '옵션 수정'}
               {lockedEditing && (
                 <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
-                  🔒 쿠팡 판매 중
+                  🔒 마켓 판매 중
                 </span>
               )}
             </h4>
@@ -994,9 +994,9 @@ export function MasterOptionEditor({
             </div>
             {lockedEditing && (
               <p className="mt-2 text-[11px] text-amber-700">
-                쿠팡에 등록된 옵션입니다. 이름과 구성 수량은 고칠 수 있고, 삭제는 할 수 없습니다. 이름을
+                마켓에 등록된 옵션입니다. 이름과 구성 수량은 고칠 수 있고, 삭제는 할 수 없습니다. 이름을
                 바꾸면 이 이름을 따라 쓰는 채널 옵션명도 함께 바뀝니다(채널에서 직접 정한 이름은 그대로).
-                구성 수량을 고치면 쿠팡에 표시된 수량·고시 문구와 달라집니다. 어느 쪽이든 쿠팡에는
+                구성 수량을 고치면 마켓에 표시된 수량·고시 문구와 달라집니다. 어느 쪽이든 마켓에는
                 [수정 요청]을 눌러야 전송됩니다.
               </p>
             )}

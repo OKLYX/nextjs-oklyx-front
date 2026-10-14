@@ -107,14 +107,18 @@ export function ChannelEditForm({
     defaultValues: {
       platform: channel.platform,
       accountAlias: channel.accountAlias ?? '',
-      vendorId: channel.vendorId,
+      vendorId: channel.vendorId ?? '',
       vendorUserId: channel.vendorUserId ?? '',
-      accessKey: channel.accessKey,
+      accessKey: channel.accessKey ?? '',
       secretKey: '',
+      apiKey: '',
       thumbnailTemplateId: channel.thumbnailTemplateId != null ? String(channel.thumbnailTemplateId) : '',
       detailTemplateId: channel.detailTemplateId != null ? String(channel.detailTemplateId) : '',
     },
   });
+
+  // The platform of a saved channel never changes (the backend refuses it) — the stored value picks the fields.
+  const isElevenst = channel.platform === 'ELEVENST';
 
   const onSubmit = async (data: UpdateMarketplaceAccountForm) => {
     try {
@@ -180,73 +184,97 @@ export function ChannelEditForm({
         )}
       </div>
 
-      <div>
-        <label htmlFor="vendorId" className="block text-sm font-medium mb-1">
-          판매자(벤더) ID <span className="text-red-600">*</span>
-        </label>
-        <input
-          {...register('vendorId')}
-          id="vendorId"
-          type="text"
-          placeholder="예: A00012345"
-          disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        {formState.errors.vendorId && (
-          <p className="mt-1 text-sm text-red-600">{formState.errors.vendorId.message}</p>
-        )}
-      </div>
+      {/* FEATURE_2610_13 / D5: the Coupang credential fields — an 11st account takes 「API 키」 alone. */}
+      {!isElevenst && (
+        <>
+          <div>
+            <label htmlFor="vendorId" className="block text-sm font-medium mb-1">
+              판매자(벤더) ID <span className="text-red-600">*</span>
+            </label>
+            <input
+              {...register('vendorId')}
+              id="vendorId"
+              type="text"
+              placeholder="예: A00012345"
+              disabled={isLoading}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {formState.errors.vendorId && (
+              <p className="mt-1 text-sm text-red-600">{formState.errors.vendorId.message}</p>
+            )}
+          </div>
 
-      <div>
-        <label htmlFor="vendorUserId" className="block text-sm font-medium mb-1">
-          WING 로그인 ID
-        </label>
-        <input
-          {...register('vendorUserId')}
-          id="vendorUserId"
-          type="text"
-          placeholder="쿠팡 상품등록 시 사용 (선택)"
-          disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        {formState.errors.vendorUserId && (
-          <p className="mt-1 text-sm text-red-600">{formState.errors.vendorUserId.message}</p>
-        )}
-      </div>
+          <div>
+            <label htmlFor="vendorUserId" className="block text-sm font-medium mb-1">
+              WING 로그인 ID
+            </label>
+            <input
+              {...register('vendorUserId')}
+              id="vendorUserId"
+              type="text"
+              placeholder="쿠팡 상품등록 시 사용 (선택)"
+              disabled={isLoading}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {formState.errors.vendorUserId && (
+              <p className="mt-1 text-sm text-red-600">{formState.errors.vendorUserId.message}</p>
+            )}
+          </div>
 
-      <div>
-        <label htmlFor="accessKey" className="block text-sm font-medium mb-1">
-          Access Key <span className="text-red-600">*</span>
-        </label>
-        <input
-          {...register('accessKey')}
-          id="accessKey"
-          type="text"
-          placeholder="Access Key를 입력하세요"
-          disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        {formState.errors.accessKey && (
-          <p className="mt-1 text-sm text-red-600">{formState.errors.accessKey.message}</p>
-        )}
-      </div>
+          <div>
+            <label htmlFor="accessKey" className="block text-sm font-medium mb-1">
+              Access Key <span className="text-red-600">*</span>
+            </label>
+            <input
+              {...register('accessKey')}
+              id="accessKey"
+              type="text"
+              placeholder="Access Key를 입력하세요"
+              disabled={isLoading}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {formState.errors.accessKey && (
+              <p className="mt-1 text-sm text-red-600">{formState.errors.accessKey.message}</p>
+            )}
+          </div>
 
-      <div>
-        <label htmlFor="secretKey" className="block text-sm font-medium mb-1">
-          Secret Key
-        </label>
-        <input
-          {...register('secretKey')}
-          id="secretKey"
-          type="password"
-          placeholder="변경 시에만 입력하세요 (비워두면 기존 값 유지)"
-          disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        {formState.errors.secretKey && (
-          <p className="mt-1 text-sm text-red-600">{formState.errors.secretKey.message}</p>
-        )}
-      </div>
+          <div>
+            <label htmlFor="secretKey" className="block text-sm font-medium mb-1">
+              Secret Key
+            </label>
+            <input
+              {...register('secretKey')}
+              id="secretKey"
+              type="password"
+              placeholder="변경 시에만 입력하세요 (비워두면 기존 값 유지)"
+              disabled={isLoading}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {formState.errors.secretKey && (
+              <p className="mt-1 text-sm text-red-600">{formState.errors.secretKey.message}</p>
+            )}
+          </div>
+        </>
+      )}
+
+      {isElevenst && (
+        <div>
+          <label htmlFor="apiKey" className="block text-sm font-medium mb-1">
+            API 키
+          </label>
+          <input
+            {...register('apiKey')}
+            id="apiKey"
+            type="password"
+            placeholder="변경 시에만 입력하세요 (비워두면 기존 값 유지)"
+            disabled={isLoading}
+            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {formState.errors.apiKey && (
+            <p className="mt-1 text-sm text-red-600">{formState.errors.apiKey.message}</p>
+          )}
+        </div>
+      )}
 
       <div>
         <label htmlFor="thumbnailTemplateId" className="block text-sm font-medium mb-1">
