@@ -8,6 +8,10 @@ import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/Maste
 import type { CategoryAttribute, CategoryNotice } from '@/domain/entities/MasterProductEntity';
 import type { MeasurePair } from './measureAttributes';
 import { CategoryMetaFields } from './CategoryMetaFields';
+import { submitNoticeGroup } from './categoryMetaValidation';
+import { noticeGroupName } from './noticeTemplates';
+import { isOptionNotice } from './optionMetaFields';
+import { useElevenstNoticePreview } from '@/presentation/hooks/useElevenstNoticePreview';
 
 // Per-platform controlled value held by the parent create modal (metaByPlatform[platform]).
 export interface CategoryMetaCreateValue {
@@ -34,6 +38,8 @@ interface CategoryMetaCreateFieldsProps {
   onSchemaLoad: (attributes: CategoryAttribute[], notices: CategoryNotice[]) => void;
   // 컨테이너(부모 모달)가 도출해 하달 — 속성부 숨김/스킵 (값 보존). 여기선 통과만.
   hideCategoryAttrs?: boolean;
+  /** FEATURE_2610_13 / D98 · D109: a switched-on 11st channel exists → 「통합」 · 「쿠팡」 · 「11번가」 tabs (COUPANG only). */
+  elevenstActive?: boolean;
 }
 
 /**
@@ -43,8 +49,9 @@ interface CategoryMetaCreateFieldsProps {
  * Loads the schema only via getCategorySchema — by `categoryId`, or by `platformCategoryCode` when this tab's
  * platform has a 「개별 지정」 pick (FEATURE_2610_12 / D45); the values are the parent's controlled state. Notices
  * are static, so nothing else is loaded. No save button (the parent modal saves with setCategoryAttributes after
- * create). The schema reloads when categoryId / platform / platformCategoryCode changes. Tabs other than COUPANG
- * accept input but show the "값 저장은 후속" notice (create saves COUPANG only).
+ * create). The schema reloads when categoryId / platform / platformCategoryCode changes. Platform tabs other than
+ * COUPANG accept input but show the "값 저장은 후속" notice (create saves the COUPANG map only); the 「통합」 · 「쿠팡」 ·
+ * 「11번가」 view tabs (FEATURE_2610_13 / D109) live inside the COUPANG tab and are saved with it.
  */
 export function CategoryMetaCreateFields({
   categoryId,
@@ -54,6 +61,7 @@ export function CategoryMetaCreateFields({
   onChange,
   onSchemaLoad,
   hideCategoryAttrs = false,
+  elevenstActive = false,
 }: CategoryMetaCreateFieldsProps) {
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   const savedLater = platform !== 'COUPANG';
@@ -64,6 +72,18 @@ export function CategoryMetaCreateFields({
   const [error, setError] = useState('');
   // Display filter, checked by default: 필수 항목만 보기 (same default as CategoryMetaPanel).
   const [onlyRequired, setOnlyRequired] = useState(true);
+
+  // FEATURE_2610_13 / D97: the 11st view of the chosen group's values, for the COUPANG values only.
+  const tabbed = elevenstActive && !savedLater;
+  const effectiveGroup = submitNoticeGroup(notices, value.noticeValues, value.noticeGroup ?? null);
+  const groupNotices = notices.filter((n) => !isOptionNotice(n) && noticeGroupName(n) === effectiveGroup);
+  const elevenstPreview = useElevenstNoticePreview(
+    useCase,
+    tabbed && categoryId != null,
+    effectiveGroup,
+    groupNotices,
+    value.noticeValues,
+  );
 
   // Keep the schema-report callback fresh without re-running the fetch effect.
   const onSchemaLoadRef = useRef(onSchemaLoad);
@@ -152,6 +172,7 @@ export function CategoryMetaCreateFields({
         hideCategoryAttrs={hideCategoryAttrs}
         noticeGroup={value.noticeGroup ?? null}
         onNoticeGroupChange={(group) => onChange({ ...value, noticeGroup: group })}
+        elevenstPreview={tabbed ? elevenstPreview : undefined}
       />
 
       {savedLater && (

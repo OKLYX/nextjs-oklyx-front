@@ -11,6 +11,8 @@ import { CategoryMetaFields } from './CategoryMetaFields';
 import { computeMissingRequired, noticesToSubmit, submitNoticeGroup } from './categoryMetaValidation';
 import { defaultNoticeRefAll, noticeGroupName } from './noticeTemplates';
 import { isOptionNotice } from './optionMetaFields';
+import { useElevenstNoticePreview } from '@/presentation/hooks/useElevenstNoticePreview';
+import { elevenstOwnNotices } from '@/domain/entities/ElevenstNotice';
 
 // 선택 그룹의 마스터 소유 고시가 전부 비었으면 "전체 상품 상세페이지 참조" 로 채운다(기본 체크).
 const withNoticeRefDefault = (
@@ -26,10 +28,12 @@ const withNoticeRefDefault = (
 interface CategoryMetaPanelProps {
   masterId: number;
   categoryCode: string | null; // assigned standard category id (null = unset); a change re-fetches
-  platform?: string; // default 'COUPANG' (only registration mall for now)
+  platform?: string; // default 'COUPANG' (the only platform with a category attribute schema — FEATURE_2610_13 / D93)
   // 구성품 종수 ≥ 2 (백엔드 63 미러, 중립 도메인 사실). 부모=마스터 상세 로더가 계산해 주입.
   isBundle?: boolean;
   onSaved?: () => void;
+  /** FEATURE_2610_13 / D98 · D109: a switched-on 11st channel exists → 「통합」 · 「쿠팡」 · 「11번가」 tabs. */
+  elevenstActive?: boolean;
 }
 
 /**
@@ -54,6 +58,7 @@ export function CategoryMetaPanel({
   platform = 'COUPANG',
   isBundle = false,
   onSaved,
+  elevenstActive = false,
 }: CategoryMetaPanelProps) {
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   // COUPANG owns the persisted per-master values; other platforms are schema-only (read-only).
@@ -78,6 +83,17 @@ export function CategoryMetaPanel({
   const [onlyRequired, setOnlyRequired] = useState(true);
   // 상품정보제공고시 = 품목군 셀렉션(하나 선택). null = 실효 그룹(값 있는 그룹 → 첫 그룹) 사용.
   const [noticeGroup, setNoticeGroup] = useState<string | null>(null);
+
+  // FEATURE_2610_13 / D97: the 11st view of the chosen group's values (Coupang tab only: never asked).
+  const effectiveGroup = submitNoticeGroup(notices, noticeValues, noticeGroup);
+  const groupNotices = notices.filter((n) => !isOptionNotice(n) && noticeGroupName(n) === effectiveGroup);
+  const elevenstPreview = useElevenstNoticePreview(
+    useCase,
+    elevenstActive && !readOnly,
+    effectiveGroup,
+    groupNotices,
+    noticeValues,
+  );
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -157,7 +173,8 @@ export function CategoryMetaPanel({
       const group = submitNoticeGroup(notices, noticeValues, noticeGroup);
       await useCase.setCategoryAttributes(masterId, {
         attributes: attrValues,
-        notices: noticesToSubmit(notices, noticeValues, group),
+        // FEATURE_2610_13 / D101: the 11st-only values ride along under their ELEVENST:{code} keys.
+        notices: { ...noticesToSubmit(notices, noticeValues, group), ...elevenstOwnNotices(noticeValues) },
         noticeGroup: group,
       });
       setNoticeGroup(group);
@@ -202,6 +219,7 @@ export function CategoryMetaPanel({
         hideCategoryAttrs={hideCategoryAttrs}
         noticeGroup={noticeGroup}
         onNoticeGroupChange={handleNoticeGroupChange}
+        elevenstPreview={elevenstActive && !readOnly ? elevenstPreview : undefined}
       />
 
       {readOnly ? (

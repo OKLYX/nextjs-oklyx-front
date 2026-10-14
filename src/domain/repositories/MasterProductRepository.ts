@@ -24,6 +24,7 @@ import type {
   ShippingForceApplyResponse,
 } from '@/domain/entities/MasterProductEntity';
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
+import type { ElevenstNoticePreviewRequest, ElevenstNotification } from '@/domain/entities/ElevenstNotice';
 
 export interface MasterProductRepository {
   list(params: MasterProductListParams): Promise<MasterProductPageResponse>;
@@ -60,6 +61,8 @@ export interface MasterProductRepository {
     platformCategoryCode?: string | null,
   ): Promise<CategoryMetaSchemaResponse>;
   setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void>;
+  // FEATURE_2610_13 / D97: the 11st view of the notice values on screen (pure conversion, nothing saved).
+  previewElevenstNotice(data: ElevenstNoticePreviewRequest): Promise<ElevenstNotification>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
   updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;
   updateShippingOverride(id: number, data: ShippingOverrideUpdateRequest): Promise<MasterProductResponse>;
