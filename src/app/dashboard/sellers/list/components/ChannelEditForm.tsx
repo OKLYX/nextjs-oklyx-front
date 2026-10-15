@@ -39,7 +39,7 @@ import {
 } from './ChannelFixedCostFields';
 import { ChannelTabBar, type ChannelTabKey } from './ChannelModalTabs';
 import type { ChannelShippingData } from './ChannelShippingSummary';
-import { EMPTY_FORM } from './ShippingConfigModal';
+import { EMPTY_FORM } from '@/domain/entities/CoupangShipping';
 
 // Hardcoded for now; mirrors ChannelRegistrationForm's PLATFORM_OPTIONS.
 // Exported as SSOT so other features (e.g. carrier platform codes) can reuse it.
