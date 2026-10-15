@@ -1,7 +1,8 @@
 import type { ShippingConfig, ShippingConfigRequest } from '@/domain/entities/ShippingEntity';
 
-// Exported for the sales channel info / edit modals (FEATURE_2610_16 / D20 · D27). The [배송관리] modal that gave this
-// file its name was removed (FEATURE_2610_16 / D29) — only this form shape and toForm stay here.
+// Coupang sales channel shipping default as form values (FEATURE_2610_16 / D29 · D31): the empty form and the
+// stored-config → form mapping, used by the sales channel info / edit modals' 「배송」 tab. Moved unchanged out of the
+// old [배송관리] modal file, which this change deletes.
 export const EMPTY_FORM: ShippingConfigRequest = {
   outboundShippingPlaceCode: null,
   returnCenterCode: null,

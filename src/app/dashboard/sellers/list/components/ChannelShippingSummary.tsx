@@ -23,7 +23,7 @@ import {
   EXTRA_INFO_PRESETS,
 } from '@/presentation/components/ShippingOverrideFields';
 import { useCarrierOptions } from '@/presentation/hooks/useCarrierOptions';
-import { EMPTY_FORM, toForm } from './ShippingConfigModal';
+import { EMPTY_FORM, toForm } from '@/domain/entities/CoupangShipping';
 
 /** What the sales channel info and edit modals load for the 「배송」 tab (FEATURE_2610_16 / D22 · D28). */
 export interface ChannelShippingData {
