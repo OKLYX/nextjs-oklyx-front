@@ -15,9 +15,10 @@ import type {
 import { recalcFailureNote } from '@/domain/entities/ElevenstShipping';
 import type { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
 import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
-import { ChannelEditForm, type ChannelShippingChange } from './ChannelEditForm';
+import { CHANNEL_EDIT_FORM_ID, ChannelEditForm, type ChannelShippingChange } from './ChannelEditForm';
 import type { ChannelTabKey } from './ChannelModalTabs';
 import { loadChannelShipping, type ChannelShippingData } from './ChannelShippingSummary';
+import { Button } from '@/presentation/components/ui/Button';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Modal } from '@/presentation/components/ui/Modal';
 
@@ -92,6 +93,8 @@ function EditChannelModalContent({
   const [shippingLoading, setShippingLoading] = useState(true);
   const [shippingError, setShippingError] = useState('');
   const [recalcNotice, setRecalcNotice] = useState('');
+  // FEATURE_2610_16 / D34: the form validity, reported by ChannelEditForm, gates the footer [저장].
+  const [formValid, setFormValid] = useState(false);
   const channelId = channel.id;
 
   const loadLinks = useCallback(async () => {
@@ -206,17 +209,36 @@ function EditChannelModalContent({
 
   return (
     <>
+      {/* FEATURE_2610_16 / D32 · D34: fixed height, so a tab switch keeps the modal size and the body scrolls instead;
+          [취소] [저장] sit in the footer, and [저장] submits the form through its id. */}
       <Modal
         isOpen
         onClose={onClose}
         title={`판매채널 수정 — ${sellerName}`}
         disableClose={isLoading}
+        fullHeight
+        footer={
+          <>
+            <Button variant="secondary" onClick={onClose} disabled={isLoading}>
+              취소
+            </Button>
+            <Button
+              type="submit"
+              form={CHANNEL_EDIT_FORM_ID}
+              disabled={!formValid}
+              isLoading={isLoading}
+              loadingText="저장 중..."
+            >
+              저장
+            </Button>
+          </>
+        }
       >
         <ChannelEditForm
           channel={channel}
           isLoading={isLoading}
           onSubmit={handleSubmit}
-          onCancel={onClose}
+          onValidityChange={setFormValid}
           thumbTemplates={thumbTemplates}
           detailTemplates={detailTemplates}
           templatesLoading={templatesLoading}

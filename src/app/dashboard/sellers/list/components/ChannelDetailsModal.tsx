@@ -135,11 +135,26 @@ function ChannelDetailsContent({
     [RETURN_EXCHANGE_NOTICE_KEY]: channel.returnExchangeNotice,
   };
 
+  // FEATURE_2610_16 / D32 · D33: fixed height, so a tab switch keeps the modal size and the body scrolls instead;
+  // [수정] [삭제] sit in the footer, so they stay in view while the body scrolls.
   return (
     <Modal
       isOpen
       onClose={onClose}
       title={`판매채널 정보 — ${sellerName}`}
+      fullHeight
+      footer={
+        onEditClick || onDeleteClick ? (
+          <>
+            {onEditClick && <Button onClick={() => onEditClick(channel)}>수정</Button>}
+            {onDeleteClick && (
+              <Button variant="danger" onClick={() => onDeleteClick(channel)}>
+                삭제
+              </Button>
+            )}
+          </>
+        ) : undefined
+      }
     >
       <ChannelTabBar active={activeTab} onSelect={setActiveTab} />
 
@@ -285,28 +300,6 @@ function ChannelDetailsContent({
           )}
         </div>
       </div>
-
-      {(onEditClick || onDeleteClick) && (
-        <div className="border-t p-4 flex gap-2">
-          {onEditClick && (
-            <button
-              onClick={() => onEditClick(channel)}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-            >
-              수정
-            </button>
-          )}
-          {onDeleteClick && (
-            <Button
-              onClick={() => onDeleteClick(channel)}
-              variant="danger"
-              className="flex-1"
-            >
-              삭제
-            </Button>
-          )}
-        </div>
-      )}
     </Modal>
   );
 }
