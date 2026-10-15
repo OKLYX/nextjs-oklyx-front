@@ -36,7 +36,8 @@ const placeholderFor = (key: string) =>
  * The list loads when this panel mounts = the first time its tab (`MasterSectionTabs`) opens (lazy).
  *
  * Blank values are left out of the request → a reserved field takes the registered-product value, a custom field
- * (and a notice text) the template default. Saving PATCHes **only its own fields** (`{ fieldValues }`) and tells the
+ * the template default, and a notice text the 11st sales channel default (FEATURE_2610_16 / D5 · D9). Saving PATCHes
+ * **only its own fields** (`{ fieldValues }`) and tells the
  * parent through `onSaved(patched)` (no matrix reload). ⚠️ The backend replaces the whole non-null fieldValues, so a
  * cleared field is saved as cleared. A notice text over 4000 EUC-KR bytes stops the save (D78).
  * A failed template read = inline notice + no template fields (only the notice texts stay editable) — it never
@@ -94,7 +95,8 @@ export function MasterFieldValuesPanel({
       setError(NOTICE_TEXT_TOO_LONG_MESSAGE);
       return;
     }
-    // Omit blank values so the backend falls back to product/template defaults.
+    // Omit blank values so the backend falls back to defaults: product / template values for the template fields,
+    // the 11st sales channel default for the two notice texts (FEATURE_2610_16 / D5).
     const cleaned: Record<string, string> = {};
     for (const [k, v] of Object.entries(values)) {
       if (v.trim() !== '') cleaned[k] = v;
@@ -167,7 +169,7 @@ export function MasterFieldValuesPanel({
                   <textarea
                     rows={4}
                     value={values[f.key] ?? ''}
-                    placeholder="템플릿 기본값 사용"
+                    placeholder="판매채널 기본값 사용"
                     disabled={isSaving}
                     onChange={(e) => {
                       const next = e.target.value;
@@ -181,7 +183,7 @@ export function MasterFieldValuesPanel({
                     {master.fieldValues?.[f.key]?.trim() ? (
                       master.fieldValues[f.key]
                     ) : (
-                      <span className="text-gray-400">템플릿 기본값 사용</span>
+                      <span className="text-gray-400">판매채널 기본값 사용</span>
                     )}
                   </p>
                 )}

@@ -20,6 +20,9 @@ export interface MarketplaceAccount {
   // FEATURE_2610_13 / D88: 11st only (null elsewhere) — last successful keyed 11st call, and whether 150 days passed.
   elevenstKeyLastUsedAt?: string | null;
   elevenstKeyRenewalNeeded?: boolean | null;
+  // FEATURE_2610_16 / D7: 11st only (null elsewhere) — the channel's A/S and return/exchange notice defaults.
+  asNotice?: string | null;
+  returnExchangeNotice?: string | null;
   createdAt: string;
   updatedAt: string;
 }

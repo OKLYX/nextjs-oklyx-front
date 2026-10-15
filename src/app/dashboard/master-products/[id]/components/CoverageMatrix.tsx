@@ -15,8 +15,11 @@ import { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 import { ShippingRepositoryImpl } from '@/infrastructure/repositories/ShippingRepositoryImpl';
 import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAccountUseCase';
 import { MarketplaceAccountRepositoryImpl } from '@/infrastructure/repositories/MarketplaceAccountRepositoryImpl';
-import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
-import { ShippingConfigModal } from '@/app/dashboard/sellers/list/components/ShippingConfigModal';
+import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
+import { EditChannelModal } from '@/app/dashboard/sellers/list/components/EditChannelModal';
+import { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
+import { FixedCostRepositoryImpl } from '@/infrastructure/repositories/FixedCostRepositoryImpl';
+import type { PlatformFixedCost } from '@/domain/entities/FixedCost';
 import { CarrierRateUseCase } from '@/application/usecases/CarrierRateUseCase';
 import { CarrierRateRepositoryImpl } from '@/infrastructure/repositories/CarrierRateRepositoryImpl';
 import { PackageUseCase } from '@/application/usecases/PackageUseCase';
@@ -127,7 +130,7 @@ interface CoverageMatrixProps {
 const UPLOAD_PLATFORMS = ['COUPANG', 'ELEVENST'];
 
 const SHIPPING_BLOCK_REASON =
-  '이 판매자의 출고지·반품지가 지정되지 않아 채널을 만들 수 없습니다. 판매채널 관리 > 배송관리에서 출고지·반품지를 먼저 지정하세요.';
+  '이 판매자의 출고지·반품지가 지정되지 않아 채널을 만들 수 없습니다. 판매채널 [수정] > 「배송」 탭에서 출고지·반품지를 먼저 지정하세요.';
 
 /**
  * 채널 반영 요약 줄(90). 배너와 확인 모달이 **같은 문구**를 쓰도록 여기서 한 번만 만든다 —
@@ -199,8 +202,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new ListingRegistrationUseCase(new ListingRegistrationRepositoryImpl()),
     [],
   );
-  // Shipping lookup (outbound/return) for the channel override modal — parent-owned,
-  // injected into CellActions (never created inside the modal).
+  // Shipping lookup (outbound/return) for the channel override modal and shipping read / save for the 「배송」 tab of
+  // the 「판매채널 수정」 modal (FEATURE_2610_16 / D29) — parent-owned, injected into CellActions and that modal
+  // (never created inside a modal).
   const shippingUseCase = useMemo(() => new ShippingUseCase(new ShippingRepositoryImpl()), []);
   // 2609_77/S6: the account object for a blocked account's [배송 설정하기] (looked up in the seller's list).
   // FEATURE_2610_11 / D17: also the tenant-wide list for the switched-on lookup platforms.
@@ -208,8 +212,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new MarketplaceAccountUseCase(new MarketplaceAccountRepositoryImpl()),
     [],
   );
-  // Carrier/box candidates + template fields for the inline detail panels (83A) — parent-owned and
-  // injected, so a panel never re-fetches what this container already holds.
+  // Carrier/box candidates + template fields for the inline detail panels (83A), and the thumbnail template list of
+  // the 「판매채널 수정」 modal (FEATURE_2610_16 / D29) — parent-owned and injected, so a panel never re-fetches what
+  // this container already holds.
   const carrierRateUseCase = useMemo(
     () => new CarrierRateUseCase(new CarrierRateRepositoryImpl()),
     [],
@@ -219,6 +224,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new ThumbnailTemplateUseCase(new ThumbnailTemplateRepositoryImpl()),
     [],
   );
+  // FEATURE_2610_16 / D29: the fixed-cost catalog of the 「판매채널 수정」 modal opened by [배송 설정하기].
+  const fixedCostUseCase = useMemo(() => new FixedCostUseCase(new FixedCostRepositoryImpl()), []);
   // Category tree + per-platform mappings for the 「표준 카테고리」 section (83B), the channel rows' category block
   // (FEATURE_2610_11) and the standard category path on that block's picker (FEATURE_2610_14 / D30) — parent-owned,
   // injected.
@@ -233,7 +240,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new CategoryLookupUseCase(new CategoryLookupRepositoryImpl()),
     [],
   );
-  // Image pool + its field derivation (83B). The pool commits straight to the server in edit mode.
+  // Image pool + its field derivation (83B), and the detail template list of the 「판매채널 수정」 modal
+  // (FEATURE_2610_16 / D29). The pool commits straight to the server in edit mode.
   const detailUseCase = useMemo(
     () => new DetailContentUseCase(new DetailContentRepositoryImpl()),
     [],
@@ -302,9 +310,19 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // ⚠️ This checks 출고지·반품지 only; the authority on *market* registerability stays the backend
   // `shippingReady` (78 guard on the cell). Do not grow this into a client-side ShippingReadiness mirror.
   const [placesUnset, setPlacesUnset] = useState<Record<number, boolean>>({});
-  // 2609_77/S6: 열려 있는 배송관리 창의 계정(null = 닫힘) · 그 계정을 불러오는 중인 계정 줄.
-  const [shippingAccount, setShippingAccount] = useState<MarketplaceAccount | null>(null);
+  // 2609_77/S6 · FEATURE_2610_16 / D29: the channel whose 「판매채널 수정」 modal is open on the 「배송」 tab (null =
+  // closed), with its seller name and the template lists the modal offers · the row whose channel is being loaded.
+  const [shippingEdit, setShippingEdit] = useState<{
+    account: MarketplaceAccount;
+    sellerName: string;
+    thumbTemplates: TemplateOption[];
+    detailTemplates: TemplateOption[];
+  } | null>(null);
   const [shippingLoadingId, setShippingLoadingId] = useState<number | null>(null);
+  // The fixed-cost catalog of that modal, read on every open (same states as SellerChannelSection).
+  const [fixedCosts, setFixedCosts] = useState<PlatformFixedCost[]>([]);
+  const [fixedCostsLoading, setFixedCostsLoading] = useState(false);
+  const [fixedCostsError, setFixedCostsError] = useState('');
   const [preview, setPreview] = useState<ChannelPreviewData | null>(null);
 
   // Open the tabbed preview modal for a channel cell, on the given initial tab.
@@ -959,18 +977,46 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     }
   };
 
-  // 2609_77/S6: 출고지·반품지가 없어 막힌 계정 → 그 계정의 배송관리 창(판매자 화면의 기존 창)을 여기서 연다.
-  // 창은 계정 객체를 받으므로 그 판매자의 계정 목록에서 찾는다(계정 단건 조회 API 는 없다).
-  const openShippingConfig = async (accountId: number, sellerId: number) => {
+  // FEATURE_2610_16 / D29: the fixed-cost catalog of the 「판매채널 수정」 modal — the same read and wording as
+  // SellerChannelSection's loadFixedCosts (a failure keeps the error; it is never shown as "no items").
+  const loadFixedCosts = async () => {
+    setFixedCostsLoading(true);
+    setFixedCostsError('');
+    try {
+      setFixedCosts(await fixedCostUseCase.list());
+    } catch {
+      setFixedCostsError('고정비 목록을 불러오지 못했습니다.');
+      setFixedCosts([]);
+    } finally {
+      setFixedCostsLoading(false);
+    }
+  };
+
+  // 2609_77/S6 · FEATURE_2610_16 / D29: an account blocked for lack of outbound/return places → open that channel's
+  // 「판매채널 수정」 modal on the 「배송」 tab right here. The modal takes an account object, so it is looked up in
+  // that seller's account list (there is no single-account read API). The two template lists and the fixed-cost
+  // catalog are read with it, the same values the seller screen passes (a template list failure = an empty list).
+  const openShippingConfig = async (accountId: number, sellerId: number, sellerName: string) => {
     setShippingLoadingId(accountId);
     try {
-      const accounts = await marketplaceUseCase.getBySeller(sellerId);
+      const [accounts, thumbTemplates, detailTemplates] = await Promise.all([
+        marketplaceUseCase.getBySeller(sellerId),
+        templateUseCase.list().catch((err) => {
+          console.error('썸네일 템플릿 목록 조회 실패', err);
+          return [] as TemplateOption[];
+        }),
+        detailUseCase.listTemplates().catch((err) => {
+          console.error('상세 템플릿 목록 조회 실패', err);
+          return [] as TemplateOption[];
+        }),
+        loadFixedCosts(),
+      ]);
       const account = accounts.find((a) => a.id === accountId);
       if (!account) {
         toast.error('판매채널 정보를 찾지 못했습니다.');
         return;
       }
-      setShippingAccount(account);
+      setShippingEdit({ account, sellerName, thumbTemplates, detailTemplates });
     } catch (e: unknown) {
       toast.error(extractErrorMessage(e, '판매채널 정보를 불러오지 못했습니다.'));
     } finally {
@@ -1532,12 +1578,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     {isAdmin && canRegister && isShippingBlocked(row.accountId) && (
                       <div className="flex basis-full flex-wrap items-center gap-2">
                         <p className="text-[11px] text-amber-700" title={SHIPPING_BLOCK_REASON}>
-                          배송 설정 필요 — 판매채널 관리 &gt; 배송관리에서 출고지·반품지를 먼저 지정하세요.
+                          배송 설정 필요 — 판매채널 [수정] &gt; 「배송」 탭에서 출고지·반품지를 먼저 지정하세요.
                         </p>
-                        {/* 2609_77/S6: 다른 메뉴로 가지 않고 이 계정의 배송관리 창을 바로 연다. */}
+                        {/* 2609_77/S6 · FEATURE_2610_16 / D29: opens this channel's 「판매채널 수정」 modal on the
+                            「배송」 tab right here, without leaving for another menu. */}
                         <button
                           type="button"
-                          onClick={() => openShippingConfig(row.accountId, row.sellerId)}
+                          onClick={() => openShippingConfig(row.accountId, row.sellerId, row.sellerName)}
                           disabled={shippingLoadingId !== null}
                           className="rounded border border-amber-300 bg-white px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
                         >
@@ -1823,16 +1870,28 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         />
       )}
 
-      {/* 2609_77/S6: reuses the seller screen's shipping modal. Save and cancel both end in onClose, so it re-reads on
-          every close — once the outbound / return places are filled, the [마켓에 올리기] block lifts. */}
-      <ShippingConfigModal
-        isOpen={shippingAccount !== null}
-        account={shippingAccount}
-        useCase={shippingUseCase}
+      {/* 2609_77/S6 · FEATURE_2610_16 / D29: the seller screen's 「판매채널 수정」 modal, opened on the 「배송」 tab. Save
+          and cancel both end in onClose, so it re-reads on every close — once the outbound / return places are
+          filled, the [마켓에 올리기] block lifts. onSuccess runs right after onClose on a save, so it adds nothing. */}
+      <EditChannelModal
+        isOpen={shippingEdit !== null}
+        channel={shippingEdit?.account ?? null}
+        sellerName={shippingEdit?.sellerName ?? ''}
+        initialTab="shipping"
         onClose={() => {
-          setShippingAccount(null);
+          setShippingEdit(null);
           void load();
         }}
+        onSuccess={() => Promise.resolve()}
+        thumbTemplates={shippingEdit?.thumbTemplates ?? []}
+        detailTemplates={shippingEdit?.detailTemplates ?? []}
+        templatesLoading={false}
+        fixedCostUseCase={fixedCostUseCase}
+        fixedCosts={fixedCosts}
+        fixedCostsLoading={fixedCostsLoading}
+        fixedCostsError={fixedCostsError}
+        onReloadFixedCosts={loadFixedCosts}
+        shippingUseCase={shippingUseCase}
       />
 
       {/* FEATURE_2610_11 / D21: one picker for the [카테고리 선택하기] buttons of the channel rows (the 「표준 카테고리」

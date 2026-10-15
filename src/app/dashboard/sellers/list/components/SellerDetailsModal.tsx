@@ -98,7 +98,10 @@ export function SellerDetailsModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                등록상품명 추가 문구
+                등록상품명 추가 문구{' '}
+                <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700">
+                  쿠팡
+                </span>
               </label>
               <p className="text-sm text-gray-900">
                 {seller.optionCheckSuffix && seller.optionCheckSuffix.trim() !== ''

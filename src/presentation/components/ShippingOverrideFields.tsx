@@ -10,15 +10,16 @@ import { useCarrierOptions } from '@/presentation/hooks/useCarrierOptions';
 import { OutboundPlacePickerModal } from './OutboundPlacePickerModal';
 import { ReturnCenterPickerModal } from './ReturnCenterPickerModal';
 
-// Coupang product-creation enums (backend 73 register payload SSOT).
-const DELIVERY_METHODS = [
+// Coupang product-creation enums (backend 73 register payload SSOT). Exported for the read-only channel
+// shipping summary (FEATURE_2610_16 / D27) — the option labels shown there are these.
+export const DELIVERY_METHODS = [
   { value: 'SEQUENCIAL', label: '일반배송' },
   { value: 'COLD_FRESH', label: '신선냉동' },
   { value: 'MAKE_ORDER', label: '주문제작' },
   { value: 'AGENT_BUY', label: '구매대행' },
   { value: 'VENDOR_DIRECT', label: '설치/직접전달' },
 ];
-const DELIVERY_CHARGE_TYPES = [
+export const DELIVERY_CHARGE_TYPES = [
   { value: 'FREE', label: '무료배송' },
   { value: 'NOT_FREE', label: '유료배송' },
   { value: 'CHARGE_RECEIVED', label: '착불' },
@@ -26,11 +27,11 @@ const DELIVERY_CHARGE_TYPES = [
 ];
 
 // deliveryMethod values that surface the extraInfoMessage input (주문제작 / 설치배송).
-const EXTRA_INFO_METHODS = new Set(['MAKE_ORDER', 'VENDOR_DIRECT']);
+export const EXTRA_INFO_METHODS = new Set(['MAKE_ORDER', 'VENDOR_DIRECT']);
 
 // Buyer-facing extra-info presets (주문제작/설치배송). Front-side constants —
 // server-managed presets are out of scope (75). Phrases confirmed 2026-08-27.
-const EXTRA_INFO_PRESETS = [
+export const EXTRA_INFO_PRESETS = [
   '주문 후 제작되는 상품으로, 발송까지 영업일 기준 3~5일이 소요됩니다.',
   '설치 배송 상품으로, 배송기사가 방문하여 설치해 드립니다.',
   '주문 제작 상품으로 단순 변심에 의한 교환·반품이 제한될 수 있습니다.',
@@ -66,20 +67,25 @@ interface ShippingOverrideFieldsProps {
 }
 
 /**
- * 배송 override 편집 공용 controlled 컴포넌트 (계정 기본값 74 / 마스터 override 75 / 채널 override 75).
+ * Shared controlled editor for shipping overrides (account default 74 / master override 75 / channel override 75).
  *
- * **용도**: 배송관리(74) 전 필드(택배사·배송방법·배송비유형/기본배송비/무료기준·묶음배송·도서산간·반품배송비·출고지/반품지)
- * + extraInfoMessage(주문제작/설치배송 시)를 한 컴포넌트로 편집. 74 계정 모달·마스터 패널·채널 모달이 재사용한다(중복 렌더 금지).
+ * **Purpose**: edits every shipping-management (74) field (carrier · delivery method · charge type / base charge / free
+ * threshold · bundling · remote areas · return fees · outbound / return places) + extraInfoMessage (made-to-order /
+ * installation) in one component. The sales channel edit modal's 「배송」 tab (account level, FEATURE_2610_16 / D20), the
+ * master panel and the channel modal reuse it (never render these fields twice).
  *
- * **파일**: src/presentation/components/ShippingOverrideFields.tsx
+ * **File**: src/presentation/components/ShippingOverrideFields.tsx
  *
- * **override 시맨틱**: 비운 필드 = 상속(master/listing). enum/토글의 빈값 = 상속. account 는 상속 개념 없는 base.
- * 값은 백엔드 override Map(문자열)과 라운드트립되므로 저장 시 부모가 overrideToMap 으로 직렬화한다(이 컴포넌트는 타입 편집만).
+ * **Override semantics**: a blank field = inherit (master/listing); a blank enum / toggle = inherit. account is the base
+ * with no inheritance. Values round-trip with the backend override map (strings), so the parent serializes with
+ * overrideToMap on save (this component only edits typed values).
  *
- * ⚠️ **level 로 출고지·반품지 노출 제어**: account/listing = 출고지/반품지 피커 노출(74 피커 재사용, `outbound`/`returns` 주입).
- * `master` = 출고지/반품지 숨김(계정별 센터라 마스터 override 불가, 백엔드도 조용히 무시). 택배사·나머지는 전 level 공통.
+ * ⚠️ **level controls the outbound / return places**: account/listing = the outbound / return pickers are shown (74 pickers
+ * reused, `outbound`/`returns` injected). `master` = hidden (per-account centers cannot be a master override; the backend
+ * ignores them silently). Carrier and the rest are shared by every level.
  *
- * **controlled 규칙**: 값은 부모가 소유(`value`/`onChange`). 피커 열림/직접입력 토글만 내부 UI state(set-state-in-effect 없음).
+ * **Controlled rule**: the parent owns the value (`value`/`onChange`). Only picker open / manual-input toggles are internal
+ * UI state (no set-state-in-effect).
  */
 export function ShippingOverrideFields({
   value,

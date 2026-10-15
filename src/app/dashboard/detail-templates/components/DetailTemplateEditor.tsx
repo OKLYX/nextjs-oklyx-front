@@ -20,12 +20,6 @@ import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity'
 import type { FontAsset } from '@/domain/entities/FontEntity';
 import type { DetailImageGroup } from '@/domain/entities/DetailImageGroupEntity';
 import { BUILTIN_FIELD_KEYS } from '@/domain/entities/ThumbnailEntity';
-import {
-  NOTICE_TEXT_FIELDS,
-  NOTICE_TEXT_KEYS,
-  NOTICE_TEXT_TOO_LONG_MESSAGE,
-  noticeTextTooLong,
-} from '@/domain/entities/ElevenstNoticeText';
 import { BlockRow } from './BlockRow';
 import { Card } from '@/presentation/components/ui/Card';
 
@@ -35,12 +29,7 @@ type AppendableType = 'text' | 'spacer' | 'imageZone';
 const BUILTIN_FIELD_LABELS: Record<string, string> = {
   brandName: '브랜드명',
   productName: '상품명',
-  // FEATURE_2610_13 / D110: the two 11st notice keys.
-  ...Object.fromEntries(NOTICE_TEXT_FIELDS.map((f) => [f.key, f.label])),
 };
-
-/** D110: same wording as the backend `DetailTemplateServiceImpl` refusal. */
-const NOTICE_DEFAULT_REQUIRED_MESSAGE = 'A/S 안내 · 반품/교환 안내 블록은 기본 글을 입력하세요.';
 
 // Initial block objects per type (SSOT = prompt 18 / backend 17). src=null keeps
 // the DetailBlock shape complete for text/spacer/imageZone.
@@ -314,10 +303,6 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
     blocks.forEach((b, i) => {
       if (b.type === 'text') {
         if (!b.bind?.trim()) errs[i] = '필드키를 선택하세요';
-        else if (NOTICE_TEXT_KEYS.includes(b.bind) && !b.defaultValue?.trim())
-          errs[i] = NOTICE_DEFAULT_REQUIRED_MESSAGE;
-        else if (NOTICE_TEXT_KEYS.includes(b.bind) && noticeTextTooLong({ [b.bind]: b.defaultValue ?? '' }))
-          errs[i] = NOTICE_TEXT_TOO_LONG_MESSAGE;
         else if (!isBuiltin(b.bind) && !b.defaultValue?.trim())
           errs[i] = '커스텀 필드는 기본값이 필수입니다';
       } else if (b.type === 'imageZone' && !b.bind?.trim()) errs[i] = '이미지 그룹을 선택하세요';

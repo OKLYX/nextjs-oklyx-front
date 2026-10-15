@@ -8,9 +8,21 @@ import {
   chargeModeLabel,
   formatFixedCostAmount,
 } from '@/domain/entities/FixedCost';
+import {
+  AS_NOTICE_KEY,
+  NOTICE_TEXT_FIELDS,
+  RETURN_EXCHANGE_NOTICE_KEY,
+} from '@/domain/entities/ElevenstNoticeText';
 import type { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
+import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { ChannelTabBar, type ChannelTabKey } from './ChannelModalTabs';
+import {
+  ChannelShippingSummary,
+  loadChannelShipping,
+  type ChannelShippingData,
+} from './ChannelShippingSummary';
 
 // Mirror of ChannelRegistrationForm's PLATFORM_OPTIONS for display labels.
 const PLATFORM_LABELS: Record<string, string> = {
@@ -27,11 +39,12 @@ interface ChannelDetailsModalProps {
   onClose: () => void;
   onEditClick?: (channel: MarketplaceAccount) => void;
   onDeleteClick?: (channel: MarketplaceAccount) => void;
-  onShippingClick?: (channel: MarketplaceAccount) => void;
   thumbTemplates: TemplateOption[];
   detailTemplates: TemplateOption[];
   /** 고정비 조회용 (FEATURE_2609_33). useCase 는 SellerChannelSection 이 소유해 주입한다. */
   fixedCostUseCase: FixedCostUseCase;
+  /** Shipping lookup for the 「배송」 tab (FEATURE_2610_16 / D28). Owned by SellerChannelSection. */
+  shippingUseCase: ShippingUseCase;
 }
 
 // Resolve an assigned template id to a display name. null id = tenant default;
@@ -48,38 +61,48 @@ function suffixLabel(suffix?: string | null): string {
 }
 
 /**
- * Read-only details modal for a single sales channel (MarketplaceAccount).
+ * Read-only details modal for a single sales channel (MarketplaceAccount), opened when a channel row is
+ * clicked in SellerChannelSection.
  *
- * Reuses the same modal chrome as CreateSellerModal/CreateChannelModal
- * (fixed overlay, max-w-md card, header with title + ✕). Opened when a
- * channel row is clicked in SellerChannelSection.
+ * FEATURE_2610_16 / D26: three tabs — 「기본 정보」 · 「플랫폼 기본값」 · 「배송」 — and every open starts on
+ * 「기본 정보」 (the body mounts on open). The platform tab shows only the fields of this channel's platform
+ * (D1 · D3 · D4); the shipping tab is read-only (D21 · D27) — it is edited in the edit modal.
  */
-export function ChannelDetailsModal({
-  isOpen,
+export function ChannelDetailsModal(props: ChannelDetailsModalProps) {
+  if (!props.isOpen || !props.channel) {
+    return null;
+  }
+  return <ChannelDetailsContent {...props} channel={props.channel} />;
+}
+
+function ChannelDetailsContent({
   channel,
   sellerName,
   onClose,
   onEditClick,
   onDeleteClick,
-  onShippingClick,
   thumbTemplates,
   detailTemplates,
   fixedCostUseCase,
-}: ChannelDetailsModalProps) {
+  shippingUseCase,
+}: ChannelDetailsModalProps & { channel: MarketplaceAccount }) {
+  const [activeTab, setActiveTab] = useState<ChannelTabKey>('basic');
   const [fixedCosts, setFixedCosts] = useState<AccountFixedCost[]>([]);
   const [fixedCostsLoading, setFixedCostsLoading] = useState(false);
   const [fixedCostsError, setFixedCostsError] = useState('');
-  const channelId = channel?.id ?? null;
+  const [shipping, setShipping] = useState<ChannelShippingData | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(true);
+  const [shippingError, setShippingError] = useState('');
+  const isElevenst = channel.platform === 'ELEVENST';
 
   // 인라인 async IIFE — 이펙트 본문에서 setState 를 동기 호출하지 않기 위한 프로젝트 관례.
   useEffect(() => {
-    if (!isOpen || channelId == null) return;
     let alive = true;
     void (async () => {
       setFixedCostsLoading(true);
       setFixedCostsError('');
       try {
-        const list = await fixedCostUseCase.listForAccount(channelId);
+        const list = await fixedCostUseCase.listForAccount(channel.id);
         if (alive) setFixedCosts(list);
       } catch {
         if (alive) {
@@ -90,16 +113,27 @@ export function ChannelDetailsModal({
         if (alive) setFixedCostsLoading(false);
       }
     })();
+    // FEATURE_2610_16 / D28: the shipping settings load together with the fixed costs when the modal opens.
+    void (async () => {
+      try {
+        const data = await loadChannelShipping(shippingUseCase, channel);
+        if (alive) setShipping(data);
+      } catch {
+        if (alive) setShippingError('배송 설정을 불러오지 못했습니다.');
+      } finally {
+        if (alive) setShippingLoading(false);
+      }
+    })();
     return () => {
       alive = false;
     };
-  }, [isOpen, channelId, fixedCostUseCase]);
-
-  if (!isOpen || !channel) {
-    return null;
-  }
+  }, [channel, fixedCostUseCase, shippingUseCase]);
 
   const formatDate = (dateString: string) => new Date(dateString).toISOString().split('T')[0];
+  const noticeValues: Record<string, string | null | undefined> = {
+    [AS_NOTICE_KEY]: channel.asNotice,
+    [RETURN_EXCHANGE_NOTICE_KEY]: channel.returnExchangeNotice,
+  };
 
   return (
     <Modal
@@ -107,124 +141,153 @@ export function ChannelDetailsModal({
       onClose={onClose}
       title={`판매채널 정보 — ${sellerName}`}
     >
-      <div className="p-4 space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">플랫폼</label>
-          <p className="text-sm text-gray-900">
-            {PLATFORM_LABELS[channel.platform] ?? channel.platform}
-          </p>
-        </div>
+      <ChannelTabBar active={activeTab} onSelect={setActiveTab} />
 
-        <div>
-          <label className="block text-sm font-medium mb-1">계정 별칭</label>
-          <p className="text-sm text-gray-900">{channel.accountAlias || '-'}</p>
-        </div>
+      <div className="p-4">
+        <div role="tabpanel" hidden={activeTab !== 'basic'} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">플랫폼</label>
+            <p className="text-sm text-gray-900">
+              {PLATFORM_LABELS[channel.platform] ?? channel.platform}
+            </p>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">판매자(벤더) ID</label>
-          <p className="text-sm text-gray-900">{channel.vendorId || '-'}</p>
-        </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">계정 별칭</label>
+            <p className="text-sm text-gray-900">{channel.accountAlias || '-'}</p>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">WING 로그인 ID</label>
-          <p className="text-sm text-gray-900">{channel.vendorUserId || '-'}</p>
-        </div>
+          {/* FEATURE_2610_16 / D10: the Coupang credential rows — an 11st channel shows none (its API key is never shown). */}
+          {!isElevenst && (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-1">판매자(벤더) ID</label>
+                <p className="text-sm text-gray-900">{channel.vendorId || '-'}</p>
+              </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Access Key</label>
-          <p className="text-sm text-gray-900 break-all">{channel.accessKey || '-'}</p>
-        </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">WING 로그인 ID</label>
+                <p className="text-sm text-gray-900">{channel.vendorUserId || '-'}</p>
+              </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">상태</label>
-          <span
-            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-              channel.isActive
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            {channel.isActive ? '활성' : '비활성'}
-          </span>
-        </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Access Key</label>
+                <p className="text-sm text-gray-900 break-all">{channel.accessKey || '-'}</p>
+              </div>
+            </>
+          )}
 
-        <div>
-          <label className="block text-sm font-medium mb-1">썸네일 템플릿</label>
-          <p className="text-sm text-gray-900">
-            {templateLabel(channel.thumbnailTemplateId, thumbTemplates)}
-          </p>
-        </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">상태</label>
+            <span
+              className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                channel.isActive
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {channel.isActive ? '활성' : '비활성'}
+            </span>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">상세 템플릿</label>
-          <p className="text-sm text-gray-900">
-            {templateLabel(channel.detailTemplateId, detailTemplates)}
-          </p>
-        </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">썸네일 템플릿</label>
+            <p className="text-sm text-gray-900">
+              {templateLabel(channel.thumbnailTemplateId, thumbTemplates)}
+            </p>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">등록상품명 추가 문구</label>
-          <p className="text-sm text-gray-900">
-            {suffixLabel(channel.optionCheckSuffix)}
-          </p>
-        </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">상세 템플릿</label>
+            <p className="text-sm text-gray-900">
+              {templateLabel(channel.detailTemplateId, detailTemplates)}
+            </p>
+          </div>
 
-        <div>
-          {/* 🔴 모드(매출 기준 자동 / 항상 부과 / 부과 안 함)를 반드시 함께 보여준다 —
-              모드가 없으면 '부과 안 함'으로 덮은 채널이 '부과 중'처럼 읽힌다. */}
-          <label className="block text-sm font-medium mb-1">고정비</label>
-          {fixedCostsLoading ? (
-            <p className="text-sm text-gray-500">불러오는 중...</p>
-          ) : fixedCostsError ? (
-            <p className="text-sm text-red-600">{fixedCostsError}</p>
-          ) : fixedCosts.length === 0 ? (
-            <p className="text-sm text-gray-900">부과 중인 고정비 없음</p>
-          ) : (
-            <ul className="space-y-2">
-              {fixedCosts.map((cost) => {
-                const period = appliedPeriodLabel(cost.appliedFrom, cost.appliedTo);
-                return (
-                  <li key={cost.fixedCostId}>
-                    <p className="text-sm text-gray-900">
-                      {cost.name} 월 {formatFixedCostAmount(cost.amount)}원 ·{' '}
-                      {chargeModeLabel(cost.chargeMode)}
-                    </p>
-                    {cost.chargeMode === 'AUTO' && (
-                      <p className="text-xs text-gray-500">
-                        기준 {formatFixedCostAmount(cost.thresholdAmount)}원 이상인 달만
+          <div>
+            {/* 🔴 모드(매출 기준 자동 / 항상 부과 / 부과 안 함)를 반드시 함께 보여준다 —
+                모드가 없으면 '부과 안 함'으로 덮은 채널이 '부과 중'처럼 읽힌다. */}
+            <label className="block text-sm font-medium mb-1">고정비</label>
+            {fixedCostsLoading ? (
+              <p className="text-sm text-gray-500">불러오는 중...</p>
+            ) : fixedCostsError ? (
+              <p className="text-sm text-red-600">{fixedCostsError}</p>
+            ) : fixedCosts.length === 0 ? (
+              <p className="text-sm text-gray-900">부과 중인 고정비 없음</p>
+            ) : (
+              <ul className="space-y-2">
+                {fixedCosts.map((cost) => {
+                  const period = appliedPeriodLabel(cost.appliedFrom, cost.appliedTo);
+                  return (
+                    <li key={cost.fixedCostId}>
+                      <p className="text-sm text-gray-900">
+                        {cost.name} 월 {formatFixedCostAmount(cost.amount)}원 ·{' '}
+                        {chargeModeLabel(cost.chargeMode)}
                       </p>
-                    )}
-                    {period && <p className="text-xs text-gray-500">{period}</p>}
-                  </li>
-                );
-              })}
-            </ul>
+                      {cost.chargeMode === 'AUTO' && (
+                        <p className="text-xs text-gray-500">
+                          기준 {formatFixedCostAmount(cost.thresholdAmount)}원 이상인 달만
+                        </p>
+                      )}
+                      {period && <p className="text-xs text-gray-500">{period}</p>}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">등록일</label>
+            <p className="text-sm text-gray-900">{formatDate(channel.createdAt)}</p>
+          </div>
+
+          {channel.updatedAt && (
+            <div>
+              <label className="block text-sm font-medium mb-1">수정일</label>
+              <p className="text-sm text-gray-900">{formatDate(channel.updatedAt)}</p>
+            </div>
           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">등록일</label>
-          <p className="text-sm text-gray-900">{formatDate(channel.createdAt)}</p>
+        <div role="tabpanel" hidden={activeTab !== 'platform'} className="space-y-4">
+          {isElevenst ? (
+            NOTICE_TEXT_FIELDS.map((f) => (
+              <div key={f.key}>
+                <label className="block text-sm font-medium mb-1">{f.label}</label>
+                <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                  {noticeValues[f.key]?.trim() ? noticeValues[f.key] : '-'}
+                </p>
+              </div>
+            ))
+          ) : (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                등록상품명 추가 문구{' '}
+                <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700">
+                  쿠팡
+                </span>
+              </label>
+              <p className="text-sm text-gray-900">
+                {suffixLabel(channel.optionCheckSuffix)}
+              </p>
+            </div>
+          )}
         </div>
 
-        {channel.updatedAt && (
-          <div>
-            <label className="block text-sm font-medium mb-1">수정일</label>
-            <p className="text-sm text-gray-900">{formatDate(channel.updatedAt)}</p>
-          </div>
-        )}
+        <div role="tabpanel" hidden={activeTab !== 'shipping'} className="space-y-4">
+          {shippingLoading ? (
+            <p className="text-sm text-gray-500">불러오는 중...</p>
+          ) : shippingError || !shipping ? (
+            <p className="text-sm text-red-600">{shippingError}</p>
+          ) : (
+            <ChannelShippingSummary platform={channel.platform} data={shipping} />
+          )}
+        </div>
       </div>
 
-      {(onEditClick || onDeleteClick || onShippingClick) && (
+      {(onEditClick || onDeleteClick) && (
         <div className="border-t p-4 flex gap-2">
-          {onShippingClick && (
-            <button
-              onClick={() => onShippingClick(channel)}
-              className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
-            >
-              배송관리
-            </button>
-          )}
           {onEditClick && (
             <button
               onClick={() => onEditClick(channel)}
