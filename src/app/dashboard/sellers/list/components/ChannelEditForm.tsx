@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
@@ -50,6 +50,9 @@ export const PLATFORM_OPTIONS = [
   { value: 'GMARKET', label: 'G마켓' },
 ];
 
+/** The modal footer [저장] sits outside this form and submits it through this id (FEATURE_2610_16 / D34). */
+export const CHANNEL_EDIT_FORM_ID = 'channel-edit-form';
+
 /** The shipping save the 「배송」 tab asks for (FEATURE_2610_16 / D22) — only when it differs from the loaded value. */
 export type ChannelShippingChange =
   | { kind: 'coupang'; config: ShippingConfigRequest }
@@ -78,7 +81,8 @@ interface ChannelEditFormProps {
     fixedCostItems: AccountFixedCostRequestItem[] | null,
     shipping: ChannelShippingChange | null,
   ) => Promise<void>;
-  onCancel: () => void;
+  /** Reports the form validity; the modal footer [저장] stays disabled while it is false (FEATURE_2610_16 / D34). */
+  onValidityChange: (valid: boolean) => void;
   thumbTemplates?: TemplateOption[];
   detailTemplates?: TemplateOption[];
   templatesLoading?: boolean;
@@ -109,7 +113,7 @@ export function ChannelEditForm({
   channel,
   isLoading = false,
   onSubmit: externalOnSubmit,
-  onCancel,
+  onValidityChange,
   thumbTemplates = [],
   detailTemplates = [],
   templatesLoading = false,
@@ -181,6 +185,11 @@ export function ChannelEditForm({
     },
   });
 
+  // FEATURE_2610_16 / D34: [저장] lives in the modal footer, outside this form, so the validity is reported up.
+  useEffect(() => {
+    onValidityChange(formState.isValid);
+  }, [formState.isValid, onValidityChange]);
+
   // The platform of a saved channel never changes (the backend refuses it) — the stored value picks the fields.
   const isElevenst = channel.platform === 'ELEVENST';
 
@@ -227,7 +236,7 @@ export function ChannelEditForm({
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form id={CHANNEL_EDIT_FORM_ID} onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {error && (
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2">
           <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
@@ -501,31 +510,6 @@ export function ChannelEditForm({
             disabled={isLoading}
           />
         )}
-      </div>
-
-      <div className="flex gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isLoading}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          취소
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading || !formState.isValid}
-          className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-        >
-          {isLoading ? (
-            <>
-              <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              저장 중...
-            </>
-          ) : (
-            '저장'
-          )}
-        </button>
       </div>
     </form>
   );
