@@ -1,6 +1,7 @@
 import {
   MarketplaceAccountRepository,
   CreateMarketplaceAccountRequest,
+  ElevenstNoticesRequest,
   UpdateMarketplaceAccountRequest,
 } from '@/domain/repositories/MarketplaceAccountRepository';
 import { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
@@ -27,6 +28,10 @@ export class MarketplaceAccountUseCase {
 
   async updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
     return this.repository.updateRegistrationNameSuffix(id, data);
+  }
+
+  async updateElevenstNotices(id: number, data: ElevenstNoticesRequest): Promise<void> {
+    return this.repository.updateElevenstNotices(id, data);
   }
 
   async delete(id: number): Promise<void> {

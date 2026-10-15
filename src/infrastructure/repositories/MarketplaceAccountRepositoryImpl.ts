@@ -4,6 +4,7 @@ import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import {
   MarketplaceAccountRepository,
   CreateMarketplaceAccountRequest,
+  ElevenstNoticesRequest,
   UpdateMarketplaceAccountRequest,
 } from '@/domain/repositories/MarketplaceAccountRepository';
 import { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
@@ -36,6 +37,11 @@ export class MarketplaceAccountRepositoryImpl implements MarketplaceAccountRepos
   // ResponseDTO<Void> — no unwrap. Backend path uses singular `marketplace-account`.
   async updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void> {
     await axiosInstance.put(`/api/admin/marketplace-account/${id}/registration-name-suffix`, data);
+  }
+
+  // ResponseDTO<Void> — no unwrap (FEATURE_2610_16 / D7).
+  async updateElevenstNotices(id: number, data: ElevenstNoticesRequest): Promise<void> {
+    await axiosInstance.put(`/api/admin/marketplace-account/${id}/elevenst-notices`, data);
   }
 
   async delete(id: number): Promise<void> {

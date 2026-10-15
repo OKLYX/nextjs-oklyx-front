@@ -5,14 +5,20 @@ import { MarketplaceAccountRepositoryImpl } from '@/infrastructure/repositories/
 import { MarketplaceAccountUseCase } from '@/application/usecases/MarketplaceAccountUseCase';
 import type { MarketplaceAccount, TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
 import type { UpdateMarketplaceAccountForm } from '@/application/dto/MarketplaceAccountDTOs';
+import type { ElevenstNoticesRequest } from '@/domain/repositories/MarketplaceAccountRepository';
 import type { OptionCheckSuffixConfig } from '@/domain/entities/OptionCheckSuffix';
 import type {
   AccountFixedCost,
   AccountFixedCostRequestItem,
   PlatformFixedCost,
 } from '@/domain/entities/FixedCost';
+import { recalcFailureNote } from '@/domain/entities/ElevenstShipping';
 import type { FixedCostUseCase } from '@/application/usecases/FixedCostUseCase';
-import { ChannelEditForm } from './ChannelEditForm';
+import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
+import { ChannelEditForm, type ChannelShippingChange } from './ChannelEditForm';
+import type { ChannelTabKey } from './ChannelModalTabs';
+import { loadChannelShipping, type ChannelShippingData } from './ChannelShippingSummary';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Modal } from '@/presentation/components/ui/Modal';
 
 interface EditChannelModalProps {
@@ -24,24 +30,45 @@ interface EditChannelModalProps {
   thumbTemplates: TemplateOption[];
   detailTemplates: TemplateOption[];
   templatesLoading: boolean;
-  /** 고정비 카탈로그 (FEATURE_2609_33). useCase 는 SellerChannelSection 이 소유해 주입한다. */
+  /**
+   * Fixed-cost catalog (FEATURE_2609_33). The caller (SellerChannelSection · CoverageMatrix) owns the useCase and
+   * injects it.
+   */
   fixedCostUseCase: FixedCostUseCase;
   fixedCosts: PlatformFixedCost[];
   fixedCostsLoading: boolean;
   fixedCostsError: string;
   onReloadFixedCosts: () => Promise<void>;
+  /**
+   * Shipping read / save for the 「배송」 tab (FEATURE_2610_16 / D19 · D22). Owned by the caller
+   * (SellerChannelSection · CoverageMatrix).
+   */
+  shippingUseCase: ShippingUseCase;
+  /**
+   * Tab shown on open — 「기본 정보」 when omitted; the master detail [배송 설정하기] passes 'shipping'
+   * (FEATURE_2610_16 / D29).
+   */
+  initialTab?: ChannelTabKey;
 }
 
 /**
  * Edit modal for a single sales channel (MarketplaceAccount).
  *
- * Mirrors EditSellerModal's flow: reuses the same modal chrome as
- * CreateChannelModal, pre-fills ChannelEditForm from the passed channel, and
- * submits a PATCH. The channel object is provided directly (the list section
- * already holds it), so no extra fetch is needed.
+ * Pre-fills ChannelEditForm from the passed channel (the caller already holds it — the seller screen's channel
+ * list, or the master detail [배송 설정하기] lookup, FEATURE_2610_16 / D29) and saves every tab
+ * with one [저장] (FEATURE_2610_16 / D22): channel PATCH → platform defaults PUT → fixed-cost PUT → shipping
+ * PUT (only when changed). The body mounts on open, so the fixed-cost links and the shipping settings are
+ * loaded fresh every time. When an 11st shipping save could not re-price some listings, a one-button notice
+ * (「배송 설정 저장」) comes first and closing it closes this modal (D22 · FEATURE_2610_13 / D124).
  */
-export function EditChannelModal({
-  isOpen,
+export function EditChannelModal(props: EditChannelModalProps) {
+  if (!props.isOpen || !props.channel) {
+    return null;
+  }
+  return <EditChannelModalContent {...props} channel={props.channel} />;
+}
+
+function EditChannelModalContent({
   channel,
   sellerName,
   onClose,
@@ -54,15 +81,20 @@ export function EditChannelModal({
   fixedCostsLoading,
   fixedCostsError,
   onReloadFixedCosts,
-}: EditChannelModalProps) {
+  shippingUseCase,
+  initialTab,
+}: EditChannelModalProps & { channel: MarketplaceAccount }) {
   const [isLoading, setIsLoading] = useState(false);
   const [fixedCostLinks, setFixedCostLinks] = useState<AccountFixedCost[]>([]);
   const [linksLoading, setLinksLoading] = useState(false);
   const [linksError, setLinksError] = useState('');
-  const channelId = channel?.id ?? null;
+  const [shipping, setShipping] = useState<ChannelShippingData | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(true);
+  const [shippingError, setShippingError] = useState('');
+  const [recalcNotice, setRecalcNotice] = useState('');
+  const channelId = channel.id;
 
   const loadLinks = useCallback(async () => {
-    if (channelId == null) return;
     setLinksLoading(true);
     setLinksError('');
     try {
@@ -75,13 +107,25 @@ export function EditChannelModal({
     }
   }, [channelId, fixedCostUseCase]);
 
+  const loadShipping = useCallback(async () => {
+    setShippingLoading(true);
+    setShippingError('');
+    try {
+      setShipping(await loadChannelShipping(shippingUseCase, channel));
+    } catch {
+      setShipping(null);
+      setShippingError('배송 설정을 불러오지 못했습니다.');
+    } finally {
+      setShippingLoading(false);
+    }
+  }, [channel, shippingUseCase]);
+
   // 인라인 async IIFE — 이펙트 본문에서 setState 를 동기 호출하지 않기 위한 프로젝트 관례.
   useEffect(() => {
-    if (!isOpen || channelId == null) return;
     void (async () => {
-      await loadLinks();
+      await Promise.all([loadLinks(), loadShipping()]);
     })();
-  }, [isOpen, channelId, loadLinks]);
+  }, [loadLinks, loadShipping]);
 
   const retryFixedCosts = () => {
     void Promise.all([onReloadFixedCosts(), loadLinks()]);
@@ -92,14 +136,17 @@ export function EditChannelModal({
     return new MarketplaceAccountUseCase(repository);
   }, []);
 
-  if (!isOpen || !channel) {
-    return null;
-  }
+  const closeAfterSave = async () => {
+    onClose();
+    await onSuccess();
+  };
 
   const handleSubmit = async (
     data: UpdateMarketplaceAccountForm,
     suffixConfig: OptionCheckSuffixConfig,
+    notices: ElevenstNoticesRequest,
     fixedCostItems: AccountFixedCostRequestItem[] | null,
+    shippingChange: ChannelShippingChange | null,
   ) => {
     try {
       setIsLoading(true);
@@ -119,20 +166,37 @@ export function EditChannelModal({
         thumbnailTemplateId: data.thumbnailTemplateId ? Number(data.thumbnailTemplateId) : undefined,
         detailTemplateId: data.detailTemplateId ? Number(data.detailTemplateId) : undefined,
       });
-      // Channel save joins the suffix PUT. On partial failure (channel saved,
-      // suffix PUT failed) this throws → ChannelEditForm shows a banner and the
-      // modal stays open; retry re-runs both (channel PATCH is idempotent).
-      await useCase.updateRegistrationNameSuffix(channel.id, {
-        enabled: suffixConfig.optionCheckSuffixEnabled,
-        suffix: suffixConfig.optionCheckSuffix,
-      });
+      // The platform defaults join the same sequential save (FEATURE_2610_16 / D3 · D7): Coupang sends the
+      // suffix, 11st sends the two notices and never the suffix. On partial failure (an earlier step saved,
+      // this one failed) this throws → ChannelEditForm shows a banner and the modal stays open; retry re-runs
+      // every step in the same order (each PUT is a replace).
+      if (channel.platform === 'ELEVENST') {
+        await useCase.updateElevenstNotices(channel.id, notices);
+      } else {
+        await useCase.updateRegistrationNameSuffix(channel.id, {
+          enabled: suffixConfig.optionCheckSuffixEnabled,
+          suffix: suffixConfig.optionCheckSuffix,
+        });
+      }
       // 고정비 연결도 같은 순차 흐름에 합류한다(멱등 replace). null = 섹션이 준비되지 않아
       // 건드리지 않는다 — 못 읽은 목록으로 replace 를 보내면 기존 연결이 끊긴다.
       if (fixedCostItems !== null) {
         await fixedCostUseCase.setForAccount(channel.id, fixedCostItems);
       }
-      onClose();
-      await onSuccess();
+      // FEATURE_2610_16 / D22: shipping goes last and only when the 「배송」 tab changed. An 11st save re-prices the listings.
+      let recalcFailedCount = 0;
+      if (shippingChange?.kind === 'elevenst') {
+        const saved = await shippingUseCase.upsertElevenstConfig(channel.id, shippingChange.settings);
+        recalcFailedCount = saved.priceRecalcFailedCount ?? 0;
+      } else if (shippingChange?.kind === 'coupang') {
+        await shippingUseCase.upsertConfig(channel.id, shippingChange.config);
+      }
+      const note = recalcFailureNote(recalcFailedCount);
+      if (note) {
+        setRecalcNotice(note);
+        return;
+      }
+      await closeAfterSave();
     } catch (err) {
       throw err;
     } finally {
@@ -141,26 +205,41 @@ export function EditChannelModal({
   };
 
   return (
-    <Modal
-      isOpen
-      onClose={onClose}
-      title={`판매채널 수정 — ${sellerName}`}
-      disableClose={isLoading}
-    >
-      <ChannelEditForm
-        channel={channel}
-        isLoading={isLoading}
-        onSubmit={handleSubmit}
-        onCancel={onClose}
-        thumbTemplates={thumbTemplates}
-        detailTemplates={detailTemplates}
-        templatesLoading={templatesLoading}
-        fixedCosts={fixedCosts}
-        fixedCostLinks={fixedCostLinks}
-        fixedCostsLoading={fixedCostsLoading || linksLoading}
-        fixedCostsError={fixedCostsError || linksError}
-        onRetryFixedCosts={retryFixedCosts}
+    <>
+      <Modal
+        isOpen
+        onClose={onClose}
+        title={`판매채널 수정 — ${sellerName}`}
+        disableClose={isLoading}
+      >
+        <ChannelEditForm
+          channel={channel}
+          isLoading={isLoading}
+          onSubmit={handleSubmit}
+          onCancel={onClose}
+          thumbTemplates={thumbTemplates}
+          detailTemplates={detailTemplates}
+          templatesLoading={templatesLoading}
+          fixedCosts={fixedCosts}
+          fixedCostLinks={fixedCostLinks}
+          fixedCostsLoading={fixedCostsLoading || linksLoading}
+          fixedCostsError={fixedCostsError || linksError}
+          onRetryFixedCosts={retryFixedCosts}
+          shipping={shipping}
+          shippingLoading={shippingLoading}
+          shippingError={shippingError}
+          onRetryShipping={() => void loadShipping()}
+          initialTab={initialTab}
+        />
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={!!recalcNotice}
+        title="배송 설정 저장"
+        message={recalcNotice}
+        onConfirm={() => void closeAfterSave()}
+        nested
       />
-    </Modal>
+    </>
   );
 }

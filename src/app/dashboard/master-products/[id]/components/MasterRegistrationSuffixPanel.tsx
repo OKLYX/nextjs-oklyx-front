@@ -82,7 +82,12 @@ export function MasterRegistrationSuffixPanel({
 
   return (
     <Card>
-      <h2 className="mb-3 text-sm font-semibold text-gray-900">등록상품명 추가 문구</h2>
+      <h2 className="mb-3 text-sm font-semibold text-gray-900">
+        등록상품명 추가 문구{' '}
+        <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700">
+          쿠팡
+        </span>
+      </h2>
 
       {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
