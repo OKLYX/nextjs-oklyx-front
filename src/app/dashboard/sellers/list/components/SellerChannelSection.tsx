@@ -19,7 +19,6 @@ import { CreateChannelModal } from './CreateChannelModal';
 import { ChannelDetailsModal } from './ChannelDetailsModal';
 import { EditChannelModal } from './EditChannelModal';
 import { DeleteChannelConfirmation } from './DeleteChannelConfirmation';
-import { ShippingConfigModal } from './ShippingConfigModal';
 import { platformDisplayName } from '@/config/platforms';
 
 interface SellerChannelSectionProps {
@@ -43,7 +42,6 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
   const [editChannel, setEditChannel] = useState<MarketplaceAccount | null>(null);
   const [deleteChannel, setDeleteChannel] = useState<MarketplaceAccount | null>(null);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
-  const [shippingChannel, setShippingChannel] = useState<MarketplaceAccount | null>(null);
   const [fixedCosts, setFixedCosts] = useState<PlatformFixedCost[]>([]);
   const [fixedCostsLoading, setFixedCostsLoading] = useState(false);
   const [fixedCostsError, setFixedCostsError] = useState('');
@@ -276,17 +274,10 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         onClose={() => setSelectedChannel(null)}
         onEditClick={(channel) => setEditChannel(channel)}
         onDeleteClick={(channel) => setDeleteChannel(channel)}
-        onShippingClick={(channel) => setShippingChannel(channel)}
         thumbTemplates={thumbTemplates}
         detailTemplates={detailTemplates}
         fixedCostUseCase={fixedCostUseCase}
-      />
-
-      <ShippingConfigModal
-        isOpen={shippingChannel !== null}
-        account={shippingChannel}
-        onClose={() => setShippingChannel(null)}
-        useCase={shippingUseCase}
+        shippingUseCase={shippingUseCase}
       />
 
       <EditChannelModal
@@ -303,6 +294,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         fixedCostsLoading={fixedCostsLoading}
         fixedCostsError={fixedCostsError}
         onReloadFixedCosts={loadFixedCosts}
+        shippingUseCase={shippingUseCase}
       />
 
       <DeleteChannelConfirmation

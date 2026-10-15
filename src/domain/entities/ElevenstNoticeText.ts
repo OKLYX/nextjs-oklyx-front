@@ -1,10 +1,14 @@
-// The two 11st notice texts kept as template field values (FEATURE_2610_13 / D73 · D74 · D78 · D110).
-// Same keys as the backend `ListingTextValueResolver` — keep the two in step.
+// The two 11st notice texts kept as master / listing field values (FEATURE_2610_13 / D73 · D74 · D78) and as the
+// 11st sales channel default (FEATURE_2610_16 / D4 · D6). Same keys as the backend `ListingTextValueResolver` — keep
+// the two in step.
 
 export const AS_NOTICE_KEY = 'asNotice';
 export const RETURN_EXCHANGE_NOTICE_KEY = 'returnExchangeNotice';
 
-/** D74: the two fields the master screens always show, in this order. */
+/**
+ * D74: the two fields the master screens always show, in this order. FEATURE_2610_16 / D4: the 11st sales channel
+ * modals show the same two fields with the same labels.
+ */
 export const NOTICE_TEXT_FIELDS: { key: string; label: string }[] = [
   { key: AS_NOTICE_KEY, label: 'A/S 안내' },
   { key: RETURN_EXCHANGE_NOTICE_KEY, label: '반품/교환 안내' },

@@ -34,11 +34,18 @@ export interface UpdateMarketplaceAccountRequest {
   detailTemplateId?: number;
 }
 
+// FEATURE_2610_16 / D7: replaced whole; a blank text is stored as null by the backend (D16).
+export interface ElevenstNoticesRequest {
+  asNotice: string;
+  returnExchangeNotice: string;
+}
+
 export interface MarketplaceAccountRepository {
   getBySeller(sellerId: number): Promise<MarketplaceAccount[]>;
   getAll(): Promise<MarketplaceAccount[]>;
   create(data: CreateMarketplaceAccountRequest): Promise<MarketplaceAccount>;
   update(id: number, data: UpdateMarketplaceAccountRequest): Promise<MarketplaceAccount>;
   updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;
+  updateElevenstNotices(id: number, data: ElevenstNoticesRequest): Promise<void>;
   delete(id: number): Promise<void>;
 }

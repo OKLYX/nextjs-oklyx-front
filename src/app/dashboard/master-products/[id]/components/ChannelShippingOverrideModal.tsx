@@ -80,7 +80,7 @@ export function ChannelShippingOverrideModal({
 
   // Fetch outbound/return for this channel's account + the inherited baseline used to pre-fill the
   // form (master ?? account). Prefer the backend-resolved baseline (getInheritedShipping); if that
-  // fails, fall back to the account's own config (getConfig, the 72 endpoint the seller 배송관리 uses)
+  // fails, fall back to the account's own config (getConfig, the 72 endpoint the sales channel 「배송」 tab uses)
   // so the seller preset still fills in. Each catch degrades gracefully; async IIFE avoids
   // set-state-in-effect.
   useEffect(() => {

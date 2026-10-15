@@ -1098,7 +1098,8 @@ export function MasterProductCreateForm({
       return;
     }
     setIsSubmitting(true);
-    // Omit blank values so the backend falls back to product/template defaults.
+    // Omit blank values so the backend falls back to defaults: product / template values for the template fields,
+    // the 11st sales channel default for the two notice texts (FEATURE_2610_16 / D5).
     const cleaned: Record<string, string> = {};
     for (const [k, v] of Object.entries(fieldValues)) {
       if (v.trim() !== '') cleaned[k] = v;
@@ -1653,7 +1654,7 @@ export function MasterProductCreateForm({
                       <textarea
                         rows={4}
                         value={fieldValues[f.key] ?? ''}
-                        placeholder="템플릿 기본값 사용"
+                        placeholder="판매채널 기본값 사용"
                         onChange={(e) =>
                           setFieldValues((prev) => ({ ...prev, [f.key]: e.target.value }))
                         }

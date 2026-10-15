@@ -175,7 +175,12 @@ export function EditSellerForm({
     {seller && (
       <div className="border-t pt-4 space-y-3">
         <div>
-          <h3 className="text-sm font-semibold">등록상품명 추가 문구</h3>
+          <h3 className="text-sm font-semibold">
+            등록상품명 추가 문구{' '}
+            <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700">
+              쿠팡
+            </span>
+          </h3>
           <p className="text-xs text-gray-500">
             옵션 2개 이상 등록상품명에 붙는 추가 문구의 판매자 기본값입니다.
           </p>
