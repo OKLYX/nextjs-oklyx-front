@@ -75,7 +75,7 @@ export function ShippingLabelPreviewModal({
         setHasLoaded(true);
       } catch {
         if (!active) return;
-        setPreviewError('쿠팡 주문 조회에 실패했습니다. 다시 시도해주세요.');
+        setPreviewError('마켓 주문 조회에 실패했습니다. 다시 시도해주세요.');
       } finally {
         if (active) setIsPreviewing(false);
       }

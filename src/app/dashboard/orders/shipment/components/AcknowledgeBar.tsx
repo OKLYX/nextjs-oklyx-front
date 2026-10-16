@@ -18,11 +18,21 @@ import { Button } from '@/presentation/components/ui/Button';
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 /** 서버 `@Size(max=500)` 과 같은 값. 넘겨 보내면 400 이라 버튼에서 먼저 막는다(PLAN 2609_17 D12). */
 const MAX_SELECTION = 500;
+/**
+ * What [발주처리] covers, per marketplace (FEATURE_2610_17 / D56): Coupang confirms the whole box of a chosen option
+ * (PLAN 2609_17 D1); 11st confirms the chosen product with the same product's lines of that delivery (D48).
+ */
+const ACK_NOTICE_BY_PLATFORM: Record<'COUPANG' | 'ELEVENST', string> = {
+  COUPANG: '쿠팡: 선택한 옵션이 속한 배송건(박스) 전체가 함께 발주처리됩니다.',
+  ELEVENST: '11번가: 선택한 상품(같은 배송건의 같은 상품 옵션 포함)만 발주확인됩니다.',
+};
 
 interface AcknowledgeBarProps {
   selectedCount: number;
   /** 선택 중 실제로 발주처리되는 건수. 체크박스는 상태 무관이라 `selectedCount` 보다 작을 수 있다. */
   acknowledgeableCount: number;
+  /** Marketplaces among the confirmation targets, order Coupang → 11st (FEATURE_2610_17 / D56). */
+  acknowledgePlatforms: readonly ('COUPANG' | 'ELEVENST')[];
   onAcknowledge: () => void;
   isSubmitting: boolean;
   canAcknowledge: boolean;      // = isAdmin
@@ -43,6 +53,8 @@ interface AcknowledgeBarProps {
   internalBusy: 'mark' | 'release' | 'cancel' | null;
   /** 선택한 주문을 마켓에서 다시 읽어 상태를 맞춘다(PLAN 2609_50). */
   onRefresh: () => void;
+  /** Selected orders [주문 상태 갱신] would send — Coupang only (FEATURE_2610_17 / D12). */
+  refreshableCount: number;
   isRefreshing: boolean;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
@@ -52,6 +64,7 @@ interface AcknowledgeBarProps {
 export function AcknowledgeBar({
   selectedCount,
   acknowledgeableCount,
+  acknowledgePlatforms,
   onAcknowledge,
   isSubmitting,
   canAcknowledge,
@@ -65,6 +78,7 @@ export function AcknowledgeBar({
   onShipStored,
   internalBusy,
   onRefresh,
+  refreshableCount,
   isRefreshing,
   pageSize,
   onPageSizeChange,
@@ -91,7 +105,7 @@ export function AcknowledgeBar({
           <Button
             variant="secondary"
             onClick={onRefresh}
-            disabled={selectedCount === 0 || isRefreshing}
+            disabled={refreshableCount === 0 || isRefreshing}
           >
             {isRefreshing ? <Spinner label="확인 중..." /> : '주문 상태 갱신'}
           </Button>
@@ -161,12 +175,12 @@ export function AcknowledgeBar({
         </div>
       </div>
 
-      {/* 선택한 라인이 아니라 그 라인이 속한 박스 전체가 전송된다(PLAN 2609_17 D1). */}
-      {acknowledgeableCount > 0 && (
-        <p className="text-xs text-gray-500">
-          선택한 옵션이 속한 배송건(박스) 전체가 함께 발주처리됩니다.
+      {/* What gets confirmed, one line per marketplace in the targets (PLAN 2609_17 D1 · FEATURE_2610_17 / D56). */}
+      {acknowledgeableCount > 0 && acknowledgePlatforms.map((platform) => (
+        <p key={platform} className="text-xs text-gray-500">
+          {ACK_NOTICE_BY_PLATFORM[platform]}
         </p>
-      )}
+      ))}
 
       {/* 발주처리 버튼이 왜 안 눌리는지 말해 준다 — 상태 갱신만 하려고 고른 경우가 흔하다. */}
       {notAcknowledgeable > 0 && (
@@ -191,7 +205,8 @@ export function AcknowledgeBar({
 
       {message && (
         <div className="text-sm text-gray-800">
-          <p>{message.text}</p>
+          {/* The confirmation result has one line per marketplace (FEATURE_2610_17 / D57). */}
+          <p className="whitespace-pre-line">{message.text}</p>
           {message.detail.map((line) => (
             <p key={line} className="text-xs text-red-700">
               {line}

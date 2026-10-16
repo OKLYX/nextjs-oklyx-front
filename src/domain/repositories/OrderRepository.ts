@@ -1,7 +1,8 @@
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  CancelReasonOption, InternalStageResult, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
+  CancelReasonOption, ElevenstCancelRejectPayload, ElevenstCancelRequest, ElevenstSellerReturnPayload,
+  InternalStageResult, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
   OrderMonth, OrderRefreshResult, OrderSetting, OrderSyncResponse, OrderSyncResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
@@ -19,4 +20,9 @@ export interface OrderRepository {
   releaseInternal(orderItemIds: number[]): Promise<InternalStageResult>;
   getOrderSetting(): Promise<OrderSetting>;
   updateOrderSetting(reservedShipmentTime: string): Promise<OrderSetting>;
+  getElevenstCancelRequests(orderItemId: number): Promise<ElevenstCancelRequest[]>;
+  approveElevenstCancel(requestId: number): Promise<void>;
+  rejectElevenstCancel(requestId: number, payload: ElevenstCancelRejectPayload): Promise<void>;
+  getElevenstReturnReasons(): Promise<CancelReasonOption[]>;
+  requestElevenstReturn(orderItemId: number, payload: ElevenstSellerReturnPayload): Promise<void>;
 }

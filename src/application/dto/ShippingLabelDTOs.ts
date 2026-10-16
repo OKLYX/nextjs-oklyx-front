@@ -7,10 +7,12 @@ export interface FailedBox {
 }
 
 // An order excluded from the send. `status` = the neutral status used for the decision
-// (SHIPPED etc.) — the Korean label is resolved at render time.
+// (SHIPPED etc.) — the Korean label is resolved at render time. `reason` = the server's sentence for
+// that row (FEATURE_2610_17 / D47); null on order-acknowledge results, absent on an older server.
 export interface SkippedOrder {
   orderId: string;
   status: OrderStatus;
+  reason?: string | null;
 }
 
 export interface ShipmentConfirmResult {

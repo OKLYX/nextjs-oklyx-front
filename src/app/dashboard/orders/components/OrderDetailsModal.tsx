@@ -28,25 +28,28 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { InternalStageBadge } from './InternalStageBadge';
 import { ReservedShipmentHistory } from './ReservedShipmentHistory';
 import { StoredInvoiceEditor } from './StoredInvoiceEditor';
+import { ElevenstCancelRequests } from './ElevenstCancelRequests';
+import { ElevenstSellerReturnForm } from './ElevenstSellerReturnForm';
 
 /**
- * 주문 상세 모달 — 읽기전용 정보 + (ADMIN·쿠팡) 단건 송장 접수시트 조회·다운로드
+ * Order detail modal — read-only info + (ADMIN · Coupang / 11st) single-order label sheet lookup and download.
+ * 11st orders also get their cancel requests and the seller return request (FEATURE_2610_17 / D19 · D35).
  *
- * 액션 배치 — 발주처리는 **하단 고정 바 왼쪽**에, 나머지는 본문의 **좌우 탭**(왼쪽부터 송장시트 ·
- * 발송처리 · 주문취소, 기본 선택은 발송처리)에 둔다. 발주는 뒤 액션들의 앞 단계라 탭에 섞지 않고,
- * 탭 셋은 한 번에 하나만 쓰는 배타적 선택이라 세로로 쌓지 않는다.
- * 엑셀 다운로드 버튼은 표를 볼 수 있는 송장시트 탭에서만 하단 바에 나온다.
- * 시트 섹션은 새 팝업이 아니라 이 모달을 인라인 확장한다. 표 편집 UI 가 기존
- * `ShippingLabelPreviewModal`(주문목록 전체)과 모양이 비슷하지만 **공통 컴포넌트로 추출하지 않는다** —
- * 사용자 결정(PLAN D5)에 따라 이미 검증된 주문목록 다운로드 화면의 회귀 위험을 0 으로 두기 위함.
+ * Action layout — order confirmation sits at the **left of the pinned foot bar**, the rest in the body's **tabs**
+ * (from the left: label sheet · shipment · order cancel; shipment is selected by default). Confirmation is the step
+ * before the others, so it is not mixed into the tabs; the three tabs are an exclusive choice, so they are not
+ * stacked. The Excel download button shows in the foot bar only on the sheet tab, where the table is visible.
+ * The sheet section expands this modal inline instead of a new popup. The table editing UI looks like the existing
+ * `ShippingLabelPreviewModal` (whole order list) but is **not extracted into a shared component** — the user decision
+ * (PLAN D5) keeps the regression risk of the already-verified order-list download at 0.
  *
- * ⚠️ 시트 조회는 쿠팡 실시간 호출이라 모달이 열릴 때 자동 조회하지 않는다(버튼 클릭 시에만).
- * ⚠️ 부모가 이 모달을 항상 렌더하고 null 가드로 숨기므로 닫아도 언마운트되지 않는다 → 상태 초기화는
- * 부모의 `key={selectedOrder?.id ?? 'none'}` remount 가 담당한다(주문이 바뀌거나 닫히면 새 인스턴스).
- * effect 로 초기화하면 프로젝트 lint(`react-hooks/set-state-in-effect`)에 걸린다.
- * `handleClose` 의 초기화는 부모를 거치지 않는 닫힘 경로용 보조 안전장치.
- * ⚠️ useCase 는 부모(OrderContainer)의 useMemo 인스턴스를 재사용 — 여기서 새로 만들지 말 것.
- * ⚠️ 전화/우편번호/전체주소는 DOM 에 렌더하지 않고 state 에만 보관(export POST 용).
+ * ⚠️ The sheet lookup is a live marketplace call, so it does not run when the modal opens (button click only).
+ * ⚠️ The parent always renders this modal and hides it with a null guard, so closing does not unmount it → state
+ * reset is the parent's `key={selectedOrder?.id ?? 'none'}` remount (a new instance when the order changes or the
+ * modal closes). Resetting in an effect trips the project lint (`react-hooks/set-state-in-effect`).
+ * The reset in `handleClose` is a backup for close paths that bypass the parent.
+ * ⚠️ useCase reuses the parent's (OrderContainer) useMemo instance — do not create a new one here.
+ * ⚠️ Phone / postcode / full address are never rendered in the DOM; they stay in state only (for the export POST).
  */
 interface OrderDetailsModalProps {
   order: OrderItem | null;
@@ -65,9 +68,9 @@ interface OrderDetailsModalProps {
 
 const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
 
-// Platform display labels. COUPANG only on purpose: the sheet button is disabled for every other
-// platform (`!isCoupang`), so no other code can reach this banner. Kept as a map (not a literal
-// '쿠팡') so a second platform needs one entry, not a rewrite; unknown codes fall back to the raw code.
+// Platform display labels for the missing-phone banner. Only COUPANG and ELEVENST reach it: the sheet button is
+// disabled for every other platform (`!isMarketOrder`, FEATURE_2610_17 / D2). Kept as a map (not a literal
+// '쿠팡') so another platform needs one entry, not a rewrite; unknown codes fall back to the raw code.
 const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11번가' };
 
 // 주문 상세 액션 탭. 왼쪽부터 송장시트 조회 → 발송처리 → 주문취소 순이고, **기본 선택은 발송처리**다 —
@@ -159,13 +162,14 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   // 아래 `activeTab` 이 파생값으로 되돌린다 — effect 로 고쳐 쓰지 않는다.
   const [actionTab, setActionTab] = useState<ActionTab>('shipment');
 
-  // Carrier list load — the platform's code table (Coupang has no carrier-list API), served from
-  // our own backend, not a Coupang call, so it runs on open without a button. The guard mirrors the section's render gate: hooks run even when the
-  // section is hidden, so without it a USER account would hammer an ADMIN-only endpoint for 403s.
+  // Carrier list load — the platform's code table (Coupang has no carrier-list API; 11st uses the same catalog),
+  // served from our own backend, not a marketplace call, so it runs on open without a button. The guard mirrors
+  // the sections' render gate (Coupang · 11st, FEATURE_2610_17 / D2): hooks run even when the section is hidden,
+  // so without it a USER account would hammer an ADMIN-only endpoint for 403s.
   // Deps are the platform *string* and isAdmin — passing the order object refetches every render.
   useEffect(() => {
     const platform = order?.platform;
-    if (!isAdmin || platform !== 'COUPANG') return;
+    if (!isAdmin || (platform !== 'COUPANG' && platform !== 'ELEVENST')) return;
     let alive = true;
     void (async () => {
       setIsLoadingCarriers(true);
@@ -217,6 +221,10 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
 
   const isEmpty = hasLoaded && rows.length === 0;
   const isCoupang = order.platform === 'COUPANG';
+  // FEATURE_2610_17 / D28: order confirmation, single invoice and the sheet are open to 11st as well;
+  // refresh · internal stage · reservation · seller cancel stay Coupang only (D12).
+  const isElevenst = order.platform === 'ELEVENST';
+  const isMarketOrder = isCoupang || isElevenst;
   // Coupang safe numbers die 48h after delivery; the ordersheet then returns an empty phone.
   // The sheet table never renders the phone (PII), so this flag is the only signal the user gets.
   // `receiverPhone` is a non-nullable string in the DTO — "" is the only "no value" form.
@@ -252,12 +260,12 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const isCancelQtyValid = Number.isInteger(cancelQty) && cancelQty >= 1 && cancelQty <= order.purchasableQty;
   const isCancelInputDisabled = isCancelling || cancelSucceeded || cancelReasons.length === 0;
   // 액션 노출 게이트 — 발주처리는 하단 고정 바로, 나머지 둘은 탭으로 갈린다.
-  const canAcknowledge = isAdmin && isCoupang && order.status === 'PAID' && !fullyCanceled;
-  // [내부 발주처리] = [발주처리] 대상 중 내부 단계가 없는 주문(D1·D13).
-  const canMarkInternal = canAcknowledge && order.internalStage == null;
+  const canAcknowledge = isAdmin && isMarketOrder && order.status === 'PAID' && !fullyCanceled;
+  // [Internal acknowledge] = Coupang [발주처리] targets without an internal stage (D1·D13 · FEATURE_2610_17 / D12).
+  const canMarkInternal = canAcknowledge && isCoupang && order.internalStage == null;
   // 시트는 쿠팡 전용이 아니다 — 버튼만 비활성되고 안내가 붙으므로 ADMIN 이면 탭을 연다.
   const canSheet = isAdmin;
-  const canShip = isAdmin && isCoupang && !fullyCanceled;
+  const canShip = isAdmin && isMarketOrder && !fullyCanceled;
   const canCancel = isAdmin && isCoupang && (order.status === 'PAID' || order.status === 'PREPARING');
   const tabAvailability: Record<ActionTab, boolean> = { sheet: canSheet, shipment: canShip, cancel: canCancel };
   // 고른 탭을 쓸 수 없으면 왼쪽부터 첫 번째로 쓸 수 있는 탭을 보여준다
@@ -295,7 +303,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
       setRows(previewRows);
       setHasLoaded(true);
     } catch {
-      setPreviewError('쿠팡 주문 조회에 실패했습니다. 다시 시도해주세요.');
+      setPreviewError('마켓 주문 조회에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setIsPreviewing(false);
     }
@@ -346,8 +354,9 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   };
 
   /**
-   * 단건 발주처리 — 이 라인이 속한 박스 1개를 결제완료→상품준비중으로 전환한다.
-   * 일괄(출고관리)과 같은 엔드포인트를 쓴다(PLAN 2609_17 D6) — 대상 판정은 서버가 한다.
+   * Single order confirmation — paid → preparing for the one box this line belongs to (Coupang) or for this line's
+   * (delivery number, product number) group (11st, FEATURE_2610_17 / D48). Same endpoint as the bulk one (shipment
+   * page, PLAN 2609_17 D6) — the server decides the targets.
    */
   const runAcknowledge = async () => {
     try {
@@ -547,6 +556,27 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             ))}
           </dl>
 
+          {/* FEATURE_2610_17 / D19 · D35 — 11st only: the buyer's open cancel requests, and the seller return
+              request for a shipped line that is not fully cancelled (D39 ⑤). */}
+          {isElevenst && (
+            <ElevenstCancelRequests
+              orderItemId={order.id}
+              isAdmin={isAdmin}
+              orderUseCase={orderUseCase}
+              carrierOptions={carrierOptions}
+              onChanged={() => setReservationChanged(true)}
+            />
+          )}
+          {isElevenst && isAdmin && !fullyCanceled
+            && (order.status === 'SHIPPED' || order.status === 'DELIVERING' || order.status === 'DELIVERED') && (
+            <ElevenstSellerReturnForm
+              orderItemId={order.id}
+              quantity={order.orderCount}
+              orderUseCase={orderUseCase}
+              carrierOptions={carrierOptions}
+            />
+          )}
+
           {/* 송장(FEATURE_2609_75 / D18 🔁) — 내부 단계 동안 언제나 배송 묶음별 택배사·송장번호를 고친다.
               택배사 목록은 이 모달이 이미 불러온 `carrierOptions` 를 넘긴다(새로 부르지 않는다). */}
           {isAdmin && isCoupang && shownStage != null && (
@@ -600,19 +630,19 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                 })}
               </div>
 
-              {/* 송장 접수시트 — 조회는 쿠팡 실시간 호출이라 탭을 열어도 자동으로 부르지 않는다.
-                  버튼을 눌러야 조회하고, 불러온 표는 이 탭 안에 남는다(탭을 오가도 유지). */}
+              {/* Label sheet — the lookup is a live marketplace call, so opening the tab does not run it.
+                  It runs on the button, and the loaded table stays in this tab (kept across tab switches). */}
               {activeTab === 'sheet' && canSheet && (
                 <div className="mt-4">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handlePreview}
-                      disabled={!isCoupang || isPreviewing}
+                      disabled={!isMarketOrder || isPreviewing}
                       className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
                     >
                       {isPreviewing ? <Spinner label="불러오는 중..." /> : '송장시트 조회'}
                     </button>
-                    {!isCoupang && <span className="text-sm text-gray-500">쿠팡 주문만 지원합니다.</span>}
+                    {!isMarketOrder && <span className="text-sm text-gray-500">쿠팡 · 11번가 주문만 지원합니다.</span>}
                   </div>
 
                   {previewError && (
@@ -694,7 +724,17 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                   내부 단계 주문은 여기서 발송처리할 수 없습니다. 「송장」에 송장을 저장한 뒤 출고관리의 [저장된 송장으로 발송]을 누르세요
                 </div>
               )}
-              {activeTab === 'shipment' && canShip && shownStage == null && (
+              {/* FEATURE_2610_17 / D20 · D21 — an 11st invoice needs [발주처리] first, and 11st has no
+                  invoice-update API: both cases show the notice instead of the form. */}
+              {activeTab === 'shipment' && canShip && isElevenst && (order.status === 'PAID' || isShipped) && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
+                  {order.status === 'PAID'
+                    ? '11번가 주문은 [발주처리] 뒤에 송장을 등록할 수 있습니다.'
+                    : '11번가는 송장 수정을 지원하지 않습니다. 11번가 셀러오피스에서 고쳐 주세요.'}
+                </div>
+              )}
+              {activeTab === 'shipment' && canShip && shownStage == null
+                && !(isElevenst && (order.status === 'PAID' || isShipped)) && (
                 <div className="mt-4">
                   <p className="mt-1 text-sm text-gray-500">
                     박스 {order.externalBoxId ?? '-'} 의 모든 옵션에 같은 운송장번호가 적용됩니다.
@@ -752,7 +792,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                       )}
                     </select>
 
-                    {/* type="text": invoice formats differ per carrier and Coupang validates them (D15). */}
+                    {/* type="text": invoice formats differ per carrier and the marketplace validates them (D15). */}
                     <input
                       type="text"
                       maxLength={50}
@@ -1017,8 +1057,11 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                           {isMarkingInternal ? <Spinner label="처리 중..." /> : '내부 발주처리'}
                         </Button>
                       ))}
+                    {/* FEATURE_2610_17 / D52: 11st confirms this product only — its notice has no box number. */}
                     <span className="hidden text-sm text-gray-500 sm:inline">
-                      박스 {order.externalBoxId ?? '-'} 전체가 상품준비중으로 전환됩니다. 되돌릴 수 없습니다.
+                      {isElevenst
+                        ? '이 상품(주문 줄)이 발주확인 처리되어 배송준비중으로 바뀝니다. 되돌릴 수 없습니다.'
+                        : `박스 ${order.externalBoxId ?? '-'} 전체가 상품준비중으로 전환됩니다. 되돌릴 수 없습니다.`}
                     </span>
                   </>
                 ))}
