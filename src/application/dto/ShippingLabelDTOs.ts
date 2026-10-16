@@ -64,6 +64,17 @@ export interface ManualShipmentRequest {
   orderItemId: number;
   deliveryCompanyCode: string;
   invoiceNumber: string;
+  // 11st only (FEATURE_2610_17 / D64): omitted = 'ALL' (the whole delivery, one invoice). 'PARTIAL' sends only
+  // `orderItemIds` with one invoice; 'SPLIT' sends the one line in `orderItemIds` over `splits` (2~10 invoices).
+  mode?: 'ALL' | 'PARTIAL' | 'SPLIT';
+  orderItemIds?: number[];
+  splits?: ManualShipmentSplit[];
+}
+
+/** One invoice of an 11st 'SPLIT' send — its quantities add up to the line's order quantity (D64). */
+export interface ManualShipmentSplit {
+  invoiceNumber: string;
+  quantity: number;
 }
 
 // `mode` is decided by the server from the order status (D3) — the client only reports it.

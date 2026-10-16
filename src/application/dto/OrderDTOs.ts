@@ -128,11 +128,11 @@ export interface CancelledLine {
   /** 전량취소(cancel+hold ≥ orderCount)면 'CANCELLED', 아니면 라인의 중립 상태. */
   resultStatus: OrderStatus;
   receiptId: string | null;
-  /** CANCEL(즉시취소) | STOP_SHIPMENT(출고중지). */
+  /** Coupang CANCEL (instant cancel) | STOP_SHIPMENT (shipment stop) · 11st ELEVENST_SALE_REFUSAL (FEATURE_2610_17 / D61). */
   receiptType: string | null;
 }
 
-/** 취소에 실패한 라인 — code/message 는 쿠팡 원문(D16). 번역·요약 금지. */
+/** A line that failed — code / message are the marketplace's original (Coupang D16 · 11st D61). Never translate or summarize. */
 export interface FailedLine {
   orderItemId: number;
   externalItemId: string;
@@ -193,6 +193,44 @@ export interface ElevenstCancelRequest {
   quantity: number;
   reason: string;
   requestedAt: string | null;
+  /** [책임사유 오류로 거부] is shown — decided by the server (buyer request on a paid line, D62). */
+  faultRejectable: boolean;
+}
+
+/**
+ * Code lists of the 11st order-detail actions (GET /api/orders/elevenst-choices, FEATURE_2610_17 / D61 · D62 ·
+ * D63). The labels are 11st's own names — show them as given, never keep a code→label map here.
+ */
+export interface ElevenstChoices {
+  cancelReasons: CancelReasonOption[];
+  faultRejectReasons: CancelReasonOption[];
+  delayReasons: CancelReasonOption[];
+}
+
+/** [책임사유 오류로 거부] body (D62): refuse code · reason text (1~200) + the same delivery fields as [취소 거부]. */
+export interface ElevenstCancelFaultRejectPayload {
+  refuseCode: string;
+  reasonText: string;
+  deliveryCompanyCode: string;
+  invoiceNumber: string;
+  sendDate: string;
+}
+
+/** One line of the same 11st delivery (GET /api/orders/{orderItemId}/elevenst-delivery-lines, D64). */
+export interface ElevenstDeliveryLine {
+  orderItemId: number;
+  itemName: string | null;
+  orderQty: number;
+  status: OrderStatus;
+  /** Add-on line — add-on lines alone cannot be sent partially. */
+  addOn: boolean;
+}
+
+/** [발송지연 안내] body (D63): expected date 'yyyy-MM-dd' (tomorrow ~ +30 days, KST) · reason code · detail text. */
+export interface ElevenstDeliveryDelayPayload {
+  expectedDate: string;
+  reasonCode: string;
+  reasonText: string;
 }
 
 /** [취소 거부] body (D38): 11st carrier code · invoice (more than 10 characters) · date sent 'yyyy-MM-dd'. */

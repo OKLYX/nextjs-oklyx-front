@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/config/routes';
 import { InquiryRepositoryImpl } from '@/infrastructure/repositories/InquiryRepositoryImpl';
 import { InquiryUseCase } from '@/application/usecases/InquiryUseCase';
-import type { Inquiry } from '@/domain/entities/InquiryEntity';
+import type { Inquiry, InquiryReplyPayload } from '@/domain/entities/InquiryEntity';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -93,11 +93,11 @@ export function InquiryDetailContainer({ inquiryId }: InquiryDetailContainerProp
    * 로컬에서 조립하면 다음 조회와 어긋난다. 성공 후 목록으로 자동 이동하지 않는다(결과를 확인해야 한다).
    */
   const handleSend = useCallback(
-    async (content: string) => {
+    async (payload: InquiryReplyPayload) => {
       try {
         setIsSending(true);
         setSendError('');
-        const updated = await inquiryUseCase.sendReply(inquiryId, content);
+        const updated = await inquiryUseCase.sendReply(inquiryId, payload);
         setInquiry(updated);
       } catch (err) {
         // 401 은 다루지 않는다 — axiosInstance 인터셉터가 갱신·재시도하고 실패 시 /login 으로 보낸다.
@@ -212,6 +212,7 @@ export function InquiryDetailContainer({ inquiryId }: InquiryDetailContainerProp
                 isAdmin && inquiry.replyCapability ? (
                   <InquiryReplyComposer
                     capability={inquiry.replyCapability}
+                    platform={inquiry.platform}
                     isSending={isSending}
                     isLocked={sendLocked}
                     error={sendError}

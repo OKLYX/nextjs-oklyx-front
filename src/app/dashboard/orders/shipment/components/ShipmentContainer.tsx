@@ -362,9 +362,11 @@ export function ShipmentContainer() {
   );
 
   // Paid + Coupang or 11st + a box (11st: delivery number) = order-confirmation target (PLAN 2609_17 D2·D10 ·
-  // FEATURE_2610_17 / D20). This is the only place that decides it.
+  // FEATURE_2610_17 / D20), minus an 11st reserved sale still waiting for [입고완료 처리] (D67). This is the only
+  // place that decides it.
   const isAcknowledgeTarget = useCallback((o: OrderItem) =>
-    o.status === 'PAID' && (o.platform === 'COUPANG' || o.platform === 'ELEVENST') && Boolean(o.externalBoxId), []);
+    o.status === 'PAID' && (o.platform === 'COUPANG' || o.platform === 'ELEVENST') && Boolean(o.externalBoxId)
+      && !o.reservedSale, []);
 
   /**
    * Whether to draw the checkbox = **a Coupang or 11st order, whatever its status** (FEATURE_2610_17 / D28).

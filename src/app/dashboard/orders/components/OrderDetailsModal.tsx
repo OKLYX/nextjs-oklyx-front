@@ -5,12 +5,13 @@ import axios from 'axios';
 import { Spinner } from '@/presentation/components/Spinner';
 import { addressHead } from '@/infrastructure/utils/address';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
-import { getOrderStatusLabel, isAlreadyShipped } from '@/domain/entities/OrderEntity';
+import { ELEVENST_RESERVED_LABEL, getOrderStatusLabel, isAlreadyShipped } from '@/domain/entities/OrderEntity';
 import type { InternalStage } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { OrderUseCase } from '@/application/usecases/OrderUseCase';
 import type {
   CancelReasonOption,
+  ElevenstChoices,
   InternalStageResult,
   OrderAcknowledgeResult,
   OrderCancelResult,
@@ -19,6 +20,7 @@ import type {
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type {
   CarrierOption,
+  ManualShipmentRequest,
   ManualShipmentResult,
   ShippingLabelExportRow,
 } from '@/application/dto/ShippingLabelDTOs';
@@ -30,10 +32,17 @@ import { ReservedShipmentHistory } from './ReservedShipmentHistory';
 import { StoredInvoiceEditor } from './StoredInvoiceEditor';
 import { ElevenstCancelRequests } from './ElevenstCancelRequests';
 import { ElevenstSellerReturnForm } from './ElevenstSellerReturnForm';
+import { ElevenstSaleRefusalForm } from './ElevenstSaleRefusalForm';
+import { ElevenstDeliveryDelayForm } from './ElevenstDeliveryDelayForm';
+import { ElevenstSplitShipmentForm } from './ElevenstSplitShipmentForm';
+import type { ElevenstSplitSubmit } from './ElevenstSplitShipmentForm';
+import { ElevenstVisitPickupForm } from './ElevenstVisitPickupForm';
 
 /**
  * Order detail modal — read-only info + (ADMIN · Coupang / 11st) single-order label sheet lookup and download.
- * 11st orders also get their cancel requests and the seller return request (FEATURE_2610_17 / D19 · D35).
+ * 11st orders also get their cancel requests and the seller return request (FEATURE_2610_17 / D19 · D35), and the
+ * 11st seller actions — sale refusal in the cancel tab, delay notice · partial / split shipment · visit pickup in
+ * the shipment tab, and [입고완료 처리] in place of [발주처리] for a reserved sale (D61 ~ D67).
  *
  * Action layout — order confirmation sits at the **left of the pinned foot bar**, the rest in the body's **tabs**
  * (from the left: label sheet · shipment · order cancel; shipment is selected by default). Confirmation is the step
@@ -161,6 +170,16 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   // 발송처리·주문취소 탭. 기본은 왼쪽(발송처리). 상태 때문에 못 쓰는 탭이 골라져 있으면
   // 아래 `activeTab` 이 파생값으로 되돌린다 — effect 로 고쳐 쓰지 않는다.
   const [actionTab, setActionTab] = useState<ActionTab>('shipment');
+  // FEATURE_2610_17 / D61 · D62 · D63: the 11st reason lists, loaded once for an 11st order (server-owned).
+  const [elevenstChoices, setElevenstChoices] = useState<ElevenstChoices | null>(null);
+  const [elevenstChoicesFailed, setElevenstChoicesFailed] = useState(false);
+  // D64: how an 11st single invoice is sent — the whole delivery (default), chosen lines, or one line split.
+  const [elevenstMode, setElevenstMode] = useState<'ALL' | 'PARTIAL' | 'SPLIT'>('ALL');
+  // D67: [입고완료 처리] of a reserved-sale line.
+  const [stockConfirmOpen, setStockConfirmOpen] = useState(false);
+  const [isConfirmingStock, setIsConfirmingStock] = useState(false);
+  const [stockSent, setStockSent] = useState(false);
+  const [stockError, setStockError] = useState('');
 
   // Carrier list load — the platform's code table (Coupang has no carrier-list API; 11st uses the same catalog),
   // served from our own backend, not a marketplace call, so it runs on open without a button. The guard mirrors
@@ -217,12 +236,31 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     return () => { alive = false; };
   }, [isAdmin, order?.platform, orderUseCase]);
 
+  // 11st reason lists (FEATURE_2610_17 / D61 · D62 · D63) — our own backend, not an 11st call; same guard style as
+  // the cancel-reason load above (ADMIN · this platform only, `alive` against a set-state after unmount).
+  useEffect(() => {
+    if (!isAdmin || order?.platform !== 'ELEVENST') return;
+    let alive = true;
+    void (async () => {
+      try {
+        const choices = await orderUseCase.getElevenstChoices();
+        if (alive) {
+          setElevenstChoices(choices);
+          setElevenstChoicesFailed(false);
+        }
+      } catch {
+        if (alive) setElevenstChoicesFailed(true);
+      }
+    })();
+    return () => { alive = false; };
+  }, [isAdmin, order?.platform, orderUseCase]);
+
   if (order == null) return null;
 
   const isEmpty = hasLoaded && rows.length === 0;
   const isCoupang = order.platform === 'COUPANG';
-  // FEATURE_2610_17 / D28: order confirmation, single invoice and the sheet are open to 11st as well;
-  // refresh · internal stage · reservation · seller cancel stay Coupang only (D12).
+  // FEATURE_2610_17 / D28: order confirmation, single invoice and the sheet are open to 11st as well, and the seller
+  // cancel opens as 11st sale refusal (D61); refresh · internal stage · reservation stay Coupang only (D12).
   const isElevenst = order.platform === 'ELEVENST';
   const isMarketOrder = isCoupang || isElevenst;
   // Coupang safe numbers die 48h after delivery; the ordersheet then returns an empty phone.
@@ -259,14 +297,23 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   // 빈칸은 Number('') === 0 이라 0·NaN 도 범위 밖으로 취급해 버튼만 막는다 — 입력 중 값을 되돌리지 않는다.
   const isCancelQtyValid = Number.isInteger(cancelQty) && cancelQty >= 1 && cancelQty <= order.purchasableQty;
   const isCancelInputDisabled = isCancelling || cancelSucceeded || cancelReasons.length === 0;
-  // 액션 노출 게이트 — 발주처리는 하단 고정 바로, 나머지 둘은 탭으로 갈린다.
-  const canAcknowledge = isAdmin && isMarketOrder && order.status === 'PAID' && !fullyCanceled;
+  // Action gates — order confirmation goes to the pinned foot bar, the other two (shipment · cancel) split into
+  // tabs. An 11st reserved sale (raw 201) is not confirmed yet — [입고완료 처리] takes the slot instead (D67).
+  const canAcknowledge = isAdmin && isMarketOrder && order.status === 'PAID' && !fullyCanceled && !order.reservedSale;
+  const canStockConfirm = isAdmin && isElevenst && order.reservedSale && order.status === 'PAID' && !fullyCanceled;
+  const stockConfirmed = stockSent || order.stockConfirmSent;
   // [Internal acknowledge] = Coupang [발주처리] targets without an internal stage (D1·D13 · FEATURE_2610_17 / D12).
   const canMarkInternal = canAcknowledge && isCoupang && order.internalStage == null;
   // 시트는 쿠팡 전용이 아니다 — 버튼만 비활성되고 안내가 붙으므로 ADMIN 이면 탭을 연다.
   const canSheet = isAdmin;
   const canShip = isAdmin && isMarketOrder && !fullyCanceled;
-  const canCancel = isAdmin && isCoupang && (order.status === 'PAID' || order.status === 'PREPARING');
+  // 11st sale refusal (D61) also needs a line that is not fully cancelled.
+  const canCancel = isAdmin && (isCoupang || (isElevenst && !fullyCanceled))
+    && (order.status === 'PAID' || order.status === 'PREPARING');
+  // D66: a visit-pickup 11st order gets [방문수령 완료] instead of the invoice form, from paid on.
+  const showVisitPickup = isElevenst && order.visitPickup && (order.status === 'PAID' || order.status === 'PREPARING');
+  // D63: [발송지연 안내] under the shipment tab for a paid / preparing 11st order.
+  const showDeliveryDelay = isElevenst && (order.status === 'PAID' || order.status === 'PREPARING');
   const tabAvailability: Record<ActionTab, boolean> = { sheet: canSheet, shipment: canShip, cancel: canCancel };
   // 고른 탭을 쓸 수 없으면 왼쪽부터 첫 번째로 쓸 수 있는 탭을 보여준다
   // (하나도 없으면 탭 영역 자체가 안 그려진다).
@@ -290,6 +337,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     // 취소 성공도 같은 채널로 올린다 — 부모 재조회가 stale 재취소 경로를 없앤다(PLAN 2609_25 D14).
     onClose(
       (result != null && result.succeeded > 0) || ackSucceeded || cancelSucceeded || internalMarked || reservationChanged
+        || stockSent
     );
   };
 
@@ -457,23 +505,17 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   };
 
   /**
-   * 단건 발송처리 — 앵커 라인이 속한 박스 1개를 전송한다.
-   * - 전송 단위는 박스 전체다. 박스 라인 전개는 서버가 한다(PLAN 2609_11 D1) — 여기서는 앵커 1줄만 보낸다.
-   * - 신규 업로드/송장수정 모드는 서버가 주문 상태로 결정한다(D3) — 클라이언트는 라벨만 바꾼다.
-   * - 200 응답을 받은 뒤에만 입력을 잠근다. 요청 자체가 실패하면 잠그지 않는다(D14).
+   * Single shipment — sends the one box the anchor line belongs to (11st: the whole delivery, or with `mode` the
+   * chosen lines / one line split, FEATURE_2610_17 / D64).
+   * - The send unit is the whole box. The server expands the box lines (PLAN 2609_11 D1) — only the anchor goes.
+   * - New upload / invoice edit mode is decided by the server from the order status (D3) — the client only relabels.
+   * - The inputs lock only after a 200. A request that failed outright does not lock (D14).
    */
-  const handleManualConfirm = async () => {
-    if (carrierCode === '') return;
+  const submitManual = async (request: ManualShipmentRequest) => {
     try {
       setIsSubmitting(true);
       setSubmitError('');
-      // orderItemId is our order_item PK (`order.id`) — the visible `order.externalItemId`
-      // (Coupang vendorItemId) would fail silently. Same value previewRowsByOrder takes.
-      const response = await useCase.confirmManualShipment({
-        orderItemId: order.id,
-        deliveryCompanyCode: carrierCode,
-        invoiceNumber: invoiceNumber.trim(),   // D15: trim only, no format check
-      });
+      const response = await useCase.confirmManualShipment(request);
       setResult(response);                     // the lock is set here and nowhere else (D14)
     } catch (err) {
       // Request never landed — no setResult, so the inputs stay open for a retry (D14).
@@ -484,6 +526,45 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
       setSubmitError(serverMessage ?? '발송처리에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleManualConfirm = () => {
+    if (carrierCode === '') return;
+    // orderItemId is our order_item PK (`order.id`) — the visible `order.externalItemId`
+    // (Coupang vendorItemId) would fail silently. Same value previewRowsByOrder takes.
+    void submitManual({
+      orderItemId: order.id,
+      deliveryCompanyCode: carrierCode,
+      invoiceNumber: invoiceNumber.trim(),     // D15: trim only, no format check
+    });
+  };
+
+  // FEATURE_2610_17 / D64: 「일부 줄만 보내기」 · 「한 줄을 송장 여러 장으로」 go through the same endpoint.
+  const handleElevenstModeSubmit = (submit: ElevenstSplitSubmit) => {
+    if (elevenstMode === 'ALL') return;
+    void submitManual({
+      orderItemId: order.id,
+      deliveryCompanyCode: submit.carrierCode,
+      invoiceNumber: submit.invoiceNumber,
+      mode: elevenstMode,
+      orderItemIds: submit.orderItemIds,
+      splits: submit.splits,
+    });
+  };
+
+  /** [입고완료 처리] of a reserved-sale 11st line (D67) — the raw status is left to the next sync. */
+  const handleStockConfirm = async () => {
+    setStockConfirmOpen(false);
+    try {
+      setIsConfirmingStock(true);
+      setStockError('');
+      await orderUseCase.confirmElevenstStock(order.id);
+      setStockSent(true);
+    } catch (err) {
+      setStockError(extractErrorMessage(err, '입고완료 처리에 실패했습니다. 다시 시도해주세요.'));
+    } finally {
+      setIsConfirmingStock(false);
     }
   };
 
@@ -507,11 +588,14 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     { label: '주문금액', value: formatAmount(order.lineAmount) },
     { label: '할인금액', value: formatAmount(order.discountAmount) },
     { label: '플랫폼 부담 할인', value: formatAmount(order.platformDiscountAmount) },
-    // A successful CREATE writes 발송처리 back server-side; show it straight from the result (D4).
-    // ⚠️ 발송처리 result 가 우선 — 순서를 뒤집으면 한 모달에서 발주→발송을 연달아 한 사용자에게 발송처리가 안 보인다.
-    // 취소가 가장 뒤 단계라 취소 결과가 이긴다 — 전량취소면 서버가 'CANCELLED' 를 준다(D14).
+    // A successful CREATE writes 「발송처리」 back server-side; show it straight from the result (D4).
+    // ⚠️ The shipment result comes first — reversing the order hides 「발송처리」 from a user who confirmed and then
+    // shipped in one modal. The cancel is the last step, so the cancel result wins — a full cancel comes back as
+    // 'CANCELLED' from the server (D14).
+    // FEATURE_2610_17 / D67: a reserved-sale line shows the 11st label beside its status.
     { label: '상태', value: getOrderStatusLabel(
-        cancelledLine?.resultStatus ?? result?.resultStatus ?? (ackSucceeded ? 'PREPARING' : order.status)) },
+        cancelledLine?.resultStatus ?? result?.resultStatus ?? (ackSucceeded ? 'PREPARING' : order.status))
+        + (order.reservedSale ? ` · ${ELEVENST_RESERVED_LABEL}` : '') },
     { label: '결제일', value: formatDate(order.paidAt) },
     { label: '마켓 계정 ID', value: order.marketplaceAccountId },
   ];
@@ -564,6 +648,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
               isAdmin={isAdmin}
               orderUseCase={orderUseCase}
               carrierOptions={carrierOptions}
+              faultRejectReasons={elevenstChoices?.faultRejectReasons ?? []}
               onChanged={() => setReservationChanged(true)}
             />
           )}
@@ -725,20 +810,69 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                 </div>
               )}
               {/* FEATURE_2610_17 / D20 · D21 — an 11st invoice needs [발주처리] first, and 11st has no
-                  invoice-update API: both cases show the notice instead of the form. */}
-              {activeTab === 'shipment' && canShip && isElevenst && (order.status === 'PAID' || isShipped) && (
+                  invoice-update API: both cases show the notice instead of the form. A visit-pickup order shows
+                  [방문수령 완료] instead, from paid on (D66). */}
+              {canShip && showVisitPickup && (
+                <div className={activeTab === 'shipment' ? undefined : 'hidden'}>
+                  <ElevenstVisitPickupForm
+                    orderItemId={order.id}
+                    orderUseCase={orderUseCase}
+                    onDone={() => setReservationChanged(true)}
+                  />
+                </div>
+              )}
+              {activeTab === 'shipment' && canShip && isElevenst && !showVisitPickup
+                && (order.status === 'PAID' || isShipped) && (
                 <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
                   {order.status === 'PAID'
                     ? '11번가 주문은 [발주처리] 뒤에 송장을 등록할 수 있습니다.'
                     : '11번가는 송장 수정을 지원하지 않습니다. 11번가 셀러오피스에서 고쳐 주세요.'}
                 </div>
               )}
-              {activeTab === 'shipment' && canShip && shownStage == null
+              {/* FEATURE_2610_17 / D64 — an 11st invoice of a preparing order picks how it goes; the choice
+                  locks with the inputs. The 11st forms stay mounted and only hide on another tab, so their inputs
+                  survive a tab switch like the parent-held inputs below. */}
+              {canShip && isElevenst && shownStage == null && !showVisitPickup && order.status === 'PREPARING' && (
+                <div className={activeTab === 'shipment' ? undefined : 'hidden'}>
+                  <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-gray-800">
+                    {([
+                      ['ALL', '한 번에 모두'],
+                      ['PARTIAL', '일부 줄만 보내기'],
+                      ['SPLIT', '한 줄을 송장 여러 장으로'],
+                    ] as const).map(([mode, label]) => (
+                      <label key={mode} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="elevenstMode"
+                          checked={elevenstMode === mode}
+                          onChange={() => setElevenstMode(mode)}
+                          disabled={isLocked}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  <div className={elevenstMode === 'ALL' ? 'hidden' : undefined}>
+                    <ElevenstSplitShipmentForm
+                      mode={elevenstMode === 'SPLIT' ? 'SPLIT' : 'PARTIAL'}
+                      orderItemId={order.id}
+                      orderUseCase={orderUseCase}
+                      carrierOptions={carrierOptions}
+                      isLocked={isInputDisabled}
+                      isSending={isSubmitting}
+                      onSubmit={handleElevenstModeSubmit}
+                    />
+                  </div>
+                </div>
+              )}
+              {activeTab === 'shipment' && canShip && shownStage == null && !showVisitPickup
                 && !(isElevenst && (order.status === 'PAID' || isShipped)) && (
                 <div className="mt-4">
-                  <p className="mt-1 text-sm text-gray-500">
-                    박스 {order.externalBoxId ?? '-'} 의 모든 옵션에 같은 운송장번호가 적용됩니다.
-                  </p>
+                  {elevenstMode === 'ALL' && (
+                    <p className="mt-1 text-sm text-gray-500">
+                      박스 {order.externalBoxId ?? '-'} 의 모든 옵션에 같은 운송장번호가 적용됩니다.
+                    </p>
+                  )}
 
                   {isShipped && (
                     <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
@@ -761,7 +895,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                     </div>
                   )}
 
-                  {isFormOpen && (
+                  {isFormOpen && elevenstMode === 'ALL' && (
                   <div className="mt-4 flex flex-wrap items-center gap-3">
                     {/* 값은 마켓 코드 자체다 — 쿠팡은 택배사 목록 API 가 없고 문서 코드표가 SSOT 라
                         로컬에 등록한 택배사는 [등록 택배사] 그룹으로 맨 위에만 올린다. */}
@@ -881,10 +1015,38 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                 </div>
               )}
 
-              {/* 주문 취소 — 결제완료는 즉시취소, 상품준비중은 출고중지로 접수된다(PLAN 2609_25 D6·D7).
-                  노출은 2단계다: ① 섹션 게이트는 `order.status` 로만 판정해 성공 후에도 결과가 남게 하고,
-                  ② 취소할 수량이 없는 주문은 섹션 안에서 안내 1줄로 갈린다. */}
-              {activeTab === 'cancel' && canCancel && (
+              {/* FEATURE_2610_17 / D63 — [발송지연 안내] under the shipment tab, paid / preparing 11st orders. */}
+              {canShip && showDeliveryDelay && (
+                <div className={activeTab === 'shipment' ? undefined : 'hidden'}>
+                  <ElevenstDeliveryDelayForm
+                    orderItemId={order.id}
+                    reasons={elevenstChoices?.delayReasons ?? []}
+                    reasonsFailed={elevenstChoicesFailed}
+                    orderUseCase={orderUseCase}
+                  />
+                </div>
+              )}
+
+              {/* 11st order cancel = sale refusal of the whole line (FEATURE_2610_17 / D61). */}
+              {canCancel && isElevenst && (
+                <div className={activeTab === 'cancel' ? undefined : 'hidden'}>
+                  <ElevenstSaleRefusalForm
+                    orderItemId={order.id}
+                    quantity={order.orderCount}
+                    purchasableQty={order.purchasableQty}
+                    reasons={elevenstChoices?.cancelReasons ?? []}
+                    reasonsFailed={elevenstChoicesFailed}
+                    orderUseCase={orderUseCase}
+                    onSent={() => setReservationChanged(true)}
+                  />
+                </div>
+              )}
+
+              {/* Coupang order cancel — paid goes through as an instant cancel, preparing as a shipment stop
+                  (PLAN 2609_25 D6·D7). Shown in two steps: ① the section gate reads only `order.status`, so the
+                  result stays after a success, and ② an order with nothing left to cancel gets a one-line notice
+                  inside the section. */}
+              {activeTab === 'cancel' && canCancel && isCoupang && (
                 <div className="mt-4">
                   {order.purchasableQty === 0 ? (
                     <p className="mt-1 text-sm text-gray-500">취소 가능한 수량이 없습니다 (이미 취소된 주문)</p>
@@ -1028,11 +1190,26 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
             </div>
           )}
 
+          {stockError && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+              {stockError}
+            </div>
+          )}
+
           {/* 왼쪽 = 발주처리 하나만. 발주는 발송·취소와 달리 배타적 선택이 아니라 앞 단계라
               탭에 넣지 않고 항상 보이는 자리에 둔다(PLAN 2609_17 D14).
               대상이 아니면 왼쪽 칸은 빈 채로 두고 오른쪽 버튼 자리는 그대로 유지한다. */}
           <div className="flex items-center justify-between gap-3 pt-6">
             <div className="flex items-center gap-3">
+              {/* FEATURE_2610_17 / D67 — a reserved sale takes [입고완료 처리] in the [발주처리] slot. */}
+              {canStockConfirm &&
+                (stockConfirmed ? (
+                  <span className="text-sm font-medium text-green-700">입고완료 보냄</span>
+                ) : (
+                  <Button variant="primary" onClick={() => setStockConfirmOpen(true)} disabled={isConfirmingStock}>
+                    {isConfirmingStock ? <Spinner label="전송 중..." /> : '입고완료 처리'}
+                  </Button>
+                ))}
               {canAcknowledge &&
                 (ackSucceeded ? (
                   <span className="text-sm font-medium text-green-700">발주처리 완료</span>
@@ -1095,6 +1272,16 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
           isDangerous
           onConfirm={() => { setAckConfirmOpen(false); void runAcknowledge(); }}
           onCancel={() => setAckConfirmOpen(false)}
+        />
+        <ConfirmDialog
+          isOpen={stockConfirmOpen}
+          nested
+          title="입고완료 처리"
+          message="상품이 입고되어 발송 준비가 되었으면 처리하세요. 되돌릴 수 없습니다."
+          confirmText="입고완료 처리"
+          isDangerous
+          onConfirm={() => void handleStockConfirm()}
+          onCancel={() => setStockConfirmOpen(false)}
         />
     </Modal>
   );

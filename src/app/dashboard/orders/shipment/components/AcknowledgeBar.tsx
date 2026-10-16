@@ -185,7 +185,7 @@ export function AcknowledgeBar({
       {/* 발주처리 버튼이 왜 안 눌리는지 말해 준다 — 상태 갱신만 하려고 고른 경우가 흔하다. */}
       {notAcknowledgeable > 0 && (
         <p className="text-xs text-gray-500">
-          선택한 {selectedCount}건 중 {notAcknowledgeable}건은 결제완료가 아니어서 발주처리 대상이 아닙니다.
+          선택한 {selectedCount}건 중 {notAcknowledgeable}건은 결제완료가 아니거나 입고완료 전 11번가 예약판매라서 발주처리 대상이 아닙니다.
           주문 상태 갱신은 그대로 됩니다.
         </p>
       )}
