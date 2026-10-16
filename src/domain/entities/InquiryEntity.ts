@@ -70,6 +70,27 @@ export interface ReplyCapability {
   maxLength: number;               // 본문 최대 길이 (trim 기준)
   once: boolean;                   // true = 되돌릴 수 없음 → 2단 확인 (D17)
   parentReplyId: string | null;    // 고객센터 전용. 서버가 고른 값 — 전송할 때 되돌려 보내지 않는다
+  // Which input to draw (FEATURE_2610_17 / D68): 'TEXT' = the reply text, 'NON_DELIVERY' = 11st non-delivery
+  // handling (reason + detail, plus carrier · invoice for the re-shipping reason). Decided by the server.
+  form: 'TEXT' | 'NON_DELIVERY';
+  reasons: InquiryReasonOption[];  // 'NON_DELIVERY' only — the handling reasons, 11st's own names; [] otherwise
+}
+
+/** One handling reason of the non-delivery form (D68) — code + server-authored name. */
+export interface InquiryReasonOption {
+  code: string;
+  label: string;
+}
+
+/**
+ * Reply body (POST /api/admin/inquiries/{id}/replies). `reasonCode` · `carrierCode` · `invoiceNumber` are sent only
+ * by the 'NON_DELIVERY' form (D68); the server checks them.
+ */
+export interface InquiryReplyPayload {
+  content: string;
+  reasonCode?: string;
+  carrierCode?: string;
+  invoiceNumber?: string;
 }
 
 /** 주문이 연결되지 않은 문의의 대체 정보 — vendorItemId 로 찾은 셀 (D15). */

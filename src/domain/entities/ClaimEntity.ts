@@ -8,7 +8,7 @@ export type ClaimStatus =
 
 export interface Claim {
   id: number;
-  platform: string;              // 'COUPANG' — D5. Display + carrier-option lookup only:
+  platform: string;              // 'COUPANG' · 'ELEVENST' (FEATURE_2610_17 / D15) — D5. Display + carrier-option lookup only:
                                  // the action list comes from `availableActions`, so the screen
                                  // never branches on the platform (2609_21 D1).
   claimType: ClaimType;
@@ -64,14 +64,18 @@ export type ClaimActionCode =
   // 송장을 다시 입력받지 않는다 — 서버가 저장된 값을 싣는다.
   | 'RETURN_COLLECT_INVOICE_RESEND'
   | 'EXCHANGE_RECEIVE_CONFIRM' | 'EXCHANGE_REJECT'
-  | 'EXCHANGE_RESHIP_INVOICE' | 'EXCHANGE_COLLECT_INVOICE';
+  | 'EXCHANGE_RESHIP_INVOICE' | 'EXCHANGE_COLLECT_INVOICE'
+  // 11st only (FEATURE_2610_17 / D23 · D34): return reject · return hold · return-completion hold.
+  | 'RETURN_REJECT' | 'RETURN_HOLD' | 'RETURN_COMPLETE_HOLD';
 
 /**
  * Extra input the action needs. ⚠️ An unknown value must hide the button — the screen cannot build
  * a form it does not know (PLAN §8). That is the whole forward-compatibility story for new
  * marketplaces, so never widen this to `string` and never `switch` on `ClaimActionCode` instead.
  */
-export type ClaimActionRequires = 'NONE' | 'INVOICE' | 'REJECT_CODE';
+export type ClaimActionRequires = 'NONE' | 'INVOICE' | 'REJECT_CODE'
+  // Reason code (from `choices`) + reason text, both required (FEATURE_2610_17 / D34 · D39 ①).
+  | 'REASON';
 
 /** A value choice for actions that require one (D19) — 반품 3액션은 항상 빈 배열. */
 export interface ActionChoice {
@@ -85,6 +89,7 @@ export interface ClaimAction {
   requires: ClaimActionRequires;
   choices: ActionChoice[];     // only filled when `requires` asks for a value (06 uses it)
   irreversible: boolean;       // drives the two-step confirm (D10)
+  hint?: string | null;        // one gray line under the input, server-authored (FEATURE_2610_17 / D34 · D39 ④)
 }
 
 /**
@@ -103,6 +108,7 @@ export interface ClaimActionPayload {
   invoiceNumber?: string;
   regNumber?: string;
   rejectCode?: string;         // 06 에서 사용
+  reasonText?: string;         // requires 'REASON' only — 1~200 characters (FEATURE_2610_17 / D39 ①)
 }
 
 /**

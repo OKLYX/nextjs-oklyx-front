@@ -55,7 +55,14 @@ export interface OrderItem {
   lineAmount: number | null;              // 할인 전 라인 합계
   discountAmount: number | null;          // 총 할인
   platformDiscountAmount: number | null;  // 플랫폼 부담 할인
+  // 11st only, false for every other line (FEATURE_2610_17 / D66 · D67) — server-decided, never re-derived here.
+  visitPickup: boolean;        // visit-pickup order: [방문수령 완료] instead of the invoice form
+  reservedSale: boolean;       // reserved-sale paid order (raw 201): [입고완료 처리] instead of [발주처리]
+  stockConfirmSent: boolean;   // [입고완료 처리] already sent — shown as 「입고완료 보냄」
 }
+
+// The reserved-sale label next to the status (FEATURE_2610_17 / D67) — one source for the list and the detail.
+export const ELEVENST_RESERVED_LABEL = '11번가 예약판매';
 
 // Maps neutral order statuses to Korean display labels
 const ORDER_STATUS_LABELS: Record<string, string> = {

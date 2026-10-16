@@ -1,6 +1,7 @@
 import type { InquiryListParams, InquiryRepository } from '@/domain/repositories/InquiryRepository';
 import type {
   Inquiry,
+  InquiryReplyPayload,
   InquirySyncResult,
   InquiryTypeOption,
   PlatformInquiryTypes,
@@ -31,8 +32,8 @@ export class InquiryUseCase {
   }
 
   /** 답변 전송 (D17). 성공하면 갱신된 문의로 화면을 통째 교체한다 — 로컬에서 스레드를 조립하지 않는다. */
-  async sendReply(inquiryId: number, content: string): Promise<Inquiry> {
-    return this.repository.sendReply(inquiryId, content);
+  async sendReply(inquiryId: number, payload: InquiryReplyPayload): Promise<Inquiry> {
+    return this.repository.sendReply(inquiryId, payload);
   }
 
   /**
