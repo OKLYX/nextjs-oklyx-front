@@ -42,17 +42,33 @@ const SHIPMENT_STATUS_LIST = SHIPMENT_STATUSES as readonly string[];
 /** 발주처리 결과 메시지 자동 소멸(ms). `MasterTagsPanel` 의 인라인 확인 메시지와 같은 값. */
 const ACK_MESSAGE_TTL = 2500;
 
+/** Marketplace names of the order-confirmation result lines (FEATURE_2610_17 / D57). */
+const ACK_PLATFORM_NAMES: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11번가' };
+
 /**
- * 발주처리 결과 → 인라인 메시지(PLAN 2609_17 D8).
- * 실패 사유는 쿠팡 원문 그대로, 중복 제거 후 최대 3종만 보여준다(수십 건이면 같은 문구가 반복된다).
+ * Order-confirmation result → inline message (PLAN 2609_17 D8 · FEATURE_2610_17 / D57), top to bottom:
+ * 「발주처리 완료」 · one line per marketplace that was sent (「쿠팡: 성공 n건」 · 「11번가: 성공 n건 / 실패 n건」, no
+ * 「/ 실패」 at 0) · the skipped / unsupported line (not split per marketplace — those lines were never sent).
+ * Failure reasons = 「{marketplace} · {code}: {text}」 as the marketplace gave them, deduped, at most 3 per marketplace.
+ * `text` holds several lines joined by '\n' — `AcknowledgeBar` renders it with `whitespace-pre-line`.
  */
 function buildMessage(result: OrderAcknowledgeResult): { text: string; detail: string[] } {
-  let text = `발주처리 완료 — 성공 ${result.succeeded}건`;
-  if (result.failed.length > 0) text += ` / 실패 ${result.failed.length}건`;
-  if (result.skipped.length > 0) text += ` / 제외 ${result.skipped.length}건(결제완료 아님)`;
-  if (result.unsupported.length > 0) text += ` / 처리불가 ${result.unsupported.length}건`;
-  const detail = [...new Set(result.failed.map((box) => `${box.resultCode}: ${box.message}`))].slice(0, 3);
-  return { text, detail };
+  const lines = ['발주처리 완료'];
+  for (const part of result.byPlatform) {
+    const name = ACK_PLATFORM_NAMES[part.platform] ?? part.platform;
+    lines.push(part.failed.length > 0
+      ? `${name}: 성공 ${part.succeeded}건 / 실패 ${part.failed.length}건`
+      : `${name}: 성공 ${part.succeeded}건`);
+  }
+  const notSent: string[] = [];
+  if (result.skipped.length > 0) notSent.push(`제외 ${result.skipped.length}건(결제완료 아님)`);
+  if (result.unsupported.length > 0) notSent.push(`처리불가 ${result.unsupported.length}건`);
+  if (notSent.length > 0) lines.push(notSent.join(' / '));
+  const detail = result.byPlatform.flatMap((part) => {
+    const name = ACK_PLATFORM_NAMES[part.platform] ?? part.platform;
+    return [...new Set(part.failed.map((box) => `${name} · ${box.resultCode}: ${box.message}`))].slice(0, 3);
+  });
+  return { text: lines.join('\n'), detail };
 }
 
 /**
@@ -345,22 +361,27 @@ export function ShipmentContainer() {
     [sorted, currentPage, pageSize]
   );
 
-  // 결제완료 + 쿠팡 + 박스 id 있음 = 발주처리 대상(PLAN 2609_17 D2·D10). 판정은 여기 한 곳에서만 한다.
+  // Paid + Coupang or 11st + a box (11st: delivery number) = order-confirmation target (PLAN 2609_17 D2·D10 ·
+  // FEATURE_2610_17 / D20), minus an 11st reserved sale still waiting for [입고완료 처리] (D67). This is the only
+  // place that decides it.
   const isAcknowledgeTarget = useCallback((o: OrderItem) =>
-    o.status === 'PAID' && o.platform === 'COUPANG' && Boolean(o.externalBoxId), []);
+    o.status === 'PAID' && (o.platform === 'COUPANG' || o.platform === 'ELEVENST') && Boolean(o.externalBoxId)
+      && !o.reservedSale, []);
 
   /**
-   * 체크박스를 그릴지 = **쿠팡 주문이면 상태 무관**.
+   * Whether to draw the checkbox = **a Coupang or 11st order, whatever its status** (FEATURE_2610_17 / D28).
    *
-   * 🔴 발주처리 화이트리스트(`isAcknowledgeTarget`)를 체크박스 판정으로 쓰면 안 된다 — 그러면
-   * 상품준비중으로 고착된 주문에 체크박스가 없어서 [주문 상태 갱신] 이 영구 비활성이 된다.
-   * 고착 건을 푸는 것이 2609_50 의 존재 이유이므로 판정을 액션별로 나눈다.
+   * 🔴 Do not use the confirmation whitelist (`isAcknowledgeTarget`) for the checkbox — then an order stuck in
+   * preparing has no checkbox and [주문 상태 갱신] stays disabled forever. Unsticking those is why 2609_50 exists,
+   * so the decision is split per action. [주문 상태 갱신] · internal stage stay Coupang only (D12) — their id
+   * lists narrow the selection again below.
    *
-   * 발주처리는 좁은 쪽이 맞다(되돌릴 수 없는 쓰기) — 서버가 결제완료 아닌 라인을 `skipped` 로
-   * 걸러 결과에 적어 주므로(`OrderAcknowledgeServiceImpl` 의 `STATUS_PAID` 검사) 섞여 들어가도
-   * 마켓에 쓰이지 않는다.
+   * Confirmation is the narrow one (an irreversible write) — the server filters non-paid lines into `skipped`
+   * and reports them (`OrderAcknowledgeServiceImpl`'s `STATUS_PAID` check), so a mixed selection never reaches
+   * the marketplace.
    */
-  const isSelectable = useCallback((o: OrderItem) => o.platform === 'COUPANG', []);
+  const isSelectable = useCallback(
+    (o: OrderItem) => o.platform === 'COUPANG' || o.platform === 'ELEVENST', []);
 
   /**
    * 선택한 것 중 실제로 발주처리되는 라인 id.
@@ -373,10 +394,22 @@ export function ShipmentContainer() {
     () => orders.filter((o) => selectedIds.has(o.id) && isAcknowledgeTarget(o)).map((o) => o.id),
     [orders, selectedIds, isAcknowledgeTarget]
   );
+  // Marketplaces among the confirmation targets, Coupang → 11st — one notice line each (FEATURE_2610_17 / D56).
+  const ackPlatforms = useMemo(() => {
+    const present = new Set(
+      orders.filter((o) => selectedIds.has(o.id) && isAcknowledgeTarget(o)).map((o) => o.platform));
+    return (['COUPANG', 'ELEVENST'] as const).filter((platform) => present.has(platform));
+  }, [orders, selectedIds, isAcknowledgeTarget]);
 
-  // 내부 발주 대상 = 발주처리 대상 중 아직 내부 단계가 없는 주문(D1). 서버가 다시 판정한다(PLAN §4-6).
+  // Internal-acknowledge targets = Coupang confirmation targets without an internal stage yet (D1 · FEATURE_2610_17 /
+  // D12). The server judges again (PLAN §4-6).
   const isInternalTarget = useCallback(
-    (o: OrderItem) => isAcknowledgeTarget(o) && o.internalStage == null, [isAcknowledgeTarget]);
+    (o: OrderItem) => isAcknowledgeTarget(o) && o.platform === 'COUPANG' && o.internalStage == null,
+    [isAcknowledgeTarget]);
+  // [주문 상태 갱신] sends only the selected Coupang orders (FEATURE_2610_17 / D12).
+  const refreshTargetIds = useMemo(
+    () => orders.filter((o) => selectedIds.has(o.id) && o.platform === 'COUPANG').map((o) => o.id),
+    [orders, selectedIds]);
   // 해제 대상 = 「내부 상품준비중」만. 발송대기중은 먼저 [예약 취소] 한다(D18 행1·행2).
   const isReleaseTarget = useCallback((o: OrderItem) => o.internalStage === 'INTERNAL_PREPARING', []);
 
@@ -538,7 +571,7 @@ export function ShipmentContainer() {
    * - 메시지 자리는 발주처리와 공유한다(`ackMessage`) — 결과 줄을 둘로 늘리지 않는다.
    */
   const handleRefresh = async () => {
-    const ids = [...selectedIds];
+    const ids = refreshTargetIds;
     if (ackTimerRef.current) clearTimeout(ackTimerRef.current);
     try {
       setIsRefreshing(true);
@@ -691,6 +724,7 @@ export function ShipmentContainer() {
       <AcknowledgeBar
         selectedCount={selectedIds.size}
         acknowledgeableCount={ackTargetIds.length}
+        acknowledgePlatforms={ackPlatforms}
         onAcknowledge={() => void handleAcknowledge()}
         isSubmitting={isAcknowledging}
         internalCount={internalTargetIds.length}
@@ -703,6 +737,7 @@ export function ShipmentContainer() {
         onShipStored={() => void openConfirm(storedTargetIds)}
         internalBusy={internalBusy}
         onRefresh={() => void handleRefresh()}
+        refreshableCount={refreshTargetIds.length}
         isRefreshing={isRefreshing}
         canAcknowledge={isAdmin}
         pageSize={pageSize}

@@ -4,6 +4,7 @@ import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { InquiryListParams, InquiryRepository } from '@/domain/repositories/InquiryRepository';
 import type {
   Inquiry,
+  InquiryReplyPayload,
   InquirySyncResult,
   PlatformInquiryTypes,
 } from '@/domain/entities/InquiryEntity';
@@ -54,10 +55,8 @@ export class InquiryRepositoryImpl implements InquiryRepository {
    *
    * ⚠️ 에러를 잡지 않는다 — 상태코드(403·502)로 갈라야 하는 판단은 컨테이너가 한다.
    */
-  async sendReply(inquiryId: number, content: string): Promise<Inquiry> {
-    const response = await axiosInstance.post(`/api/admin/inquiries/${inquiryId}/replies`, {
-      content,
-    });
+  async sendReply(inquiryId: number, payload: InquiryReplyPayload): Promise<Inquiry> {
+    const response = await axiosInstance.post(`/api/admin/inquiries/${inquiryId}/replies`, payload);
     return response.data.data;
   }
 }

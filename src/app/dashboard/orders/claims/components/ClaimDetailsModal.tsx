@@ -86,7 +86,7 @@ export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetails
     <>
       {collect}
       {claim.collectInvoiceSource === 'LOCAL' && (
-        <LocalRecordBadge title="쿠팡에는 반영되지 않았습니다" />
+        <LocalRecordBadge title="마켓에는 반영되지 않았습니다" />
       )}
     </>
   );

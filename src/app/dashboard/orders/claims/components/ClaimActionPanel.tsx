@@ -9,6 +9,7 @@ import { ClaimRepositoryImpl } from '@/infrastructure/repositories/ClaimReposito
 import { useCarrierOptions } from '@/presentation/hooks/useCarrierOptions';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ClaimRejectForm } from './ClaimRejectForm';
+import { ClaimReasonForm } from './ClaimReasonForm';
 import type {
   Claim,
   ClaimAction,
@@ -47,10 +48,11 @@ interface ClaimActionPanelProps {
 }
 
 /**
- * 화면이 폼을 만들 수 있는 `requires` 값. `REJECT_CODE`(교환 거부, 06)는 선택지를 서버가
- * `choices` 로 내려주므로 폼을 만들 수 있다 — 값·라벨을 프론트가 알 필요가 없다.
+ * The `requires` values the screen can build a form for. `REJECT_CODE` (exchange reject, 06) and `REASON`
+ * (11st reject / hold, FEATURE_2610_17 / D34) get their choices from the server's `choices` — the front end
+ * needs to know neither the values nor the labels.
  */
-const SUPPORTED_REQUIRES: ClaimAction['requires'][] = ['NONE', 'INVOICE', 'REJECT_CODE'];
+const SUPPORTED_REQUIRES: ClaimAction['requires'][] = ['NONE', 'INVOICE', 'REJECT_CODE', 'REASON'];
 
 /**
  * 송장 폼의 보조 문구. 교환에는 송장 액션이 **둘**(회수·재발송)이고 라벨만으로는 어느 쪽에 넣는지
@@ -69,7 +71,7 @@ const SUCCESS_MESSAGE = '처리 요청을 보냈습니다. 다음 동기화 후 
  * 마켓이 회수송장을 거절해 우리 장부에만 기록한 회차(2609_70 D6) — HTTP 200 으로 온다.
  * 실패가 아니라 "절반만 됐다" 라서 안내 톤이고, 마켓 원문을 함께 보여준다(그 문구가 다음 수정의 단서다).
  */
-const LOCAL_RECORD_MESSAGE = '쿠팡에는 반영되지 않았습니다. 회수송장은 우리 기록에만 저장했습니다.';
+const LOCAL_RECORD_MESSAGE = '마켓에는 반영되지 않았습니다. 회수송장은 우리 기록에만 저장했습니다.';
 const CONFLICT_MESSAGE = '이미 처리된 접수입니다.';
 const FORBIDDEN_MESSAGE = '이 작업은 관리자만 할 수 있습니다.';
 /**
@@ -106,9 +108,9 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
       claim.availableActions.filter(
         (a) =>
           SUPPORTED_REQUIRES.includes(a.requires) &&
-          // 값을 골라야 하는 액션인데 선택지가 비면 폼을 만들 수 없다 — 눌러도 아무것도 열리지 않는
-          // 죽은 버튼을 남기지 않는다(모르는 `requires` 를 숨기는 것과 같은 자세).
-          (a.requires !== 'REJECT_CODE' || a.choices.length > 0)
+          // An action that needs a choice but has none cannot build its form — leave no dead button that opens
+          // nothing (same stance as hiding an unknown `requires`). Applies to REJECT_CODE and REASON.
+          ((a.requires !== 'REJECT_CODE' && a.requires !== 'REASON') || a.choices.length > 0)
       ),
     [claim.availableActions]
   );
@@ -158,8 +160,11 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
     }
   };
 
-  /** `rejectCode` 는 `requires: 'REJECT_CODE'` 인 액션에서만 온다(폼이 확인까지 마친 뒤 1회). */
-  const handleSubmit = async (option: ClaimAction, rejectCode?: string) => {
+  /**
+   * `rejectCode` comes only from actions with `requires: 'REJECT_CODE'` or `'REASON'`, and `reasonText` only from
+   * `'REASON'` (FEATURE_2610_17 / D34) — once, after the form finished its own confirm.
+   */
+  const handleSubmit = async (option: ClaimAction, rejectCode?: string, reasonText?: string) => {
     const payload: ClaimActionPayload =
       option.requires === 'INVOICE'
         ? {
@@ -169,7 +174,9 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
           }
         : option.requires === 'REJECT_CODE'
           ? { action: option.action, rejectCode }
-          : { action: option.action };
+          : option.requires === 'REASON'
+            ? { action: option.action, rejectCode, reasonText }
+            : { action: option.action };
 
     try {
       setIsSending(true);
@@ -251,7 +258,17 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
       {/* 인라인 확장 — 모달 위에 모달을 띄우면 무엇에 대해 입력하는지 안 보인다. */}
       {openAction && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-          {openAction.requires === 'REJECT_CODE' ? (
+          {openAction.requires === 'REASON' ? (
+            /* FEATURE_2610_17 / D34: code + text form; it owns its confirm like ClaimRejectForm. */
+            <ClaimReasonForm
+              key={openAction.action}
+              claim={claim}
+              action={openAction}
+              isSending={isSending}
+              onSubmit={(code, text) => void handleSubmit(openAction, code, text)}
+              onCancel={() => setOpenAction(null)}
+            />
+          ) : openAction.requires === 'REJECT_CODE' ? (
             /* 확인은 폼이 소유한다(06 Step 4) — 패널이 자기 확인 영역까지 그리면 확인이 2단이 아니라
                3단이 되고, 사유가 보이지 않는 확인이 하나 낀다. `key` 로 액션이 바뀌면 언마운트해
                선택·확인 상태를 초기화한다(다시 열었을 때 확인 영역부터 뜨지 않게). */
@@ -313,7 +330,8 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
               </p>
             )}
 
-            {/* 2단 확인(D10) — "정말 하시겠습니까?" 로는 아무것도 막지 못한다. 무엇을 확정하는지 실명으로. */}
+            {/* Two-step confirm (D10) — "are you sure?" stops nothing; name what gets settled. NONE = return approve
+                (refund); INVOICE = the 11st exchange approve with the re-shipping invoice (FEATURE_2610_17 / D24). */}
             {openAction.irreversible && (
               <div className="mt-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
                 <p className="font-medium">
@@ -321,7 +339,11 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
                   {claim.returnShippingCharge != null &&
                     ` · 반품비 ${claim.returnShippingCharge.toLocaleString()}원`}
                 </p>
-                <p className="mt-1">이 반품을 승인하면 환불이 확정되며 되돌릴 수 없습니다.</p>
+                <p className="mt-1">
+                  {openAction.requires === 'INVOICE'
+                    ? '이 교환을 승인하면 재발송 송장이 등록되며 되돌릴 수 없습니다.'
+                    : '이 반품을 승인하면 환불이 확정되며 되돌릴 수 없습니다.'}
+                </p>
               </div>
             )}
 
@@ -383,7 +405,7 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
                   banner.kind === 'notice' ? 'text-amber-700' : 'text-red-700'
                 }`}
               >
-                쿠팡 응답 보기
+                마켓 응답 보기
               </summary>
               <p
                 className={`mt-1 break-all ${

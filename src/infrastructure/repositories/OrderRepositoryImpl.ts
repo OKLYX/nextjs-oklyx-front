@@ -5,7 +5,9 @@ import type { OrderRepository } from '@/domain/repositories/OrderRepository';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
-  CancelReasonOption, InternalStageResult, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
+  CancelReasonOption, ElevenstCancelFaultRejectPayload, ElevenstCancelRejectPayload, ElevenstCancelRequest,
+  ElevenstChoices, ElevenstDeliveryDelayPayload, ElevenstDeliveryLine, ElevenstSellerReturnPayload,
+  InternalStageResult, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
   OrderMonth, OrderRefreshResult, OrderSetting, OrderSyncResponse, OrderSyncResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
@@ -96,5 +98,68 @@ export class OrderRepositoryImpl implements OrderRepository {
   async updateOrderSetting(reservedShipmentTime: string): Promise<OrderSetting> {
     const response = await axiosInstance.put('/api/admin/order-settings', { reservedShipmentTime });
     return response.data.data;
+  }
+
+  // FEATURE_2610_17 / D19 — read for any signed-in user; approve / reject are ADMIN-only 11st writes.
+  async getElevenstCancelRequests(orderItemId: number): Promise<ElevenstCancelRequest[]> {
+    const response = await axiosInstance.get(`/api/orders/${orderItemId}/elevenst-cancel-requests`);
+    return response.data.data;
+  }
+
+  async approveElevenstCancel(requestId: number): Promise<void> {
+    await axiosInstance.post(`/api/admin/elevenst-cancel-requests/${requestId}/approve`);
+  }
+
+  async rejectElevenstCancel(requestId: number, payload: ElevenstCancelRejectPayload): Promise<void> {
+    await axiosInstance.post(`/api/admin/elevenst-cancel-requests/${requestId}/reject`, payload);
+  }
+
+  // FEATURE_2610_17 / D39 ⑤ — the 13 reason codes come from the server; never copy them into the screen.
+  async getElevenstReturnReasons(): Promise<CancelReasonOption[]> {
+    const response = await axiosInstance.get('/api/orders/elevenst-return-reasons');
+    return response.data.data;
+  }
+
+  async requestElevenstReturn(orderItemId: number, payload: ElevenstSellerReturnPayload): Promise<void> {
+    await axiosInstance.post(`/api/admin/orders/${orderItemId}/elevenst-return-request`, payload);
+  }
+
+  // FEATURE_2610_17 / D61 · D62 · D63 — the reason lists come from the server; never copy them into the screen.
+  async getElevenstChoices(): Promise<ElevenstChoices> {
+    const response = await axiosInstance.get('/api/orders/elevenst-choices');
+    return response.data.data;
+  }
+
+  // D61 — the same cancel endpoint as Coupang; an 11st line takes `reasonCode` · `reasonText` and the whole line
+  // is cancelled on 11st (the quantity only passes the request check).
+  async cancelElevenstLine(orderItemId: number, quantity: number, reasonCode: string, reasonText: string):
+    Promise<OrderCancelResult> {
+    const response = await axiosInstance.post('/api/admin/orders/cancel', {
+      lines: [{ orderItemId, quantity }],
+      reasonCode,
+      reasonText,
+    });
+    return response.data.data;
+  }
+
+  async rejectElevenstCancelFault(requestId: number, payload: ElevenstCancelFaultRejectPayload): Promise<void> {
+    await axiosInstance.post(`/api/admin/elevenst-cancel-requests/${requestId}/reject-fault`, payload);
+  }
+
+  async getElevenstDeliveryLines(orderItemId: number): Promise<ElevenstDeliveryLine[]> {
+    const response = await axiosInstance.get(`/api/orders/${orderItemId}/elevenst-delivery-lines`);
+    return response.data.data;
+  }
+
+  async sendElevenstDeliveryDelay(orderItemId: number, payload: ElevenstDeliveryDelayPayload): Promise<void> {
+    await axiosInstance.post(`/api/admin/orders/${orderItemId}/elevenst-delivery-delay`, payload);
+  }
+
+  async completeElevenstVisitPickup(orderItemId: number, certCode: string): Promise<void> {
+    await axiosInstance.post(`/api/admin/orders/${orderItemId}/elevenst-visit-pickup`, { certCode });
+  }
+
+  async confirmElevenstStock(orderItemId: number): Promise<void> {
+    await axiosInstance.post(`/api/admin/orders/${orderItemId}/elevenst-stock-confirm`);
   }
 }

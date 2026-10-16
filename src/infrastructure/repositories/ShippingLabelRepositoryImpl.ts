@@ -65,7 +65,8 @@ export class ShippingLabelRepositoryImpl implements ShippingLabelRepository {
   }
 
   // Manual single-box confirm — standard JSON envelope. The server expands the anchor line into
-  // every line of its box (PLAN 2609_11 D1) and picks CREATE/UPDATE from the order status (D3).
+  // every line of its box (PLAN 2609_11 D1) and picks CREATE/UPDATE from the order status (D3);
+  // an 11st `mode` 'PARTIAL' / 'SPLIT' sends only the chosen lines (FEATURE_2610_17 / D64).
   async confirmManualShipment(request: ManualShipmentRequest): Promise<ManualShipmentResult> {
     const response = await axiosInstance.post('/api/admin/shipping-labels/confirm/manual', request);
     return response.data.data;

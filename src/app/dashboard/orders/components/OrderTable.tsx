@@ -4,6 +4,7 @@ import { getCustomerName } from '@/domain/entities/OrderEntity';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { InternalStageBadge } from './InternalStageBadge';
+import { ElevenstReservedBadge } from './ElevenstReservedBadge';
 
 interface OrderTableProps {
   orders: OrderItem[];
@@ -146,6 +147,7 @@ export function OrderTable({
               <td className="px-6 py-3 text-sm text-gray-700">
                 {order.externalOrderId}
                 <InternalStageBadge stage={order.internalStage} />
+                <ElevenstReservedBadge reservedSale={order.reservedSale} />
                 {onEditInvoice && order.internalStage != null && (
                   <button
                     type="button"

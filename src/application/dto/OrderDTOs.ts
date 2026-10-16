@@ -43,11 +43,13 @@ export interface SyncTarget {
 }
 
 /**
- * 발주처리 결과 (POST /api/admin/orders/acknowledge).
+ * Order-confirmation result (POST /api/admin/orders/acknowledge).
  *
- * 백엔드가 `ShipmentConfirmResult.FailedBox`/`SkippedOrder` 를 그대로 재사용하므로 프론트도 같은 타입을
- * import 한다 — shape 을 새로 적으면 두 벌이 되어 서버와 조용히 어긋난다.
- * 실패 사유는 쿠팡 원문 그대로 노출한다(PLAN 2609_17 D8·D15).
+ * The backend reuses `ShipmentConfirmResult.FailedBox` / `SkippedOrder` as they are, so the front end imports the
+ * same types — writing the shape again would make two copies that silently drift from the server.
+ * Failure reasons are shown as the marketplace's original text (PLAN 2609_17 D8·D15 · FEATURE_2610_17 / D54).
+ * `byPlatform` = the same send split per marketplace, only marketplaces that had something to send, order
+ * COUPANG → ELEVENST (FEATURE_2610_17 / D57); the fields above stay the sum of both.
  */
 export interface OrderAcknowledgeResult {
   requestedLines: number;
@@ -56,6 +58,15 @@ export interface OrderAcknowledgeResult {
   failed: FailedBox[];
   skipped: SkippedOrder[];
   unsupported: string[];
+  byPlatform: OrderAcknowledgePlatformResult[];
+}
+
+/** One marketplace's share of an order-confirmation send (FEATURE_2610_17 / D57). */
+export interface OrderAcknowledgePlatformResult {
+  platform: 'COUPANG' | 'ELEVENST';
+  /** Succeeded units — a Coupang box or an 11st (delivery number, product number) group (D54). */
+  succeeded: number;
+  failed: FailedBox[];
 }
 
 /**
@@ -117,11 +128,11 @@ export interface CancelledLine {
   /** 전량취소(cancel+hold ≥ orderCount)면 'CANCELLED', 아니면 라인의 중립 상태. */
   resultStatus: OrderStatus;
   receiptId: string | null;
-  /** CANCEL(즉시취소) | STOP_SHIPMENT(출고중지). */
+  /** Coupang CANCEL (instant cancel) | STOP_SHIPMENT (shipment stop) · 11st ELEVENST_SALE_REFUSAL (FEATURE_2610_17 / D61). */
   receiptType: string | null;
 }
 
-/** 취소에 실패한 라인 — code/message 는 쿠팡 원문(D16). 번역·요약 금지. */
+/** A line that failed — code / message are the marketplace's original (Coupang D16 · 11st D61). Never translate or summarize. */
 export interface FailedLine {
   orderItemId: number;
   externalItemId: string;
@@ -170,4 +181,74 @@ export interface InternalStageResult {
 export interface OrderSetting {
   reservedShipmentTime: string;   // 'HH:mm'
   nextExecuteAt: string;          // 'yyyy-MM-ddTHH:mm:ss'
+}
+
+/**
+ * One open 11st cancel request of an order line (GET /api/orders/{orderItemId}/elevenst-cancel-requests,
+ * FEATURE_2610_17 / D19 · D40 · D41). `reason` is the server-made 「사유 이름 — 사유 글」 — show it as is.
+ * `requestedAt` is a KST wall-clock string.
+ */
+export interface ElevenstCancelRequest {
+  id: number;
+  quantity: number;
+  reason: string;
+  requestedAt: string | null;
+  /** [책임사유 오류로 거부] is shown — decided by the server (buyer request on a paid line, D62). */
+  faultRejectable: boolean;
+}
+
+/**
+ * Code lists of the 11st order-detail actions (GET /api/orders/elevenst-choices, FEATURE_2610_17 / D61 · D62 ·
+ * D63). The labels are 11st's own names — show them as given, never keep a code→label map here.
+ */
+export interface ElevenstChoices {
+  cancelReasons: CancelReasonOption[];
+  faultRejectReasons: CancelReasonOption[];
+  delayReasons: CancelReasonOption[];
+}
+
+/** [책임사유 오류로 거부] body (D62): refuse code · reason text (1~200) + the same delivery fields as [취소 거부]. */
+export interface ElevenstCancelFaultRejectPayload {
+  refuseCode: string;
+  reasonText: string;
+  deliveryCompanyCode: string;
+  invoiceNumber: string;
+  sendDate: string;
+}
+
+/** One line of the same 11st delivery (GET /api/orders/{orderItemId}/elevenst-delivery-lines, D64). */
+export interface ElevenstDeliveryLine {
+  orderItemId: number;
+  itemName: string | null;
+  orderQty: number;
+  status: OrderStatus;
+  /** Add-on line — add-on lines alone cannot be sent partially. */
+  addOn: boolean;
+}
+
+/** [발송지연 안내] body (D63): expected date 'yyyy-MM-dd' (tomorrow ~ +30 days, KST) · reason code · detail text. */
+export interface ElevenstDeliveryDelayPayload {
+  expectedDate: string;
+  reasonCode: string;
+  reasonText: string;
+}
+
+/** [취소 거부] body (D38): 11st carrier code · invoice (more than 10 characters) · date sent 'yyyy-MM-dd'. */
+export interface ElevenstCancelRejectPayload {
+  deliveryCompanyCode: string;
+  invoiceNumber: string;
+  sendDate: string;
+}
+
+/**
+ * [판매자가 대신 반품 신청] body (D35 · D36 · D39 ⑤). Carrier and invoice go together or not at all;
+ * `completeNow` = request and complete the return at once.
+ */
+export interface ElevenstSellerReturnPayload {
+  reasonCode: string;
+  reasonText: string;
+  shippingFeeMethod: '03' | '04';
+  deliveryCompanyCode?: string;
+  invoiceNumber?: string;
+  completeNow: boolean;
 }

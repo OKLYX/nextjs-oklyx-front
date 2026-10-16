@@ -39,8 +39,8 @@ function buildChips(result: ShipmentConfirmResult): Chip[] {
 }
 
 // `wide` = the 736px-minimum list-table contract (globals.css .list-table-scroll). Use it only for
-// the failure table (3 columns + the raw 쿠팡 message). A 2-column table with that class always
-// overflows inside this 608px-wide modal, so narrow tables just scroll when they actually overflow.
+// the failure table (3 columns + the marketplace's raw message, Coupang · 11st). A 2-column table with that class
+// always overflows inside this 608px-wide modal, so narrow tables just scroll when they actually overflow.
 function ResultTable({
   headers,
   rows,
@@ -83,24 +83,28 @@ function ResultTable({
 const statusLabel = (s: string) => (s ? getOrderStatusLabel(s) : '알 수 없음');
 
 /**
- * 발송처리(운송장 업로드) 모달 — 택배사 결과 xlsx를 올리고 [지금 발송]·[예약 발송] 버튼으로 보낸다.
+ * Shipment (invoice upload) modal — upload the carrier's result xlsx and send it with [지금 발송] · [예약 발송].
  *
- * [지금 발송] = 서버가 주문번호로 order_item을 전개해 계정별 쿠팡 송장업로드를 실행하고
- * 성공/미매칭/실패/제외 요약을 돌려준다. 결과는 요약 칩 6개 + 선택한 칩의 상세 표 1개(PLAN 2609_12 D2).
- * 「내부 상품준비중」·「발송대기중」 주문은 서버가 발주처리 → 송장 등록 순으로 보낸다(FEATURE_2609_75 / D27) — 화면 흐름은 같다.
- * [예약 발송] = 「내부 상품준비중」 배송건의 송장만 저장하고 예약 시각에 서버가 발주처리·송장 등록을 한다
- * (FEATURE_2609_75 / D20·D27). 파일은 저장하지 않는다.
- * 저장된 송장 모드(`storedOrderItemIds` 전달, D18) = 파일 선택이 없고 두 버튼이 저장된 송장으로 보낸다(E15·E16). 결과 화면은 같다.
+ * [지금 발송] = the server expands order_items by order number, runs the marketplace invoice upload per account
+ * (Coupang; 11st per delivery number, FEATURE_2610_17 / D2) and returns the success / unmatched / failed / skipped
+ * summary. The result is 6 summary chips + one detail table of the chosen chip (PLAN 2609_12 D2).
+ * 「내부 상품준비중」 · 「발송대기중」 orders are sent by the server as confirmation → invoice (FEATURE_2609_75 / D27) —
+ * the screen flow is the same.
+ * [예약 발송] = stores only the invoices of 「내부 상품준비중」 deliveries, and at the reserved time the server confirms
+ * and registers the invoices (FEATURE_2609_75 / D20·D27). The file is not stored.
+ * Stored-invoice mode (`storedOrderItemIds` given, D18) = no file pick, both buttons send the stored invoices
+ * (E15·E16). Same result screen.
  *
- * ⚠️ ADMIN 전용 · 출고관리 페이지에서만 사용.
- * ⚠️ useCase는 부모가 useMemo로 만든 인스턴스를 재사용 — 여기서 새로 만들지 말 것.
- * ⚠️ 부모는 열 때마다 `key` 를 바꿔 다시 마운트한다 — 예약 시각 입력칸이 `defaultExecuteAt` 로 새로 시작한다.
+ * ⚠️ ADMIN only · used on the shipment page only.
+ * ⚠️ useCase reuses the instance the parent made with useMemo — do not create a new one here.
+ * ⚠️ The parent remounts it with a new `key` on every open — the reserved-time input starts again from `defaultExecuteAt`.
  *
- * @param isOpen             모달 표시 여부
- * @param onClose            닫기 콜백. 인자 = 전송·예약이 한 번이라도 성공했는지(true 면 부모가 목록 재조회)
- * @param useCase            부모가 주입하는 ShippingLabelUseCase 인스턴스
- * @param defaultExecuteAt   기본 예약 시각(KST 'yyyy-MM-ddTHH:mm:ss', D12). null 이면 빈 칸
- * @param storedOrderItemIds 저장된 송장 모드의 주문 라인 id(D18). null = 파일 모드
+ * @param isOpen             whether the modal is shown
+ * @param onClose            close callback; argument = whether a send or reservation succeeded at least once (true → the
+ *                           parent reloads the list)
+ * @param useCase            ShippingLabelUseCase instance injected by the parent
+ * @param defaultExecuteAt   default reserved time (KST 'yyyy-MM-ddTHH:mm:ss', D12); null → empty input
+ * @param storedOrderItemIds order line ids of the stored-invoice mode (D18); null = file mode
  */
 interface ShipmentConfirmModalProps {
   isOpen: boolean;
@@ -295,7 +299,7 @@ export function ShipmentConfirmModal({
               ) : (
                 <>
                   <p className="text-sm text-gray-600">
-                    택배사가 운송장번호를 채운 결과 xlsx를 업로드하세요. 서버가 주문번호로 매칭해 쿠팡에 송장을 등록합니다.
+                    택배사가 운송장번호를 채운 결과 xlsx를 업로드하세요. 서버가 주문번호로 매칭해 마켓에 송장을 등록합니다.
                   </p>
                   <p className="text-sm text-gray-500">이미 발송처리된 주문은 자동으로 제외됩니다.</p>
 
@@ -436,7 +440,7 @@ export function ShipmentConfirmModal({
                   <p className="text-xs text-gray-500 mb-2">
                     {isStored
                       ? '저장된 송장이 없거나 내부 단계 주문이 아니라 제외됨'
-                      : 'order_item 없거나 쿠팡이 아니라 스킵됨'}
+                      : 'order_item 없거나 쿠팡 · 11번가가 아니라 스킵됨'}
                   </p>
                   <ResultTable
                     headers={['#', '주문번호']}
@@ -448,11 +452,11 @@ export function ShipmentConfirmModal({
               {selected === 'skipped' && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 mb-2">전송 제외</h4>
-                  <p className="text-xs text-gray-500 mb-2">이미 발송처리된 상태입니다.</p>
                   <p className="text-xs text-gray-500 mb-2">{skippedSummary}</p>
+                  {/* FEATURE_2610_17 / D47: the reason is per row from the server; an older server sends none. */}
                   <ResultTable
-                    headers={['주문번호', '상태']}
-                    rows={skippedRows.map((row) => [row.orderId, statusLabel(row.status)])}
+                    headers={['주문번호', '상태', '사유']}
+                    rows={skippedRows.map((row) => [row.orderId, statusLabel(row.status), row.reason ?? ''])}
                   />
                 </div>
               )}
