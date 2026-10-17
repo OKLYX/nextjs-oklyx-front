@@ -98,7 +98,7 @@ export function MasterNoticeTextPanel({ master, useCase, onSaved }: MasterNotice
 
       {tab === 'COUPANG' ? (
         <p className="rounded bg-gray-50 px-3 py-3 text-sm text-gray-700">
-          쿠팡은 A/S 안내 · 반품/교환 안내 문구를 받지 않습니다. 따로 입력할 것이 없습니다.
+          쿠팡은 A/S 안내 · 반품/교환 안내 문구를 받지 않습니다.
         </p>
       ) : (
         <>
