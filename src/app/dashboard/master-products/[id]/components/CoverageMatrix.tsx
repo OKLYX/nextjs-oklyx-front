@@ -89,6 +89,8 @@ import { MasterCategoryPanel } from './MasterCategoryPanel';
 import { CategoryMetaPanel } from './CategoryMetaPanel';
 import { MasterBasicInfoPanel } from './MasterBasicInfoPanel';
 import { MasterFieldValuesPanel } from './MasterFieldValuesPanel';
+import { MasterNoticeTextPanel } from './MasterNoticeTextPanel';
+import { NOTICE_TEXT_KEYS } from '@/domain/entities/ElevenstNoticeText';
 import { MasterDefaultCostPanel, carrierLabel, packageLabel } from './MasterDefaultCostPanel';
 import { MasterTagsPanel } from './MasterTagsPanel';
 import { MasterRegistrationSuffixPanel } from './MasterRegistrationSuffixPanel';
@@ -830,8 +832,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   );
   // Collapsed-section summaries (83A): one line of current value per section, drawn from the master
   // this container already holds — no extra fetch, and they update as soon as a panel saves.
-  const filledFieldCount = Object.values(master?.fieldValues ?? {}).filter((v) => v.trim() !== '')
-    .length;
+  const filledFieldCount = Object.entries(master?.fieldValues ?? {}).filter(
+    ([k, v]) => !NOTICE_TEXT_KEYS.includes(k) && v.trim() !== '',
+  ).length;
   const categorySummary = category ? category.categoryName : '미지정';
   const metaFilledCount =
     Object.values(masterAttrValues).filter((v) => v.trim() !== '').length +
@@ -1782,6 +1785,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                           onSaved={load}
                           activePlatforms={activeLookupPlatforms}
                         />
+                        <StackedBlock title="A/S · 반품/교환 안내">
+                          <MasterNoticeTextPanel master={master} useCase={masterUseCase} onSaved={handlePanelSaved} />
+                        </StackedBlock>
                       </div>
                     ),
                   },
