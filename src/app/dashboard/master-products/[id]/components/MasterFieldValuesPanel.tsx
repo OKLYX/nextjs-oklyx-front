@@ -9,12 +9,7 @@ import type { MasterProductUseCase } from '@/application/usecases/MasterProductU
 import type { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import { Button } from '@/presentation/components/ui/Button';
 import { Input } from '@/presentation/components/ui/Input';
-import {
-  NOTICE_TEXT_FIELDS,
-  NOTICE_TEXT_KEYS,
-  NOTICE_TEXT_TOO_LONG_MESSAGE,
-  noticeTextTooLong,
-} from '@/domain/entities/ElevenstNoticeText';
+import { NOTICE_TEXT_KEYS } from '@/domain/entities/ElevenstNoticeText';
 
 interface MasterFieldValuesPanelProps {
   master: MasterProductResponse; // initial values come from the parent (no getById here)
@@ -30,18 +25,16 @@ const placeholderFor = (key: string) =>
  * Inline editor of the master's template field values (master detail).
  * File: src/app/dashboard/master-products/[id]/components/MasterFieldValuesPanel.tsx
  *
- * The field **list** = the default thumbnail template's (`isDefault`) `fields` + the two 11st notice texts
- * 「A/S 안내」 · 「반품/교환 안내」, always shown as multi-line fields (FEATURE_2610_13 / D74). The field **values**
+ * The field **list** = the default thumbnail template's (`isDefault`) `fields`. The two 11st notice texts live in the
+ * same map but are edited in 「배송 설정」 (`MasterNoticeTextPanel`), so they are left out here. The field **values**
  * are prefilled from `master.fieldValues` handed down by the parent (the panel does not call `getById` again).
  * The list loads when this panel mounts = the first time its tab (`MasterSectionTabs`) opens (lazy).
  *
  * Blank values are left out of the request → a reserved field takes the registered-product value, a custom field
- * the template default, and a notice text the 11st sales channel default (FEATURE_2610_16 / D5 · D9). Saving PATCHes
- * **only its own fields** (`{ fieldValues }`) and tells the
- * parent through `onSaved(patched)` (no matrix reload). ⚠️ The backend replaces the whole non-null fieldValues, so a
- * cleared field is saved as cleared. A notice text over 4000 EUC-KR bytes stops the save (D78).
- * A failed template read = inline notice + no template fields (only the notice texts stay editable) — it never
- * blocks saving other sections.
+ * the template default. Saving PATCHes `{ fieldValues }` and tells the parent through `onSaved(patched)` (no matrix
+ * reload). ⚠️ The backend replaces the whole non-null fieldValues, so the edit buffer starts from the full saved map —
+ * the notice texts ride along unchanged. A cleared field is saved as cleared.
+ * A failed template read = inline notice + no template fields — it never blocks saving other sections.
  */
 export function MasterFieldValuesPanel({
   master,
@@ -71,7 +64,7 @@ export function MasterFieldValuesPanel({
       } catch {
         if (alive) {
           setFields([]);
-          setLoadError('템플릿 필드를 불러오지 못했습니다. A/S 안내 · 반품/교환 안내만 편집할 수 있습니다.');
+          setLoadError('템플릿 필드를 불러오지 못했습니다.');
         }
       } finally {
         if (alive) setIsLoading(false);
@@ -90,13 +83,7 @@ export function MasterFieldValuesPanel({
   };
 
   const handleSave = async () => {
-    // FEATURE_2610_13 / D78: a notice text over the 11st limit is not saved.
-    if (noticeTextTooLong(values)) {
-      setError(NOTICE_TEXT_TOO_LONG_MESSAGE);
-      return;
-    }
-    // Omit blank values so the backend falls back to defaults: product / template values for the template fields,
-    // the 11st sales channel default for the two notice texts (FEATURE_2610_16 / D5).
+    // Omit blank values so the backend falls back to the product / template values.
     const cleaned: Record<string, string> = {};
     for (const [k, v] of Object.entries(values)) {
       if (v.trim() !== '') cleaned[k] = v;
@@ -156,34 +143,6 @@ export function MasterFieldValuesPanel({
                       master.fieldValues[f.key]
                     ) : (
                       <span className="text-gray-400">{placeholderFor(f.key)}</span>
-                    )}
-                  </p>
-                )}
-              </div>
-            ))}
-            {/* FEATURE_2610_13 / D74: the two 11st notice texts, always shown, multi-line. */}
-            {NOTICE_TEXT_FIELDS.map((f) => (
-              <div key={f.key} className="col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
-                {isEditing ? (
-                  <textarea
-                    rows={4}
-                    value={values[f.key] ?? ''}
-                    placeholder="판매채널 기본값 사용"
-                    disabled={isSaving}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setValues((prev) => ({ ...prev, [f.key]: next }));
-                      setSaved(false);
-                    }}
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
-                  />
-                ) : (
-                  <p className="whitespace-pre-wrap rounded bg-gray-50 px-3 py-2 text-sm text-gray-800">
-                    {master.fieldValues?.[f.key]?.trim() ? (
-                      master.fieldValues[f.key]
-                    ) : (
-                      <span className="text-gray-400">판매채널 기본값 사용</span>
                     )}
                   </p>
                 )}
