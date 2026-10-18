@@ -10,9 +10,9 @@ interface CompletedPurchaseFilterProps {
   onReset: () => void;
 }
 
-// Filter bar for the completed-purchase tab: purchase-date range only.
-// 🔴 판매자 필터는 없앴다(PLAN 2609_29 D11) — 완료 목록도 항상 전체다.
-// Filters apply on demand (조회 button) so empty dates mean "all time".
+// Filter bar for the completed-purchase tab: processing-day range (FEATURE_2610_09 D63 · D81 · D85).
+// The seller filter is the page's one under the tabs (D5), not part of this bar.
+// Filters apply on demand ([조회] button) so empty dates mean "all time".
 export function CompletedPurchaseFilter({
   from,
   to,
@@ -25,7 +25,7 @@ export function CompletedPurchaseFilter({
   return (
     <div className="bg-white rounded-lg shadow px-6 py-4 flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-gray-700">구매일 시작</label>
+        <label className="text-sm font-medium text-gray-700">처리일 시작</label>
         <input
           type="date"
           value={from}
@@ -36,7 +36,7 @@ export function CompletedPurchaseFilter({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-gray-700">구매일 종료</label>
+        <label className="text-sm font-medium text-gray-700">처리일 종료</label>
         <input
           type="date"
           value={to}

@@ -16,11 +16,14 @@ export interface RecordMovementRequest {
   quantity: number;
   reason?: StockReason;
   reasonNote?: string;
-  /** OPENING(기초재고)에서만 필수. PURCHASE 는 구매기록 단가를 승계하므로 보내지 않는다(D8). */
+  /**
+   * OPENING · PURCHASE without a purchase record (stock link off, FEATURE_2610_09 D71 round 13): optional — omitted =
+   * the product's registered price. PURCHASE with a record: ignored by the server, the record's unit price is copied (D8).
+   */
   unitPrice?: number;
   /** RETURN_IN 필수. */
   orderClaimId?: number;
-  /** STOCK_IN + PURCHASE 필수. */
+  /** STOCK_IN + PURCHASE: required while the stock link is on, omitted while it is off (FEATURE_2610_09 D71 round 12). */
   purchaseRecordId?: number;
   movedOn: string;
 }

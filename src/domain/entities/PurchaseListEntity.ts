@@ -1,10 +1,10 @@
 export type PurchaseLineSource = 'ORDER' | 'MANUAL';
 
 /**
- * 최근 구매이력 한 줄 (PLAN 2609_29 D9).
+ * One recent purchase row (PLAN 2609_29 D9 · FEATURE_2610_09 D7 · D25).
  *
- * ⚠️ 물품 기준 조회라 판매자가 섞여 나온다 — 각 줄이 누구 것인지 보이도록 sellerName 을 함께 그린다.
- * 금액은 FEATURE_2609_28 이전에 기록된 행에서 null 이다 — "금액 미상"이며 0 이 아니다.
+ * ⚠️ Without a seller filter the rows of every seller come mixed — sellerName is drawn on each row.
+ * Amounts are null on rows recorded before FEATURE_2609_28 — "amount unknown", not 0.
  */
 export interface PurchaseRecord {
   id: number;
@@ -17,10 +17,11 @@ export interface PurchaseRecord {
 }
 
 /**
- * 그룹 토글 안에 보이는 기여 라인 1개 (PLAN 2609_29 D7·D8).
+ * One contributing line shown in an opened product row (PLAN 2609_29 D7 · D8 · FEATURE_2610_09 D17).
  *
- * ⚠️ 라인에는 구매수량도 구매이력도 없다 — 구매기록이 주문 라인을 모른다(D3).
- * 수동 라인은 orderLineId·externalOrderId 와 채널 3필드가 전부 null 이며 화면에서 "수동"으로 그린다.
+ * ⚠️ A line has no purchased quantity and no purchase history — purchase records do not know order lines (D3).
+ * sellerId · sellerName are filled on both kinds. A manual line keeps orderLineId · externalOrderId ·
+ * marketplaceAccountId · platform null and is drawn as 「{sellerName}/수동」.
  */
 export interface PurchaseListLine {
   itemId: number;
@@ -28,11 +29,34 @@ export interface PurchaseListLine {
   source: PurchaseLineSource;
   externalOrderId: string | null;
   marketplaceAccountId: number | null;
-  sellerName: string | null;
+  sellerId: number;
+  sellerName: string;
   platform: string | null;
   autoQty: number;
   manualQty: number;
   neededQty: number;
+}
+
+/**
+ * Processing state of one (product × seller) share (FEATURE_2610_09 D57 · D67 · D79 · D80).
+ * OPEN = to buy · SKIPPED_TODAY = 「내일 매입」 today · PURCHASED = 「매입 완료」 · NOT_NEEDED = 「필요 없음」 · NEED_ZERO = 「필요 0」.
+ */
+export type PurchaseShareState = 'OPEN' | 'SKIPPED_TODAY' | 'PURCHASED' | 'NOT_NEEDED' | 'NEED_ZERO';
+
+/** One seller's share of a product (FEATURE_2610_09 D2 · D59). */
+export interface PurchaseShare {
+  sellerId: number;
+  sellerName: string;
+  neededQty: number;
+  purchasedQty: number;
+  remainingQty: number;
+  /** purchasedQty ≥ neededQty — the 「목표 수량 매입 완료」 tag (D57 ①). */
+  targetMet: boolean;
+  state: PurchaseShareState;
+  /** Undo target of SKIPPED_TODAY · PURCHASED · NOT_NEEDED; null otherwise. */
+  checkId: number | null;
+  /** Processing day (yyyy-MM-dd) of PURCHASED · NOT_NEEDED · NEED_ZERO; null otherwise. */
+  checkedOn: string | null;
 }
 
 export interface PurchaseListItem {
@@ -43,6 +67,8 @@ export interface PurchaseListItem {
   neededQty: number;
   purchasedQty: number;
   remainingQty: number;
+  /** Seller chosen: that one share. 「전체」: every shown share, seller id ascending. */
+  shares: PurchaseShare[];
   lines: PurchaseListLine[];
 }
 
@@ -55,5 +81,7 @@ export interface UnmappedOrder {
 
 export interface PurchaseList {
   items: PurchaseListItem[];
+  /** The 「오늘 넘김」 group — rows put off with 「내일 매입」 today (FEATURE_2610_09 D67). */
+  skippedToday: PurchaseListItem[];
   unmappedOrders: UnmappedOrder[];
 }

@@ -8,19 +8,25 @@ import type {
   PurchaseRecordResult,
   AddManualItemRequest,
   AdjustManualQtyRequest,
+  PurchaseCheckRequest,
 } from '@/application/dto/PurchaseListDTOs';
 
-// 🔴 조회·추출에 판매자 파라미터가 없다(PLAN 2609_29 D11) — 항상 전체다.
+// 🔴 sellerId is a view filter on the reads only — the extract takes none (FEATURE_2610_09 D4 · D19).
 export interface PurchaseListRepository {
-  getPurchaseList(): Promise<PurchaseList>;
-  // Completed purchases (remainingQty <= 0 && purchasedQty > 0), flat product list, no pagination.
-  // from/to filter by purchase date (ISO yyyy-MM-dd, inclusive).
-  getCompletedList(from?: string, to?: string): Promise<PurchaseListItem[]>;
+  getPurchaseList(sellerId?: number): Promise<PurchaseList>;
+  // Completed rows (every share processed, FEATURE_2610_09 D57 · D78), flat product list, no pagination.
+  // from/to filter by processing day (ISO yyyy-MM-dd, inclusive).
+  getCompletedList(from?: string, to?: string, sellerId?: number): Promise<PurchaseListItem[]>;
   extractPurchaseList(): Promise<PurchaseList>;
-  // 입고 1회 = 구매기록 + 재고 입고(PLAN 2609_29 D1). 물품 × 판매자 단위.
+  // One check-in = purchase record + stock check-in while the stock link is on (PLAN 2609_29 D1 · FEATURE_2610_09 D65).
+  // Product × seller.
   recordPurchase(request: RecordPurchaseRequest): Promise<PurchaseRecordResult>;
-  // 그 물품의 최근 구매이력. ⚠️ 판매자 조건 없음(D9).
-  getRecentPurchases(productId: number, limit: number): Promise<PurchaseRecord[]>;
+  // Recent purchases of a product; sellerId omitted = every seller (FEATURE_2610_09 D7 · D25).
+  getRecentPurchases(productId: number, limit: number, sellerId?: number): Promise<PurchaseRecord[]>;
   addManualItem(request: AddManualItemRequest): Promise<void>;
   adjustManualQty(itemId: number, request: AdjustManualQtyRequest): Promise<void>;
+  changeManualSeller(itemId: number, sellerId: number): Promise<void>;
+  deleteManualItem(itemId: number): Promise<void>;
+  check(request: PurchaseCheckRequest): Promise<void>;
+  cancelCheck(checkId: number): Promise<void>;
 }
