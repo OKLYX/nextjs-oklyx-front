@@ -59,6 +59,10 @@ export interface OrderItem {
   visitPickup: boolean;        // visit-pickup order: [방문수령 완료] instead of the invoice form
   reservedSale: boolean;       // reserved-sale paid order (raw 201): [입고완료 처리] instead of [발주처리]
   stockConfirmSent: boolean;   // [입고완료 처리] already sent — shown as 「입고완료 보냄」
+  // Row thumbnail = first component product of the line's master option (stored product.image_url as-is).
+  // Both null when the server could not expand the line (unmapped option etc.) — draw an empty box.
+  thumbnailProductId: number | null;
+  thumbnailImageUrl: string | null;
 }
 
 // The reserved-sale label next to the status (FEATURE_2610_17 / D67) — one source for the list and the detail.
