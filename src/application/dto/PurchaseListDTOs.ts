@@ -1,11 +1,13 @@
 /**
- * 입고 1회 입력 — 물품 × 판매자 (PLAN 2609_29 D1·D3).
+ * One check-in input — product × seller (PLAN 2609_29 D1 · D3).
  *
- * ⚠️ 주문 라인이 아니라 물품에 붙는다: 입고는 "이 주문 몫"이 아니라 "이 판매자가 이만큼 들였다"이다.
- * ⚠️ totalAmount 와 unitPrice 는 <b>둘 중 하나만</b> 보낸다(PLAN 2609_28 D2) — 둘 다 오면 서버가 400.
- * 안 쓰는 쪽은 키 자체를 생략한다. null 을 넣으면 그대로 직렬화되어 400 이 난다.
- * 둘 다 생략하면 "금액 미상" 행으로 저장된다 — 0 으로 치환하지 않는다.
- * ⚠️ recordStock 은 항상 true 로 보낸다 — 화면 체크박스는 체크 + 비활성이다(PLAN 2609_29 D19).
+ * ⚠️ It belongs to the product, not to an order line: a check-in means "this seller brought in this many", not
+ * "this order's share".
+ * ⚠️ Send <b>only one</b> of totalAmount and unitPrice (PLAN 2609_28 D2) — both → the server answers 400.
+ * Omit the unused key entirely; a null value is serialized as is and also ends in 400.
+ * Omitting both saves an "amount unknown" row — it is never replaced with 0.
+ * ⚠️ recordStock is always sent as true. The server writes stock only while the stock link setting is on
+ * (FEATURE_2610_09 D65) — the screen has no switch for it (D71 ③).
  */
 export interface RecordPurchaseRequest {
   productId: number;
@@ -18,17 +20,30 @@ export interface RecordPurchaseRequest {
   recordStock: boolean;
 }
 
-/** 입고 1회의 결과. stockRecorded=false → 음수 정정이라 재고가 반영되지 않았다(PLAN 2609_29 D17). */
+/**
+ * Result of one check-in. stockRecorded=false → no stock written: a negative correction (PLAN 2609_29 D17) or the
+ * stock link setting is off (FEATURE_2610_09 D65).
+ */
 export interface PurchaseRecordResult {
   purchaseRecordId: number;
   stockRecorded: boolean;
 }
 
+/** Manual line add — the seller is required (FEATURE_2610_09 D11). */
 export interface AddManualItemRequest {
   productId: number;
+  sellerId: number;
   quantity: number;
 }
 
+/** Manual line quantity — 1 or more (FEATURE_2610_09 D23 · D77). */
 export interface AdjustManualQtyRequest {
   manualQty: number;
+}
+
+/** [매입 완료] · [오늘 매입 안 함] on one share (FEATURE_2610_09 D57 · D61). */
+export interface PurchaseCheckRequest {
+  productId: number;
+  sellerId: number;
+  status: 'PURCHASED' | 'NOT_NEEDED' | 'TOMORROW';
 }

@@ -16,6 +16,7 @@ import {
   STOCK_REASON_LABELS,
 } from '@/domain/entities/StockEntity';
 import { ProductPicker } from '@/presentation/components/ProductPicker';
+import { usePurchaseSettingStore } from '@/infrastructure/stores/purchaseSettingStore';
 
 /**
  * 후보 목록(입고 대기 · 반품 대기)이 폼을 채울 때 쓰는 값.
@@ -125,6 +126,9 @@ export function StockInOutForm({ sellers, prefill, onRecorded }: StockInOutFormP
   const [isSaving, setIsSaving] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  // Off (or not loaded) = no purchase record to pick: no 「입고 대기」 hint, and PURCHASE gets the unit
+  // price field (FEATURE_2610_09 D71 round 12 · 13).
+  const stockLinked = usePurchaseSettingStore((state) => state.stockLinked);
 
   // watch() 대신 useWatch — watch() 는 React Compiler 메모이제이션을 통째로 끈다.
   const [movementType, reason, productId, productName, purchaseRecordLabel, orderClaimLabel] =
@@ -290,7 +294,8 @@ export function StockInOutForm({ sellers, prefill, onRecorded }: StockInOutFormP
           </div>
         )}
 
-        {reason === 'OPENING' && (
+        {/* FEATURE_2610_09 D71 (round 13): stock link off = PURCHASE has no record price, so it gets this field. */}
+        {(reason === 'OPENING' || (reason === 'PURCHASE' && stockLinked !== true)) && (
           <div>
             {/* 단가는 선택이다 — 비우면 서버가 상품 등록가를 스냅샷으로 넣는다. */}
             <label className="block text-xs text-gray-500 mb-1">단가 (선택)</label>
@@ -360,7 +365,8 @@ export function StockInOutForm({ sellers, prefill, onRecorded }: StockInOutFormP
         </div>
       )}
 
-      {movementType === 'STOCK_IN' && reason === 'PURCHASE' && !purchaseRecordLabel && (
+      {/* FEATURE_2610_09 D71 (round 12): the 「입고 대기」 list is shown while the stock link is on — this hint points at it. */}
+      {movementType === 'STOCK_IN' && reason === 'PURCHASE' && !purchaseRecordLabel && stockLinked === true && (
         <p className="text-xs text-gray-500">
           아래 <b>입고 대기</b> 목록에서 구매기록을 선택하세요.
         </p>

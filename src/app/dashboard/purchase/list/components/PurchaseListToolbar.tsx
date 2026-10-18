@@ -2,8 +2,9 @@
 
 import { RefreshCw } from 'lucide-react';
 
-// 🔴 판매자 드롭다운과 [재적재] 버튼은 없앴다(PLAN 2609_29 D11·D12).
-// 조회·동기화는 항상 전체이고, [주문내역 동기화] 가 이미 동기화→재추출을 함께 한다.
+// 🔴 No seller dropdown and no [재적재] here (PLAN 2609_29 D11 · D12). The seller filter sits under the tabs and
+// only narrows the view (FEATURE_2610_09 D5); sync always covers every seller, and [주문내역 동기화] already
+// syncs and re-extracts together.
 interface PurchaseListToolbarProps {
   onAddManualClick: () => void;
   onSyncOrders: () => void;

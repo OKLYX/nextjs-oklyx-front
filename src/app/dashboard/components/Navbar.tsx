@@ -20,6 +20,7 @@ import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { ROUTES } from '@/config/routes';
 import { useAlertStore } from '@/infrastructure/stores/alertStore';
+import { usePurchaseSettingStore } from '@/infrastructure/stores/purchaseSettingStore';
 import { NavbarHeader } from './NavbarHeader';
 import { NavBadge } from './NavBadge';
 
@@ -75,12 +76,19 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
   const toggleDesignTemplatesMenu = useNavigationStore((state) => state.toggleDesignTemplatesMenu);
   const toggleSettlementMenu = useNavigationStore((state) => state.toggleSettlementMenu);
   const user = useAuthStore((state) => state.user);
+  // Stock link off (or not loaded yet) hides 「재고 조회」 (FEATURE_2610_09 D71 ②).
+  const stockLinked = usePurchaseSettingStore((state) => state.stockLinked);
+  const loadPurchaseSetting = usePurchaseSettingStore((state) => state.load);
 
   useEffect(() => {
     if (!useNavigationStore.persist.hasHydrated()) {
       useNavigationStore.persist.rehydrate();
     }
   }, []);
+
+  useEffect(() => {
+    void loadPurchaseSetting();
+  }, [loadPurchaseSetting]);
 
   // Display order. ADMIN-only groups are marked and filtered below rather than
   // appended, so this array reads top-to-bottom exactly as the sidebar renders.
@@ -120,7 +128,10 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       label: '구매관리',
       open: isPurchaseOpen,
       toggle: togglePurchaseMenu,
-      items: [{ href: ROUTES.PURCHASE_LIST, label: '구매목록' }],
+      items: [
+        { href: ROUTES.PURCHASE_LIST, label: '구매목록' },
+        { href: ROUTES.PURCHASE_SETTINGS, label: '구매관리 설정', adminOnly: true },
+      ],
     },
     {
       icon: Package,
@@ -142,7 +153,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         { href: ROUTES.STOCK_OUTBOUND, label: '출고 확인' },
         // 포장 콘솔은 `/api/admin/packing` 전용이다 — 일반 사용자에게 보이면 열자마자 403 이 된다.
         { href: ROUTES.STOCK_PACKING, label: '포장 작업', adminOnly: true },
-        { href: ROUTES.STOCK_SEARCH, label: '재고 조회' },
+        ...(stockLinked === true ? [{ href: ROUTES.STOCK_SEARCH, label: '재고 조회' }] : []),
       ],
     },
     {

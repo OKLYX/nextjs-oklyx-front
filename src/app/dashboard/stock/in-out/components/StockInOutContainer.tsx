@@ -6,6 +6,7 @@ import { StockRepositoryImpl } from '@/infrastructure/repositories/StockReposito
 import { StockUseCase } from '@/application/usecases/StockUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
+import { usePurchaseSettingStore } from '@/infrastructure/stores/purchaseSettingStore';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type {
   PurchaseCandidate,
@@ -18,15 +19,19 @@ import { PurchaseCandidateTable } from './PurchaseCandidateTable';
 import { ReturnCandidateTable } from './ReturnCandidateTable';
 
 /**
- * 입고 · 조정 화면 (FEATURE_2609_28 / PLAN D6~D10 · D22).
+ * 「입고 · 조정」 screen (FEATURE_2609_28 / PLAN D6~D10 · D22).
  *
- * 구성 = 기록 폼 + 입고 대기(구매기록) + 반품 대기(클레임) + 최근 이력.
- * 두 대기 목록은 폼의 참조(purchaseRecordId · orderClaimId)를 채우는 선택지다 — 그 값 없이는
- * 매입 입고와 반품입고를 아예 기록할 수 없다.
+ * Parts = record form + 「입고 대기」 (purchase records, shown only while the stock link is on — FEATURE_2610_09 D71 ②)
+ * + 「반품 대기」 (claims) + recent history.
+ * The two waiting lists are the choices that fill the form's references (purchaseRecordId · orderClaimId) — without
+ * those values a return check-in cannot be recorded at all, nor a purchase check-in while the stock link is on
+ * (off = no record needed, FEATURE_2610_09 D71 round 12).
  */
 export function StockInOutContainer() {
   const stockUseCase = useMemo(() => new StockUseCase(new StockRepositoryImpl()), []);
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
+  // Stock link off (or not loaded yet) hides 「입고 대기」 (FEATURE_2610_09 D71 ②) — the sidebar loads the setting.
+  const stockLinked = usePurchaseSettingStore((state) => state.stockLinked);
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [prefill, setPrefill] = useState<MovementPrefill | null>(null);
@@ -155,14 +160,16 @@ export function StockInOutContainer() {
         />
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <PurchaseCandidateTable
-          candidates={purchaseCandidates}
-          isLoading={isPurchaseLoading}
-          error={purchaseError}
-          onSelect={handleSelectPurchase}
-        />
-      </div>
+      {stockLinked === true && (
+        <div className="bg-white rounded-lg shadow">
+          <PurchaseCandidateTable
+            candidates={purchaseCandidates}
+            isLoading={isPurchaseLoading}
+            error={purchaseError}
+            onSelect={handleSelectPurchase}
+          />
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow">
         <ReturnCandidateTable

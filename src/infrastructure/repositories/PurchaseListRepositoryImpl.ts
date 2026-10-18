@@ -10,18 +10,22 @@ import type {
   PurchaseRecordResult,
   AddManualItemRequest,
   AdjustManualQtyRequest,
+  PurchaseCheckRequest,
 } from '@/application/dto/PurchaseListDTOs';
 
 export class PurchaseListRepositoryImpl implements PurchaseListRepository {
-  async getPurchaseList(): Promise<PurchaseList> {
-    const response = await axiosInstance.get('/api/admin/purchase-list');
+  async getPurchaseList(sellerId?: number): Promise<PurchaseList> {
+    const response = await axiosInstance.get('/api/admin/purchase-list', {
+      params: sellerId ? { sellerId } : {},
+    });
     return response.data.data;
   }
 
-  async getCompletedList(from?: string, to?: string): Promise<PurchaseListItem[]> {
-    const params: Record<string, string> = {};
+  async getCompletedList(from?: string, to?: string, sellerId?: number): Promise<PurchaseListItem[]> {
+    const params: Record<string, string | number> = {};
     if (from) params.from = from;
     if (to) params.to = to;
+    if (sellerId) params.sellerId = sellerId;
     const response = await axiosInstance.get('/api/admin/purchase-list/completed', { params });
     return response.data.data;
   }
@@ -36,9 +40,9 @@ export class PurchaseListRepositoryImpl implements PurchaseListRepository {
     return response.data.data;
   }
 
-  async getRecentPurchases(productId: number, limit: number): Promise<PurchaseRecord[]> {
+  async getRecentPurchases(productId: number, limit: number, sellerId?: number): Promise<PurchaseRecord[]> {
     const response = await axiosInstance.get('/api/admin/purchase-list/purchases', {
-      params: { productId, limit },
+      params: sellerId ? { productId, limit, sellerId } : { productId, limit },
     });
     return response.data.data;
   }
@@ -49,5 +53,21 @@ export class PurchaseListRepositoryImpl implements PurchaseListRepository {
 
   async adjustManualQty(itemId: number, request: AdjustManualQtyRequest): Promise<void> {
     await axiosInstance.patch(`/api/admin/purchase-list/items/${itemId}`, request);
+  }
+
+  async changeManualSeller(itemId: number, sellerId: number): Promise<void> {
+    await axiosInstance.patch(`/api/admin/purchase-list/items/${itemId}/seller`, { sellerId });
+  }
+
+  async deleteManualItem(itemId: number): Promise<void> {
+    await axiosInstance.delete(`/api/admin/purchase-list/items/${itemId}`);
+  }
+
+  async check(request: PurchaseCheckRequest): Promise<void> {
+    await axiosInstance.post('/api/admin/purchase-list/checks', request);
+  }
+
+  async cancelCheck(checkId: number): Promise<void> {
+    await axiosInstance.post(`/api/admin/purchase-list/checks/${checkId}/cancel`);
   }
 }

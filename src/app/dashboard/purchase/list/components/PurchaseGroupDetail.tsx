@@ -16,33 +16,40 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { ShareActionCell, TargetMetTag, type ShareActions } from './purchaseShareUi';
 
 /**
- * 구매목록 탭과 구매완료 탭이 <b>같이 쓰는</b> 그룹 토글 내용물 (PLAN 2609_29 D21).
+ * Opened content of a product row, <b>shared</b> by the list tab, the 「오늘 넘김」 group and the completed tab
+ * (PLAN 2609_29 D21 · FEATURE_2610_09 D67).
  *
- * **용도**: 그룹(물품)을 펼쳤을 때 보이는 ① 입고 카드 ② 최근 구매이력 ③ 채널 칩 + 주문 줄.
- * **필수 규칙**: 완료탭용으로 복제하지 말 것 — 두 탭의 차이는 그룹 필터와 기간 필터뿐이다.
- * **파일**: src/app/dashboard/purchase/list/components/PurchaseGroupDetail.tsx
+ * **Purpose**: ① check-in card ② recent purchases ③ seller shares (「전체」 only, D83) ④ channel chips + lines.
+ * **Rule**: do not copy it for one tab — the tabs differ only in which rows they hold and in the date filter.
+ * **File**: src/app/dashboard/purchase/list/components/PurchaseGroupDetail.tsx
  *
- * **사용 예제**:
- * <PurchaseGroupDetail item={item} sellers={sellers} onRecorded={refresh} />
+ * **Usage**:
+ * <PurchaseGroupDetail item={item} sellers={sellers} filterSellerId={null} stockLinked={false}
+ *                      onRecorded={refresh} shareActions={shareActions} />
  *
- * ⚠️ 입고는 물품 × 판매자 단위다(D3) — 주문 라인에 붙지 않는다.
- * ⚠️ 채널 칩은 표시 필터일 뿐 헤더 숫자(필요 수량·매입 완료 수량·매입 필요 수량)를 바꾸지 않는다(D10).
- * ❌ 주문 줄에 구매수량·입력 컨트롤을 두지 않는다(D7).
- *    예외: 수동 줄(source=MANUAL)의 [제거] — manualQty 를 0 으로 되돌릴 뿐 구매수량 입력이 아니다.
+ * ⚠️ A check-in is per product × seller (D3) — it never hangs off an order line.
+ * ⚠️ The channel chips filter the lines only; the header numbers do not change (D10).
+ * ❌ No purchased quantity and no input on an order line (D7). Manual lines (source=MANUAL) are the exception:
+ *    quantity (1 or more), [판매자 바꾸기] and [제거] (FEATURE_2610_09 D23 · D24 · D77) — none of them is a purchase.
  */
 
 const PLATFORM_LABEL: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버', ELEVENST: '11번가' };
 
 /**
- * 채널 = 판매자 × 플랫폼. 수동 라인은 둘 다 null 이라 '수동'.
- * ⚠️ 매핑에 없는 플랫폼은 원문 그대로 — 새 플랫폼이 붙어도 빈칸이 되지 않는다.
+ * Channel = seller × platform. A manual line has no platform → 「{sellerName}/수동」 (FEATURE_2610_09 D17).
+ * ⚠️ A platform missing from the map shows its raw code — a new platform never draws an empty label.
  */
 export function channelLabel(line: PurchaseListLine): string {
-  if (!line.platform || !line.sellerName) return '수동';
+  if (!line.platform) return `${line.sellerName}/수동`;
   return `${line.sellerName}/${PLATFORM_LABEL[line.platform] ?? line.platform}`;
 }
+
+/** Chip key: an order line's account, or one manual chip per seller (D17). */
+const channelKey = (line: PurchaseListLine) =>
+  line.marketplaceAccountId != null ? String(line.marketplaceAccountId) : `MANUAL-${line.sellerId}`;
 
 const RECENT_PURCHASE_LIMIT = 5;
 
@@ -80,8 +87,9 @@ const today = () => {
 // 통화 표시는 toLocaleString 하나로 충분하다 — 포맷 라이브러리를 새로 들이지 않는다.
 const formatAmount = (v: number) => v.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
 
-const checkInDefaults = (): CheckInFormData => ({
-  sellerId: '',
+/** The seller field starts at the filter's seller, or the only seller, or empty (D9 · D10 · D53). */
+const checkInDefaults = (sellerId: string): CheckInFormData => ({
+  sellerId,
   purchasedOn: today(),
   quantity: '1',
   amountMode: 'TOTAL',
@@ -89,21 +97,41 @@ const checkInDefaults = (): CheckInFormData => ({
   reflectToBasePrice: true,
 });
 
+const SELECT_CLASS =
+  'px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500';
+
 interface PurchaseGroupDetailProps {
   item: PurchaseListItem;
   sellers: Seller[];
+  /** Seller filter; null = 「전체」 (D9 default seller · D83 share rows). */
+  filterSellerId: number | null;
+  /** Stock link setting (D71 ③ — the check-in notice). */
+  stockLinked: boolean;
   onRecorded: () => void | Promise<void>;
+  shareActions: ShareActions;
 }
 
-export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroupDetailProps) {
+export function PurchaseGroupDetail({
+  item,
+  sellers,
+  filterSellerId,
+  stockLinked,
+  onRecorded,
+  shareActions,
+}: PurchaseGroupDetailProps) {
   const purchaseListUseCase = useMemo(
     () => new PurchaseListUseCase(new PurchaseListRepositoryImpl()),
     []
   );
 
+  // D53: one seller → the seller fields are hidden and that seller is used.
+  const soleSeller = sellers.length === 1 ? sellers[0] : null;
+  const defaultSellerId =
+    filterSellerId != null ? String(filterSellerId) : soleSeller ? String(soleSeller.id) : '';
+
   const form = useForm<CheckInFormData>({
     resolver: zodResolver(checkInSchema),
-    defaultValues: checkInDefaults(),
+    defaultValues: checkInDefaults(defaultSellerId),
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -111,6 +139,7 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
   const [stockNotice, setStockNotice] = useState('');
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historySellerId, setHistorySellerId] = useState('');
   const [records, setRecords] = useState<PurchaseRecord[] | null>(null);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
@@ -119,14 +148,14 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
 
   const [removeTarget, setRemoveTarget] = useState<PurchaseListLine | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [pendingLineId, setPendingLineId] = useState<number | null>(null);
 
-  // Removing a manual line = absolute manualQty 0. The server keeps the row but it
-  // contributes nothing, so the group drops out of the list once nothing is left to buy.
+  // [제거] deletes the manual line itself (FEATURE_2610_09 D77).
   const removeManualLine = useCallback(async () => {
     if (!removeTarget || isRemoving) return;
     setIsRemoving(true);
     try {
-      await purchaseListUseCase.adjustManualQty(removeTarget.itemId, { manualQty: 0 });
+      await purchaseListUseCase.deleteManualItem(removeTarget.itemId);
       toast.success('수동 추가를 제거했습니다.');
       setRemoveTarget(null);
       await onRecorded();
@@ -136,6 +165,37 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
       setIsRemoving(false);
     }
   }, [removeTarget, isRemoving, purchaseListUseCase, onRecorded]);
+
+  const saveManualQty = useCallback(
+    async (line: PurchaseListLine, manualQty: number) => {
+      setPendingLineId(line.itemId);
+      try {
+        await purchaseListUseCase.adjustManualQty(line.itemId, { manualQty });
+        await onRecorded();
+      } catch (err) {
+        toast.error(extractErrorMessage(err, '수량을 고치지 못했습니다.'));
+      } finally {
+        setPendingLineId(null);
+      }
+    },
+    [purchaseListUseCase, onRecorded]
+  );
+
+  // D13 · D24 · D26: saved as soon as a seller is picked; a taken seller → the server's 409 text, the line stays.
+  const changeManualSeller = useCallback(
+    async (line: PurchaseListLine, sellerId: number) => {
+      setPendingLineId(line.itemId);
+      try {
+        await purchaseListUseCase.changeManualSeller(line.itemId, sellerId);
+        await onRecorded();
+      } catch (err) {
+        toast.error(extractErrorMessage(err, '판매자를 바꾸지 못했습니다.'));
+      } finally {
+        setPendingLineId(null);
+      }
+    },
+    [purchaseListUseCase, onRecorded]
+  );
 
   // watch() 대신 useWatch — watch() 는 React Compiler 메모이제이션을 통째로 끈다.
   const [sellerId, amountMode, amountInput, quantityInput, reflectToBasePrice] = useWatch({
@@ -156,24 +216,44 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
   const canSubmit =
     sellerId !== '' && isIntStr(quantityInput) && Number(quantityInput) !== 0 && !isSaving;
 
-  const loadHistory = useCallback(async () => {
-    setIsHistoryLoading(true);
-    setHistoryError('');
-    try {
-      setRecords(await purchaseListUseCase.getRecentPurchases(item.productId, RECENT_PURCHASE_LIMIT));
-    } catch {
-      setHistoryError('구매 이력 조회에 실패했습니다.');
-    } finally {
-      setIsHistoryLoading(false);
-    }
-  }, [purchaseListUseCase, item.productId]);
+  const loadHistory = useCallback(
+    async (historySeller: string) => {
+      setIsHistoryLoading(true);
+      setHistoryError('');
+      try {
+        setRecords(
+          await purchaseListUseCase.getRecentPurchases(
+            item.productId,
+            RECENT_PURCHASE_LIMIT,
+            historySeller ? Number(historySeller) : undefined
+          )
+        );
+      } catch {
+        setHistoryError('구매 이력 조회에 실패했습니다.');
+      } finally {
+        setIsHistoryLoading(false);
+      }
+    },
+    [purchaseListUseCase, item.productId]
+  );
 
-  // 한 번 불러온 뒤 접었다 펴면 재호출하지 않는다 — 캐시는 [입고] 성공 때만 버린다.
+  // D25: every opening starts at 「전체」 and loads again; the box's own seller filter is separate from the page's.
   const toggleHistory = useCallback(() => {
     const next = !isHistoryOpen;
     setIsHistoryOpen(next);
-    if (next && records === null && !isHistoryLoading) loadHistory();
-  }, [isHistoryOpen, records, isHistoryLoading, loadHistory]);
+    if (next) {
+      setHistorySellerId('');
+      void loadHistory('');
+    }
+  }, [isHistoryOpen, loadHistory]);
+
+  const changeHistorySeller = useCallback(
+    (value: string) => {
+      setHistorySellerId(value);
+      void loadHistory(value);
+    },
+    [loadHistory]
+  );
 
   const submitCheckIn = useCallback(
     async (data: CheckInFormData) => {
@@ -193,19 +273,19 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
             : {}),
           ...(amountNum !== undefined && data.amountMode === 'UNIT' ? { unitPrice: amountNum } : {}),
           reflectToBasePrice: data.reflectToBasePrice,
-          // 체크박스는 체크 + 비활성이라 항상 true 다(PLAN 2609_29 D19).
+          // Always true — the server writes stock only while the stock link is on (FEATURE_2610_09 D65).
           recordStock: true,
         });
         // 음수 정정은 재고를 건드리지 않는다(D17) — 조용히 넘기면 재고가 오른 줄 안다.
-        if (!result.stockRecorded) {
+        if (stockLinked && !result.stockRecorded) {
           setStockNotice(
             '재고는 반영되지 않았습니다 — 실물이 줄었다면 재고 화면에서 조정하세요'
           );
         }
-        form.reset(checkInDefaults());
+        form.reset(checkInDefaults(defaultSellerId));
         // 방금 넣은 건이 안 보이면 이상하다 — 이력 캐시를 버린다.
         setRecords(null);
-        if (isHistoryOpen) await loadHistory();
+        if (isHistoryOpen) await loadHistory(historySellerId);
         await onRecorded();
       } catch (err) {
         // 금액 검증(총액·단가 동시 입력 등)은 서버가 판정한다 — 메시지를 원문 그대로 보여준다.
@@ -215,14 +295,24 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
         setIsSaving(false);
       }
     },
-    [purchaseListUseCase, item.productId, form, isHistoryOpen, loadHistory, onRecorded]
+    [
+      purchaseListUseCase,
+      item.productId,
+      form,
+      stockLinked,
+      defaultSellerId,
+      isHistoryOpen,
+      historySellerId,
+      loadHistory,
+      onRecorded,
+    ]
   );
 
-  // 그 그룹에 실제로 등장하는 채널만 칩으로 낸다. 수동 라인은 marketplaceAccountId 가 없어 'MANUAL' 하나로 묶인다.
+  // Chips = the channels that actually appear in this product's lines; manual lines get one chip per seller (D17).
   const channels = useMemo(() => {
     const seen = new Map<string, string>();
     item.lines.forEach((line) => {
-      const key = line.marketplaceAccountId != null ? String(line.marketplaceAccountId) : 'MANUAL';
+      const key = channelKey(line);
       if (!seen.has(key)) seen.set(key, channelLabel(line));
     });
     return Array.from(seen, ([key, label]) => ({ key, label }));
@@ -231,11 +321,7 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
   const visibleLines =
     activeChannel === 'ALL'
       ? item.lines
-      : item.lines.filter(
-          (line) =>
-            (line.marketplaceAccountId != null ? String(line.marketplaceAccountId) : 'MANUAL') ===
-            activeChannel
-        );
+      : item.lines.filter((line) => channelKey(line) === activeChannel);
 
   return (
     <div className="space-y-4">
@@ -247,20 +333,19 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
         <h3 className="text-sm font-semibold text-gray-900">입고</h3>
 
         <div className="mt-3 flex flex-wrap items-end gap-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">판매자</label>
-            <select
-              {...form.register('sellerId')}
-              className="px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">선택</option>
-              {sellers.map((seller) => (
-                <option key={seller.id} value={seller.id}>
-                  {seller.sellerName}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!soleSeller && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">판매자</label>
+              <select {...form.register('sellerId')} className={SELECT_CLASS}>
+                <option value="">선택</option>
+                {sellers.map((seller) => (
+                  <option key={seller.id} value={seller.id}>
+                    {seller.sellerName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-xs text-gray-500 mb-1">구매일</label>
             <input
@@ -271,10 +356,7 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">금액 기준</label>
-            <select
-              {...form.register('amountMode')}
-              className="px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
+            <select {...form.register('amountMode')} className={SELECT_CLASS}>
               <option value="TOTAL">총액</option>
               <option value="UNIT">단가</option>
             </select>
@@ -322,17 +404,8 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          {/* 재고 즉시 반영: 켠 채로 잠근다(D19) — 끄는 기능은 재고 화면과 함께 열린다 */}
-          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-not-allowed">
-            <input
-              type="checkbox"
-              checked
-              disabled
-              readOnly
-              className="h-4 w-4 cursor-not-allowed"
-            />
-            재고 즉시 반영 <span className="text-gray-400">(입고대기 화면 준비 중)</span>
-          </label>
+          {/* D71 ③: no stock switch — the stock link setting decides; the notice shows only while it is on. */}
+          {stockLinked && <span className="text-xs text-gray-400">입고하면 재고에 바로 더해집니다</span>}
 
           <div className="ml-auto flex items-center gap-2">
             <button
@@ -371,9 +444,26 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
           </p>
         )}
 
-        {/* 최근 구매이력 — 물품 기준, 판매자 무관(D9) */}
+        {/* Recent purchases — per product, 「전체」 by default, its own seller filter (D7 · D25). */}
         {isHistoryOpen && (
-          <div className="mt-3 border-t border-gray-100 pt-3">
+          <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
+            {!soleSeller && (
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500">판매자</label>
+                <select
+                  value={historySellerId}
+                  onChange={(e) => changeHistorySeller(e.target.value)}
+                  className={SELECT_CLASS}
+                >
+                  <option value="">전체</option>
+                  {sellers.map((seller) => (
+                    <option key={seller.id} value={seller.id}>
+                      {seller.sellerName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {isHistoryLoading && <p className="text-xs text-gray-400">불러오는 중...</p>}
             {!isHistoryLoading && historyError && (
               <p className="text-xs text-red-600">{historyError}</p>
@@ -415,6 +505,39 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
         )}
       </form>
 
+      {/* Seller shares — 「전체」 only; the seller view puts the buttons on the product row (D59 · D83). */}
+      {filterSellerId == null && (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100 border-b border-gray-200">
+              <tr className="text-gray-600">
+                <th className="px-4 py-2 text-left font-medium">판매자</th>
+                <th className="px-4 py-2 text-right font-medium">필요 수량</th>
+                <th className="px-4 py-2 text-right font-medium">매입 완료 수량</th>
+                <th className="px-4 py-2 text-right font-medium">매입 필요 수량</th>
+                <th className="px-4 py-2 text-right font-medium">처리</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {item.shares.map((share) => (
+                <tr key={share.sellerId}>
+                  <td className="px-4 py-2 text-gray-700">
+                    {share.sellerName}
+                    <TargetMetTag share={share} />
+                  </td>
+                  <td className="px-4 py-2 text-right text-gray-900">{share.neededQty}</td>
+                  <td className="px-4 py-2 text-right text-gray-900">{share.purchasedQty}</td>
+                  <td className="px-4 py-2 text-right text-gray-900">{share.remainingQty}</td>
+                  <td className="px-4 py-2 text-right">
+                    <ShareActionCell productId={item.productId} share={share} actions={shareActions} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* 채널 칩 — 표시 필터일 뿐 헤더 숫자는 그대로다(D10) */}
       <div className="flex flex-wrap gap-2">
         {[{ key: 'ALL', label: '전체' }, ...channels].map((chip) => {
@@ -436,7 +559,7 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
         })}
       </div>
 
-      {/* 주문 줄 — 읽기 전용. 구매수량도 입력 컨트롤도 없다(D7) */}
+      {/* Lines — order lines are read-only; a manual line takes quantity · seller · removal (D23 · D24 · D77). */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-100 border-b border-gray-200">
@@ -444,7 +567,7 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
               <th className="px-4 py-2 text-left font-medium">채널</th>
               <th className="px-4 py-2 text-left font-medium">주문번호</th>
               <th className="px-4 py-2 text-right font-medium">필요 수량</th>
-              <th className="px-4 py-2 w-16" aria-label="작업" />
+              <th className="px-4 py-2 w-56" aria-label="작업" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -455,24 +578,50 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
                 </td>
               </tr>
             )}
-            {visibleLines.map((line) => (
-              <tr key={line.itemId}>
-                <td className="px-4 py-2 text-gray-700">{channelLabel(line)}</td>
-                <td className="px-4 py-2 text-gray-500">{line.externalOrderId ?? '—'}</td>
-                <td className="px-4 py-2 text-right text-gray-900">{line.neededQty}</td>
-                <td className="px-4 py-2 text-right">
-                  {line.source === 'MANUAL' && line.manualQty > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setRemoveTarget(line)}
-                      className="px-2 py-0.5 text-xs border border-gray-300 rounded text-red-600 hover:bg-red-50"
-                    >
-                      제거
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {visibleLines.map((line) => {
+              const isManual = line.source === 'MANUAL' && line.manualQty > 0;
+              const busy = pendingLineId === line.itemId;
+              return (
+                <tr key={line.itemId}>
+                  <td className="px-4 py-2 text-gray-700">{channelLabel(line)}</td>
+                  <td className="px-4 py-2 text-gray-500">{line.externalOrderId ?? '—'}</td>
+                  <td className="px-4 py-2 text-right text-gray-900">
+                    {isManual ? (
+                      <ManualQtyInput
+                        key={`${line.itemId}-${line.manualQty}`}
+                        value={line.manualQty}
+                        disabled={busy}
+                        onSave={(qty) => void saveManualQty(line, qty)}
+                      />
+                    ) : (
+                      line.neededQty
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    {isManual && (
+                      <div className="flex items-center justify-end gap-1">
+                        {!soleSeller && (
+                          <ManualSellerPicker
+                            sellers={sellers}
+                            currentSellerId={line.sellerId}
+                            disabled={busy}
+                            onPick={(id) => void changeManualSeller(line, id)}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setRemoveTarget(line)}
+                          className="px-2 py-0.5 text-xs border border-gray-300 rounded text-red-600 hover:bg-red-50"
+                        >
+                          제거
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -491,6 +640,97 @@ export function PurchaseGroupDetail({ item, sellers, onRecorded }: PurchaseGroup
         isDangerous
         isLoading={isRemoving}
       />
+    </div>
+  );
+}
+
+/** Manual quantity — 1 or more; [저장] is enabled once the value is a different whole number ≥ 1 (D23). */
+function ManualQtyInput({
+  value,
+  disabled,
+  onSave,
+}: {
+  value: number;
+  disabled: boolean;
+  onSave: (qty: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  const valid = isIntStr(text) && Number(text) >= 1 && Number(text) !== value;
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <input
+        type="number"
+        min={1}
+        value={text}
+        disabled={disabled}
+        onChange={(e) => setText(e.target.value)}
+        className="w-20 px-2 py-0.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+      />
+      <button
+        type="button"
+        disabled={disabled || !valid}
+        onClick={() => onSave(Number(text))}
+        className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        저장
+      </button>
+    </div>
+  );
+}
+
+/** [판매자 바꾸기] → a seller select (no 「전체」) that saves on pick, [취소] closes it (D13 · D24). */
+function ManualSellerPicker({
+  sellers,
+  currentSellerId,
+  disabled,
+  onPick,
+}: {
+  sellers: Seller[];
+  currentSellerId: number;
+  disabled: boolean;
+  onPick: (sellerId: number) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen(true)}
+        className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        판매자 바꾸기
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1">
+      <select
+        value=""
+        disabled={disabled}
+        onChange={(e) => {
+          if (e.target.value === '') return;
+          setIsOpen(false);
+          onPick(Number(e.target.value));
+        }}
+        className={SELECT_CLASS}
+      >
+        <option value="">선택</option>
+        {sellers
+          .filter((seller) => seller.id !== currentSellerId)
+          .map((seller) => (
+            <option key={seller.id} value={seller.id}>
+              {seller.sellerName}
+            </option>
+          ))}
+      </select>
+      <button
+        type="button"
+        onClick={() => setIsOpen(false)}
+        className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+      >
+        취소
+      </button>
     </div>
   );
 }
