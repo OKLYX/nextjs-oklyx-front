@@ -130,6 +130,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       toggle: togglePurchaseMenu,
       items: [
         { href: ROUTES.PURCHASE_LIST, label: '구매목록' },
+        { href: ROUTES.PURCHASE_RECEIPTS, label: '영수증' },
         { href: ROUTES.PURCHASE_SETTINGS, label: '구매관리 설정', adminOnly: true },
       ],
     },

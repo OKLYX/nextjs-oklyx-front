@@ -68,9 +68,9 @@ export function PurchaseCandidateTable({
                     {candidate.remainingQty}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-700 text-right">
-                    {/* null = 금액 미상. 0 으로 그리면 무상 매입으로 읽힌다. */}
+                    {/* null = amount not entered (FEATURE_2610_18 D68 「미기입」). Drawing 0 would read as a free purchase. */}
                     {candidate.unitPrice == null
-                      ? '미상'
+                      ? '미기입'
                       : candidate.unitPrice.toLocaleString('ko-KR')}
                   </td>
                   <td className="px-4 py-2 text-right">
