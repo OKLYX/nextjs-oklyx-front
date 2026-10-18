@@ -5,6 +5,7 @@ import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { InternalStageBadge } from './InternalStageBadge';
 import { ElevenstReservedBadge } from './ElevenstReservedBadge';
+import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 
 interface OrderTableProps {
   orders: OrderItem[];
@@ -160,7 +161,12 @@ export function OrderTable({
                 )}
               </td>
               <td className="px-6 py-3 text-sm text-gray-700">{getCustomerName(order)}</td>
-              <td className="px-6 py-3 text-sm text-gray-700">{order.itemName || '-'}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                <div className="flex items-center gap-2">
+                  <OrderThumbnail order={order} />
+                  <span>{order.itemName || '-'}</span>
+                </div>
+              </td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">{order.orderCount}</td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">{order.cancelCount}</td>
               <td className="px-6 py-3 text-sm text-gray-700">{formatDate(order.paidAt)}</td>
@@ -191,5 +197,29 @@ export function OrderTable({
         </div>
       )}
     </TableCard>
+  );
+}
+
+/**
+ * Row thumbnail — the first component product's representative image (server-picked). Missing image or an
+ * unexpanded line draws the same 「없음」 box as the product picker so row heights stay equal.
+ */
+function OrderThumbnail({ order }: { order: OrderItem }) {
+  const src =
+    order.thumbnailProductId != null
+      ? getProductThumbUrl(order.thumbnailImageUrl, order.thumbnailProductId)
+      : null;
+  return src ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={order.itemName ?? ''}
+      loading="lazy"
+      className="w-10 h-10 shrink-0 rounded border border-gray-200 object-cover bg-gray-50"
+    />
+  ) : (
+    <div className="w-10 h-10 shrink-0 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-300 text-xs">
+      없음
+    </div>
   );
 }
