@@ -6,12 +6,15 @@ import { RefreshCw } from 'lucide-react';
 // only narrows the view (FEATURE_2610_09 D5); sync always covers every seller, and [주문내역 동기화] already
 // syncs and re-extracts together.
 interface PurchaseListToolbarProps {
+  /** [영수증 입고] — the receipt check-in popup (FEATURE_2610_18 D46). */
+  onReceiptClick: () => void;
   onAddManualClick: () => void;
   onSyncOrders: () => void;
   isSyncingOrders: boolean;
 }
 
 export function PurchaseListToolbar({
+  onReceiptClick,
   onAddManualClick,
   onSyncOrders,
   isSyncingOrders,
@@ -34,6 +37,12 @@ export function PurchaseListToolbar({
         >
           <RefreshCw size={16} className={isSyncingOrders ? 'animate-spin' : ''} />
           {isSyncingOrders ? '동기화 중...' : '주문내역 동기화'}
+        </button>
+        <button
+          onClick={onReceiptClick}
+          className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100"
+        >
+          영수증 입고
         </button>
         <button
           onClick={onAddManualClick}
