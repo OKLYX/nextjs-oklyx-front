@@ -4,36 +4,44 @@ import { Fragment } from 'react';
 import type { PurchaseListItem } from '@/domain/entities/PurchaseListEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PurchaseGroupDetail } from './PurchaseGroupDetail';
+import { ShareActionCell, type ShareActions } from './purchaseShareUi';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 
 // 완료 그룹이라도 추가 입고·정정이 있을 수 있어 토글 내용물은 구매목록 탭과 같다(PLAN 2609_29 D21).
 interface CompletedPurchaseTableProps {
   items: PurchaseListItem[];
   sellers: Seller[];
+  /** Seller filter; null = 「전체」. A chosen seller puts the share words and undo on the row (D83). */
+  filterSellerId: number | null;
+  stockLinked: boolean;
   productImages: Record<number, string | null>;
   isLoading: boolean;
   error: string;
   expandedProductId: number | null;
   onToggle: (productId: number) => void;
   onRecorded: () => void | Promise<void>;
+  shareActions: ShareActions;
 }
 
 export function CompletedPurchaseTable({
   items,
   sellers,
+  filterSellerId,
+  stockLinked,
   productImages,
   isLoading,
   error,
   expandedProductId,
   onToggle,
   onRecorded,
+  shareActions,
 }: CompletedPurchaseTableProps) {
   return (
     // 카드 머리말(제목·안내)이 로딩·빈 상태에서도 남아야 해 상태 행은 tbody 가 그대로 그린다.
     <TableCard>
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900">구매 완료 내역</h2>
-        <p className="mt-1 text-xs text-gray-500">매입이 끝난(매입 필요 수량 ≤ 0) 구성품만 표시됩니다.</p>
+        <p className="mt-1 text-xs text-gray-500">매입 완료 처리한 구성품입니다.</p>
       </div>
 
       <table className="w-full text-sm">
@@ -45,12 +53,13 @@ export function CompletedPurchaseTable({
             <th className="px-4 py-3 text-right font-medium">필요 수량</th>
             <th className="px-4 py-3 text-right font-medium">매입 완료 수량</th>
             <th className="px-4 py-3 text-right font-medium">매입 필요 수량</th>
+            <th className="px-4 py-3 text-right font-medium">처리</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {isLoading && (
             <tr>
-              <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+              <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                 불러오는 중...
               </td>
             </tr>
@@ -58,7 +67,7 @@ export function CompletedPurchaseTable({
 
           {!isLoading && error && (
             <tr>
-              <td colSpan={6} className="px-4 py-10 text-center text-red-600">
+              <td colSpan={7} className="px-4 py-10 text-center text-red-600">
                 {error}
               </td>
             </tr>
@@ -66,7 +75,7 @@ export function CompletedPurchaseTable({
 
           {!isLoading && !error && items.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+              <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                 완료된 구매 내역이 없습니다.
               </td>
             </tr>
@@ -76,6 +85,7 @@ export function CompletedPurchaseTable({
             !error &&
             items.map((item) => {
               const isExpanded = expandedProductId === item.productId;
+              const rowShare = filterSellerId != null ? item.shares[0] : undefined;
               return (
                 <Fragment key={item.productId}>
                   <tr
@@ -108,15 +118,23 @@ export function CompletedPurchaseTable({
                     <td className="px-4 py-3 text-right font-semibold text-gray-500">
                       {item.remainingQty}
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      {rowShare && (
+                        <ShareActionCell productId={item.productId} share={rowShare} actions={shareActions} />
+                      )}
+                    </td>
                   </tr>
 
                   {isExpanded && (
                     <tr className="bg-gray-50">
-                      <td colSpan={6} className="px-4 py-4">
+                      <td colSpan={7} className="px-4 py-4">
                         <PurchaseGroupDetail
                           item={item}
                           sellers={sellers}
+                          filterSellerId={filterSellerId}
+                          stockLinked={stockLinked}
                           onRecorded={onRecorded}
+                          shareActions={shareActions}
                         />
                       </td>
                     </tr>

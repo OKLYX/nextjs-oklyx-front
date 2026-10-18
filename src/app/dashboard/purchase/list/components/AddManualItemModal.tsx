@@ -5,6 +5,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { AddManualItemRequest } from '@/application/dto/PurchaseListDTOs';
+import type { Seller } from '@/domain/entities/SellerEntity';
 import { Input } from '@/presentation/components/ui/Input';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { ProductPicker } from '@/presentation/components/ProductPicker';
@@ -14,6 +15,8 @@ const isIntStr = (v: string) => v.trim() !== '' && Number.isInteger(Number(v));
 const schema = z.object({
   productId: z.string().refine((v) => v !== '', '상품을 검색해 선택하세요.'),
   productName: z.string(),
+  // FEATURE_2610_09 D11: required. D12: starts empty every time the popup opens.
+  sellerId: z.string().min(1, '판매자를 선택하세요.'),
   quantity: z
     .string()
     .refine(isIntStr, '정수만 입력 가능합니다.')
@@ -23,11 +26,15 @@ type FormData = z.infer<typeof schema>;
 
 interface AddManualItemModalProps {
   isOpen: boolean;
+  sellers: Seller[];
   onClose: () => void;
   onSubmit: (request: AddManualItemRequest) => Promise<void>;
 }
 
-export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemModalProps) {
+export function AddManualItemModal({ isOpen, sellers, onClose, onSubmit }: AddManualItemModalProps) {
+  // D53: one seller → the field is hidden and that seller is used.
+  const soleSellerId = sellers.length === 1 ? String(sellers[0].id) : '';
+
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -40,7 +47,7 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { productId: '', productName: '', quantity: '1' },
+    defaultValues: { productId: '', productName: '', sellerId: soleSellerId, quantity: '1' },
   });
   const productId = useWatch({ control, name: 'productId' });
   const productName = useWatch({ control, name: 'productName' });
@@ -48,11 +55,11 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
   useEffect(() => {
     if (!isOpen) return;
     const initForm = async () => {
-      reset({ productId: '', productName: '', quantity: '1' });
+      reset({ productId: '', productName: '', sellerId: soleSellerId, quantity: '1' });
       setSubmitError('');
     };
     initForm();
-  }, [isOpen, reset]);
+  }, [isOpen, reset, soleSellerId]);
 
   if (!isOpen) return null;
 
@@ -60,7 +67,11 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
     setSubmitError('');
     setIsSubmitting(true);
     try {
-      await onSubmit({ productId: Number(data.productId), quantity: Number(data.quantity) });
+      await onSubmit({
+        productId: Number(data.productId),
+        sellerId: Number(data.sellerId),
+        quantity: Number(data.quantity),
+      });
     } catch {
       setSubmitError('수동 항목 추가에 실패했습니다.');
     } finally {
@@ -101,6 +112,27 @@ export function AddManualItemModal({ isOpen, onClose, onSubmit }: AddManualItemM
           {/* Reserved line so a validation message does not resize the popup. */}
           <p className="mt-1 h-4 text-xs text-red-600">{errors.productId?.message}</p>
         </div>
+
+        {soleSellerId === '' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">판매자</label>
+            <select
+              {...register('sellerId')}
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">선택</option>
+              {sellers.map((seller) => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.sellerName}
+                </option>
+              ))}
+            </select>
+            {errors.sellerId && (
+              <p className="mt-1 text-xs text-red-600">{errors.sellerId.message}</p>
+            )}
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">수량</label>
