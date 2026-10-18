@@ -28,19 +28,20 @@ interface ProductPickerProps {
 }
 
 /**
- * 물품(Product) 한 개를 상품명 검색으로 고르는 공통 선택기.
+ * Shared picker that chooses one product (Product) by searching its name.
  *
- * 검색 = Enter 또는 [검색], 상위 10건. 결과 행마다 대표 사진(없으면 「없음」 상자).
- * 선택 상태는 호출부가 가진다(제어 컴포넌트) — `productId` 가 null 이 아니면 선택 상태로 그린다.
+ * Search = Enter or [검색], top 10 results. Each result row shows the main photo (a 「없음」 box when there is none).
+ * The caller owns the selection (controlled component) — a non-null `productId` draws the selected state.
  *
- * 두 가지 모양:
- * - 기본 — 선택 전에는 검색 입력 + 결과, 선택 후에는 이름 #ID + [변경] 만 보인다(폼 한 줄 안에 쓰기 좋다).
- * - `fixedResults` — 결과 칸을 고정 높이로 미리 잡아 두고, 선택해도 검색창·결과를 그대로 둔 채
- *   고른 행만 강조한다. 팝업 안에서 결과 개수에 따라 팝업 크기가 바뀌지 않게 할 때 쓴다.
+ * Two looks:
+ * - default — before a pick: search input + results; after a pick: only name #ID + [변경] (fits one form row).
+ * - `fixedResults` — the results area is reserved at a fixed height; after a pick the search bar and results stay and
+ *   only the picked row is highlighted. Use it inside a popup so the popup size does not follow the result count.
  *
- * 사용처:
- * - 입출고 폼 `stock/in-out/StockInOutForm` (기본, FEATURE_2609_28)
- * - 구매목록 수동 항목 추가 `purchase/list/AddManualItemModal` (`fixedResults`)
+ * Used by:
+ * - stock in/out form `stock/in-out/StockInOutForm` (default, FEATURE_2609_28)
+ * - purchase list manual add `purchase/list/AddManualItemModal` (`fixedResults`)
+ * - purchase list receipt check-in `purchase/list/ReceiptIntakeModal` (default, one picker per line, FEATURE_2610_18)
  *
  * @example
  * <ProductPicker
@@ -51,12 +52,12 @@ interface ProductPickerProps {
  * />
  *
  * @example
- * // 팝업 안 — 결과 칸 고정
+ * // inside a popup — fixed results area
  * <ProductPicker fixedResults productId={…} productName={…} onSelect={…} onClear={…} />
  *
- * ⚠️ 판매 옵션·마스터 상품이 아니라 물품(Product) 을 고른다.
- * ⚠️ 사진 src 는 `getProductThumbUrl`(대표 사진) — 상품 목록과 같은 규칙.
- * ❌ 물품 ID 를 숫자로 직접 입력받는 칸을 새로 만들지 말고 이 컴포넌트를 쓴다.
+ * ⚠️ It picks a product (Product), not a sales option or a master product.
+ * ⚠️ The photo src is `getProductThumbUrl` (main photo) — the same rule as the product list.
+ * ❌ Do not add a field that takes a product ID as a typed number — use this component.
  */
 export function ProductPicker({
   productId,

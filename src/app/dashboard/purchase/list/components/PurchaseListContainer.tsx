@@ -20,6 +20,7 @@ import { PurchaseListToolbar } from './PurchaseListToolbar';
 import { PurchaseListTable } from './PurchaseListTable';
 import { UnmappedOrdersSection } from './UnmappedOrdersSection';
 import { AddManualItemModal } from './AddManualItemModal';
+import { ReceiptIntakeModal } from './ReceiptIntakeModal';
 import { PurchaseTabs, type PurchaseTab } from './PurchaseTabs';
 import { CompletedPurchaseTable } from './CompletedPurchaseTable';
 import { CompletedPurchaseFilter } from './CompletedPurchaseFilter';
@@ -55,6 +56,7 @@ export function PurchaseListContainer() {
   const [error, setError] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   // productId -> 이미지 프록시 URL (없으면 null). 구매목록 응답엔 이미지가 없어 상품 상세로 보강.
   const [productImages, setProductImages] = useState<Record<number, string | null>>({});
   // Tab (「구매목록」 / 「구매완료내역조회」). The completed tab loads on entry while it is not loaded (D5 marks it stale).
@@ -298,6 +300,14 @@ export function PurchaseListContainer() {
     await loadList();
   };
 
+  // FEATURE_2610_18: a receipt check-in changes purchased quantities like a check-in — the completed tab reloads on
+  // its next entry (D5).
+  const handleReceiptSaved = async () => {
+    setIsReceiptModalOpen(false);
+    setCompletedLoaded(false);
+    await loadList();
+  };
+
   const handleToggle = (productId: number) => {
     setExpandedProductId((prev) => (prev === productId ? null : productId));
   };
@@ -333,6 +343,7 @@ export function PurchaseListContainer() {
         {activeTab === 'list' && (
           <>
             <PurchaseListToolbar
+              onReceiptClick={() => setIsReceiptModalOpen(true)}
               onAddManualClick={() => setIsManualModalOpen(true)}
               onSyncOrders={handleSyncOrders}
               isSyncingOrders={isSyncingOrders}
@@ -422,6 +433,13 @@ export function PurchaseListContainer() {
         sellers={sellers}
         onClose={() => setIsManualModalOpen(false)}
         onSubmit={handleAddManual}
+      />
+
+      <ReceiptIntakeModal
+        isOpen={isReceiptModalOpen}
+        sellers={sellers}
+        onClose={() => setIsReceiptModalOpen(false)}
+        onSaved={handleReceiptSaved}
       />
 
       <SkipReasonModal

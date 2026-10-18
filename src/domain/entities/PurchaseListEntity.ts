@@ -4,7 +4,8 @@ export type PurchaseLineSource = 'ORDER' | 'MANUAL';
  * One recent purchase row (PLAN 2609_29 D9 · FEATURE_2610_09 D7 · D25).
  *
  * ⚠️ Without a seller filter the rows of every seller come mixed — sellerName is drawn on each row.
- * Amounts are null on rows recorded before FEATURE_2609_28 — "amount unknown", not 0.
+ * Amounts are null when the amount was not entered (FEATURE_2610_18 D68 「미기입」) or the row predates FEATURE_2609_28 —
+ * never 0.
  */
 export interface PurchaseRecord {
   id: number;
@@ -14,6 +15,8 @@ export interface PurchaseRecord {
   unitPrice: number | null;
   reflectToBasePrice: boolean;
   sellerName: string;
+  /** Set = the purchase came in with a receipt → [영수증] (FEATURE_2610_18 D93 ①). null = per-product check-in. */
+  receiptId: number | null;
 }
 
 /**

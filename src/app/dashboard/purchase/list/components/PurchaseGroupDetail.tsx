@@ -17,6 +17,7 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ShareActionCell, TargetMetTag, type ShareActions } from './purchaseShareUi';
+import { ReceiptDetailModal } from '../../receipts/components/ReceiptDetailModal';
 
 /**
  * Opened content of a product row, <b>shared</b> by the list tab, the 「오늘 넘김」 group and the completed tab
@@ -143,6 +144,8 @@ export function PurchaseGroupDetail({
   const [records, setRecords] = useState<PurchaseRecord[] | null>(null);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  // FEATURE_2610_18 D93 ①: the receipt opened from a history row's [영수증]; null = closed.
+  const [openReceiptId, setOpenReceiptId] = useState<number | null>(null);
 
   const [activeChannel, setActiveChannel] = useState<string>('ALL');
 
@@ -480,9 +483,9 @@ export function PurchaseGroupDetail({
                     <span className={record.quantity < 0 ? 'text-red-600' : 'text-gray-800'}>
                       {record.quantity > 0 ? `+${record.quantity}` : record.quantity}
                     </span>
-                    {/* 금액 미상(null)과 0원은 다르다 — 0원으로 표시하지 않는다 */}
+                    {/* A blank amount (null) is not 「0원」 — it reads 「미기입」 (FEATURE_2610_18 D68). */}
                     {record.totalAmount == null ? (
-                      <span className="text-gray-400">금액 미상</span>
+                      <span className="text-gray-400">미기입</span>
                     ) : (
                       <span className={record.totalAmount < 0 ? 'text-red-600' : 'text-gray-800'}>
                         {formatAmount(record.totalAmount)}원
@@ -496,6 +499,15 @@ export function PurchaseGroupDetail({
                     )}
                     {!record.reflectToBasePrice && (
                       <span className="text-gray-400">· 기준가 미반영</span>
+                    )}
+                    {record.receiptId != null && (
+                      <button
+                        type="button"
+                        onClick={() => setOpenReceiptId(record.receiptId)}
+                        className="text-blue-600 hover:underline"
+                      >
+                        영수증
+                      </button>
                     )}
                   </li>
                 ))}
@@ -639,6 +651,18 @@ export function PurchaseGroupDetail({
         onCancel={() => setRemoveTarget(null)}
         isDangerous
         isLoading={isRemoving}
+      />
+
+      <ReceiptDetailModal
+        receiptId={openReceiptId}
+        sellers={sellers}
+        onClose={() => setOpenReceiptId(null)}
+        onEdited={async () => {
+          // D100: the lines moved to another seller or day — reload the history and the list numbers (D2).
+          setRecords(null);
+          if (isHistoryOpen) await loadHistory(historySellerId);
+          await onRecorded();
+        }}
       />
     </div>
   );

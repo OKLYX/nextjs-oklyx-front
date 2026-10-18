@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { SellerChannelSection } from './SellerChannelSection';
+import { SellerCardSection } from './SellerCardSection';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 
 interface SellerTableProps {
@@ -92,6 +93,10 @@ export function SellerTable({
                   <tr>
                     <td colSpan={4} className="p-0">
                       <SellerChannelSection sellerId={seller.id} sellerName={seller.sellerName} />
+                      {/* FEATURE_2610_18 D52 · D53: payment cards only when there is more than one seller. */}
+                      {sellers.length !== 1 && (
+                        <SellerCardSection sellerId={seller.id} sellerName={seller.sellerName} />
+                      )}
                     </td>
                   </tr>
                 )}
