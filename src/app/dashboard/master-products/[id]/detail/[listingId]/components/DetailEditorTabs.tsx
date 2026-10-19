@@ -16,6 +16,8 @@ export type OnGenerated = (next: GeneratedProductResponse) => void;
 interface DetailEditorTabsProps {
   masterId: number;
   listingId: number;
+  /** 2+ components (FEATURE_2610_21 D3) — shows the thumbnail tab's [콜라주 편집]. */
+  collageMaster: boolean;
   generated: GeneratedProductResponse;
   template: DetailTemplateResponse;
   listingUseCase: ListingRegistrationUseCase;
@@ -41,6 +43,7 @@ const TABS: { key: TabKey; label: string }[] = [
 export function DetailEditorTabs({
   masterId,
   listingId,
+  collageMaster,
   generated,
   template,
   listingUseCase,
@@ -101,7 +104,9 @@ export function DetailEditorTabs({
         )}
         {tab === 'thumbnail' && (
           <ThumbnailPane
+            masterId={masterId}
             listingId={listingId}
+            collageMaster={collageMaster}
             generated={generated}
             useCase={listingUseCase}
             onGenerated={onGenerated}

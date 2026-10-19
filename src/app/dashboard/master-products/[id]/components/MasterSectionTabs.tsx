@@ -23,27 +23,29 @@ interface MasterSectionTabsProps {
 }
 
 /**
- * 마스터 상세에서 판매상품 목록(채널 매트릭스) **아래** 편집 섹션들의 탭 셸.
+ * Tab shell of the edit sections **below** the listing list (channel matrix) on the master detail page.
  * File: src/app/dashboard/master-products/[id]/components/MasterSectionTabs.tsx
  *
- * **용도**: 목록 아래 편집 섹션을 탭 4개(상품 기본 정보 · 이미지 · 배송 설정 · 채널별 옵션 설정)로 보여
- * 한 번에 하나만 보인다. 각 탭은 하위 블록을 세로로 펼친다 — 「이미지」 = 이미지 풀 + 템플릿 필드값,
- * 「배송 설정」 = 기본 택배/상자 + 전 채널 배송, 「채널별 옵션 설정」 = 옵션 표 + 등록상품명·태그 + 추가 문구.
+ * **Use**: shows the edit sections below the list as 4 tabs (「상품 기본 정보」 · 「이미지」 · 「배송 설정」 · 「채널별 옵션 설정」),
+ * one at a time. Each tab lays its sub-blocks out vertically — 「이미지」 = image pool + template field values +
+ * thumbnail collage (2+ components only, FEATURE_2610_21), 「배송 설정」 = default carrier/box + all-channel
+ * shipping, 「채널별 옵션 설정」 = option table + registration name·tags + extra text.
  *
- * **필수 사용 규칙**:
- * - 목록 아래에 새 편집 패널을 추가할 때는 토글 섹션으로 쌓지 말고 이 탭에 항목을 추가한다.
- * - 첫 탭이 기본 선택이다. 활성 탭은 **컴포넌트 로컬** — store·localStorage 로 persist 하지 않는다.
+ * **Required rules**:
+ * - A new edit panel below the list is added as an item of these tabs, not stacked as a toggle section.
+ * - The first tab is selected by default. The active tab is **component-local** — not persisted to a store or
+ *   localStorage.
  *
- * **마운트 규칙**:
- * | 상태 | 처리 | 이유 |
+ * **Mount rules**:
+ * | State | Handling | Why |
  * |---|---|---|
- * | 한 번도 안 본 탭 | 렌더하지 않는다 | lazy — 그 탭의 조회가 일어나지 않는다 |
- * | 지금 보는 탭 | 보인다 | — |
- * | 봤다가 떠난 탭 | **마운트 유지 + `hidden`** | 🔴 미저장 입력을 지킨다 |
+ * | a tab never opened | not rendered | lazy — that tab's reads do not happen |
+ * | the tab being viewed | visible | — |
+ * | a tab opened then left | **stays mounted + `hidden`** | 🔴 keeps unsaved input |
  *
- * ❌ `{active === key && <Pane/>}` 로 갈아끼우지 말 것 — 탭을 옮겼다 오면 입력 중이던 값이 사라진다.
- * ❌ 탭 바를 sticky 로 고정하지 말 것 — 이 화면에서 고정하는 것은 페이지 머리말 하나뿐이다.
- * ❌ 탭 안에 다시 탭을 두지 말 것 — 하위 블록은 한 탭에 펼쳐 보이는 것이 사용자 결정이다.
+ * ❌ Do not swap with `{active === key && <Pane/>}` — moving to another tab and back loses the input in progress.
+ * ❌ Do not make the tab bar sticky — the only fixed element on this screen is the page header.
+ * ❌ Do not put tabs inside a tab — showing the sub-blocks spread out in one tab is the user's decision.
  *
  * @example
  * <MasterSectionTabs
