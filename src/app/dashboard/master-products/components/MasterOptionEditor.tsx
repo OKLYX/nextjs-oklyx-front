@@ -32,7 +32,10 @@ import {
   isTotalQuantityName,
 } from '../[id]/components/optionMetaFields';
 import { CategoryMetaOverrideFields } from '../[id]/components/CategoryMetaOverrideFields';
-import { computeMissingOptionRequired } from '../[id]/components/categoryMetaValidation';
+import {
+  computeMissingOptionRequired,
+  optionNoticesToSubmit,
+} from '../[id]/components/categoryMetaValidation';
 
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
@@ -230,7 +233,9 @@ export function normalizeOptionPayload(
     packageId,
     stockQuantity,
     categoryAttributes: Object.keys(categoryAttributes).length ? categoryAttributes : undefined,
-    categoryNotices: Object.keys(categoryNotices).length ? categoryNotices : undefined,
+    // Always sent (even empty): the update API treats undefined as "keep stored", so an empty map is the
+    // only way to drop notice overrides that are no longer in the form (stale 품목군 keys, 2026-10-19).
+    categoryNotices,
   };
 }
 
@@ -685,7 +690,7 @@ export function MasterOptionEditor({
       optStock,
       masterDefaults,
       optAttrValues,
-      optNoticeValues,
+      optionNoticesToSubmit(notices, optNoticeValues, masterNoticeGroup),
       masterAttrValues,
       masterNoticeValues,
     );
