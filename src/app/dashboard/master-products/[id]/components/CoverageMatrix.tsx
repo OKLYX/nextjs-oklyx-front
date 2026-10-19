@@ -89,6 +89,8 @@ import { MasterCategoryPanel } from './MasterCategoryPanel';
 import { CategoryMetaPanel } from './CategoryMetaPanel';
 import { MasterBasicInfoPanel } from './MasterBasicInfoPanel';
 import { MasterFieldValuesPanel } from './MasterFieldValuesPanel';
+import { CollageStagesPanel } from './CollageStagesPanel';
+import { isCollageMaster } from '@/domain/collage/collageGeometry';
 import { MasterNoticeTextPanel } from './MasterNoticeTextPanel';
 import { NOTICE_TEXT_KEYS } from '@/domain/entities/ElevenstNoticeText';
 import { MasterDefaultCostPanel, carrierLabel, packageLabel } from './MasterDefaultCostPanel';
@@ -1760,6 +1762,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             onSaved={handlePanelSaved}
                           />
                         </StackedBlock>
+                        {isAdmin && master && isCollageMaster(master) && (
+                          <StackedBlock title="썸네일 콜라주">
+                            <CollageStagesPanel masterId={masterId} />
+                          </StackedBlock>
+                        )}
                       </div>
                     ),
                   },

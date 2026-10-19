@@ -14,6 +14,7 @@ import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCas
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
 import type { GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
 import type { DetailTemplateResponse } from '@/domain/entities/DetailTemplateEntity';
+import { isCollageMaster } from '@/domain/collage/collageGeometry';
 import { DetailEditorTabs } from './components/DetailEditorTabs';
 
 /**
@@ -49,6 +50,7 @@ export default function MasterProductDetailEditPage() {
   const [generated, setGenerated] = useState<GeneratedProductResponse | null>(null);
   const [template, setTemplate] = useState<DetailTemplateResponse | null>(null);
   const [masterName, setMasterName] = useState('');
+  const [collageMaster, setCollageMaster] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -68,6 +70,7 @@ export default function MasterProductDetailEditPage() {
         setGenerated(gen);
         setTemplate(resolvedTemplate);
         setMasterName(master.name);
+        setCollageMaster(isCollageMaster(master));
       } catch {
         if (alive) setError('상세 편집 정보를 불러오지 못했습니다.');
       } finally {
@@ -130,6 +133,7 @@ export default function MasterProductDetailEditPage() {
         <DetailEditorTabs
           masterId={masterId}
           listingId={listingId}
+          collageMaster={collageMaster}
           generated={generated}
           template={template}
           listingUseCase={listingUseCase}
