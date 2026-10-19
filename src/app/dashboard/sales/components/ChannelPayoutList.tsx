@@ -65,6 +65,9 @@ function reconNote(payout: PayoutSummary): { text: string; className: string } {
       return { text: '금액 차이', className: 'text-orange-600' };
     case 'AMOUNT_ONLY':
       return { text: '금액만 기록', className: 'text-gray-500' };
+    case 'NO_TOTAL':
+      // 11st (FEATURE_2610_20 / D29) — same words as PayoutTable.reconBadge.
+      return { text: '맞춰 볼 총액 없음', className: 'text-gray-500' };
     default:
       return {
         text: payout.finalAmount == null ? '지급내역 대기' : '확인 대기',
@@ -105,18 +108,28 @@ export function ChannelPayoutList({ payouts, isLoading, error, onOpen }: Channel
           <ul className="mt-1 space-y-1">
             {group.rows.map((payout) => {
               const recon = reconNote(payout);
+              const paidDate = payout.finalSettlementDate ?? payout.settlementDate;
               return (
                 <li key={payout.payoutId} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="text-gray-700">{settlementTypeLabel(payout.settlementType)}</span>
                   <span className="text-gray-900 tabular-nums">
                     {formatMoney(payout.finalAmount)}원
                   </span>
-                  {/* 🔴 날짜는 `settlementDate` 다 — `finalSettlementDate` 는 지급내역 API 가 주지 않아
-                      항상 비어 있다(2026-09-11 문서 확인). 그걸 쓰면 날짜가 영영 안 보인다. */}
-                  <span className="text-gray-500">
-                    지급 {payoutStatusLabel(payout.status)}
-                    {payout.settlementDate ? ` ${payout.settlementDate.slice(5)}` : ''}
-                  </span>
+                  {/* 🔴 The date is `finalSettlementDate ?? settlementDate` — only an 11st payout marked
+                      「지급 완료」 has `finalSettlementDate` (FEATURE_2610_20 / D38); Coupang's payment history never
+                      sends it (checked against the docs 2026-09-11), so reading it alone leaves the date blank.
+                      An overdue 11st payout reads 「입금 확인 필요」 in yellow (D40). */}
+                  {payout.paymentCheckNeeded ? (
+                    <span className="text-amber-700">
+                      입금 확인 필요
+                      {paidDate ? ` ${paidDate.slice(5)}` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">
+                      지급 {payoutStatusLabel(payout.status)}
+                      {paidDate ? ` ${paidDate.slice(5)}` : ''}
+                    </span>
+                  )}
                   <span className={recon.className}>{recon.text}</span>
                   <button
                     type="button"

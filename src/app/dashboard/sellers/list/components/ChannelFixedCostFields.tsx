@@ -7,7 +7,11 @@ import type {
   FixedCostChargeMode,
   PlatformFixedCost,
 } from '@/domain/entities/FixedCost';
-import { CHARGE_MODE_OPTIONS, formatFixedCostAmount } from '@/domain/entities/FixedCost';
+import {
+  CHARGE_MODE_OPTIONS,
+  ELEVENST_THRESHOLD_RULE,
+  formatFixedCostAmount,
+} from '@/domain/entities/FixedCost';
 
 /**
  * 채널 편집 폼의 <b>고정비</b> 섹션 (FEATURE_2609_33 / PLAN 2609_33 D1 · D2 · D2-1 · D5).
@@ -86,6 +90,8 @@ export function toFixedCostRequestItems(rows: ChannelFixedCostRow[]): AccountFix
 
 interface ChannelFixedCostFieldsProps {
   rows: ChannelFixedCostRow[];
+  /** The channel's platform — 11st reads a different AUTO rule (FEATURE_2610_20 / D42). */
+  platform: string;
   onChange: (rows: ChannelFixedCostRow[]) => void;
   isLoading: boolean;
   /** 카탈로그·연결 조회 실패 문구. 있으면 목록 대신 [다시 시도]를 보여준다. */
@@ -96,6 +102,7 @@ interface ChannelFixedCostFieldsProps {
 
 export function ChannelFixedCostFields({
   rows,
+  platform,
   onChange,
   isLoading,
   loadError,
@@ -114,7 +121,10 @@ export function ChannelFixedCostFields({
       <div>
         <label className="block text-sm font-medium">고정비</label>
         <p className="text-xs text-gray-500">
-          자동은 그 달 매출이 임계 이상인 달에만 부과합니다. 실제 청구서와 다르면 [항상 부과] 또는 [부과 안 함]으로 덮으세요.
+          {platform === 'ELEVENST'
+            ? ELEVENST_THRESHOLD_RULE
+            : '자동은 그 달 매출이 임계 이상인 달에만 부과합니다.'}{' '}
+          실제 청구서와 다르면 [항상 부과] 또는 [부과 안 함]으로 덮으세요.
         </p>
       </div>
 

@@ -7,7 +7,7 @@ import {
   channelLabel,
   formatDateRange,
   formatMoney,
-  payoutStatusLabel,
+  payoutStatusText,
   settlementTypeLabel,
 } from '@/domain/entities/Settlement';
 import { Button } from '@/presentation/components/ui/Button';
@@ -51,6 +51,12 @@ function reconBadge(row: PayoutSummary): Badge {
       // 🔴 경고색 금지. 라인 대조가 불가능할 뿐 정상 입금이다.
       return {
         text: 'ⓘ 금액만 기록 — 판매 내역 대조 불가',
+        className: 'bg-gray-50 text-gray-600 border-gray-200',
+      };
+    case 'NO_TOTAL':
+      // 🔴 No warning color — 11st sends no paid total to compare with (FEATURE_2610_20 / D29).
+      return {
+        text: 'ⓘ 맞춰 볼 총액 없음',
         className: 'bg-gray-50 text-gray-600 border-gray-200',
       };
     default:
@@ -128,8 +134,10 @@ export function PayoutTable({ rows, loading, error, onOpen, onRetry }: PayoutTab
                 </td>
                 <td className="px-6 py-3 text-sm text-gray-900">
                   {row.finalSettlementDate ?? row.settlementDate ?? '—'}
-                  <span className="block text-xs text-gray-500">
-                    {payoutStatusLabel(row.status)}
+                  <span
+                    className={`block text-xs ${row.paymentCheckNeeded ? 'text-amber-700' : 'text-gray-500'}`}
+                  >
+                    {payoutStatusText(row)}
                   </span>
                 </td>
                 <td className="px-6 py-3 text-sm text-right text-gray-900 font-medium">

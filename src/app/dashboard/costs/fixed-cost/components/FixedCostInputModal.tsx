@@ -7,13 +7,14 @@ import type {
   PlatformFixedCost,
   UpdateFixedCostRequest,
 } from '@/domain/entities/FixedCost';
-import { DEFAULT_THRESHOLD_AMOUNT } from '@/domain/entities/FixedCost';
+import { DEFAULT_THRESHOLD_AMOUNT, thresholdRuleText } from '@/domain/entities/FixedCost';
 import { platformLabel } from '@/domain/entities/Settlement';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { Modal } from '@/presentation/components/ui/Modal';
 
-// 고정비 항목이 확인된 플랫폼만 둔다 — 실제 청구서를 본 뒤에 늘린다(PLAN 2609_33 "이번 범위 밖").
-const PLATFORM_VALUES = ['COUPANG'];
+// Only platforms whose fixed-cost items are confirmed — widened after seeing a real bill (PLAN 2609_33
+// "out of scope"). 11st = the monthly server fee (FEATURE_2610_20 / D43 · D47).
+const PLATFORM_VALUES = ['COUPANG', 'ELEVENST'];
 
 interface FixedCostInputModalProps {
   /** null = 추가 · 값 = 그 항목 수정(플랫폼은 카탈로그의 축이라 수정 대상이 아니다). */
@@ -175,9 +176,7 @@ export function FixedCostInputModal({
             disabled={isLoading}
             className={inputCls}
           />
-          <p className="mt-1 text-xs text-gray-500">
-            그 달 상품 매출(배송비 제외)이 임계 이상인 달에만 부과됩니다.
-          </p>
+          <p className="mt-1 text-xs text-gray-500">{thresholdRuleText(platform)}</p>
         </div>
 
         {isEdit && (

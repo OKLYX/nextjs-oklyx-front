@@ -3,6 +3,7 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { SettlementRepository } from '@/domain/repositories/SettlementRepository';
 import type {
+  FirstMonthQuestion,
   PayoutDetail,
   PayoutQuery,
   PayoutSummary,
@@ -116,5 +117,22 @@ export class SettlementRepositoryImpl implements SettlementRepository {
       params: sellerId != null ? { sellerId } : undefined,
     });
     return response.data.data;
+  }
+
+  async markPaid(payoutId: number, paidOn: string): Promise<void> {
+    await axiosInstance.post(`/api/admin/settlement/payouts/${payoutId}/mark-paid`, { paidOn });
+  }
+
+  async unmarkPaid(payoutId: number): Promise<void> {
+    await axiosInstance.post(`/api/admin/settlement/payouts/${payoutId}/unmark-paid`);
+  }
+
+  async getFirstMonthQuestions(): Promise<FirstMonthQuestion[]> {
+    const response = await axiosInstance.get('/api/admin/settlement/first-month-questions');
+    return response.data.data;
+  }
+
+  async answerFirstMonth(linkId: number, charged: boolean): Promise<void> {
+    await axiosInstance.post(`/api/admin/settlement/first-month-questions/${linkId}`, { charged });
   }
 }

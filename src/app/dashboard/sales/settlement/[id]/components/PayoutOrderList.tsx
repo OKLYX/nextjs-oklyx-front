@@ -6,21 +6,22 @@ import type { ReconLineView } from '@/domain/entities/Settlement';
 import { ReconLineTable } from './ReconLineTable';
 
 /**
- * 이 지급 묶음이 <b>어떤 주문에 대한 정산인지</b> 그대로 펼친 목록 (FEATURE_2609_34).
+ * The list of <b>which orders this payout settles</b>, laid out as is (FEATURE_2609_34).
  *
- * 🔴 아래 차이 리포트의 목록과 <b>같은 데이터</b>지만 성격이 다르다. 저쪽은 "왜 금액이 어긋났나"를 원인
- * 라벨로 좁혀 들어가는 드릴다운이고, 이쪽은 <b>묻지 않아도 보이는 전체 목록</b>이다 — 대사가 맞든 안 맞든
- * "이 돈이 어느 주문 값인가"는 언제나 답할 수 있어야 한다.
+ * 🔴 <b>The same data</b> as the difference report's list below, but a different role. That one is a drill-down
+ * narrowed by cause label ("why do the amounts differ"); this one is <b>the whole list, shown without asking</b> —
+ * whether reconciliation matches or not, "which orders is this money for" must always be answerable.
  *
- * 🔴 <b>목록만 스크롤한다</b>(사용자 요청 2026-09-11). 수백 줄이 페이지를 늘리면 위의 요약·원인 분석에
- * 닿으려고 매번 스크롤해야 한다 — 표에 높이를 주고 머리글을 고정해, 페이지는 그대로 두고 목록 안에서만
- * 움직이게 한다.
+ * 🔴 <b>Only the list scrolls</b> (user request 2026-09-11). Hundreds of rows lengthening the page would mean
+ * scrolling every time to reach the summary and cause analysis above — the table gets a height and a fixed
+ * header, so the page stays and only the list moves.
  *
- * 🔴 <b>비어 있을 때 이유를 밝힌다.</b> 라인은 쿠팡 <b>매출내역</b> 조회로만 들어오고, 지급내역만 받아 둔
- * 채널은 이 목록이 0건이다. 그냥 "없습니다" 라고만 하면 정산에 주문이 없다는 뜻으로 읽힌다.
+ * 🔴 <b>An empty list says why.</b> Lines come in only through the market's <b>revenue</b> lookup (Coupang ·
+ * 11st, FEATURE_2610_20); a channel that has only loaded payouts has 0 rows here. Saying just "none" reads as
+ * "the payout has no orders".
  *
- * ⚠️ 검색은 <b>화면 안에서만</b> 거른다(서버 재조회 없음) — 목록이 이미 전부 와 있어서 왕복할 이유가 없다.
- * ⚠️ 표시 전용이다 — 조회·클립보드는 `PayoutDetailContainer` 가 소유한다.
+ * ⚠️ The search filters <b>on screen only</b> (no server re-read) — the whole list is already here.
+ * ⚠️ Display only — the lookup and the clipboard belong to `PayoutDetailContainer`.
  */
 interface PayoutOrderListProps {
   lines: ReconLineView[];

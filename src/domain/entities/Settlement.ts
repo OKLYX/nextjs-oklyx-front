@@ -24,11 +24,16 @@ export interface PayoutSummary {
   revenueRecognitionMonth: string | null;
   recognitionFrom: string | null;
   recognitionTo: string | null;
-  /** 지급(예정)일. 🔴 실제 입금 시점 판정은 이 날짜 + `status` 로 한다. */
+  /**
+   * Scheduled payout date (11st: the remittance date). 🔴 Whether and when the money arrived is judged by `status` +
+   * `finalSettlementDate ?? settlementDate` (FEATURE_2610_20 / D38).
+   */
   settlementDate: string | null;
   /**
-   * 🔴 <b>지급내역 API 는 이 필드를 주지 않는다</b>(2026-09-11 문서 확인) — 지급 묶음에서는 항상 null 이다.
-   * 날짜를 보여줄 때 이것부터 읽으면 영영 빈칸이 된다. `settlementDate` 를 쓸 것.
+   * The date the money actually arrived — filled only when a person marks an 11st payout 「지급 완료」
+   * (FEATURE_2610_20 / D38). 🔴 Coupang's payment-history API never sends it (checked against the docs 2026-09-11),
+   * so it is always null on Coupang payouts. Show a date as `finalSettlementDate ?? settlementDate` — reading this
+   * field alone leaves the cell empty forever.
    */
   finalSettlementDate: string | null;
   totalSale: number | null;
@@ -36,10 +41,30 @@ export interface PayoutSummary {
   finalAmount: number | null;
   /** SCHEDULED · PAID · UNKNOWN. */
   status: string | null;
-  /** PENDING · RECONCILED · UNRECONCILED · AMOUNT_ONLY. */
+  /** PENDING · RECONCILED · UNRECONCILED · AMOUNT_ONLY · NO_TOTAL (11st, FEATURE_2610_20 / D29). */
   reconStatus: string | null;
   /** 🔴 0 이 정상일 수 있다 — 유보금 해제·채무 상환·광고비 정산은 판매 라인이 없다(D5-4). */
   lineCount: number;
+  /**
+   * FEATURE_2610_20 / D40: an 11st payout still scheduled after its remittance date (server, KST) — shown as
+   * 「입금 확인 필요」 instead of 「예정」. Display only; `status` stays `SCHEDULED`.
+   */
+  paymentCheckNeeded: boolean;
+}
+
+/**
+ * One 11st server-fee link waiting for the first-month answer. `GET /api/admin/settlement/first-month-questions`
+ * (FEATURE_2610_20 / D45 ⑦)
+ */
+export interface FirstMonthQuestion {
+  linkId: number;
+  accountId: number;
+  accountAlias: string | null;
+  sellerName: string | null;
+  /** M0, `yyyy-MM`. */
+  firstMonth: string;
+  /** The month asked about = M0's previous month, `yyyy-MM`. */
+  askMonth: string;
 }
 
 /**
@@ -282,13 +307,51 @@ const CAUSE_LABELS: Record<string, string> = {
   UNMATCHED: '미분류',
 };
 
+/**
+ * The detail notice of an 11st payout (`reconStatus === 'NO_TOTAL'`, FEATURE_2610_20 / D29). Not a warning — gray.
+ */
+export const NO_TOTAL_NOTICE =
+  '11번가는 입금 총액을 따로 주지 않아 맞춰 볼 수 없습니다. 금액은 11번가가 알려 준 정산 예정 금액의 합입니다.';
+
 /** 모르는 코드는 원문 그대로 — 두 번째 마켓이나 새 enum 이 붙어도 화면이 빈칸이 되지 않는다. */
 const label = (dictionary: Record<string, string>, code: string | null | undefined): string =>
   code == null || code === '' ? '—' : (dictionary[code] ?? code);
 
 export const platformLabel = (platform: string | null): string => label(PLATFORM_LABELS, platform);
+
+/**
+ * Market name in a sentence (FEATURE_2610_20 / D14): the platform's name, or 「마켓」 when no channel is chosen
+ * (`null`) or the platform has no name.
+ */
+export const marketName = (platform: string | null | undefined): string =>
+  platform != null && PLATFORM_LABELS[platform] ? PLATFORM_LABELS[platform] : '마켓';
+
+/** Whether the last Hangul syllable has a final consonant (decides 「이/가」 · 「을/를」). */
+const endsWithFinalConsonant = (word: string): boolean => {
+  const code = word.charCodeAt(word.length - 1);
+  return code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0;
+};
+
+/** 「쿠팡」 → 「쿠팡이」, 「11번가」 → 「11번가가」, 「마켓」 → 「마켓이」. */
+export const withSubjectParticle = (word: string): string =>
+  `${word}${endsWithFinalConsonant(word) ? '이' : '가'}`;
+
+/** 「쿠팡」 → 「쿠팡을」, 「11번가」 → 「11번가를」, 「마켓」 → 「마켓을」. */
+export const withObjectParticle = (word: string): string =>
+  `${word}${endsWithFinalConsonant(word) ? '을' : '를'}`;
 export const settlementTypeLabel = (type: string | null): string => label(SETTLEMENT_TYPE_LABELS, type);
 export const payoutStatusLabel = (status: string | null): string => label(PAYOUT_STATUS_LABELS, status);
+
+/** The payout status as shown: 「입금 확인 필요」 when the server flags it (D40), otherwise {@link payoutStatusLabel}. */
+export const payoutStatusText = (row: Pick<PayoutSummary, 'status' | 'paymentCheckNeeded'>): string =>
+  row.paymentCheckNeeded ? '입금 확인 필요' : payoutStatusLabel(row.status);
+
+/** Today in KST as `yyyy-MM-dd` — the last day an 11st arrival date may take (FEATURE_2610_20 / D38). */
+export const todayKst = (): string => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+
+/** The 「실제 입금일」 starting value: the remittance date, or today (KST) when that is still ahead (D38). */
+export const defaultPaidOn = (settlementDate: string | null, today: string = todayKst()): string =>
+  settlementDate == null || settlementDate > today ? today : settlementDate;
 export const adjustmentLabel = (type: string | null): string => label(ADJUSTMENT_LABELS, type);
 export const causeLabel = (cause: string | null): string => label(CAUSE_LABELS, cause);
 
@@ -372,10 +435,11 @@ export const buildSettlementMonthOptions = (
 };
 
 /**
- * `'yyyy-MM'` → 그 달의 `[from, to]`(`yyyy-MM-dd`) (FEATURE_2609_31 / PLAN 2609_31 D5 · D10).
+ * `'yyyy-MM'` → that month's `[from, to]` (`yyyy-MM-dd`) (FEATURE_2609_31 / PLAN 2609_31 D5 · D10).
  *
- * 🔴 `to` 는 <b>오늘(KST)을 넘지 않는다</b> — 어댑터에 클램프가 없어 미래 인식일이 그대로 쿠팡에 나간다.
- * 🔴 날짜는 `getFullYear()/getMonth()/getDate()` 로 직접 조립한다(`toISOString()` 금지, KST 하루 밀림).
+ * 🔴 `to` <b>never passes today (KST)</b> — the adapters have no clamp, so a future recognition date would go to the
+ * market (Coupang · 11st) as is.
+ * 🔴 The date is built from `getFullYear()/getMonth()/getDate()` (no `toISOString()` — it shifts a day in KST).
  */
 export const monthRange = (
   month: string,

@@ -4,7 +4,7 @@ import { Fragment } from 'react';
 import type { ChannelSales, SellerSales } from '@/domain/entities/SalesSummary';
 import type { PayoutSummary } from '@/domain/entities/Settlement';
 import {
-  FIXED_COST_HINT,
+  FIXED_COST_HINT_MIXED,
   PROFIT_PENDING_HINT,
   formatFixedCost,
   formatMoney,
@@ -118,7 +118,7 @@ export function SellerSummaryTable({
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">할인</th>
             <th
               className="px-6 py-3 text-right text-sm font-semibold text-gray-900"
-              title={FIXED_COST_HINT}
+              title={FIXED_COST_HINT_MIXED}
             >
               고정비
             </th>
