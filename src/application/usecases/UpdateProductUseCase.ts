@@ -1,4 +1,4 @@
-import type { ProductRepository, UpdateProductRequest } from '@/domain/repositories/ProductRepository';
+import type { BarcodeScanResult, ProductRepository, UpdateProductRequest } from '@/domain/repositories/ProductRepository';
 import type { Product } from '@/domain/entities/Product';
 
 export class UpdateProductUseCase {
@@ -18,5 +18,9 @@ export class UpdateProductUseCase {
 
   async checkBarcodeExists(barcodeId: string): Promise<boolean> {
     return this.repository.checkBarcodeExists(barcodeId);
+  }
+
+  async scanBarcodeFromImage(file: File): Promise<BarcodeScanResult> {
+    return this.repository.scanBarcodeFromImage(file);
   }
 }
