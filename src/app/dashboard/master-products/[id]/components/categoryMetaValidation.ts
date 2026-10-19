@@ -21,6 +21,7 @@ import {
   type MeasurePair,
 } from './measureAttributes';
 import { isOptionField, isOptionNotice } from './optionMetaFields';
+import { ELEVENST_NOTICE_PREFIX } from '@/domain/entities/ElevenstNotice';
 
 const pairFilled = (p: MeasurePair, values: Record<string, string>): boolean => {
   const u = derivedUnit(p, values);
@@ -93,6 +94,31 @@ export function noticesToSubmit(
   const masterNotices = notices.filter((n) => !isOptionNotice(n));
   const group = submitNoticeGroup(notices, noticeValues, noticeGroup);
   return noticesForGroup(masterNotices, noticeValues, group);
+}
+
+/**
+ * 옵션 저장 시 보낼 옵션-소유 고시 = **선택 품목군의 옵션-소유 고시 key 만**. 옵션 편집기는 저장된 고시 맵을
+ * 통째로 다시 시드하므로, 거르지 않으면 예전 품목군·옛 항목 이름으로 들어간 값이 화면에 안 보인 채 계속 남아
+ * 마켓 전송 때마다 버려진다(2026-10-19 마스터 1705). 그룹이 없는 스키마면 옵션-소유 고시 전부.
+ * 스키마가 아직 없으면(`notices` 비어 있음) 판단 근거가 없으므로 그대로 둔다 — 지우지 않는다.
+ * `ELEVENST:*` 값은 쿠팡 스키마 밖이라 항상 유지.
+ */
+export function optionNoticesToSubmit(
+  notices: CategoryNotice[],
+  optNoticeValues: Record<string, string>,
+  noticeGroup: string | null,
+): Record<string, string> {
+  if (notices.length === 0) return optNoticeValues;
+  const allowed = new Set(
+    notices
+      .filter((n) => isOptionNotice(n) && (!noticeGroup || noticeGroupName(n) === noticeGroup))
+      .map((n) => n.key),
+  );
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(optNoticeValues)) {
+    if (allowed.has(k) || k.startsWith(ELEVENST_NOTICE_PREFIX)) out[k] = v;
+  }
+  return out;
 }
 
 /**
