@@ -35,6 +35,15 @@ export const ROUTES = {
   // 2609_64/D9: 구성상품 변경은 팝업이 아니라 페이지다(검색·선택 + 옵션×구성상품 수량 격자 = 긴 작업).
   MASTER_PRODUCT_COMPOSITION: (id: number | string) =>
     `/dashboard/master-products/${id}/composition` as const,
+  // FEATURE_2610_21 / D40: thumbnail collage editor — the stage is in the query (MASTER · SELLER + sellerId ·
+  // LISTING + listingId).
+  MASTER_PRODUCT_COLLAGE: (
+    id: number | string,
+    key: { stage: 'MASTER' | 'SELLER' | 'LISTING'; sellerId?: number; listingId?: number },
+  ) =>
+    `/dashboard/master-products/${id}/collage?stage=${key.stage}` +
+    (key.sellerId != null ? `&sellerId=${key.sellerId}` : '') +
+    (key.listingId != null ? `&listingId=${key.listingId}` : ''),
   MARGIN_POLICIES: '/dashboard/margin-policies' as const,
   LISTINGS_SYNC: '/dashboard/listings/sync' as const,
   // 🔴 LISTINGS_SYNC(콘텐츠 재전송·재심사) 와 다른 화면이다 — 이쪽은 가격 전송(FEATURE_2609_39 / PLAN D12).

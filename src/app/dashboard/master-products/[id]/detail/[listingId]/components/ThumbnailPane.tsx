@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/presentation/components/ui/Button';
+import { ROUTES } from '@/config/routes';
 import { Spinner } from '@/presentation/components/Spinner';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
@@ -16,22 +19,36 @@ const isReserved = (key: string) => (BUILTIN_FIELD_KEYS as readonly string[]).in
 const RESERVED_LABELS: Record<string, string> = { brandName: '브랜드명', productName: '상품명' };
 
 interface ThumbnailPaneProps {
+  masterId: number;
   listingId: number;
+  /** 2+ components (FEATURE_2610_21 D3 · D40 listing-tab entry) — shows [콜라주 편집]. */
+  collageMaster: boolean;
   generated: GeneratedProductResponse;
   useCase: ListingRegistrationUseCase;
   onGenerated: OnGenerated;
 }
 
 /**
- * 탭4 — 채널 셀 썸네일 관리(조회 / 재생성 / 업로드 override / override 해제).
+ * Tab 4 — channel cell thumbnail management (view / regenerate / upload override / clear override / open the
+ * collage editor).
  * File: src/app/dashboard/master-products/[id]/detail/[listingId]/components/ThumbnailPane.tsx
  *
- * 배지·override 상태는 항상 `generated.thumbnailSource`로 파생(상세용 `source`와 별개).
- * 필드값(brandName 등)은 이 패널에서 인라인 입력 → [저장 후 재생성]이 `updateFieldValues`로
- * 채널 필드값을 저장하면서 썸네일·상세를 재생성한다(prompt 12 백엔드). 예약키는 비우면
- * 등록상품값, 커스텀은 비우면 템플릿 기본값. override 상태에선 썸네일만 보존(필드값·상세는 갱신).
+ * The badge and override state are always derived from `generated.thumbnailSource` (separate from the detail's
+ * `source`). Field values (brandName etc.) are typed inline in this panel → [저장 후 재생성] saves the channel
+ * field values through `updateFieldValues` and regenerates the thumbnail and detail (prompt 12 backend). An empty
+ * reserved key uses the registered product value, an empty custom key the template default. In the override state
+ * only the thumbnail is kept (field values and detail are refreshed).
+ * [콜라주 편집] (2+ components, FEATURE_2610_21 D40 listing-tab entry) opens the collage editor at this listing's stage.
  */
-export function ThumbnailPane({ listingId, generated, useCase, onGenerated }: ThumbnailPaneProps) {
+export function ThumbnailPane({
+  masterId,
+  listingId,
+  collageMaster,
+  generated,
+  useCase,
+  onGenerated,
+}: ThumbnailPaneProps) {
+  const router = useRouter();
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -228,6 +245,16 @@ export function ThumbnailPane({ listingId, generated, useCase, onGenerated }: Th
           >
             {isClearing ? <Spinner label="되돌리는 중..." /> : '자동 생성으로 되돌리기'}
           </button>
+        )}
+
+        {collageMaster && (
+          <Button
+            variant="secondary"
+            onClick={() => router.push(ROUTES.MASTER_PRODUCT_COLLAGE(masterId, { stage: 'LISTING', listingId }))}
+            disabled={busy}
+          >
+            콜라주 편집
+          </Button>
         )}
       </div>
     </div>
