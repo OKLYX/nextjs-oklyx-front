@@ -12,6 +12,7 @@ import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type {
+  FirstMonthQuestion,
   PayoutSummary,
   SaleMonthSettlement,
   SettlementSyncTarget,
@@ -19,10 +20,13 @@ import type {
 import {
   channelLabel,
   formatDateTime,
+  marketName,
   monthLabel,
   monthRange,
   monthsBetween,
+  withSubjectParticle,
 } from '@/domain/entities/Settlement';
+import { FirstMonthQuestionBar } from './FirstMonthQuestionBar';
 import { PayoutFilter, type PayoutFilterValue } from './PayoutFilter';
 import { SyncBar } from './SyncBar';
 import { PayoutTable } from './PayoutTable';
@@ -30,17 +34,21 @@ import { SaleMonthTable } from './SaleMonthTable';
 import { SettlementBackfillDialog } from './SettlementBackfillDialog';
 
 /**
- * 지급 묶음 목록 화면의 상태 소유자 (FEATURE_2609_30 / 05 Step 2 · Step 4).
+ * State owner of the payout list screen (FEATURE_2609_30 / 05 Step 2 · Step 4).
  *
- * 소유 상태 = 필터(판매자·채널·지급일 구간) · 목록 · 동기화 대상(마지막 갱신 시각) · 갱신 진행/안내.
+ * Owned state = filter (seller · channel · payout-date range) · list · sync targets (last refresh time) · refresh
+ * progress / notices · the 11st server-fee first-month questions (FEATURE_2610_20 / D45 ⑦).
  *
- * 🔴 <b>마운트에서 `POST /sync` 를 부르지 않는다</b>(PLAN D11). 진입 시 호출하는 것은 조회 3종
- * (`/payouts` · `/sync/targets` · 판매자 목록)뿐이고, 마켓 호출은 [갱신] 버튼에서만 나간다.
- * 검증 방법: 화면을 열고 새로고침해도 네트워크 탭에 `POST /sync` 가 없어야 한다.
+ * 🔴 <b>No `POST /sync` on mount</b> (PLAN D11). Entry calls only the four lookups (`/payouts` · `/sync/targets` ·
+ * the seller list · `/first-month-questions`); market calls go out only from the [갱신] buttons.
+ * How to check: open the screen and reload — the network tab must show no `POST /sync`.
  *
- * ⚠️ 진입 쿼리파라미터(`?sellerId=` · `?accountId=` · `?reconStatus=`)는 매출 화면(04)의 배지·링크가
- * 넘겨준다. <b>초기값으로만</b> 읽고 이후에는 URL 을 따라가지 않는다 — 필터를 바꿀 때마다 URL 을 쓰면
- * 뒤로가기가 필터 히스토리가 된다.
+ * ⚠️ The entry query parameters (`?sellerId=` · `?accountId=` · `?reconStatus=`) come from the sales screen's (04)
+ * badges · links. They are read <b>as initial values only</b> and the URL is not followed afterwards — writing the URL
+ * on every filter change would turn the back button into a filter history.
+ *
+ * The 「{market}」 words in the notices use the chosen channel's market name, 「마켓」 when no channel is chosen
+ * (FEATURE_2610_20 / D14).
  */
 export function PayoutListContainer() {
   const router = useRouter();
@@ -97,6 +105,11 @@ export function PayoutListContainer() {
   // 429 쿨다운 문구는 서버가 준 것을 그대로 쓴다(해제 시각이 들어 있다). 값이 있으면 버튼을 감춘다.
   const [rateLimited, setRateLimited] = useState('');
 
+  // 11st server-fee first-month questions (FEATURE_2610_20 / D45 ⑦) — a local read, so it loads on mount.
+  const [questions, setQuestions] = useState<FirstMonthQuestion[]>([]);
+  const [answeringLinkId, setAnsweringLinkId] = useState<number | null>(null);
+  const [questionError, setQuestionError] = useState('');
+
   // 필터를 빠르게 바꾸면 응답이 역순으로 도착할 수 있다 — 마지막 요청의 결과만 반영한다.
   const requestIdRef = useRef(0);
 
@@ -151,6 +164,40 @@ export function PayoutListContainer() {
       await loadTargets();
     })();
   }, [loadTargets]);
+
+  // A failure only hides the question rows — the list keeps working.
+  const loadQuestions = useCallback(async () => {
+    try {
+      setQuestions(await settlementUseCase.getFirstMonthQuestions());
+    } catch {
+      setQuestions([]);
+    }
+  }, [settlementUseCase]);
+
+  useEffect(() => {
+    // The effect only calls — calling setState right in the effect body is blocked by the project lint
+    // (`react-hooks/set-state-in-effect`).
+    void (async () => {
+      await loadQuestions();
+    })();
+  }, [loadQuestions]);
+
+  /** [예] / [아니오] → save, then reload so the answered row disappears (D45 ⑦). */
+  const handleAnswer = useCallback(
+    async (linkId: number, charged: boolean) => {
+      setAnsweringLinkId(linkId);
+      setQuestionError('');
+      try {
+        await settlementUseCase.answerFirstMonth(linkId, charged);
+        await loadQuestions();
+      } catch (e) {
+        setQuestionError(extractErrorMessage(e, '답을 저장하지 못했습니다.'));
+      } finally {
+        setAnsweringLinkId(null);
+      }
+    },
+    [settlementUseCase, loadQuestions]
+  );
 
   useEffect(() => {
     sellerUseCase
@@ -226,10 +273,17 @@ export function PayoutListContainer() {
   const lastSyncedAt = latest((target) => target.lastSettlementSyncAt);
   const lastPayoutSyncedAt = latest((target) => target.lastPayoutSyncAt);
 
+  // The filter's channel names the market in the notices; no channel chosen = 「마켓」 (D14).
+  const filterMarket = marketName(
+    filter.accountId === ''
+      ? null
+      : (channels.find((channel) => channel.accountId === filter.accountId)?.platform ?? null)
+  );
+
   /** 429 는 재시도가 밴을 연장하므로 버튼을 감추는 별도 상태로 옮긴다. */
-  const handleSyncFailure = useCallback((e: unknown, fallback: string) => {
+  const handleSyncFailure = useCallback((e: unknown, fallback: string, market: string) => {
     if (axios.isAxiosError(e) && e.response?.status === 429) {
-      setRateLimited(extractErrorMessage(e, '쿠팡 호출이 일시 제한되었습니다.'));
+      setRateLimited(extractErrorMessage(e, `${market} 호출이 일시 제한되었습니다.`));
       return;
     }
     setSyncError(extractErrorMessage(e, fallback));
@@ -259,12 +313,13 @@ export function PayoutListContainer() {
       }
       await loadTargets();
       await load();
+      await loadQuestions();
     } catch (e) {
-      handleSyncFailure(e, '정산 갱신에 실패했습니다.');
+      handleSyncFailure(e, '정산 갱신에 실패했습니다.', filterMarket);
     } finally {
       setSyncing(false);
     }
-  }, [settlementUseCase, filter, load, loadTargets, handleSyncFailure]);
+  }, [settlementUseCase, filter, filterMarket, load, loadTargets, loadQuestions, handleSyncFailure]);
 
   const handleSyncPayout = useCallback(async () => {
     setPayoutSyncing(true);
@@ -284,11 +339,11 @@ export function PayoutListContainer() {
       await loadTargets();
       await load();
     } catch (e) {
-      handleSyncFailure(e, '지급내역 갱신에 실패했습니다.');
+      handleSyncFailure(e, '지급내역 갱신에 실패했습니다.', filterMarket);
     } finally {
       setPayoutSyncing(false);
     }
-  }, [settlementUseCase, filter.accountId, load, loadTargets, handleSyncFailure]);
+  }, [settlementUseCase, filter.accountId, filterMarket, load, loadTargets, handleSyncFailure]);
 
   /**
    * 과거 정산 백필 (FEATURE_2609_31 / 02 · PLAN 2609_31 D2 · D5 · D6 · D8 · D10 · D11).
@@ -310,6 +365,7 @@ export function PayoutListContainer() {
       const total = months.length * 2; // 매출 1 + 지급 1 (진행률 분모)
       const target = channels.find((channel) => channel.accountId === accountId);
       const name = target ? channelLabel(target) : `채널 #${accountId}`;
+      const market = marketName(target?.platform ?? null);
       const periodLabel = `${monthLabel(months[0])}~${monthLabel(months[months.length - 1])}`;
       // 같은 달이 매출·지급 양쪽에서 실패할 수 있다 — 문구에 두 번 찍히지 않게 Set 으로 모은다.
       const failedMonths = new Set<string>();
@@ -338,7 +394,7 @@ export function PayoutListContainer() {
           } catch (e) {
             if (isRateLimit(e)) {
               rateLimited = true;
-              handleSyncFailure(e, '쿠팡 호출이 일시 제한되었습니다.');
+              handleSyncFailure(e, `${market} 호출이 일시 제한되었습니다.`, market);
               break;
             }
             failedMonths.add(monthLabel(month));
@@ -359,7 +415,7 @@ export function PayoutListContainer() {
             } catch (e) {
               if (isRateLimit(e)) {
                 rateLimited = true;
-                handleSyncFailure(e, '쿠팡 호출이 일시 제한되었습니다.');
+                handleSyncFailure(e, `${market} 호출이 일시 제한되었습니다.`, market);
                 break;
               }
               failedMonths.add(monthLabel(month));
@@ -369,10 +425,10 @@ export function PayoutListContainer() {
         }
 
         if (!rateLimited) {
-          // 정산 0건은 실패가 아니다 — 그 기간에 쿠팡이 통보한 정산이 없었을 뿐이다.
+          // Zero payouts is not a failure — the market simply announced no settlement in that period.
           const summary =
             payouts === 0
-              ? `${periodLabel}에 쿠팡이 통보한 정산이 없습니다.`
+              ? `${periodLabel}에 ${withSubjectParticle(market)} 통보한 정산이 없습니다.`
               : `${periodLabel} · 정산 ${payouts}건 · 조정 ${adjustments}건 불러왔습니다 (판매 건 연결 ${attributedLines}건)`;
           const filtered = filter.from || filter.to
             ? ' 지급일 필터가 걸려 있어 그 밖의 정산은 목록에 보이지 않습니다.'
@@ -388,15 +444,23 @@ export function PayoutListContainer() {
         setBackfillOpen(false);
         await loadTargets();
         await load();
+        await loadQuestions();
       }
     },
-    [settlementUseCase, channels, filter.from, filter.to, load, loadTargets, handleSyncFailure]
+    [settlementUseCase, channels, filter.from, filter.to, load, loadTargets, loadQuestions, handleSyncFailure]
   );
 
   const invalidRange = Boolean(filter.from && filter.to && filter.from > filter.to);
 
   return (
     <PageContainer title="정산 내역">
+      <FirstMonthQuestionBar
+        questions={questions}
+        answeringLinkId={answeringLinkId}
+        error={questionError}
+        onAnswer={handleAnswer}
+      />
+
       <SyncBar
         lastSyncedAt={lastSyncedAt}
         lastPayoutSyncedAt={lastPayoutSyncedAt}

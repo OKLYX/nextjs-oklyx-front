@@ -1,4 +1,5 @@
 import type {
+  FirstMonthQuestion,
   PayoutDetail,
   PayoutQuery,
   PayoutSummary,
@@ -14,12 +15,13 @@ import type {
 } from '@/domain/entities/Settlement';
 
 /**
- * 정산 원장·금액 확인 API (FEATURE_2609_30 / 백엔드 01·02). 전 경로가 `/api/admin/settlement/**` —
- * ADMIN 전용(PLAN D17).
+ * Settlement ledger · amount check API (FEATURE_2609_30 / backend 01 · 02). Every path is `/api/admin/settlement/**`
+ * — ADMIN only (PLAN D17).
  *
- * 🔴 <b>조회(get*)와 갱신(sync*)은 성격이 다르다.</b> 조회는 전부 로컬 DB 라 마켓을 부르지 않지만,
- * `sync*` 는 쿠팡을 호출한다. 그래서 화면 진입(마운트)에서 `sync*` 를 부르면 안 된다 — 사용자가 화면을
- * 열 때마다 마켓 API 호출이 나간다. D11 이 막으려는 것이 정확히 이것이다.
+ * 🔴 <b>Lookups (get*) and refreshes (sync*) are different in kind.</b> Lookups read the local DB and never call the
+ * market, but `sync*` calls the market (Coupang · 11st, FEATURE_2610_20). So never call `sync*` on screen entry
+ * (mount) — every visit would send market API calls. That is exactly what D11 prevents. The 11st 「지급 완료」 mark
+ * and the first-month answer (`markPaid` · `unmarkPaid` · `answerFirstMonth`) only write local rows.
  */
 export interface SettlementRepository {
   /** 지급 묶음 목록 — <b>지급일</b> 축. `lineCount === 0` 인 묶음도 그대로 내려온다(정상, D5-4). */
@@ -45,10 +47,11 @@ export interface SettlementRepository {
   /** 🔴 마켓 호출. 사용자가 [갱신] 을 누를 때만 부른다. */
   syncSettlement(accountId?: number, sellerId?: number): Promise<SettlementSyncResult>;
   /**
-   * 🔴 마켓 호출. 주 1회 스케줄이 기본이고 이 버튼은 수동 보정용이다.
+   * 🔴 Market call — except 11st, whose payouts are rebuilt from the stored lines with no market call
+   * (FEATURE_2610_20 / D30). A weekly schedule is the default; this button is a manual correction.
    *
-   * `month`('yyyy-MM')를 주면 그 달만 읽고 <b>마지막 갱신 앵커를 건드리지 않는다</b>
-   * (백엔드 2609_31 / 01 · PLAN 2609_31 D3) — 과거 달 백필이 초기 백필 기회를 소진하지 않는다.
+   * With `month` ('yyyy-MM') only that month is read and <b>the last-refresh anchor is not touched</b>
+   * (backend 2609_31 / 01 · PLAN 2609_31 D3) — a past-month backfill does not use up the initial backfill.
    */
   syncPayouts(accountId?: number, month?: string): Promise<PayoutSyncResult>;
   /**
@@ -60,4 +63,12 @@ export interface SettlementRepository {
   syncRevenuePeriod(accountId: number, from: string, to: string): Promise<SettlementSyncResult>;
   /** 대상 채널 + 마지막 갱신 시각. 자격증명은 포함되지 않는다. */
   getSyncTargets(sellerId?: number): Promise<SettlementSyncTarget[]>;
+  /** 11st 「지급 완료」 — status PAID + the date the money arrived (`yyyy-MM-dd`). Local write only (FEATURE_2610_20 / D34 · D38). */
+  markPaid(payoutId: number, paidOn: string): Promise<void>;
+  /** 11st 「지급 완료 취소」 — back to scheduled, the arrival date cleared (D39). */
+  unmarkPaid(payoutId: number): Promise<void>;
+  /** 11st server-fee links waiting for the first-month answer (D45 ⑦). Local read — safe on mount. */
+  getFirstMonthQuestions(): Promise<FirstMonthQuestion[]>;
+  /** [예] = true · [아니오] = false on one question (D45 ⑦). */
+  answerFirstMonth(linkId: number, charged: boolean): Promise<void>;
 }

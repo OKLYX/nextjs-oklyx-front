@@ -8,35 +8,42 @@ import {
   formatMoney,
   formatSigned,
   isInformationalAdjustment,
+  marketName,
+  withSubjectParticle,
 } from '@/domain/entities/Settlement';
 
 /**
- * 블록 A — <b>정산 상세 내역</b> (지급 묶음 단위, FEATURE_2609_30 / 05 Step 3 · PLAN D9 · D12).
+ * Block A — <b>settlement detail</b> (per payout, FEATURE_2609_30 / 05 Step 3 · PLAN D9 · D12).
  *
- * 검증식 `Σ라인 + Σ조정 == 쿠팡 지급액` 의 좌우변을 그대로 펼친다. 블록 B(라인 단위)와 위아래로 나누는
- * 이유는 사용자가 <b>어디에 문의할지</b> 알아야 하기 때문이다 — 통장 금액 차이는 플랫폼 정산팀,
- * 라인 차이는 상품·수수료 설정 쪽이다. 섞으면 둘 다 못 물어본다.
+ * Lays out both sides of `Σ lines + Σ adjustments == {market} paid amount` as they are. It is split from block B
+ * (per line) because the user has to know <b>where to ask</b> — a bank-amount difference goes to the platform's
+ * settlement team, a line difference to the product · commission settings. Mixed, neither can be asked.
  *
- * 🔴 <b>표시 전용이다.</b> 금액을 여기서 다시 더하지 않는다 — 합계·차액·허용오차는 전부 서버(`SettlementReconciler`)가
- * 계산한 값이고, 화면이 따로 더하면 저장값과 다른 답이 나온다.
- * 🔴 `DEDUCTION` 의 ⓘ 문구(`guidance`)는 <b>서버 값을 그대로</b> 쓴다. 쿠팡이 사유를 주지 않으므로
- * 프론트가 추측 문구를 지어내면 리포트 전체를 못 믿게 된다(D13).
- * 🔴 판매 건 0건은 정상이다(D5-4) — 유보금 해제·채무 상환·광고비 정산은 판매 라인이 없다.
+ * 🔴 <b>Display only.</b> No amount is summed again here — totals, differences and tolerance are all computed by the
+ * server (`SettlementReconciler`); adding on screen gives a different answer from the stored values.
+ * 🔴 The `DEDUCTION` ⓘ text (`guidance`) is <b>the server's value as is</b>. The market gives no reason, so a
+ * guessed text invented here would make the whole report untrustworthy (D13).
+ * 🔴 Zero sale lines is normal (D5-4) — reserve releases, debt repayments and ad settlements carry no lines.
  *
- * 🔴 <b>`ourTotal == null` 이면 대조를 하지 않은 것이다</b>(FEATURE_2609_32 / PLAN 2609_32 D2·D3).
- * 추가정산·유보금은 라인을 일부러 귀속시키지 않아 계산하면 100% 차액 −전액이 나온다. 이때는
- * `OCLYX 집계` 행·차액 배지·허용오차를 <b>렌더하지 않는다</b> — 빈칸(`—`)으로 두면 "값을 못 불러왔다"로
- * 읽힌다. 아예 없는 항목이다. 쿠팡이 준 금액 구성(라인 합·조정 행·지급액)은 그대로 남긴다.
- * 🔴 판정은 `reconStatus` 문자열이 아니라 <b>값의 유무</b>로 한다 — 서버가 대조 대상 규칙을 바꿔도
- * 화면이 따로 판단하지 않는다.
+ * 🔴 <b>`ourTotal == null` means no comparison was made</b> (FEATURE_2609_32 / PLAN 2609_32 D2 · D3). Additional and
+ * reserve payouts deliberately carry no attributed lines, so computing would give a 100% "diff −full amount" — and
+ * an 11st payout has no platform total at all (FEATURE_2610_20 / D29). Then the 「OCLYX 집계」 row, the diff badge and
+ * the tolerance are <b>not rendered</b> — a blank (`—`) would read as "failed to load"; the items simply do not
+ * exist. The amount breakdown the market gave (line sum · adjustments · paid amount) stays.
+ * 🔴 The decision uses <b>whether the value exists</b>, not the `reconStatus` string — if the server changes which
+ * payouts are compared, the screen does not decide on its own.
+ *
+ * The 「{market}」 words use the payout channel's market name (`platform`, FEATURE_2610_20 / D14).
  */
 interface ReconBlockAProps {
   blockA: BlockA;
+  /** The payout channel's platform — names the market in the texts (D14). */
+  platform: string | null;
   /** "미분류 판매 건 N건 [보기]" — 블록 B 의 미분류 목록을 연다. */
   onShowUnmatched: () => void;
 }
 
-export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
+export function ReconBlockA({ blockA, platform, onShowUnmatched }: ReconBlockAProps) {
   // 값이 없다 = 서버가 계산하지 않았다(D2). 상태 문자열로 다시 판단하지 않는다.
   const notReconciled = blockA.ourTotal == null;
   const pending = blockA.finalAmount == null;
@@ -47,7 +54,9 @@ export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
     <Card className="space-y-4">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-gray-900">정산 상세 내역</h2>
-        <p className="text-sm text-gray-500">쿠팡이 알려준 금액 구성입니다.</p>
+        <p className="text-sm text-gray-500">
+          {withSubjectParticle(marketName(platform))} 알려준 금액 구성입니다.
+        </p>
       </div>
 
       <dl className="divide-y divide-gray-200 text-sm">
@@ -96,7 +105,7 @@ export function ReconBlockA({ blockA, onShowUnmatched }: ReconBlockAProps) {
         )}
 
         <div className="flex items-center justify-between py-2">
-          <dt className="font-semibold text-gray-900">쿠팡 지급액</dt>
+          <dt className="font-semibold text-gray-900">{marketName(platform)} 지급액</dt>
           <dd className="flex items-center gap-3">
             <span className="font-semibold text-gray-900">{formatMoney(blockA.finalAmount)}</span>
             {notReconciled ? null : pending ? (

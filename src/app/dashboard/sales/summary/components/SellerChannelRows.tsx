@@ -4,7 +4,8 @@ import { Fragment } from 'react';
 import type { ChannelSales } from '@/domain/entities/SalesSummary';
 import type { PayoutSummary } from '@/domain/entities/Settlement';
 import {
-  FIXED_COST_HINT,
+  ELEVENST_FIXED_COST_HINT,
+  FIXED_COST_HINT_MIXED,
   PROFIT_PENDING_HINT,
   channelLabel,
   formatFixedCost,
@@ -80,7 +81,7 @@ export function SellerChannelRows({
           <th className="px-3 py-2 text-left font-medium">채널</th>
           <th className="px-3 py-2 text-right font-medium">매출액</th>
           <th className="px-3 py-2 text-right font-medium">할인</th>
-          <th className="px-3 py-2 text-right font-medium" title={FIXED_COST_HINT}>
+          <th className="px-3 py-2 text-right font-medium" title={FIXED_COST_HINT_MIXED}>
             고정비
           </th>
           <th className="px-3 py-2 text-right font-medium">순이익(추정)</th>
@@ -110,7 +111,13 @@ export function SellerChannelRows({
               <td
                 className="px-3 py-2 text-right text-gray-700"
                 title={
-                  (channel.fixedCost ?? 0) > 0 ? `${channel.fixedCostMonths ?? 0}개월분` : undefined
+                  channel.platform === 'ELEVENST'
+                    ? (channel.fixedCost ?? 0) > 0
+                      ? `${channel.fixedCostMonths ?? 0}개월분 · ${ELEVENST_FIXED_COST_HINT}`
+                      : ELEVENST_FIXED_COST_HINT
+                    : (channel.fixedCost ?? 0) > 0
+                      ? `${channel.fixedCostMonths ?? 0}개월분`
+                      : undefined
                 }
               >
                 {formatFixedCost(channel.fixedCost)}

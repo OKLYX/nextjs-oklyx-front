@@ -5,6 +5,8 @@ import { Spinner } from '@/presentation/components/Spinner';
 import {
   buildSettlementMonthOptions,
   channelLabel,
+  marketName,
+  withObjectParticle,
   type SettlementSyncTarget,
 } from '@/domain/entities/Settlement';
 import { Modal } from '@/presentation/components/ui/Modal';
@@ -54,11 +56,17 @@ export function SettlementBackfillDialog({
   const selectedAccountId = accountId ?? (channels.length > 0 ? channels[0].accountId : null);
   const invalidRange = Boolean(fromMonth && toMonth && fromMonth > toMonth);
   const disabled = running || selectedAccountId == null || invalidRange;
+  // FEATURE_2610_20 / D11 · D14: the chosen channel's market; 11st is called once per month (no payout API),
+  // other markets twice (revenue + payouts).
+  const selectedPlatform =
+    channels.find((channel) => channel.accountId === selectedAccountId)?.platform ?? null;
+  const callsPerMonth = selectedPlatform === 'ELEVENST' ? 1 : 2;
 
   return (
     <Modal isOpen onClose={onClose} title="과거 정산 불러오기" disableClose={running}>
         <p className="mb-4 text-xs text-gray-500">
-          선택한 달마다 쿠팡을 2번씩 조회합니다. 기간이 길수록 오래 걸립니다.
+          선택한 달마다 {withObjectParticle(marketName(selectedPlatform))} {callsPerMonth}번씩 조회합니다. 기간이 길수록
+          오래 걸립니다.
         </p>
 
         {channels.length === 0 ? (

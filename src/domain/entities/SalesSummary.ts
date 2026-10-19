@@ -157,9 +157,25 @@ export const formatProfit = (row: { estNetProfit: number | null; costBasisReady:
 export const formatFixedCost = (value: number | null | undefined): string =>
   value ? `−${formatMoney(value)}` : '—';
 
-/** 고정비 열 헤더 툴팁. 월 단위 조건부 부과라는 규칙을 화면에서 설명한다(D2 · D4). */
+/**
+ * Fixed-cost rule of a channel other than 11st (D2 · D4) — the hint of one channel card or row. A header over rows of
+ * mixed platforms uses {@link FIXED_COST_HINT_MIXED}; an 11st channel uses {@link ELEVENST_FIXED_COST_HINT}
+ * (FEATURE_2610_20 / D42).
+ */
 export const FIXED_COST_HINT =
   '그 달 상품 매출이 기준 이상인 달에만 부과됩니다. 일할 계산은 없습니다.';
+
+/** Fixed-cost rule of an 11st channel — judged on the previous month's purchase-confirmed sales (FEATURE_2610_20 / D42). */
+export const ELEVENST_FIXED_COST_HINT =
+  '전달 11번가 구매확정액(판매가 + 옵션가)이 기준 이상인 달에만 부과됩니다. 일할 계산은 없습니다.';
+
+/** Header hint over rows of mixed platforms — one header covers both rules (FEATURE_2610_20 / D42). */
+export const FIXED_COST_HINT_MIXED =
+  '11번가 외 채널: 그 달 상품 매출이 기준 이상인 달에만 부과됩니다. 11번가: 전달 11번가 구매확정액(판매가 + 옵션가)이 기준 이상인 달에만 부과됩니다. 일할 계산은 없습니다.';
+
+/** The fixed-cost hint of one channel: {@link ELEVENST_FIXED_COST_HINT} for 11st, otherwise {@link FIXED_COST_HINT}. */
+export const fixedCostHintFor = (platform: string | null | undefined): string =>
+  platform === 'ELEVENST' ? ELEVENST_FIXED_COST_HINT : FIXED_COST_HINT;
 
 /** 순이익이 비어 있는 이유를 셀 툴팁으로 설명한다(헤더 툴팁만으론 행마다 다른 상태를 못 보여준다). */
 export const PROFIT_PENDING_HINT =
