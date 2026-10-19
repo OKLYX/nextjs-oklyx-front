@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { COUNT_UNITS, type Product } from '@/domain/entities/Product';
 import type { UpdateProductRequest } from '@/domain/repositories/ProductRepository';
@@ -16,6 +17,7 @@ import { ClipboardFillModal, CLIP_FIELD_LABELS, type ProductClip } from './Clipb
 import { PurchasePlaceCheckboxes } from './PurchasePlaceCheckboxes';
 import { VolumeDiagram } from './VolumeDiagram';
 import { usePurchasePlaces } from '@/presentation/hooks/usePurchasePlaces';
+import type { BarcodeScanOutcome } from '@/app/dashboard/products/register/components/useProductRegistration';
 
 interface ProductEditFormValues {
   productName: string;
@@ -39,6 +41,8 @@ interface ProductEditFormProps {
   onSave: (data: UpdateProductRequest) => Promise<void>;
   onCancel: () => void;
   onCheckBarcode: (barcodeId: string) => Promise<boolean>;
+  /** Reads a barcode from a photo on the server ([이미지로 스캔]). Provided by `ProductDetailContainer`. */
+  onScanBarcode: (file: File) => Promise<BarcodeScanOutcome>;
   imageUseCase: ProductImageUseCase;
 }
 
@@ -47,10 +51,15 @@ export function ProductEditForm({
   onSave,
   onCancel,
   onCheckBarcode,
+  onScanBarcode,
   imageUseCase,
 }: ProductEditFormProps) {
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const [isCheckingBarcode, setIsCheckingBarcode] = useState(false);
+  const [isScanningBarcode, setIsScanningBarcode] = useState(false);
+  // Kept apart from `barcodeError` — that one disables [저장], a failed scan must not.
+  const [barcodeScanError, setBarcodeScanError] = useState<string | null>(null);
+  const barcodeFileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   // 저장 실패는 **폼 안에서** 끝난다 — 페이지 전체를 에러 화면으로 바꾸지 않는다(입력값이 날아간다).
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -121,27 +130,107 @@ export function ProductEditForm({
     [setValue],
   );
 
-  const handleBarcodeBlur = useCallback(async () => {
-    if (!barcodeValue || barcodeValue.trim() === '') {
-      setBarcodeError(null);
+  const checkBarcodeDuplicate = useCallback(
+    async (value: string) => {
+      if (!value || value.trim() === '') {
+        setBarcodeError(null);
+        return;
+      }
+
+      if (value === product.barcodeId) {
+        setBarcodeError(null);
+        return;
+      }
+
+      setIsCheckingBarcode(true);
+      try {
+        const exists = await onCheckBarcode(value);
+        setBarcodeError(exists ? '이미 존재하는 바코드입니다' : null);
+      } catch {
+        setBarcodeError('바코드 확인 중 오류가 발생했습니다');
+      } finally {
+        setIsCheckingBarcode(false);
+      }
+    },
+    [onCheckBarcode, product.barcodeId],
+  );
+
+  const handleBarcodeBlur = useCallback(
+    () => checkBarcodeDuplicate(barcodeValue),
+    [barcodeValue, checkBarcodeDuplicate],
+  );
+
+  // A scanned value replaces the input. Blur never fires for it, so the duplicate check runs right away.
+  const scanBarcodeFile = useCallback(
+    async (file: File) => {
+      setIsScanningBarcode(true);
+      setBarcodeScanError(null);
+      try {
+        const outcome = await onScanBarcode(file);
+        if (outcome.ok) {
+          setValue('barcodeId', outcome.barcode, { shouldDirty: true, shouldValidate: false });
+          await checkBarcodeDuplicate(outcome.barcode);
+        } else {
+          setBarcodeScanError(outcome.message);
+        }
+      } finally {
+        setIsScanningBarcode(false);
+      }
+    },
+    [onScanBarcode, setValue, checkBarcodeDuplicate],
+  );
+
+  const handleScanFileChange = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // Clear so picking the same file again still fires onChange.
+      e.target.value = '';
+      if (!file) return;
+      await scanBarcodeFile(file);
+    },
+    [scanBarcodeFile],
+  );
+
+  // Drag-and-drop onto the barcode field runs the same scan as [이미지로 스캔] (same as ProductRegistrationForm).
+  // dragenter/dragleave fire for every child, so nesting depth is counted to keep the overlay from flickering.
+  const barcodeDragDepth = useRef(0);
+  const [isBarcodeDragOver, setIsBarcodeDragOver] = useState(false);
+  const canDropBarcode = !isScanningBarcode && !isCheckingBarcode;
+  const hasDraggedFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files');
+
+  const handleBarcodeDragEnter = (e: DragEvent) => {
+    if (!canDropBarcode || !hasDraggedFiles(e)) return;
+    e.preventDefault();
+    barcodeDragDepth.current += 1;
+    setIsBarcodeDragOver(true);
+  };
+
+  const handleBarcodeDragOver = (e: DragEvent) => {
+    if (!canDropBarcode || !hasDraggedFiles(e)) return;
+    // Required: without it the browser opens the dropped file instead of firing onDrop.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleBarcodeDragLeave = () => {
+    barcodeDragDepth.current = Math.max(0, barcodeDragDepth.current - 1);
+    if (barcodeDragDepth.current === 0) setIsBarcodeDragOver(false);
+  };
+
+  const handleBarcodeDrop = async (e: DragEvent) => {
+    if (!hasDraggedFiles(e)) return;
+    e.preventDefault();
+    barcodeDragDepth.current = 0;
+    setIsBarcodeDragOver(false);
+    if (!canDropBarcode) return;
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
+      setBarcodeScanError('JPEG 또는 PNG 이미지만 스캔할 수 있습니다.');
       return;
     }
-
-    if (barcodeValue === product.barcodeId) {
-      setBarcodeError(null);
-      return;
-    }
-
-    setIsCheckingBarcode(true);
-    try {
-      const exists = await onCheckBarcode(barcodeValue);
-      setBarcodeError(exists ? '이미 존재하는 바코드입니다' : null);
-    } catch {
-      setBarcodeError('바코드 확인 중 오류가 발생했습니다');
-    } finally {
-      setIsCheckingBarcode(false);
-    }
-  }, [barcodeValue, onCheckBarcode, product.barcodeId]);
+    await scanBarcodeFile(file);
+  };
 
   useEffect(() => {
     if (barcodeValue !== product.barcodeId) {
@@ -241,19 +330,64 @@ export function ProductEditForm({
 
       <Card title="선택 항목">
         <div className="space-y-4">
-          <div>
+          {/* Barcode ID — the whole field is a drop zone for [이미지로 스캔] */}
+          <div
+            className="relative"
+            onDragEnter={handleBarcodeDragEnter}
+            onDragOver={handleBarcodeDragOver}
+            onDragLeave={handleBarcodeDragLeave}
+            onDrop={handleBarcodeDrop}
+          >
             <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
               바코드 ID
             </label>
-            <Input
-              id="barcodeId"
-              type="text"
-              placeholder="바코드 ID를 입력해주세요 (선택)"
-              {...register('barcodeId')}
-              onBlur={handleBarcodeBlur}
-            />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  id="barcodeId"
+                  type="text"
+                  placeholder="바코드 ID를 입력해주세요 (선택)"
+                  {...register('barcodeId')}
+                  onBlur={handleBarcodeBlur}
+                />
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => barcodeFileInputRef.current?.click()}
+                isLoading={isScanningBarcode}
+                loadingText="읽는 중..."
+                disabled={isCheckingBarcode}
+              >
+                이미지로 스캔
+              </Button>
+              <input
+                ref={barcodeFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                className="hidden"
+                onChange={handleScanFileChange}
+              />
+            </div>
+            {/* pointer-events-none is required — if this layer eats the drop, onDrop never fires. */}
+            {isBarcodeDragOver && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-50/80">
+                <p className="text-sm font-medium text-blue-700">여기에 놓으면 바코드를 스캔합니다 (JPEG/PNG)</p>
+              </div>
+            )}
             {isCheckingBarcode && <p className="text-gray-500 text-sm mt-1">확인 중...</p>}
             {barcodeError && <p className="text-red-600 text-sm mt-1">{barcodeError}</p>}
+            {barcodeScanError && (
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-red-600 text-sm flex-1">{barcodeScanError}</p>
+                <button
+                  type="button"
+                  onClick={() => setBarcodeScanError(null)}
+                  className="text-red-600 hover:text-red-700 text-lg font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

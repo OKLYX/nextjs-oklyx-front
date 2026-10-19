@@ -25,6 +25,7 @@ import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
 import { ProductDetailView } from './ProductDetailView';
 import { ProductEditForm } from './ProductEditForm';
+import type { BarcodeScanOutcome } from '@/app/dashboard/products/register/components/useProductRegistration';
 
 interface ProductDetailContainerProps {
   id: number;
@@ -175,6 +176,26 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
     [updateUseCase]
   );
 
+  // Same contract as `useProductRegistration.scanBarcode` — the image is not stored, 401 goes to login.
+  const handleScanBarcode = useCallback(
+    async (file: File): Promise<BarcodeScanOutcome> => {
+      try {
+        const result = await updateUseCase.scanBarcodeFromImage(file);
+        if (!result.barcode) {
+          return { ok: false, message: '바코드를 읽지 못했습니다. 바코드가 잘 보이는 사진으로 다시 시도해 주세요.' };
+        }
+        return { ok: true, barcode: result.barcode };
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 401) {
+          tokenStorage.removeToken();
+          router.push(ROUTES.LOGIN);
+        }
+        return { ok: false, message: extractErrorMessage(err, '이미지를 확인하지 못했습니다.') };
+      }
+    },
+    [updateUseCase, router]
+  );
+
   // 로딩·에러·없음은 다른 화면과 같은 공용 조합이다: `Card padded={false}` + `StateBlock`.
   // 손으로 만든 빨간 박스·영어 문구로 되돌리지 말 것.
   if (isLoading) {
@@ -215,6 +236,7 @@ export function ProductDetailContainer({ id }: ProductDetailContainerProps) {
           onSave={handleSave}
           onCancel={handleCancel}
           onCheckBarcode={handleCheckBarcode}
+          onScanBarcode={handleScanBarcode}
           imageUseCase={imageUseCase}
         />
       </PageContainer>
