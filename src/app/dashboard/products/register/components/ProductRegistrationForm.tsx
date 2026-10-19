@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState, useEffect, useRef } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import type { CreateProductRequest } from '@/domain/repositories/ProductRepository';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
@@ -179,13 +179,8 @@ export function ProductRegistrationForm({
 
   // A scanned value replaces the input and drops any earlier 중복 확인 result, exactly like typing a new
   // value — the user must run 중복 확인 again before saving.
-  const handleScanFileChange = useCallback(
-    async (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      // Clear so picking the same file again still fires onChange.
-      e.target.value = '';
-      if (!file) return;
-
+  const scanBarcodeFile = useCallback(
+    async (file: File) => {
       setIsScanningBarcode(true);
       try {
         const outcome = await onScanBarcode(file);
@@ -202,6 +197,58 @@ export function ProductRegistrationForm({
     },
     [onScanBarcode, setValue],
   );
+
+  const handleScanFileChange = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // Clear so picking the same file again still fires onChange.
+      e.target.value = '';
+      if (!file) return;
+      await scanBarcodeFile(file);
+    },
+    [scanBarcodeFile],
+  );
+
+  // Drag-and-drop onto the barcode field runs the same scan as [이미지로 스캔].
+  // dragenter/dragleave fire for every child, so nesting depth is counted to keep the overlay from flickering.
+  const barcodeDragDepth = useRef(0);
+  const [isBarcodeDragOver, setIsBarcodeDragOver] = useState(false);
+  const canDropBarcode = !isScanningBarcode && !isCheckingBarcode;
+  const hasDraggedFiles = (e: DragEvent) => e.dataTransfer.types.includes('Files');
+
+  const handleBarcodeDragEnter = (e: DragEvent) => {
+    if (!canDropBarcode || !hasDraggedFiles(e)) return;
+    e.preventDefault();
+    barcodeDragDepth.current += 1;
+    setIsBarcodeDragOver(true);
+  };
+
+  const handleBarcodeDragOver = (e: DragEvent) => {
+    if (!canDropBarcode || !hasDraggedFiles(e)) return;
+    // Required: without it the browser opens the dropped file instead of firing onDrop.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleBarcodeDragLeave = () => {
+    barcodeDragDepth.current = Math.max(0, barcodeDragDepth.current - 1);
+    if (barcodeDragDepth.current === 0) setIsBarcodeDragOver(false);
+  };
+
+  const handleBarcodeDrop = async (e: DragEvent) => {
+    if (!hasDraggedFiles(e)) return;
+    e.preventDefault();
+    barcodeDragDepth.current = 0;
+    setIsBarcodeDragOver(false);
+    if (!canDropBarcode) return;
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
+      setBarcodeError('JPEG 또는 PNG 이미지만 스캔할 수 있습니다.');
+      return;
+    }
+    await scanBarcodeFile(file);
+  };
 
   const handleFormSubmit = useCallback(
     async (data: ProductRegistrationFormValues) => {
@@ -283,8 +330,14 @@ export function ProductRegistrationForm({
       {/* Optional Fields */}
       <Card title="선택 항목">
         <div className="space-y-4">
-          {/* Barcode ID */}
-          <div>
+          {/* Barcode ID — the whole field is a drop zone for [이미지로 스캔] */}
+          <div
+            className="relative"
+            onDragEnter={handleBarcodeDragEnter}
+            onDragOver={handleBarcodeDragOver}
+            onDragLeave={handleBarcodeDragLeave}
+            onDrop={handleBarcodeDrop}
+          >
             <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
               바코드 ID
             </label>
@@ -333,6 +386,12 @@ export function ProductRegistrationForm({
                 onChange={handleScanFileChange}
               />
             </div>
+            {/* pointer-events-none is required — if this layer eats the drop, onDrop never fires. */}
+            {isBarcodeDragOver && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-50/80">
+                <p className="text-sm font-medium text-blue-700">여기에 놓으면 바코드를 스캔합니다 (JPEG/PNG)</p>
+              </div>
+            )}
             {barcodeError && (
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-red-600 text-sm flex-1">{barcodeError}</p>
