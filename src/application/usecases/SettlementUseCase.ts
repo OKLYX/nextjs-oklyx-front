@@ -1,5 +1,6 @@
 import type { SettlementRepository } from '@/domain/repositories/SettlementRepository';
 import type {
+  FirstMonthQuestion,
   PayoutDetail,
   PayoutQuery,
   PayoutSummary,
@@ -68,5 +69,24 @@ export class SettlementUseCase {
 
   async getSyncTargets(sellerId?: number): Promise<SettlementSyncTarget[]> {
     return this.repository.getSyncTargets(sellerId);
+  }
+
+  /** 11st 「지급 완료」 (FEATURE_2610_20 / D34 · D38). `paidOn` = `yyyy-MM-dd`. */
+  async markPaid(payoutId: number, paidOn: string): Promise<void> {
+    return this.repository.markPaid(payoutId, paidOn);
+  }
+
+  /** 11st 「지급 완료 취소」 (D39). */
+  async unmarkPaid(payoutId: number): Promise<void> {
+    return this.repository.unmarkPaid(payoutId);
+  }
+
+  /** 11st server-fee first-month questions (D45 ⑦). */
+  async getFirstMonthQuestions(): Promise<FirstMonthQuestion[]> {
+    return this.repository.getFirstMonthQuestions();
+  }
+
+  async answerFirstMonth(linkId: number, charged: boolean): Promise<void> {
+    return this.repository.answerFirstMonth(linkId, charged);
   }
 }

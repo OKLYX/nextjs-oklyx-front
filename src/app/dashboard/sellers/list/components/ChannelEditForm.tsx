@@ -424,6 +424,7 @@ export function ChannelEditForm({
 
         <ChannelFixedCostFields
           rows={fixedCostRows}
+          platform={channel.platform}
           onChange={handleFixedCostRowsChange}
           isLoading={fixedCostsLoading}
           loadError={fixedCostsError}

@@ -2,8 +2,8 @@
 
 import type { ChannelSales } from '@/domain/entities/SalesSummary';
 import {
-  FIXED_COST_HINT,
   PROFIT_PENDING_HINT,
+  fixedCostHintFor,
   formatFixedCost,
   formatMoney,
   formatProfit,
@@ -30,7 +30,7 @@ export function ChannelSummaryCard({ channel }: ChannelSummaryCardProps) {
     { label: '매출액', value: formatMoney(channel.grossSales) },
     { label: '할인', value: formatMoney(channel.discount) },
     { label: '수수료(추정)', value: formatMoney(channel.estFee) },
-    { label: '고정비', value: formatFixedCost(channel.fixedCost), hint: FIXED_COST_HINT },
+    { label: '고정비', value: formatFixedCost(channel.fixedCost), hint: fixedCostHintFor(channel.platform) },
     {
       label: '순이익(추정)',
       value: formatProfit(channel),

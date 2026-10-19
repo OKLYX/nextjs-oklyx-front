@@ -1,11 +1,13 @@
 /**
- * 채널 월 고정비 (FEATURE_2609_33 / PLAN 2609_33 D1 · D2 · D2-1 · D3 · D5, 백엔드 01 SSOT).
+ * Channel monthly fixed cost (FEATURE_2609_33 / PLAN 2609_33 D1 · D2 · D2-1 · D3 · D5, backend 01 SSOT).
  *
- * 🔴 금액·임계의 소유자는 <b>플랫폼 카탈로그</b>다. 채널은 항목을 연결만 하고 금액을 복사해 갖지 않는다(D1)
- * — 카탈로그 한 줄을 고치면 그 항목을 쓰는 모든 채널에 그대로 반영된다.
+ * 🔴 The owner of the amount and threshold is the <b>platform catalog</b>. A channel only links an item and never
+ * copies its amount (D1) — fixing one catalog row reaches every channel that uses the item.
  *
- * 🔴 그 달에 실제로 부과되는지는 <b>서버가 달마다</b> 판정한다(D2). 화면이 매출을 보고 부과 여부를
- * 계산하지 않는다 — 판정 축(할인 후 매출·주문일)이 서버와 어긋나는 순간 두 화면이 다른 답을 낸다.
+ * 🔴 Whether a month is actually charged is judged <b>by the server, month by month</b> (D2). The screen never
+ * computes it from sales — the moment its axis (sales after discounts · order date; for an 11st item the previous
+ * month's purchase-confirmed settlement lines, FEATURE_2610_20 / D42) drifts from the server's, two screens answer
+ * differently.
  */
 
 /** 플랫폼 단위 고정비 항목 (카탈로그 한 줄). `GET /api/admin/fixed-costs` */
@@ -15,7 +17,10 @@ export interface PlatformFixedCost {
   name: string;
   /** 월 정액, **VAT 포함 값 그대로**(D3). 🔴 채널이 이 값을 복사해 갖지 않는다(D1). */
   amount: number;
-  /** 이 금액 이상 팔린 달에만 부과된다(쿠팡 기준 1,000,000 · 가전/디지털 5,000,000). */
+  /**
+   * Charged only in months that sold at least this much (Coupang 1,000,000 · home appliances / digital 5,000,000;
+   * 11st 5,000,000 on the previous month's purchase-confirmed sales — FEATURE_2610_20 / D42).
+   */
   thresholdAmount: number;
   active: boolean;
 }
@@ -87,6 +92,15 @@ export const CHARGE_MODE_OPTIONS: { value: FixedCostChargeMode; label: string }[
 
 /** 쿠팡 일반 카테고리 임계(D2-1). 카탈로그 추가 폼의 프리필 값이다. */
 export const DEFAULT_THRESHOLD_AMOUNT = 1000000;
+
+/** How AUTO decides for an 11st item — judged on the previous month (FEATURE_2610_20 / D42). */
+export const ELEVENST_THRESHOLD_RULE = '전달 11번가 구매확정액(판매가 + 옵션가)이 임계 이상인 달에 부과됩니다.';
+
+/** The catalog form's threshold hint per platform: 11st = {@link ELEVENST_THRESHOLD_RULE}, others the old text. */
+export const thresholdRuleText = (platform: string): string =>
+  platform === 'ELEVENST'
+    ? ELEVENST_THRESHOLD_RULE
+    : '그 달 상품 매출(배송비 제외)이 임계 이상인 달에만 부과됩니다.';
 
 /** 금액 표시(원 단위 정수). 고정비는 정액이라 소수 원이 없다. */
 export const formatFixedCostAmount = (value: number | null | undefined): string =>
