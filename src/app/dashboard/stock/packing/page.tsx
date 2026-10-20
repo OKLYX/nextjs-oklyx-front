@@ -31,6 +31,7 @@ import { PackingItemList, type PackedRow } from './components/PackingItemList';
 import { BoxCandidateRow } from './components/BoxCandidateRow';
 import { PendingParcelList } from './components/PendingParcelList';
 import { RightRailTabs, type RailTab } from './components/RightRailTabs';
+import { platformName } from '@/config/platforms';
 
 /**
  * 송장 스캔 포장 화면 — 키보드 전용 (FEATURE_2609_40 / PLAN D9 ~ D17 · D31 ~ D33,
@@ -90,16 +91,6 @@ type MessageTone = 'info' | 'error' | 'success';
  * 작업자는 서서 1~2초만 보기 때문에 「색이 바뀐 면」이 「작은 띠」보다 훨씬 빨리 읽힌다.
  * 오류는 채운 빨강이다. 연한 배경 + 빨간 글씨로는 몇 미터 떨어진 작업대에서 구분이 안 된다.
  */
-/**
- * 플랫폼 enum → 화면 이름. 🔴 모르는 값은 **원문 그대로** 보여준다(빈칸보다 낫다) —
- * 새 채널이 붙었을 때 화면이 조용히 비지 않게.
- */
-const PLATFORM_LABEL: Record<string, string> = {
-  COUPANG: '쿠팡',
-  NAVER: '네이버',
-  ELEVENST: '11번가',
-};
-
 const TONE_LABEL: Record<MessageTone, string> = {
   info: '상태 메시지',
   error: '오류',
@@ -1102,8 +1093,7 @@ export default function StockPackingPage() {
   /** 채널 표시 — 별칭이 있으면 그것이 더 구체적이다(같은 플랫폼에 계정이 여럿) */
   const channelLabel =
     scanResult?.order.accountAlias?.trim() ||
-    PLATFORM_LABEL[scanResult?.order.platform ?? ''] ||
-    scanResult?.order.platform ||
+    platformName(scanResult?.order.platform ?? '') ||
     '-';
 
   /**

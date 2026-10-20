@@ -18,9 +18,6 @@ export interface MarketSource {
   preview: MasterFromChannelPreview;
 }
 
-/** 플랫폼 코드 → 화면 이름. 플랫폼이 늘면 여기 한 줄만 는다(UX D64). */
-export const PLATFORM_LABEL: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11번가' };
-
 /** 구성상품·카테고리를 바꿀 때 뜨는 확인창 문구(마켓 모드) — 옵션은 남고 구성 수량만 지워진다(UX D71·D32). */
 export const MARKET_OPTION_RESET_MESSAGE =
   '구성상품이나 카테고리를 바꾸면 옵션별 구성 수량이 지워집니다(옵션은 마켓 상품 그대로 남습니다). 계속하시겠습니까?';

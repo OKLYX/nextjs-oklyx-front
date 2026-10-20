@@ -9,14 +9,10 @@ import {
   type CreateMarketplaceAccountForm,
 } from '@/application/dto/MarketplaceAccountDTOs';
 import type { TemplateOption } from '@/domain/entities/MarketplaceAccountEntity';
+import { PLATFORMS, platformName } from '@/config/platforms';
 
-// Hardcoded for now; will be replaced with a managed platform list later.
-const PLATFORM_OPTIONS = [
-  { value: 'COUPANG', label: '쿠팡' },
-  { value: 'NAVER', label: '네이버 스마트스토어' },
-  { value: 'ELEVENST', label: '11번가' },
-  { value: 'GMARKET', label: 'G마켓' },
-];
+// Platform select options — values and names from src/config/platforms.ts (FEATURE_2610_22 / D15).
+const PLATFORM_OPTIONS = PLATFORMS.map((p) => ({ value: p, label: platformName(p) }));
 
 interface ChannelRegistrationFormProps {
   isLoading?: boolean;

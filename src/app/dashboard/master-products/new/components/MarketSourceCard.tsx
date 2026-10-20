@@ -1,7 +1,8 @@
 'use client';
 
 import { Card } from '@/presentation/components/ui/Card';
-import { PLATFORM_LABEL, type MarketSource } from './marketSource';
+import type { MarketSource } from './marketSource';
+import { platformName } from '@/config/platforms';
 
 // 상태 enum → 화면 문구(enum 원문을 사용자에게 노출하지 않는다). 가져오기 창과 같은 한 줄짜리 표지만,
 // 서로 import 하면 화면 간 결합이 생기므로 지역으로 둔다.
@@ -22,7 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
  */
 export function MarketSourceCard({ market }: { market: MarketSource }) {
   const { preview } = market;
-  const label = PLATFORM_LABEL[market.platform] ?? market.platform;
+  const label = platformName(market.platform);
   return (
     <Card title="마켓 상품" className="mb-4 space-y-2">
       <p className="text-sm text-gray-900">

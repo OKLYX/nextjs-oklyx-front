@@ -18,6 +18,7 @@ import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ShareActionCell, TargetMetTag, type ShareActions } from './purchaseShareUi';
 import { ReceiptDetailModal } from '../../receipts/components/ReceiptDetailModal';
+import { platformName } from '@/config/platforms';
 
 /**
  * Opened content of a product row, <b>shared</b> by the list tab, the 「오늘 넘김」 group and the completed tab
@@ -37,15 +38,13 @@ import { ReceiptDetailModal } from '../../receipts/components/ReceiptDetailModal
  *    quantity (1 or more), [판매자 바꾸기] and [제거] (FEATURE_2610_09 D23 · D24 · D77) — none of them is a purchase.
  */
 
-const PLATFORM_LABEL: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버', ELEVENST: '11번가' };
-
 /**
  * Channel = seller × platform. A manual line has no platform → 「{sellerName}/수동」 (FEATURE_2610_09 D17).
- * ⚠️ A platform missing from the map shows its raw code — a new platform never draws an empty label.
+ * ⚠️ A platform `platformName` does not know shows its raw code, so a new platform still gets a label.
  */
 export function channelLabel(line: PurchaseListLine): string {
   if (!line.platform) return `${line.sellerName}/수동`;
-  return `${line.sellerName}/${PLATFORM_LABEL[line.platform] ?? line.platform}`;
+  return `${line.sellerName}/${platformName(line.platform)}`;
 }
 
 /** Chip key: an order line's account, or one manual chip per seller (D17). */

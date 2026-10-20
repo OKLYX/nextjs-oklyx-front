@@ -44,6 +44,7 @@ import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
 import { Button } from '@/presentation/components/ui/Button';
 import { ROUTES } from '@/config/routes';
+import { platformName } from '@/config/platforms';
 
 // 상태 enum → 화면 문구 + 배지 색. ⚠️ enum 원문(`SELLING` 등)을 사용자에게 노출하지 않는다(UI 용어 규칙).
 const STATUS_META: Record<string, { label: string; className: string }> = {
@@ -56,8 +57,8 @@ const STATUS_META: Record<string, { label: string; className: string }> = {
 
 // 플랫폼 코드 → 화면 문구 + 배지 색. 모르는 코드는 코드 원문 + 회색(두 번째 몰은 한 줄만 추가하면 된다).
 const PLATFORM_META: Record<string, { label: string; className: string }> = {
-  COUPANG: { label: '쿠팡', className: 'bg-red-50 text-red-700' },
-  NAVER: { label: '네이버', className: 'bg-green-50 text-green-700' },
+  COUPANG: { label: platformName('COUPANG'), className: 'bg-red-50 text-red-700' },
+  NAVER: { label: platformName('NAVER'), className: 'bg-green-50 text-green-700' },
 };
 
 /** 채널·계정 | 판매 상품 | 구성 | 상태 | › — 좁은 화면(md 미만)에서는 한 줄씩 쌓는다 */

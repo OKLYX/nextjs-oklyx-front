@@ -36,14 +36,12 @@ import { StoredInvoiceModal } from './StoredInvoiceModal';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { platformName } from '@/config/platforms';
 
 const SHIPMENT_STATUS_LIST = SHIPMENT_STATUSES as readonly string[];
 
 /** 발주처리 결과 메시지 자동 소멸(ms). `MasterTagsPanel` 의 인라인 확인 메시지와 같은 값. */
 const ACK_MESSAGE_TTL = 2500;
-
-/** Marketplace names of the order-confirmation result lines (FEATURE_2610_17 / D57). */
-const ACK_PLATFORM_NAMES: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11번가' };
 
 /**
  * Order-confirmation result → inline message (PLAN 2609_17 D8 · FEATURE_2610_17 / D57), top to bottom:
@@ -55,7 +53,7 @@ const ACK_PLATFORM_NAMES: Record<string, string> = { COUPANG: '쿠팡', ELEVENST
 function buildMessage(result: OrderAcknowledgeResult): { text: string; detail: string[] } {
   const lines = ['발주처리 완료'];
   for (const part of result.byPlatform) {
-    const name = ACK_PLATFORM_NAMES[part.platform] ?? part.platform;
+    const name = platformName(part.platform);
     lines.push(part.failed.length > 0
       ? `${name}: 성공 ${part.succeeded}건 / 실패 ${part.failed.length}건`
       : `${name}: 성공 ${part.succeeded}건`);
@@ -65,7 +63,7 @@ function buildMessage(result: OrderAcknowledgeResult): { text: string; detail: s
   if (result.unsupported.length > 0) notSent.push(`처리불가 ${result.unsupported.length}건`);
   if (notSent.length > 0) lines.push(notSent.join(' / '));
   const detail = result.byPlatform.flatMap((part) => {
-    const name = ACK_PLATFORM_NAMES[part.platform] ?? part.platform;
+    const name = platformName(part.platform);
     return [...new Set(part.failed.map((box) => `${name} · ${box.resultCode}: ${box.message}`))].slice(0, 3);
   });
   return { text: lines.join('\n'), detail };
