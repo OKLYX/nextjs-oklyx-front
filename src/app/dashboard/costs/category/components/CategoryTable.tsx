@@ -3,6 +3,7 @@
 import type { Category } from '@/domain/entities/CategoryEntity';
 import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { platformName } from '@/config/platforms';
 
 /**
  * 표준 카테고리 목록 테이블: 표준명 · 몰별 매핑 배지 · 액션(이름수정/매핑/삭제).
@@ -19,7 +20,7 @@ interface CategoryTableProps {
 }
 
 // 배지로 표시할 플랫폼(현 매핑 대상). 미매핑이면 회색.
-const BADGE_PLATFORMS: { platform: string; label: string }[] = [{ platform: 'COUPANG', label: '쿠팡' }];
+const BADGE_PLATFORMS: { platform: string; label: string }[] = [{ platform: 'COUPANG', label: platformName('COUPANG') }];
 
 export function CategoryTable({
   categories,

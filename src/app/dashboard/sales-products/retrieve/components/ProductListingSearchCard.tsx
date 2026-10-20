@@ -4,6 +4,7 @@ import type { KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
+import { PLATFORMS, platformName } from '@/config/platforms';
 
 /**
  * 판매상품 조회 조회 조건 카드.
@@ -73,10 +74,11 @@ export function ProductListingSearchCard({
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
           >
             <option value="">선택하세요</option>
-            <option value="COUPANG">쿠팡</option>
-            <option value="GMARKET">지마켓</option>
-            <option value="AUCTION">옥션</option>
-            <option value="SMARTSTORE">스마트스토어</option>
+            {PLATFORMS.map((p) => (
+              <option key={p} value={p}>
+                {platformName(p)}
+              </option>
+            ))}
           </select>
         </div>
 

@@ -20,13 +20,14 @@ import { unitPlaceholder, unitSuffix } from './basicUnit';
 import { Input } from '@/presentation/components/ui/Input';
 import { Spinner } from '@/presentation/components/Spinner';
 import type { ElevenstNotification } from '@/domain/entities/ElevenstNotice';
+import { platformName } from '@/config/platforms';
 
 /** FEATURE_2610_13 / D97 · D109: the tabs shown when a switched-on 11st channel exists. */
 type MetaTab = 'ALL' | 'COUPANG' | 'ELEVENST';
 const META_TABS: { key: MetaTab; label: string }[] = [
   { key: 'ALL', label: '통합' },
-  { key: 'COUPANG', label: '쿠팡' },
-  { key: 'ELEVENST', label: '11번가' },
+  { key: 'COUPANG', label: platformName('COUPANG') },
+  { key: 'ELEVENST', label: platformName('ELEVENST') },
 ];
 /** D99: the gray line under a read-only shared field. */
 const SHARED_NOTE = '공통 항목은 「통합」 에서 고칩니다';
@@ -379,7 +380,7 @@ export function CategoryMetaFields({
                       <label className="mb-1 block text-xs font-medium text-gray-600">
                         {n.label}
                         {n.required && <span className="text-red-600"> *</span>}
-                        {tabbed && metaTab === 'ALL' && shared != null && !shared.has(n.key) && renderTag('쿠팡')}
+                        {tabbed && metaTab === 'ALL' && shared != null && !shared.has(n.key) && renderTag(platformName('COUPANG'))}
                       </label>
                       <input
                         type="text"
@@ -407,7 +408,7 @@ export function CategoryMetaFields({
               <div key={line.code}>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
                   {line.name}
-                  {renderTag('11번가')}
+                  {renderTag(platformName('ELEVENST'))}
                 </label>
                 <input
                   type="text"

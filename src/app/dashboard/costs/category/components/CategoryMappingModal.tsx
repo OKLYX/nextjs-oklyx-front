@@ -9,6 +9,7 @@ import type { CategoryLookupUseCase } from '@/application/usecases/CategoryLooku
 import type { Category } from '@/domain/entities/CategoryEntity';
 import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { platformName } from '@/config/platforms';
 
 /**
  * Per-mall mapping status of a standard category + filling it (reuses the lookup picker) modal.
@@ -32,8 +33,8 @@ interface CategoryMappingModalProps {
 
 // Platforms the lookup picker can open for (Coupang, 11st). Naver is a backend seam only → later.
 const LOOKUP_PLATFORMS: { platform: 'COUPANG' | 'ELEVENST'; label: string }[] = [
-  { platform: 'COUPANG', label: '쿠팡' },
-  { platform: 'ELEVENST', label: '11번가' },
+  { platform: 'COUPANG', label: platformName('COUPANG') },
+  { platform: 'ELEVENST', label: platformName('ELEVENST') },
 ];
 
 export function CategoryMappingModal({

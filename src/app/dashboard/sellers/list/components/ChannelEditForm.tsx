@@ -40,15 +40,11 @@ import {
 import { ChannelTabBar, type ChannelTabKey } from './ChannelModalTabs';
 import type { ChannelShippingData } from './ChannelShippingSummary';
 import { EMPTY_FORM } from '@/domain/entities/CoupangShipping';
+import { PLATFORMS, platformName } from '@/config/platforms';
 
-// Hardcoded for now; mirrors ChannelRegistrationForm's PLATFORM_OPTIONS.
-// Exported as SSOT so other features (e.g. carrier platform codes) can reuse it.
-export const PLATFORM_OPTIONS = [
-  { value: 'COUPANG', label: '쿠팡' },
-  { value: 'NAVER', label: '네이버 스마트스토어' },
-  { value: 'ELEVENST', label: '11번가' },
-  { value: 'GMARKET', label: 'G마켓' },
-];
+// Platform select options — values and names from src/config/platforms.ts (FEATURE_2610_22 / D15).
+// Exported so the carrier platform codes screen shows the same options (D19).
+export const PLATFORM_OPTIONS = PLATFORMS.map((p) => ({ value: p, label: platformName(p) }));
 
 /** The modal footer [저장] sits outside this form and submits it through this id (FEATURE_2610_16 / D34). */
 export const CHANNEL_EDIT_FORM_ID = 'channel-edit-form';

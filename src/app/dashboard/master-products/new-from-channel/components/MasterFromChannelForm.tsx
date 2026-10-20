@@ -23,6 +23,7 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import type { Product } from '@/domain/entities/Product';
 import type { MasterFromChannelPreview } from '@/domain/entities/ListingRegistrationEntity';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
+import { platformName } from '@/config/platforms';
 
 // 상태 enum → 화면 문구(enum 원문을 사용자에게 노출하지 않는다). 가져오기 창과 같은 한 줄짜리 표지만,
 // 서로 import 하면 화면 간 결합이 생기므로 지역으로 둔다.
@@ -48,7 +49,7 @@ type PlatformOption = {
 };
 
 const PLATFORMS: PlatformOption[] = [
-  { value: 'COUPANG', label: '쿠팡', idLabel: '쿠팡 상품 ID', idNumeric: true },
+  { value: 'COUPANG', label: platformName('COUPANG'), idLabel: '쿠팡 상품 ID', idNumeric: true },
 ];
 
 /** 상품명에서 물품 후보를 찾을 때 쓰는 낱말 수 · 보여 줄 후보 수 · 검색 한 번의 크기(UX D79). */

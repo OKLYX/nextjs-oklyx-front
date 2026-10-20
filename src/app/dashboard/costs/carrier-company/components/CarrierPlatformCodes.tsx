@@ -26,14 +26,15 @@ import type { PlatformCarrierCode } from '@/domain/entities/PlatformCarrierCodeE
 import { PlatformCarrierCodeUseCase } from '@/application/usecases/PlatformCarrierCodeUseCase';
 import { PlatformCarrierCodeRepositoryImpl } from '@/infrastructure/repositories/PlatformCarrierCodeRepositoryImpl';
 import { PLATFORM_OPTIONS } from '@/app/dashboard/sellers/list/components/ChannelEditForm';
+import { platformName } from '@/config/platforms';
 
 interface CarrierPlatformCodesProps {
   carrierId: number;
 }
 
-// PLATFORM_OPTIONS(SSOT) 기반 한글 라벨. 매핑에 없으면 코드 원문 표시.
+// Screen name of a platform code — the shared `platformName` (FEATURE_2610_22 / D17). An unknown code shows as it is.
 function platformLabel(platform: string): string {
-  return PLATFORM_OPTIONS.find((o) => o.value === platform)?.label ?? platform;
+  return platformName(platform);
 }
 
 const DEFAULT_PLATFORM = PLATFORM_OPTIONS[0]?.value ?? '';

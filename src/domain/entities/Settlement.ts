@@ -11,6 +11,8 @@
  * 단위로 온다(D3). 매출(판매일 축)은 이 파일이 아니라 `SalesSummary.ts` 다.
  */
 
+import { platformName } from '@/config/platforms';
+
 /** 지급 묶음 1건의 요약. `GET /api/admin/settlement/payouts` */
 export interface PayoutSummary {
   payoutId: number;
@@ -270,8 +272,6 @@ export interface ReconLineQuery {
   unmatched?: boolean;
 }
 
-const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버', ELEVENST: '11번가' };
-
 const SETTLEMENT_TYPE_LABELS: Record<string, string> = {
   WEEKLY: '주정산',
   MONTHLY: '월정산',
@@ -317,14 +317,15 @@ export const NO_TOTAL_NOTICE =
 const label = (dictionary: Record<string, string>, code: string | null | undefined): string =>
   code == null || code === '' ? '—' : (dictionary[code] ?? code);
 
-export const platformLabel = (platform: string | null): string => label(PLATFORM_LABELS, platform);
+export const platformLabel = (platform: string | null): string =>
+  platform == null || platform === '' ? '—' : platformName(platform);
 
 /**
  * Market name in a sentence (FEATURE_2610_20 / D14): the platform's name, or 「마켓」 when no channel is chosen
  * (`null`) or the platform has no name.
  */
 export const marketName = (platform: string | null | undefined): string =>
-  platform != null && PLATFORM_LABELS[platform] ? PLATFORM_LABELS[platform] : '마켓';
+  platform != null && platformName(platform) !== platform ? platformName(platform) : '마켓';
 
 /** Whether the last Hangul syllable has a final consonant (decides 「이/가」 · 「을/를」). */
 const endsWithFinalConsonant = (word: string): boolean => {

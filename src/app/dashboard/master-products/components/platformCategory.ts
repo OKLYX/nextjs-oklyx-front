@@ -2,6 +2,7 @@ import type { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEnt
 import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
 import type { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
 import type { MasterPlatformCategory } from '@/domain/entities/MasterProductEntity';
+import { platformName } from '@/config/platforms';
 
 /**
  * Platforms whose category can be picked in the lookup picker — Coupang and 11st (FEATURE_2610_11 / D1).
@@ -13,17 +14,12 @@ export type LookupPlatform = 'COUPANG' | 'ELEVENST';
 
 export const LOOKUP_PLATFORMS: LookupPlatform[] = ['COUPANG', 'ELEVENST'];
 
-const LOOKUP_PLATFORM_LABEL: Record<LookupPlatform, string> = {
-  COUPANG: '쿠팡',
-  ELEVENST: '11번가',
-};
-
 /** `platform` narrowed to a lookup platform, or null (Naver and any other platform). */
 export const asLookupPlatform = (platform: string): LookupPlatform | null =>
   LOOKUP_PLATFORMS.find((p) => p === platform) ?? null;
 
 /** Screen label of a lookup platform (「쿠팡」 · 「11번가」). */
-export const lookupPlatformLabel = (platform: LookupPlatform): string => LOOKUP_PLATFORM_LABEL[platform];
+export const lookupPlatformLabel = (platform: LookupPlatform): string => platformName(platform);
 
 /** Lookup platforms that have at least one switched-on sales-channel account (D17). */
 export const activeLookupPlatformsOf = (accounts: MarketplaceAccount[]): LookupPlatform[] =>

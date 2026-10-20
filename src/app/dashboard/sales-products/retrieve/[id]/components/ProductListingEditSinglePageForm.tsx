@@ -11,8 +11,7 @@ import type { ProductListing, ProductListingOption } from '@/domain/entities/Pro
 import type { Product } from '@/domain/entities/Product';
 import { ROUTES } from '@/config/routes';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
-
-const PLATFORMS = ['COUPANG', 'GMARKET', 'AUCTION', 'SMARTSTORE'];
+import { PLATFORMS } from '@/config/platforms';
 
 interface CarrierRate {
   id: number;
