@@ -23,14 +23,7 @@ import {
   loadChannelShipping,
   type ChannelShippingData,
 } from './ChannelShippingSummary';
-
-// Mirror of ChannelRegistrationForm's PLATFORM_OPTIONS for display labels.
-const PLATFORM_LABELS: Record<string, string> = {
-  COUPANG: '쿠팡',
-  NAVER: '네이버 스마트스토어',
-  ELEVENST: '11번가',
-  GMARKET: 'G마켓',
-};
+import { platformName } from '@/config/platforms';
 
 interface ChannelDetailsModalProps {
   isOpen: boolean;
@@ -163,7 +156,7 @@ function ChannelDetailsContent({
           <div>
             <label className="block text-sm font-medium mb-1">플랫폼</label>
             <p className="text-sm text-gray-900">
-              {PLATFORM_LABELS[channel.platform] ?? channel.platform}
+              {platformName(channel.platform)}
             </p>
           </div>
 

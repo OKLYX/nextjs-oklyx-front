@@ -11,6 +11,7 @@ import type { Claim } from '@/domain/entities/ClaimEntity';
 import { ClaimActionPanel } from './ClaimActionPanel';
 import { LocalRecordBadge } from './LocalRecordBadge';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { platformName } from '@/config/platforms';
 
 /**
  * 반품/교환 상세. 목록 행 객체를 그대로 받는다 — 서버가 목록·상세에 같은 record 를 준다.
@@ -30,9 +31,6 @@ interface ClaimDetailsModalProps {
   /** 단건 재조회 결과 — 컨테이너 핸들러를 그대로 패널에 내려보낸다. */
   onActionDone: (updated: Claim) => void;
 }
-
-// Platform display labels; unknown codes fall back to the raw code.
-const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11번가' };
 
 function formatDate(value: string | null): string {
   if (!value) return '-';
@@ -113,7 +111,7 @@ export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetails
               </>
             }
           />
-          <Row label="플랫폼" value={PLATFORM_LABELS[claim.platform] ?? claim.platform} />
+          <Row label="플랫폼" value={platformName(claim.platform)} />
         </Section>
 
         <Section title="주문/상품">

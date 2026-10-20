@@ -17,6 +17,8 @@
  * ⚠️ 이 화면은 정산 배치·금액 확인을 다루지 않는다. 그쪽 진입점은 `ROUTES.SETTLEMENT_PAYOUTS` 뿐이다.
  */
 
+import { platformName } from '@/config/platforms';
+
 /** ① 판매자별 요약 한 줄. `GET /api/admin/sales/summary` */
 export interface SellerSales {
   sellerId: number;
@@ -128,10 +130,8 @@ export interface ProductProfit {
   uncategorized: boolean;
 }
 
-const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', NAVER: '네이버', ELEVENST: '11번가' };
-
 /** 알 수 없는 코드는 원문 그대로 — 두 번째 마켓이 붙어도 화면이 빈칸이 되지 않는다. */
-export const platformLabel = (platform: string): string => PLATFORM_LABELS[platform] ?? platform;
+export const platformLabel = (platform: string): string => platformName(platform);
 
 /** 채널 표시명. 별칭이 비어 있으면 주문 화면과 같은 `채널 #12` 표기를 쓴다. */
 export const channelLabel = (row: Pick<ChannelSales, 'accountId' | 'accountAlias' | 'platform'>): string =>

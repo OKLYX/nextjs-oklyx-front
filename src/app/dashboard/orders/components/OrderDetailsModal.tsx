@@ -37,6 +37,7 @@ import { ElevenstDeliveryDelayForm } from './ElevenstDeliveryDelayForm';
 import { ElevenstSplitShipmentForm } from './ElevenstSplitShipmentForm';
 import type { ElevenstSplitSubmit } from './ElevenstSplitShipmentForm';
 import { ElevenstVisitPickupForm } from './ElevenstVisitPickupForm';
+import { platformName } from '@/config/platforms';
 
 /**
  * Order detail modal — read-only info + (ADMIN · Coupang / 11st) single-order label sheet lookup and download.
@@ -76,11 +77,6 @@ interface OrderDetailsModalProps {
 }
 
 const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
-
-// Platform display labels for the missing-phone banner. Only COUPANG and ELEVENST reach it: the sheet button is
-// disabled for every other platform (`!isMarketOrder`, FEATURE_2610_17 / D2). Kept as a map (not a literal
-// '쿠팡') so another platform needs one entry, not a rewrite; unknown codes fall back to the raw code.
-const PLATFORM_LABELS: Record<string, string> = { COUPANG: '쿠팡', ELEVENST: '11번가' };
 
 // 주문 상세 액션 탭. 왼쪽부터 송장시트 조회 → 발송처리 → 주문취소 순이고, **기본 선택은 발송처리**다 —
 // 주문 대부분이 발송으로 끝나고, 취소는 되돌릴 수 없어 한 번 더 누르게 두는 편이 안전하다.
@@ -746,7 +742,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                           and re-fetching the ordersheet returns the same value (PLAN 조사 결과). */}
                       {hasMissingPhone && (
                         <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
-                          {PLATFORM_LABELS[order.platform] ?? order.platform}에서 고객 안심번호를 재발행하십시오.
+                          {platformName(order.platform)}에서 고객 안심번호를 재발행하십시오.
                         </div>
                       )}
 
