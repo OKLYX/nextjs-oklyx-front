@@ -11,7 +11,11 @@ import { MarketOptionLinkModal } from './MarketOptionLinkModal';
 
 const CHANNEL_ONLY_REASON = '마스터 옵션이 없는 채널 전용 옵션입니다';
 const OPTION_LINK_UNKNOWN_REASON = '채널별 옵션을 불러오지 못해 연결된 마스터 옵션을 알 수 없습니다';
-const OPTION_LINK_UNSUPPORTED_REASON = '11번가 옵션 연결은 아직 지원하지 않습니다';
+/** FEATURE_2610_13 / D128 · D130 and FEATURE_2610_26 / D41: platforms whose [마켓 옵션 연결] is disabled, and why. */
+const OPTION_LINK_UNSUPPORTED_REASONS: Record<string, string> = {
+  ELEVENST: '11번가 옵션 연결은 아직 지원하지 않습니다',
+  ESM: 'G마켓 · 옥션 옵션 연결은 아직 지원하지 않습니다',
+};
 const OPTION_ID_PENDING_HINT = '승인 후 부여';
 
 /**
@@ -24,6 +28,15 @@ export const MARKET_OPTION_LOCK_REASON = '마켓에 등록된 옵션은 뺄 수 
 export const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
 
 /**
+ * One option's price text (FEATURE_2610_26 / D48 W36): 「G {G마켓 price} · 옥션 {옥션 price}」 on a Gmarket · Auction (ESM)
+ * option (`auctionSellingPrice != null`), otherwise `formatWon(sellingPrice)`.
+ */
+export const formatSitePrices = (sellingPrice: number, auctionSellingPrice?: number | null): string =>
+  auctionSellingPrice == null
+    ? formatWon(sellingPrice)
+    : `G ${formatWon(sellingPrice)} · 옥션 ${formatWon(auctionSellingPrice)}`;
+
+/**
  * 판매상품 옵션 한 줄의 화면용 모양. 두 조회를 합친 것이다 —
  * `generated[].optionPrices`(활성·마켓 잠금·가격·재고, 모든 사용자) 와
  * `channel-options`(옵션 ID·연결된 마스터 옵션, ADMIN 전용).
@@ -32,6 +45,8 @@ export interface ListingOptionView {
   optionId: number;
   name: string;
   sellingPrice: number;
+  /** FEATURE_2610_26 / D50: the Auction price of an ESM option (`sellingPrice` = Gmarket); null elsewhere. */
+  auctionSellingPrice: number | null;
   /** 2609_19: 자동계산가가 아니라 사람이 정한 값. */
   priceManual: boolean;
   /** 실효 재고 = 채널 값 ?? 마스터 상한(103/D5, 백엔드 SSOT). */
@@ -55,11 +70,14 @@ interface ListingDetailPanelProps {
   isAdmin: boolean;
   /**
    * 2609_74/D13: this listing is on a market (has a product ID) — a row with an empty option ID shows
-   * [마켓 옵션 연결]. The link window is for Coupang listings; on an 11st listing the button is disabled
-   * (FEATURE_2610_13 / D128).
+   * [마켓 옵션 연결]. The link window is for Coupang listings; on an 11st or ESM listing the button is disabled
+   * (FEATURE_2610_13 / D128 · FEATURE_2610_26 / D41).
    */
   onMarket: boolean;
-  /** The listing's platform — `'ELEVENST'` disables [마켓 옵션 연결] with a reason (FEATURE_2610_13 / D128 · D130). */
+  /**
+   * The listing's platform — `'ELEVENST'` and `'ESM'` disable [마켓 옵션 연결] with a reason (FEATURE_2610_13 / D128 ·
+   * D130 · FEATURE_2610_26 / D41).
+   */
   platform: string;
   options: ListingOptionView[];
   /** 옵션 조회가 아직 안 끝났다 — 빈 목록("옵션 없음")과 구분해 스피너를 보여준다. */
@@ -84,7 +102,7 @@ interface ListingDetailPanelProps {
  *   the options to upload are picked only in the [마켓에 올리기] confirm · [⋯ > 올릴 옵션 고르기] window; here unused
  *   options are only dimmed + 「(미사용)」. [수정] does not edit the option, it goes to the editing place (2609_61/D7).
  *   When the option ID is empty and the listing is on a market, that cell shows [마켓 옵션 연결] (2609_74/D13) —
- *   disabled with a reason on an 11st listing (FEATURE_2610_13 / D128 · D130).
+ *   disabled with a reason on an 11st or ESM listing (FEATURE_2610_13 / D128 · D130 · FEATURE_2610_26 / D41).
  * - Tags: the channel's raw tags (33). The current value is `generated[].tags` the matrix already has (no extra call).
  *
  * Every save refreshes through the parent reload (onSaved).
@@ -254,7 +272,7 @@ export function ListingDetailPanel({
                       {!o.active && <span className="ml-1 text-[10px]">(미사용)</span>}
                     </td>
                     <td className={`px-2 py-1.5 text-right tabular-nums ${dim}`}>
-                      {formatWon(o.sellingPrice)}
+                      {formatSitePrices(o.sellingPrice, o.auctionSellingPrice)}
                       {/* 2609_19: 사람이 정한 값 표식. 재고의 '상속=회색' 과는 다른 규칙이다. */}
                       {o.priceManual && (
                         <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700">
@@ -281,13 +299,13 @@ export function ListingDetailPanel({
                       ) : isAdmin && onMarket && o.masterOptionId !== undefined ? (
                         // 2609_74/D13: the listing is on a market but the option ID is empty → a person links it.
                         // undefined = channel options not loaded yet / failed — whether an option ID exists is unknown.
-                        // FEATURE_2610_13 / D128 · D130: on an 11st listing the button stays visible but disabled,
-                        // with the reason in `title`.
+                        // FEATURE_2610_13 / D128 · D130 · FEATURE_2610_26 / D41: on an 11st or ESM listing the button
+                        // stays visible but disabled, with the reason in `title`.
                         <button
                           type="button"
                           onClick={() => setLinkTarget({ optionId: o.optionId, name: o.name })}
-                          disabled={platform === 'ELEVENST'}
-                          title={platform === 'ELEVENST' ? OPTION_LINK_UNSUPPORTED_REASON : undefined}
+                          disabled={OPTION_LINK_UNSUPPORTED_REASONS[platform] != null}
+                          title={OPTION_LINK_UNSUPPORTED_REASONS[platform]}
                           className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100 disabled:text-gray-400 disabled:hover:bg-transparent"
                         >
                           마켓 옵션 연결

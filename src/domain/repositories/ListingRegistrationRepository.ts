@@ -39,6 +39,7 @@ import type {
 } from '@/domain/entities/MasterProductEntity';
 import type { ShippingConfig } from '@/domain/entities/ShippingEntity';
 import type { ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
+import type { EsmShippingMap } from '@/domain/entities/EsmShipping';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -71,6 +72,8 @@ export interface ListingRegistrationRepository {
   getInheritedShipping(listingId: number): Promise<ShippingConfig>;
   // FEATURE_2610_13 / D104: an 11st listing's inherited baseline (master ?? 11st channel default), elevenst.* keys.
   getInheritedElevenstShipping(listingId: number): Promise<ElevenstShippingMap>;
+  // FEATURE_2610_26 / D36: an ESM listing's inherited baseline (the ESM channel layer — no master level), esm.* keys.
+  getInheritedEsmShipping(listingId: number): Promise<EsmShippingMap>;
   propagate(masterId: number): Promise<PropagateResponse>;
   // Channel sync preview (89): what a propagate run would change, read-only.
   getChannelSyncPreview(masterId: number): Promise<ChannelSyncPreview>;

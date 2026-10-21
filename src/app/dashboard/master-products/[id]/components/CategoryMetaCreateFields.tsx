@@ -12,6 +12,7 @@ import { submitNoticeGroup } from './categoryMetaValidation';
 import { noticeGroupName } from './noticeTemplates';
 import { isOptionNotice } from './optionMetaFields';
 import { useElevenstNoticePreview } from '@/presentation/hooks/useElevenstNoticePreview';
+import { useEsmNoticePreview } from '@/presentation/hooks/useEsmNoticePreview';
 
 // Per-platform controlled value held by the parent create modal (metaByPlatform[platform]).
 export interface CategoryMetaCreateValue {
@@ -40,6 +41,8 @@ interface CategoryMetaCreateFieldsProps {
   hideCategoryAttrs?: boolean;
   /** FEATURE_2610_13 / D98 · D109: a switched-on 11st channel exists → 「통합」 · 「쿠팡」 · 「11번가」 tabs (COUPANG only). */
   elevenstActive?: boolean;
+  /** FEATURE_2610_26 / D45: a switched-on Gmarket · Auction channel exists → the 「G마켓 · 옥션」 tab too (COUPANG only). */
+  esmActive?: boolean;
 }
 
 /**
@@ -62,6 +65,7 @@ export function CategoryMetaCreateFields({
   onSchemaLoad,
   hideCategoryAttrs = false,
   elevenstActive = false,
+  esmActive = false,
 }: CategoryMetaCreateFieldsProps) {
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   const savedLater = platform !== 'COUPANG';
@@ -80,6 +84,15 @@ export function CategoryMetaCreateFields({
   const elevenstPreview = useElevenstNoticePreview(
     useCase,
     tabbed && categoryId != null,
+    effectiveGroup,
+    groupNotices,
+    value.noticeValues,
+  );
+  // FEATURE_2610_26 / D56: the Gmarket · Auction view of the same values, for the COUPANG values only.
+  const esmTabbed = esmActive && !savedLater;
+  const esmPreview = useEsmNoticePreview(
+    useCase,
+    esmTabbed && categoryId != null,
     effectiveGroup,
     groupNotices,
     value.noticeValues,
@@ -173,6 +186,7 @@ export function CategoryMetaCreateFields({
         noticeGroup={value.noticeGroup ?? null}
         onNoticeGroupChange={(group) => onChange({ ...value, noticeGroup: group })}
         elevenstPreview={tabbed ? elevenstPreview : undefined}
+        esmPreview={esmTabbed ? esmPreview : undefined}
       />
 
       {savedLater && (

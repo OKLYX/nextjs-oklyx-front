@@ -5,20 +5,20 @@ import type { MasterPlatformCategory } from '@/domain/entities/MasterProductEnti
 import { platformName } from '@/config/platforms';
 
 /**
- * Platforms whose category can be picked in the lookup picker — Coupang and 11st (FEATURE_2610_11 / D1).
- * Naver has no category list, so these screens never ask for it and never block it (D18 (d) — the server
- * still refuses a Naver upload without a mapping).
+ * Platforms whose category can be picked in the lookup picker — Coupang and 11st (FEATURE_2610_11 / D1), and ESM
+ * (FEATURE_2610_26 / D11 — the imported ESM categories). Naver has no category list, so these screens never ask for
+ * it and never block it (D18 (d) — the server still refuses a Naver upload without a mapping).
  * File: src/app/dashboard/master-products/components/platformCategory.ts
  */
-export type LookupPlatform = 'COUPANG' | 'ELEVENST';
+export type LookupPlatform = 'COUPANG' | 'ELEVENST' | 'ESM';
 
-export const LOOKUP_PLATFORMS: LookupPlatform[] = ['COUPANG', 'ELEVENST'];
+export const LOOKUP_PLATFORMS: LookupPlatform[] = ['COUPANG', 'ELEVENST', 'ESM'];
 
 /** `platform` narrowed to a lookup platform, or null (Naver and any other platform). */
 export const asLookupPlatform = (platform: string): LookupPlatform | null =>
   LOOKUP_PLATFORMS.find((p) => p === platform) ?? null;
 
-/** Screen label of a lookup platform (「쿠팡」 · 「11번가」). */
+/** Screen label of a lookup platform (「쿠팡」 · 「11번가」 · 「G마켓 · 옥션」). */
 export const lookupPlatformLabel = (platform: LookupPlatform): string => platformName(platform);
 
 /** Lookup platforms that have at least one switched-on sales-channel account (D17). */
@@ -26,8 +26,8 @@ export const activeLookupPlatformsOf = (accounts: MarketplaceAccount[]): LookupP
   LOOKUP_PLATFORMS.filter((p) => accounts.some((a) => a.isActive && a.platform === p));
 
 /**
- * Platforms the missing-category popup asks for (FEATURE_2610_12 / D35): 11st always, Coupang only with a
- * switched-on account (`activePlatforms`, D17).
+ * Platforms the missing-category popup asks for (FEATURE_2610_12 / D35): 11st always, Coupang and ESM only with a
+ * switched-on account (`activePlatforms`, D17 · FEATURE_2610_26 / D45).
  */
 export const promptPlatformsOf = (activePlatforms: LookupPlatform[]): LookupPlatform[] =>
   LOOKUP_PLATFORMS.filter((p) => p === 'ELEVENST' || activePlatforms.includes(p));
@@ -49,14 +49,16 @@ export interface PlatformCategoryRow {
 }
 
 /**
- * The D50 lines, 「쿠팡」 → 「11번가」: the master's own row wins (D41), else the standard category mapping, else none.
- * Path = the cached display path, or the code when no path was cached.
+ * The D50 lines, 「쿠팡」 → 「11번가」 → 「G마켓 · 옥션」: the master's own row wins (D41), else the standard category
+ * mapping, else none. Path = the cached display path, or the code when no path was cached. The ESM line is there only
+ * with a switched-on ESM account in `activePlatforms` (FEATURE_2610_26 / D45).
  */
 export const platformCategoryRowsOf = (
   mappings: CategoryMapping[],
   owns: Pick<MasterPlatformCategory, 'platform' | 'platformCategoryId' | 'platformCategoryName'>[],
+  activePlatforms: LookupPlatform[],
 ): PlatformCategoryRow[] =>
-  LOOKUP_PLATFORMS.map((platform) => {
+  LOOKUP_PLATFORMS.filter((platform) => platform !== 'ESM' || activePlatforms.includes('ESM')).map((platform) => {
     const own = owns.find((o) => o.platform === platform);
     if (own) return { platform, path: own.platformCategoryName || own.platformCategoryId, own: true };
     const mapping = mappings.find((m) => m.platform === platform);

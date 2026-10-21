@@ -4,7 +4,7 @@ import { Button } from '@/presentation/components/ui/Button';
 import { lookupPlatformLabel, type LookupPlatform, type PlatformCategoryRow } from './platformCategory';
 
 interface PlatformCategoryRowsProps {
-  /** From `platformCategoryRowsOf` (「쿠팡」 → 「11번가」, own row first — D41). */
+  /** From `platformCategoryRowsOf` (「쿠팡」 → 「11번가」 → 「G마켓 · 옥션」, own row first — D41). */
   rows: PlatformCategoryRow[];
   /** [변경] — the caller opens the picker for that platform, then 「적용 범위 선택」 (D51). */
   onChange: (platform: LookupPlatform) => void;
@@ -14,8 +14,9 @@ interface PlatformCategoryRowsProps {
 }
 
 /**
- * Platform category lines under the standard category — one line per platform (「쿠팡」 → 「11번가」) with one
- * [변경] each (FEATURE_2610_12 / D50). Shared by the master create form and the detail 「표준 카테고리」 block.
+ * Platform category lines under the standard category — one line per platform (「쿠팡」 → 「11번가」 → 「G마켓 · 옥션」,
+ * the last only with a switched-on ESM channel — FEATURE_2610_26 / D45) with one [변경] each (FEATURE_2610_12 / D50).
+ * Shared by the master create form and the detail 「표준 카테고리」 block.
  * File: src/app/dashboard/master-products/components/PlatformCategoryRows.tsx
  *
  * **Lines**: 「{플랫폼}: {경로}」 · own 「{플랫폼}: {경로} (개별 지정)」 + [기준으로 되돌리기] ·
@@ -24,10 +25,10 @@ interface PlatformCategoryRowsProps {
  * **Usage**:
  * ```tsx
  * // Master detail (MasterCategoryPanel)
- * <PlatformCategoryRows rows={platformCategoryRowsOf(mappings, owns)} onChange={setPickerPlatform}
+ * <PlatformCategoryRows rows={platformCategoryRowsOf(mappings, owns, activePlatforms)} onChange={setPickerPlatform}
  *   onRevert={(p) => void handleRevert(p)} disabled={busy} />
  * // Master create (after [설정적용])
- * <PlatformCategoryRows rows={platformCategoryRowsOf(createMappings, Object.values(ownPicks))}
+ * <PlatformCategoryRows rows={platformCategoryRowsOf(createMappings, Object.values(ownPicks), activePlatforms)}
  *   onChange={setPickerPlatform} onRevert={handleRevertOwn} disabled={isSubmitting} />
  * ```
  *

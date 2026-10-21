@@ -10,10 +10,7 @@ import type {
 import type { ListingOptionSummary } from '@/domain/entities/ListingRegistrationEntity';
 import { CopyIdButton } from './CopyIdButton';
 import { platformDisplayName } from '@/config/platforms';
-
-// 매트릭스 판매가 열과 같은 표기(`12,900원`). ⚠️ 같은 화면에 두 가지 금액 표기가 섞이지 않도록
-// `CoverageMatrix.formatWon` 과 형식을 맞춘다.
-const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
+import { formatSitePrices } from './ListingDetailPanel';
 
 const NO_ACCOUNT_LABEL = '계정 없음';
 const CHANNEL_ONLY_REASON = '마스터 옵션이 없는 채널 전용 옵션입니다';
@@ -222,7 +219,7 @@ export function ChannelOptionTable({
                     <td key={col.productListingId} className="px-3 py-2">
                       <div className={active ? 'text-gray-900' : 'text-gray-400'}>
                         {active
-                          ? `${formatWon(option.sellingPrice)} / ${option.stockQuantity ?? option.maxStock}`
+                          ? `${formatSitePrices(option.sellingPrice, option.auctionSellingPrice)} / ${option.stockQuantity ?? option.maxStock}`
                           : '미사용'}
                       </div>
                       <OptionIdCell value={option.platformOptionId ?? null} />
@@ -251,7 +248,7 @@ export function ChannelOptionTable({
                     <span className="font-medium">{option.optionName}</span>
                     <span className="text-gray-500">
                       {option.active !== false
-                        ? `${formatWon(option.sellingPrice)} / ${option.stockQuantity ?? option.maxStock}`
+                        ? `${formatSitePrices(option.sellingPrice, option.auctionSellingPrice)} / ${option.stockQuantity ?? option.maxStock}`
                         : '미사용'}
                     </span>
                     <OptionIdCell value={option.platformOptionId ?? null} />

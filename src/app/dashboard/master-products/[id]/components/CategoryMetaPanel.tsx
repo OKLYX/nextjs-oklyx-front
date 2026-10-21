@@ -13,6 +13,8 @@ import { defaultNoticeRefAll, noticeGroupName } from './noticeTemplates';
 import { isOptionNotice } from './optionMetaFields';
 import { useElevenstNoticePreview } from '@/presentation/hooks/useElevenstNoticePreview';
 import { elevenstOwnNotices } from '@/domain/entities/ElevenstNotice';
+import { useEsmNoticePreview } from '@/presentation/hooks/useEsmNoticePreview';
+import { esmOwnNotices } from '@/domain/entities/EsmNotice';
 
 // 선택 그룹의 마스터 소유 고시가 전부 비었으면 "전체 상품 상세페이지 참조" 로 채운다(기본 체크).
 const withNoticeRefDefault = (
@@ -34,6 +36,8 @@ interface CategoryMetaPanelProps {
   onSaved?: () => void;
   /** FEATURE_2610_13 / D98 · D109: a switched-on 11st channel exists → 「통합」 · 「쿠팡」 · 「11번가」 tabs. */
   elevenstActive?: boolean;
+  /** FEATURE_2610_26 / D45: a switched-on Gmarket · Auction channel exists → the 「G마켓 · 옥션」 tab too. */
+  esmActive?: boolean;
 }
 
 /**
@@ -59,6 +63,7 @@ export function CategoryMetaPanel({
   isBundle = false,
   onSaved,
   elevenstActive = false,
+  esmActive = false,
 }: CategoryMetaPanelProps) {
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   // COUPANG owns the persisted per-master values; other platforms are schema-only (read-only).
@@ -94,6 +99,8 @@ export function CategoryMetaPanel({
     groupNotices,
     noticeValues,
   );
+  // FEATURE_2610_26 / D56: the Gmarket · Auction view of the same values.
+  const esmPreview = useEsmNoticePreview(useCase, esmActive && !readOnly, effectiveGroup, groupNotices, noticeValues);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -173,8 +180,13 @@ export function CategoryMetaPanel({
       const group = submitNoticeGroup(notices, noticeValues, noticeGroup);
       await useCase.setCategoryAttributes(masterId, {
         attributes: attrValues,
-        // FEATURE_2610_13 / D101: the 11st-only values ride along under their ELEVENST:{code} keys.
-        notices: { ...noticesToSubmit(notices, noticeValues, group), ...elevenstOwnNotices(noticeValues) },
+        // FEATURE_2610_13 / D101 and FEATURE_2610_26 / D17: the 11st-only and Gmarket · Auction-only values ride along
+        // under their ELEVENST:{code} and ESM:{code} keys.
+        notices: {
+          ...noticesToSubmit(notices, noticeValues, group),
+          ...elevenstOwnNotices(noticeValues),
+          ...esmOwnNotices(noticeValues),
+        },
         noticeGroup: group,
       });
       setNoticeGroup(group);
@@ -220,6 +232,7 @@ export function CategoryMetaPanel({
         noticeGroup={noticeGroup}
         onNoticeGroupChange={handleNoticeGroupChange}
         elevenstPreview={elevenstActive && !readOnly ? elevenstPreview : undefined}
+        esmPreview={esmActive && !readOnly ? esmPreview : undefined}
       />
 
       {readOnly ? (
