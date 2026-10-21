@@ -78,6 +78,7 @@ const buildOptionViews = (
           masterOptions.find((o) => o.id === p.optionId)?.name ??
           `옵션 #${p.optionId}`,
         sellingPrice: p.sellingPrice,
+        auctionSellingPrice: p.auctionSellingPrice ?? null,
         priceManual: p.priceSource === 'MANUAL_OVERRIDE',
         stock: p.stockQuantity ?? p.maxStock,
         stockInherited: p.stockQuantity == null,
@@ -93,6 +94,7 @@ const buildOptionViews = (
     optionId: o.optionId,
     name: o.optionName,
     sellingPrice: o.sellingPrice,
+    auctionSellingPrice: o.auctionSellingPrice ?? null,
     priceManual: o.priceSource === 'MANUAL_OVERRIDE',
     stock: o.stockQuantity ?? o.maxStock,
     stockInherited: o.stockQuantity == null,
@@ -178,12 +180,18 @@ export function ListingRow({
   const prices = activeViews.map((v) => v.sellingPrice);
   const minPrice = prices.length > 0 ? Math.min(...prices) : cell.sellingPrice;
   const hasPriceRange = prices.length > 1 && new Set(prices).size > 1;
+  // FEATURE_2610_26 / D48 W38: an ESM row also shows its lowest Auction price — 「G {G마켓 min} · 옥션 {옥션 min}」.
+  const auctionPrices = activeViews.flatMap((v) => (v.auctionSellingPrice == null ? [] : [v.auctionSellingPrice]));
+  const minAuction =
+    auctionPrices.length > 0 ? Math.min(...auctionPrices) : (cell.auctionSellingPrice ?? null);
+  const hasAuctionRange = auctionPrices.length > 1 && new Set(auctionPrices).size > 1;
   const stockTotal = activeViews.reduce((sum, v) => sum + v.stock, 0);
   const needsSync = cell.needsMarketSync === true;
   const categoryMismatch = cell.usesOwnCategory === true;
   const categoryLabel = cell.categoryName ?? cell.categoryCode ?? null;
   // FEATURE_2610_11 / D19: an unsent row whose category the server could not resolve (empty
-  // `categoryCode`) hides its upload button. Coupang · 11st only (D20), and only with a master category.
+  // `categoryCode`) hides its upload button. Coupang · 11st · ESM only (D20 · FEATURE_2610_26 / D45), and only with
+  // a master category.
   const lookupPlatform = asLookupPlatform(platform);
   const categoryBlocked =
     lookupPlatform != null && hasMasterCategory && status === 'DRAFT' && !cell.categoryCode;
@@ -276,8 +284,11 @@ export function ListingRow({
               <>
                 <span aria-hidden>·</span>
                 <span className="tabular-nums">
-                  {formatWon(minPrice)}
-                  {hasPriceRange ? '~' : ''}
+                  {minAuction == null
+                    ? `${formatWon(minPrice)}${hasPriceRange ? '~' : ''}`
+                    : `G ${formatWon(minPrice)}${hasPriceRange ? '~' : ''} · 옥션 ${formatWon(minAuction)}${
+                        hasAuctionRange ? '~' : ''
+                      }`}
                 </span>
               </>
             )}

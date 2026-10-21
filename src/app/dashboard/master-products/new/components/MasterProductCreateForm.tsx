@@ -9,6 +9,7 @@ import { getImageUrl } from '@/infrastructure/utils/imageUrl';
 import { EMPTY_SHIPPING_OVERRIDE, type ShippingOverride } from '@/domain/entities/ShippingEntity';
 import { tierError, type ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import { elevenstOwnNotices } from '@/domain/entities/ElevenstNotice';
+import { esmOwnNotices } from '@/domain/entities/EsmNotice';
 import {
   NOTICE_TEXT_FIELDS,
   NOTICE_TEXT_KEYS,
@@ -435,9 +436,10 @@ export function MasterProductCreateForm({
           mappingUseCase.getMappings(categoryId),
           standardCategoryPathOf(categoryUseCase, categoryId, categoryName),
         ]);
+        const active = activeLookupPlatformsOf(accounts);
         return {
-          platforms: missingPlatformsOf(promptPlatformsOf(activeLookupPlatformsOf(accounts)), [...mappings, ...present]),
-          current: platformCategoryRowsOf(mappings, present),
+          platforms: missingPlatformsOf(promptPlatformsOf(active), [...mappings, ...present]),
+          current: platformCategoryRowsOf(mappings, present, active),
           path,
         };
       } catch {
@@ -1137,7 +1139,8 @@ export function MasterProductCreateForm({
         return;
       }
       // Category required-attributes/notices: the COUPANG meta map, which also carries the 11st-only
-      // ELEVENST:{code} notice values (FEATURE_2610_13 / D101). Other platforms' attributes are follow-up.
+      // ELEVENST:{code} and the Gmarket · Auction-only ESM:{code} notice values (FEATURE_2610_13 / D101 · FEATURE_2610_26 /
+      // D17). Other platforms' attributes are follow-up.
       const coupangMeta = metaByPlatform['COUPANG'];
       if (coupangMeta) {
         try {
@@ -1149,11 +1152,13 @@ export function MasterProductCreateForm({
           );
           await useCase.setCategoryAttributes(created.id, {
             attributes: coupangMeta.attrValues,
-            // Send only the selected notice group's notices (user picks one group) + the 11st-only values
-            // under their ELEVENST:{code} keys (FEATURE_2610_13 / D101).
+            // Send only the selected notice group's notices (user picks one group) + the 11st-only and
+            // Gmarket · Auction-only values under their ELEVENST:{code} and ESM:{code} keys (FEATURE_2610_13 / D101 ·
+            // FEATURE_2610_26 / D17).
             notices: {
               ...noticesToSubmit(coupangMeta.notices, coupangMeta.noticeValues, group),
               ...elevenstOwnNotices(coupangMeta.noticeValues),
+              ...esmOwnNotices(coupangMeta.noticeValues),
             },
             noticeGroup: group,
           });
@@ -1487,6 +1492,7 @@ export function MasterProductCreateForm({
                     rows={platformCategoryRowsOf(
                       createMappings.mappings,
                       Object.values(ownPicks).filter((o): o is MasterPlatformCategoryRequest => o != null),
+                      activePlatforms,
                     )}
                     onChange={setPickerPlatform}
                     onRevert={handleRevertOwn}
@@ -1593,9 +1599,10 @@ export function MasterProductCreateForm({
               <label className="mb-1 block text-xs font-medium text-gray-600">
                 필수속성 / 상품정보제공고시
               </label>
-              {/* FEATURE_2610_13 / D109 (a): with a switched-on 11st channel the fields bring their own
-                  「통합」 · 「쿠팡」 · 「11번가」 tabs, so the single-platform tab bar is left out. */}
-              {activePlatforms.includes('ELEVENST') ? (
+              {/* FEATURE_2610_13 / D109 (a) · FEATURE_2610_26 / D45: with a switched-on 11st or Gmarket · Auction
+                  channel the fields bring their own 「통합」 · 「쿠팡」 · platform tabs, so the single-platform tab bar
+                  is left out. */}
+              {activePlatforms.includes('ELEVENST') || activePlatforms.includes('ESM') ? (
                 <CategoryMetaCreateFields
                   categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
                   platform="COUPANG"
@@ -1604,7 +1611,8 @@ export function MasterProductCreateForm({
                   onChange={(next) => handleMetaChange('COUPANG', next)}
                   onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad('COUPANG', attrs, notices)}
                   hideCategoryAttrs={hideCategoryAttrs}
-                  elevenstActive
+                  elevenstActive={activePlatforms.includes('ELEVENST')}
+                  esmActive={activePlatforms.includes('ESM')}
                 />
               ) : (
                 <MetaPlatformTabs>
@@ -1907,6 +1915,7 @@ export function MasterProductCreateForm({
             platformCategoryRowsOf(
               createMappings?.categoryId === selectedCategoryId ? createMappings.mappings : [],
               Object.values(ownPicks).filter((o): o is MasterPlatformCategoryRequest => o != null),
+              activePlatforms,
             ),
           )}
           onSelect={(sel) => handlePlatformPicked(pickerPlatform, sel)}

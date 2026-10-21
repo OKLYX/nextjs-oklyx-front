@@ -190,8 +190,8 @@ export interface ElevenstShippingConfig {
 }
 
 /**
- * D120 — the note a shipping save adds when some 11st listings could not be re-priced
- * (`priceRecalcFailedCount` > 0). '' when there is none.
+ * D120 — the note a shipping save adds when some 11st (or, FEATURE_2610_26 / D65, ESM) listings could not be
+ * re-priced (`priceRecalcFailedCount` > 0). '' when there is none.
  */
 export const recalcFailureNote = (failed: number | undefined): string =>
   failed && failed > 0

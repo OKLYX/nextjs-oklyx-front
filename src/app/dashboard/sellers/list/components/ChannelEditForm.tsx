@@ -30,6 +30,8 @@ import {
 import { OptionCheckSuffixControl } from '@/presentation/components/OptionCheckSuffixControl';
 import { ShippingOverrideFields } from '@/presentation/components/ShippingOverrideFields';
 import { ElevenstShippingFields } from '@/presentation/components/ElevenstShippingFields';
+import { EsmShippingFields } from '@/presentation/components/EsmShippingFields';
+import { cleanEsmMap, type EsmChoice, type EsmShippingMap } from '@/domain/entities/EsmShipping';
 import { Spinner } from '@/presentation/components/Spinner';
 import {
   ChannelFixedCostFields,
@@ -52,7 +54,8 @@ export const CHANNEL_EDIT_FORM_ID = 'channel-edit-form';
 /** The shipping save the 「배송」 tab asks for (FEATURE_2610_16 / D22) — only when it differs from the loaded value. */
 export type ChannelShippingChange =
   | { kind: 'coupang'; config: ShippingConfigRequest }
-  | { kind: 'elevenst'; settings: ElevenstShippingMap };
+  | { kind: 'elevenst'; settings: ElevenstShippingMap }
+  | { kind: 'esm'; settings: EsmShippingMap };
 
 /** True when both objects hold the same value under every key (a missing key counts as null). */
 function sameValues(a: object, b: object): boolean {
@@ -64,8 +67,8 @@ function sameValues(a: object, b: object): boolean {
 interface ChannelEditFormProps {
   channel: MarketplaceAccount;
   isLoading?: boolean;
-  // Channel PATCH → platform defaults PUT (Coupang = suffix, 11st = notices) → fixed-cost PUT → shipping PUT
-  // run sequentially in the parent (FEATURE_2610_16 / D22).
+  // Channel PATCH → platform defaults PUT (Coupang = suffix, 11st = notices, ESM = none — FEATURE_2610_26 / D57)
+  // → fixed-cost PUT → shipping PUT run sequentially in the parent (FEATURE_2610_16 / D22).
   // Any failure throws here → inline banner + retry, modal stays open (see EditChannelModal).
   // 🔴 fixedCostItems = null means the fixed-cost section is not ready (loading or load failure), so it is not
   // saved — a replace (PUT) built from a list that was never read would cut every existing link.
@@ -96,6 +99,8 @@ interface ChannelEditFormProps {
   shippingLoading?: boolean;
   shippingError?: string;
   onRetryShipping?: () => void;
+  /** FEATURE_2610_26 / D37: the bundle-fee policies of one ESM shipping place (an ESM channel only). */
+  loadEsmBundles?: (placeNo: string) => Promise<EsmChoice[]>;
   /** Tab shown when the form mounts (FEATURE_2610_16 / D29: the master detail [배송 설정하기] opens 「배송」). */
   initialTab?: ChannelTabKey;
 }
@@ -122,6 +127,7 @@ export function ChannelEditForm({
   shippingLoading = false,
   shippingError = '',
   onRetryShipping = () => {},
+  loadEsmBundles = async () => [],
   initialTab = 'basic',
 }: ChannelEditFormProps) {
   const [error, setError] = useState<string | null>(null);
@@ -137,8 +143,10 @@ export function ChannelEditForm({
   // The shipping values arrive after mount — keep only what the user touched and read the rest from `shipping`.
   const [coupangShippingDraft, setCoupangShippingDraft] = useState<ShippingConfigRequest | null>(null);
   const [elevenstShippingDraft, setElevenstShippingDraft] = useState<ElevenstShippingMap | null>(null);
+  const [esmShippingDraft, setEsmShippingDraft] = useState<EsmShippingMap | null>(null);
   const coupangShipping = coupangShippingDraft ?? shipping?.coupang ?? EMPTY_FORM;
   const elevenstShipping = elevenstShippingDraft ?? shipping?.elevenst ?? {};
+  const esmShipping = esmShippingDraft ?? cleanEsmMap(shipping?.esm);
 
   const fixedCostReady = !fixedCostsLoading && fixedCostsError === '';
 
@@ -176,6 +184,10 @@ export function ChannelEditForm({
       accessKey: channel.accessKey ?? '',
       secretKey: '',
       apiKey: '',
+      esmMasterId: channel.esmMasterId ?? '',
+      esmSecretKey: '',
+      gmarketSellerId: channel.gmarketSellerId ?? '',
+      auctionSellerId: channel.auctionSellerId ?? '',
       thumbnailTemplateId: channel.thumbnailTemplateId != null ? String(channel.thumbnailTemplateId) : '',
       detailTemplateId: channel.detailTemplateId != null ? String(channel.detailTemplateId) : '',
     },
@@ -187,7 +199,9 @@ export function ChannelEditForm({
   }, [formState.isValid, onValidityChange]);
 
   // The platform of a saved channel never changes (the backend refuses it) — the stored value picks the fields.
+  const isCoupang = channel.platform === 'COUPANG';
   const isElevenst = channel.platform === 'ELEVENST';
+  const isEsm = channel.platform === 'ESM';
 
   // FEATURE_2610_16 / D22: shipping is sent only when the tab was loaded and now differs from the loaded value.
   const shippingChange = (): ChannelShippingChange | null => {
@@ -196,6 +210,12 @@ export function ChannelEditForm({
       if (elevenstShippingDraft === null) return null;
       const settings = cleanElevenstMap(elevenstShippingDraft);
       return sameValues(settings, cleanElevenstMap(shipping.elevenst)) ? null : { kind: 'elevenst', settings };
+    }
+    if (isEsm) {
+      // FEATURE_2610_26 / D66: only the six input keys are sent — the server writes the policy facts itself.
+      if (esmShippingDraft === null) return null;
+      const settings = cleanEsmMap(esmShippingDraft);
+      return sameValues(settings, cleanEsmMap(shipping.esm)) ? null : { kind: 'esm', settings };
     }
     if (coupangShippingDraft === null || sameValues(coupangShippingDraft, shipping.coupang)) return null;
     return { kind: 'coupang', config: coupangShippingDraft };
@@ -284,8 +304,9 @@ export function ChannelEditForm({
           )}
         </div>
 
-        {/* FEATURE_2610_13 / D5: the Coupang credential fields — an 11st account takes 「API 키」 alone. */}
-        {!isElevenst && (
+        {/* FEATURE_2610_13 / D5 · FEATURE_2610_26 / D40: each platform shows its own credential fields — Coupang the
+            four below, 11st 「API 키」 alone, ESM the four ESM fields. */}
+        {isCoupang && (
           <>
             <div>
               <label htmlFor="vendorId" className="block text-sm font-medium mb-1">
@@ -376,6 +397,76 @@ export function ChannelEditForm({
           </div>
         )}
 
+        {/* FEATURE_2610_26 / D4: the ESM+ master ID, its secret key (blank = keep) and both site seller IDs. */}
+        {isEsm && (
+          <>
+            <div>
+              <label htmlFor="esmMasterId" className="block text-sm font-medium mb-1">
+                ESM+ 마스터 ID <span className="text-red-600">*</span>
+              </label>
+              <input
+                {...register('esmMasterId')}
+                id="esmMasterId"
+                type="text"
+                disabled={isLoading}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {formState.errors.esmMasterId && (
+                <p className="mt-1 text-sm text-red-600">{formState.errors.esmMasterId.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="esmSecretKey" className="block text-sm font-medium mb-1">
+                비밀키
+              </label>
+              <input
+                {...register('esmSecretKey')}
+                id="esmSecretKey"
+                type="password"
+                placeholder="변경 시에만 입력하세요 (비워두면 기존 값 유지)"
+                disabled={isLoading}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {formState.errors.esmSecretKey && (
+                <p className="mt-1 text-sm text-red-600">{formState.errors.esmSecretKey.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="gmarketSellerId" className="block text-sm font-medium mb-1">
+                G마켓 판매자 ID <span className="text-red-600">*</span>
+              </label>
+              <input
+                {...register('gmarketSellerId')}
+                id="gmarketSellerId"
+                type="text"
+                disabled={isLoading}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {formState.errors.gmarketSellerId && (
+                <p className="mt-1 text-sm text-red-600">{formState.errors.gmarketSellerId.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="auctionSellerId" className="block text-sm font-medium mb-1">
+                옥션 판매자 ID <span className="text-red-600">*</span>
+              </label>
+              <input
+                {...register('auctionSellerId')}
+                id="auctionSellerId"
+                type="text"
+                disabled={isLoading}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {formState.errors.auctionSellerId && (
+                <p className="mt-1 text-sm text-red-600">{formState.errors.auctionSellerId.message}</p>
+              )}
+            </div>
+          </>
+        )}
+
         <div>
           <label htmlFor="thumbnailTemplateId" className="block text-sm font-medium mb-1">
             썸네일 템플릿
@@ -430,8 +521,11 @@ export function ChannelEditForm({
       </div>
 
       <div role="tabpanel" hidden={activeTab !== 'platform'} className="space-y-4">
-        {/* FEATURE_2610_16 / D3 · D4: only this channel's platform fields — Coupang = the suffix, 11st = the two notices. */}
-        {isElevenst ? (
+        {/* FEATURE_2610_16 / D3 · D4: only this channel's platform fields — Coupang = the suffix, 11st = the two
+            notices, ESM = a one-line note (FEATURE_2610_26 / D57). */}
+        {isEsm ? (
+          <p className="text-sm text-gray-500">G마켓 · 옥션은 따로 정할 플랫폼 기본값이 없습니다</p>
+        ) : isElevenst ? (
           NOTICE_TEXT_FIELDS.map((f) => (
             <div key={f.key}>
               <label htmlFor={f.key} className="block text-sm font-medium mb-1">
@@ -494,6 +588,18 @@ export function ChannelEditForm({
             onChange={setElevenstShippingDraft}
             outbound={shipping.outbound}
             returns={shipping.returns}
+            disabled={isLoading}
+          />
+        ) : isEsm ? (
+          <EsmShippingFields
+            level="account"
+            value={esmShipping}
+            onChange={setEsmShippingDraft}
+            outbound={shipping.outbound}
+            returns={shipping.returns}
+            dispatches={shipping.esmDispatches}
+            companies={shipping.esmCompanies}
+            loadBundles={loadEsmBundles}
             disabled={isLoading}
           />
         ) : (

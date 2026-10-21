@@ -58,6 +58,11 @@ export interface OptionPrice {
   optionNameSource?: 'AUTO' | 'MANUAL_OVERRIDE';
   // 2609_22/D2: 마스터에 대응 옵션이 없는 채널 전용 옵션.
   channelOnly?: boolean;
+  // FEATURE_2610_26 / D50: on a Gmarket · Auction (ESM) listing `sellingPrice` is the Gmarket price and this is the Auction
+  // price; null / absent on every other platform.
+  auctionSellingPrice?: number | null;
+  // FEATURE_2610_26 / D53 ②: origin of `auctionSellingPrice` ('AUTO' / 'MANUAL_OVERRIDE'); null / absent elsewhere.
+  auctionPriceSource?: 'AUTO' | 'MANUAL_OVERRIDE' | null;
 }
 
 // Auto-generated (or overridden) product assets for one channel/listing.
@@ -85,7 +90,8 @@ export interface GeneratedProductResponse {
   shippingReady?: boolean | null;
   // 이 셀에 지정된 상세 템플릿 id(2609_20/D12). null|undefined = 계정/테넌트 기본 상속.
   detailTemplateId?: number | null;
-  // FEATURE_2610_13 / D120: 1 when this 11st listing's re-price failed after a shipping save, else 0.
+  // FEATURE_2610_13 / D120 · FEATURE_2610_26 / D65: 1 when this 11st or ESM listing's re-price failed after a
+  // shipping save, else 0.
   priceRecalcFailedCount?: number;
 }
 
@@ -228,6 +234,10 @@ export interface ListingOptionSummary {
   platformOptionId?: string | null;
   // 2609_61: 연결된 마스터 옵션 id. null = 채널 전용 옵션(2609_22/D2) = 마스터에 고칠 곳이 없다.
   masterOptionId?: number | null;
+  // FEATURE_2610_26 / D50: the Auction price of an ESM option (`sellingPrice` = Gmarket); null / absent elsewhere.
+  auctionSellingPrice?: number | null;
+  // FEATURE_2610_26 / D53 ②: origin of `auctionSellingPrice`; null / absent elsewhere.
+  auctionPriceSource?: 'AUTO' | 'MANUAL_OVERRIDE' | null;
 }
 
 export interface ListingOptionsResponse {
@@ -252,9 +262,11 @@ export interface OptionStocksRequest {
   stocks: { optionId: number; stockQuantity: number | null }[];
 }
 
-// 채널 옵션 판매가 부분 갱신(2609_19). sellingPrice null = 자동계산가로 복귀(D3).
+// Partial update of channel option selling prices (2609_19). sellingPrice null = back to the calculated price (D3).
+// FEATURE_2610_26 / D53 ②: an ESM option also sends `auctionSellingPrice` (null = back to the calculated Auction price);
+// other platforms leave it out.
 export interface OptionPricesRequest {
-  prices: { optionId: number; sellingPrice: number | null }[];
+  prices: { optionId: number; sellingPrice: number | null; auctionSellingPrice?: number | null }[];
 }
 
 // 저장 + 마켓 반영 결과(D5·D6). 부분 성공이 정상 경로다.

@@ -22,6 +22,7 @@ import {
 } from './measureAttributes';
 import { isOptionField, isOptionNotice } from './optionMetaFields';
 import { ELEVENST_NOTICE_PREFIX } from '@/domain/entities/ElevenstNotice';
+import { ESM_NOTICE_PREFIX } from '@/domain/entities/EsmNotice';
 
 const pairFilled = (p: MeasurePair, values: Record<string, string>): boolean => {
   const u = derivedUnit(p, values);
@@ -97,11 +98,12 @@ export function noticesToSubmit(
 }
 
 /**
- * 옵션 저장 시 보낼 옵션-소유 고시 = **선택 품목군의 옵션-소유 고시 key 만**. 옵션 편집기는 저장된 고시 맵을
- * 통째로 다시 시드하므로, 거르지 않으면 예전 품목군·옛 항목 이름으로 들어간 값이 화면에 안 보인 채 계속 남아
- * 마켓 전송 때마다 버려진다(2026-10-19 마스터 1705). 그룹이 없는 스키마면 옵션-소유 고시 전부.
- * 스키마가 아직 없으면(`notices` 비어 있음) 판단 근거가 없으므로 그대로 둔다 — 지우지 않는다.
- * `ELEVENST:*` 값은 쿠팡 스키마 밖이라 항상 유지.
+ * The option-owned notices to send when an option is saved = **only the option-owned notice keys of the chosen
+ * notice group**. The option editor re-seeds the whole saved notice map, so without this filter a value
+ * entered under an old group or an old item name stays hidden on screen and is dropped on every market upload
+ * (2026-10-19, master 1705). A schema without groups keeps every option-owned notice.
+ * With no schema yet (`notices` empty) there is nothing to judge by, so the map is kept as is — nothing is removed.
+ * `ELEVENST:*` and `ESM:*` values are outside the Coupang schema and are always kept (FEATURE_2610_26 / D17).
  */
 export function optionNoticesToSubmit(
   notices: CategoryNotice[],
@@ -116,7 +118,7 @@ export function optionNoticesToSubmit(
   );
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(optNoticeValues)) {
-    if (allowed.has(k) || k.startsWith(ELEVENST_NOTICE_PREFIX)) out[k] = v;
+    if (allowed.has(k) || k.startsWith(ELEVENST_NOTICE_PREFIX) || k.startsWith(ESM_NOTICE_PREFIX)) out[k] = v;
   }
   return out;
 }

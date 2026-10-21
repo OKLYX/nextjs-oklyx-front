@@ -20,14 +20,19 @@ import { unitPlaceholder, unitSuffix } from './basicUnit';
 import { Input } from '@/presentation/components/ui/Input';
 import { Spinner } from '@/presentation/components/Spinner';
 import type { ElevenstNotification } from '@/domain/entities/ElevenstNotice';
+import type { EsmNotification } from '@/domain/entities/EsmNotice';
 import { platformName } from '@/config/platforms';
 
-/** FEATURE_2610_13 / D97 · D109: the tabs shown when a switched-on 11st channel exists. */
-type MetaTab = 'ALL' | 'COUPANG' | 'ELEVENST';
+/**
+ * FEATURE_2610_13 / D97 · D109 and FEATURE_2610_26 / D45: the tabs shown when a switched-on 11st or Gmarket · Auction
+ * channel exists — the 11st tab only with an 11st channel, the Gmarket · Auction tab only with an ESM channel.
+ */
+type MetaTab = 'ALL' | 'COUPANG' | 'ELEVENST' | 'ESM';
 const META_TABS: { key: MetaTab; label: string }[] = [
   { key: 'ALL', label: '통합' },
   { key: 'COUPANG', label: platformName('COUPANG') },
   { key: 'ELEVENST', label: platformName('ELEVENST') },
+  { key: 'ESM', label: platformName('ESM') },
 ];
 /** D99: the gray line under a read-only shared field. */
 const SHARED_NOTE = '공통 항목은 「통합」 에서 고칩니다';
@@ -74,9 +79,14 @@ interface CategoryMetaFieldsProps {
   onNoticeGroupChange?: (group: string) => void;
   /**
    * FEATURE_2610_13 / D97 · D109: given only when a switched-on 11st channel exists → 「통합」 · 「쿠팡」 · 「11번가」 tabs.
-   * Absent = the single-platform screen as before.
+   * Absent together with `esmPreview` = the single-platform screen as before.
    */
   elevenstPreview?: { notification: ElevenstNotification | null; failed: boolean };
+  /**
+   * FEATURE_2610_26 / D45 · D46: given only when a switched-on Gmarket · Auction channel exists → the 「G마켓 · 옥션」 tab.
+   * Absent = no such tab.
+   */
+  esmPreview?: { notification: EsmNotification | null; failed: boolean };
 }
 
 /**
@@ -105,15 +115,25 @@ export function CategoryMetaFields({
   noticeGroup = null,
   onNoticeGroupChange,
   elevenstPreview,
+  esmPreview,
 }: CategoryMetaFieldsProps) {
   // Display-only unit pick per pair; the actual value lives in the parent's attrValues.
   const [measureUnit, setMeasureUnit] = useState<Record<string, string>>({});
   const [metaTab, setMetaTab] = useState<MetaTab>('ALL');
-  const tabbed = elevenstPreview != null;
+  const tabbed = elevenstPreview != null || esmPreview != null;
+  const tabs = META_TABS.filter(
+    (t) => (t.key !== 'ELEVENST' || elevenstPreview != null) && (t.key !== 'ESM' || esmPreview != null),
+  );
   const notification = elevenstPreview?.notification ?? null;
-  // Coupang items 11st also reads (shared). null = not known yet / failed → no tags, nothing read-only.
-  const shared = notification ? new Set(notification.usedCoupangItems) : null;
+  const esmNotification = esmPreview?.notification ?? null;
+  // Coupang items another shown platform also reads (shared) — the union over the 11st and Gmarket · Auction previews.
+  // null = a shown preview is not known yet / failed → no tags, nothing read-only.
+  const shared =
+    (elevenstPreview != null && notification == null) || (esmPreview != null && esmNotification == null)
+      ? null
+      : new Set([...(notification?.usedCoupangItems ?? []), ...(esmNotification?.usedCoupangItems ?? [])]);
   const ownLines = notification ? notification.lines.filter((l) => l.ownKey != null) : [];
+  const esmOwnLines = esmNotification ? esmNotification.lines.filter((l) => l.ownKey != null) : [];
   // D109 (b) · (c): 「통합」 shows notices only and owns the group select; the Coupang tab shows the attributes too.
   const showAttributes = !tabbed || metaTab === 'COUPANG';
   const coupangView = tabbed && metaTab === 'COUPANG';
@@ -204,6 +224,55 @@ export function CategoryMetaFields({
     </div>
   );
 
+  // FEATURE_2610_26 / D46: on the Gmarket · Auction tab every item shows the value ESM receives; only ESM-only items
+  // (D17 「주문후 예상 배송기간」) are editable.
+  const esmView = (
+    <div className="mb-4 space-y-3">
+      {esmPreview?.failed ? (
+        <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">G마켓 · 옥션 고시 미리보기를 불러오지 못했습니다.</p>
+      ) : esmNotification == null ? (
+        <div className="flex min-h-16 items-center justify-center">
+          <Spinner size={20} label="불러오는 중..." />
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-gray-600">
+            G마켓 · 옥션 고시 유형: <span className="font-medium text-gray-900">{esmNotification.groupName}</span>
+            <span className="ml-1 text-gray-400">(쿠팡 품목군으로 정해집니다)</span>
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {esmNotification.lines.map((line) => (
+              <div key={line.code}>
+                <label className="mb-1 block text-xs font-medium text-gray-600">{line.name}</label>
+                {line.ownKey != null ? (
+                  <input
+                    type="text"
+                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                    value={noticeValues[line.ownKey] ?? ''}
+                    placeholder="비우면 「상품 상세페이지 참조」"
+                    onChange={(e) => onNoticeChange(line.ownKey as string, e.target.value)}
+                    disabled={disabled}
+                  />
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                      value={line.value}
+                      disabled
+                      readOnly
+                    />
+                    <p className="mt-1 text-[11px] text-gray-400">{SHARED_NOTE}</p>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -221,7 +290,7 @@ export function CategoryMetaFields({
 
       {tabbed && (
         <div className="mb-3 flex gap-1 border-b border-gray-200">
-          {META_TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.key}
               type="button"
@@ -321,7 +390,7 @@ export function CategoryMetaFields({
 
       {/* 상품정보제공고시: 카테고리가 여러 품목군을 줄 수 있어 품목군을 하나 선택해 그 그룹만
           입력·전송한다(선택된 그룹만 마켓에 전송). */}
-      {tabbed && metaTab === 'ELEVENST' ? elevenstView : (
+      {tabbed && metaTab === 'ELEVENST' ? elevenstView : tabbed && metaTab === 'ESM' ? esmView : (
       <div className="mb-4 border-t border-gray-100 pt-3">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -409,6 +478,28 @@ export function CategoryMetaFields({
                 <label className="mb-1 block text-xs font-medium text-gray-600">
                   {line.name}
                   {renderTag(platformName('ELEVENST'))}
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                  value={noticeValues[line.ownKey as string] ?? ''}
+                  placeholder="비우면 「상품 상세페이지 참조」"
+                  onChange={(e) => onNoticeChange(line.ownKey as string, e.target.value)}
+                  disabled={disabled}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* FEATURE_2610_26 / D17: the Gmarket · Auction-only items of the ESM group, stored under ESM:{code}. */}
+        {tabbed && metaTab === 'ALL' && esmOwnLines.length > 0 && (
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {esmOwnLines.map((line) => (
+              <div key={line.code}>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  {line.name}
+                  {renderTag(platformName('ESM'))}
                 </label>
                 <input
                   type="text"
