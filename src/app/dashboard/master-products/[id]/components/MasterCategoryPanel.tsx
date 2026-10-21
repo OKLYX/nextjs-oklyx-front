@@ -199,7 +199,7 @@ export function MasterCategoryPanel({
       setPendingLeaf({
         leaf,
         platforms: missing,
-        current: platformCategoryRowsOf(leafMappings ?? [], leafOwns),
+        current: platformCategoryRowsOf(leafMappings ?? [], leafOwns, activePlatforms),
         path,
       });
       return;
@@ -301,7 +301,7 @@ export function MasterCategoryPanel({
             </p>
           )}
           <PlatformCategoryRows
-            rows={platformCategoryRowsOf(mappings, owns)}
+            rows={platformCategoryRowsOf(mappings, owns, activePlatforms)}
             onChange={setPickerPlatform}
             onRevert={handleRevert}
             disabled={busy}
@@ -367,7 +367,7 @@ export function MasterCategoryPanel({
           references={pickerReferencesOf(
             pickerPlatform,
             current ? (standardPath ?? current.categoryName) : null,
-            platformCategoryRowsOf(mappings, owns),
+            platformCategoryRowsOf(mappings, owns, activePlatforms),
           )}
           onSelect={(sel) => handlePicked(pickerPlatform, sel)}
           onClose={() => setPickerPlatform(null)}

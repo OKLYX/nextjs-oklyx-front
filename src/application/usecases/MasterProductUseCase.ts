@@ -26,6 +26,7 @@ import type {
 } from '@/domain/entities/MasterProductEntity';
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 import type { ElevenstNoticePreviewRequest, ElevenstNotification } from '@/domain/entities/ElevenstNotice';
+import type { EsmNoticePreviewRequest, EsmNotification } from '@/domain/entities/EsmNotice';
 
 export class MasterProductUseCase {
   constructor(private repository: MasterProductRepository) {}
@@ -128,6 +129,10 @@ export class MasterProductUseCase {
 
   previewElevenstNotice(data: ElevenstNoticePreviewRequest): Promise<ElevenstNotification> {
     return this.repository.previewElevenstNotice(data);
+  }
+
+  previewEsmNotice(data: EsmNoticePreviewRequest): Promise<EsmNotification> {
+    return this.repository.previewEsmNotice(data);
   }
 
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {

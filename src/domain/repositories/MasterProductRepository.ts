@@ -25,6 +25,7 @@ import type {
 } from '@/domain/entities/MasterProductEntity';
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 import type { ElevenstNoticePreviewRequest, ElevenstNotification } from '@/domain/entities/ElevenstNotice';
+import type { EsmNoticePreviewRequest, EsmNotification } from '@/domain/entities/EsmNotice';
 
 export interface MasterProductRepository {
   list(params: MasterProductListParams): Promise<MasterProductPageResponse>;
@@ -63,6 +64,8 @@ export interface MasterProductRepository {
   setCategoryAttributes(id: number, data: CategoryAttributesRequest): Promise<void>;
   // FEATURE_2610_13 / D97: the 11st view of the notice values on screen (pure conversion, nothing saved).
   previewElevenstNotice(data: ElevenstNoticePreviewRequest): Promise<ElevenstNotification>;
+  // FEATURE_2610_26 / D56: the Gmarket · Auction view of the notice values on screen (pure conversion, nothing saved).
+  previewEsmNotice(data: EsmNoticePreviewRequest): Promise<EsmNotification>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
   updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;
   updateShippingOverride(id: number, data: ShippingOverrideUpdateRequest): Promise<MasterProductResponse>;

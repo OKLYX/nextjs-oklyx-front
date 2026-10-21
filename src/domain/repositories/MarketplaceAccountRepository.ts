@@ -2,6 +2,7 @@ import { MarketplaceAccount } from '@/domain/entities/MarketplaceAccountEntity';
 import { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 
 // FEATURE_2610_13 / D5: vendorId · accessKey · secretKey are Coupang fields; apiKey is the 11st key.
+// FEATURE_2610_26 / D4: esmMasterId · esmSecretKey · gmarketSellerId · auctionSellerId are the ESM fields.
 export interface CreateMarketplaceAccountRequest {
   sellerId: number;
   platform: string;
@@ -11,13 +12,17 @@ export interface CreateMarketplaceAccountRequest {
   accessKey?: string;
   secretKey?: string;
   apiKey?: string;
+  esmMasterId?: string;
+  esmSecretKey?: string;
+  gmarketSellerId?: string;
+  auctionSellerId?: string;
   isActive?: boolean;
   // Channel template assignment. Omit = tenant-default fallback (create).
   thumbnailTemplateId?: number;
   detailTemplateId?: number;
 }
 
-// secretKey and apiKey are optional — omit/blank keeps the existing key on the backend.
+// secretKey, apiKey and esmSecretKey are optional — omit/blank keeps the existing key on the backend.
 export interface UpdateMarketplaceAccountRequest {
   sellerId: number;
   platform: string;
@@ -27,6 +32,10 @@ export interface UpdateMarketplaceAccountRequest {
   accessKey?: string;
   secretKey?: string;
   apiKey?: string;
+  esmMasterId?: string;
+  esmSecretKey?: string;
+  gmarketSellerId?: string;
+  auctionSellerId?: string;
   isActive?: boolean;
   // Channel template assignment. Omit = keep existing (backend does not support
   // clearing an override back to default — assign/replace only).

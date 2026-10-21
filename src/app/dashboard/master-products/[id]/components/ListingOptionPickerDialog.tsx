@@ -9,7 +9,7 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import type { GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
-import { MARKET_OPTION_LOCK_REASON, formatWon } from './ListingDetailPanel';
+import { MARKET_OPTION_LOCK_REASON, formatSitePrices } from './ListingDetailPanel';
 
 /** Why a listing cannot be uploaded while its shipping settings are incomplete (77). The [마켓에 올리기] button and this window share it. */
 export const SHIPPING_BLOCKED_REASON = '배송 설정 미완료 — 마스터/채널/계정 중 한 곳에서 배송 설정 필요';
@@ -42,7 +42,7 @@ interface ListingOptionPickerDialogProps {
  * File: src/app/dashboard/master-products/[id]/components/ListingOptionPickerDialog.tsx
  *
  * - upload: pick options, check the prices, [올리기] → (active options saved when the pick changed) → market
- *   register (Coupang · 11st, FEATURE_2610_13 / D9 ③).
+ *   register (Coupang · 11st · ESM, FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2).
  *   🔴 This window IS the confirmation for the market push (D29) — nothing is sent to the market before [올리기].
  * - select: [저장] → saves the active options only (no market call). An uploaded listing then needs [수정 요청].
  * - Upload mode display-name field: [저장] uses the same `updateDisplayName` path as
@@ -269,7 +269,7 @@ export function ListingOptionPickerDialog({
                         checked ? 'text-gray-900' : 'text-gray-400'
                       }`}
                     >
-                      {formatWon(p.sellingPrice)}
+                      {formatSitePrices(p.sellingPrice, p.auctionSellingPrice)}
                     </td>
                   </tr>
                 );

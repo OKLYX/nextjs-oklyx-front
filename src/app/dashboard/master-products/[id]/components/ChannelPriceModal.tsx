@@ -21,16 +21,20 @@ interface ChannelPriceModalProps {
 }
 
 /**
- * 채널(셀)별 옵션 판매가 편집 모달 (2609_19).
+ * Per-channel (cell) option selling price editor (2609_19).
  * File: src/app/dashboard/master-products/[id]/components/ChannelPriceModal.tsx
  *
- * 판매가는 기본적으로 마진 역산 자동계산값이고, 이 모달은 **그 채널만** 다른 값으로 덮는다.
- * - 입력칸에는 현재 값이 프리필된다. 비우면 저장 버튼이 잠긴다(400 까지 가지 않는다) —
- *   자동계산가로 되돌리려면 [기본값으로 변경].
- * - [기본값으로 변경] = 그 행을 `null` 로 전송 → 서버가 재계산해 자동가로 되돌린다(D3).
- * - 저장은 **마켓 반영까지** 수행한다(D4). 결과(반영/스킵/실패)를 모달 안에서 보여준다.
- * - 비활성 옵션은 숨긴다(재고 모달과 같은 규칙, D10). 값은 서버에 남는다.
- * - ⚠️ 마진 미달 경고는 없다(D9). 마진 정책은 판매가 계산의 입력일 뿐 저장을 막지 않는다.
+ * A selling price is the margin back-calculated price by default; this modal overrides it for **this channel only**.
+ * - Each input is pre-filled with the current value. Emptying it locks the save button (no trip to a 400) —
+ *   to go back to the calculated price, press [기본값으로 변경].
+ * - [기본값으로 변경] = that field is sent as `null` → the server recalculates it back to the automatic price (D3).
+ * - Saving **also pushes to the market** (D4); the result (pushed / skipped / failed) is shown inside the modal.
+ * - Inactive options are hidden (same rule as the stock modal, D10). Their values stay on the server.
+ * - ⚠️ There is no below-margin warning (D9). The margin policy is an input of the price calculation and never
+ *   blocks a save.
+ * - FEATURE_2610_26 / D53 ②: a Gmarket · Auction (ESM) option (`auctionSellingPrice != null`) has two fields, 「G마켓」 and
+ *   「옥션」, each with its own [기본값으로 변경]. An untouched field is sent as its current value when it was set by hand
+ *   and as `null` when it is automatic, so saving one site never changes the other site's origin.
  */
 export function ChannelPriceModal({
   listingId,
@@ -49,6 +53,9 @@ export function ChannelPriceModal({
   const [draft, setDraft] = useState<Record<number, string>>({});
   // [기본값으로 변경] 을 누른 행. 저장 시 sellingPrice: null 로 나간다(D3).
   const [restore, setRestore] = useState<Set<number>>(new Set());
+  // FEATURE_2610_26 / D53 ②: the Auction field of an ESM option — its own input buffer and its own [기본값으로 변경].
+  const [draftAuction, setDraftAuction] = useState<Record<number, string>>({});
+  const [restoreAuction, setRestoreAuction] = useState<Set<number>>(new Set());
   const [result, setResult] = useState<ChannelPriceUpdateResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,6 +78,19 @@ export function ChannelPriceModal({
         ),
       );
       setRestore((prev) => new Set([...prev].filter((id) => keep.has(id))));
+      setDraftAuction((prev) =>
+        Object.fromEntries(
+          visible
+            .filter((o) => o.auctionSellingPrice != null)
+            .map((o) => [
+              o.optionId,
+              keep.has(o.optionId)
+                ? (prev[o.optionId] ?? String(o.auctionSellingPrice))
+                : String(o.auctionSellingPrice),
+            ]),
+        ),
+      );
+      setRestoreAuction((prev) => new Set([...prev].filter((id) => keep.has(id))));
     },
     [],
   );
@@ -104,13 +124,34 @@ export function ChannelPriceModal({
     const v = parsed(id);
     return raw(id).trim() !== '' && Number.isInteger(v) && v >= 10;
   };
-  const invalid = rows.some((r) => !restore.has(r.optionId) && !validRow(r.optionId));
-  const dirty = rows.filter(
-    (r) => restore.has(r.optionId) || parsed(r.optionId) !== r.sellingPrice,
+  // FEATURE_2610_26 / D53 ②: the same three helpers for the Auction field of an ESM option.
+  const rawAuction = (id: number) => draftAuction[id] ?? '';
+  const parsedAuction = (id: number) => Number(rawAuction(id));
+  const validAuction = (id: number) => {
+    const v = parsedAuction(id);
+    return rawAuction(id).trim() !== '' && Number.isInteger(v) && v >= 10;
+  };
+  const isEsmRow = (r: ListingOptionSummary) => r.auctionSellingPrice != null;
+  const auctionTouched = (r: ListingOptionSummary) =>
+    isEsmRow(r) && (restoreAuction.has(r.optionId) || parsedAuction(r.optionId) !== r.auctionSellingPrice);
+  const sellingTouched = (r: ListingOptionSummary) =>
+    restore.has(r.optionId) || parsed(r.optionId) !== r.sellingPrice;
+  const invalid = rows.some(
+    (r) =>
+      (!restore.has(r.optionId) && !validRow(r.optionId)) ||
+      (isEsmRow(r) && !restoreAuction.has(r.optionId) && !validAuction(r.optionId)),
   );
+  const dirty = rows.filter((r) => sellingTouched(r) || auctionTouched(r));
 
   const toggleRestore = (optionId: number) =>
     setRestore((prev) => {
+      const next = new Set(prev);
+      if (next.has(optionId)) next.delete(optionId);
+      else next.add(optionId);
+      return next;
+    });
+  const toggleRestoreAuction = (optionId: number) =>
+    setRestoreAuction((prev) => {
       const next = new Set(prev);
       if (next.has(optionId)) next.delete(optionId);
       else next.add(optionId);
@@ -127,10 +168,27 @@ export function ChannelPriceModal({
     setResult(null); // 이전 부분 성공 배너를 지운다 — 남으면 옛 실패가 새 결과처럼 읽힌다
     try {
       const res = await useCase.setOptionPrices(listingId, {
-        prices: dirty.map((r) => ({
-          optionId: r.optionId,
-          sellingPrice: restore.has(r.optionId) ? null : parsed(r.optionId),
-        })),
+        prices: dirty.map((r) =>
+          isEsmRow(r)
+            ? {
+                // D53 ②: an untouched site keeps its origin — its value when set by hand, null when automatic.
+                optionId: r.optionId,
+                sellingPrice:
+                  restore.has(r.optionId) ||
+                  (!sellingTouched(r) && r.priceSource !== 'MANUAL_OVERRIDE')
+                    ? null
+                    : parsed(r.optionId),
+                auctionSellingPrice:
+                  restoreAuction.has(r.optionId) ||
+                  (!auctionTouched(r) && r.auctionPriceSource !== 'MANUAL_OVERRIDE')
+                    ? null
+                    : parsedAuction(r.optionId),
+              }
+            : {
+                optionId: r.optionId,
+                sellingPrice: restore.has(r.optionId) ? null : parsed(r.optionId),
+              },
+        ),
       });
       // 실패 행 식별자는 옵션명뿐이다(백엔드 `FailedOption.optionName`) → 현재 rows 에서 id 로 되돌린다.
       const failedIds = new Set(
@@ -201,6 +259,85 @@ export function ChannelPriceModal({
               const willRestore = restore.has(r.optionId);
               const value = raw(r.optionId);
               const empty = !willRestore && value.trim() === '';
+              if (isEsmRow(r)) {
+                // FEATURE_2610_26 / D53 ②: 「G마켓」 and 「옥션」, each field with its own [기본값으로 변경].
+                const auctionRestore = restoreAuction.has(r.optionId);
+                const auctionValue = rawAuction(r.optionId);
+                const auctionEmpty = !auctionRestore && auctionValue.trim() === '';
+                const sites = [
+                  {
+                    label: 'G마켓',
+                    manual: r.priceSource === 'MANUAL_OVERRIDE',
+                    restoring: willRestore,
+                    value,
+                    empty,
+                    onChange: (v: string) => setDraft((prev) => ({ ...prev, [r.optionId]: v })),
+                    onRestore: () => toggleRestore(r.optionId),
+                  },
+                  {
+                    label: '옥션',
+                    manual: r.auctionPriceSource === 'MANUAL_OVERRIDE',
+                    restoring: auctionRestore,
+                    value: auctionValue,
+                    empty: auctionEmpty,
+                    onChange: (v: string) => setDraftAuction((prev) => ({ ...prev, [r.optionId]: v })),
+                    onRestore: () => toggleRestoreAuction(r.optionId),
+                  },
+                ];
+                return (
+                  <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
+                    <p className="mb-1 truncate text-sm text-gray-900">{r.optionName}</p>
+                    {sites.map((site) => (
+                      <div key={site.label} className="mt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="flex min-w-0 flex-1 items-center gap-1">
+                            <span className="text-xs text-gray-600">{site.label}</span>
+                            {site.manual && (
+                              <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+                                수동
+                              </span>
+                            )}
+                          </span>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              aria-label={`${r.optionName} ${site.label} 판매가`}
+                              disabled={site.restoring || isSaving}
+                              className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+                              value={site.value}
+                              onChange={(e) => site.onChange(e.target.value)}
+                            />
+                            <span className="text-xs text-gray-500">원</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={site.onRestore}
+                            disabled={isSaving}
+                            className={`shrink-0 rounded border px-2 py-1 text-[11px] font-medium disabled:opacity-50 ${
+                              site.restoring
+                                ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                            }`}
+                          >
+                            기본값으로 변경
+                          </button>
+                        </div>
+                        {site.restoring && (
+                          <p className="mt-1 text-[11px] text-gray-500">
+                            저장하면 자동계산가로 돌아갑니다
+                          </p>
+                        )}
+                        {site.empty && (
+                          <p className="mt-1 text-[11px] text-gray-500">
+                            값을 입력하거나 [기본값으로 변경]을 누르세요
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </li>
+                );
+              }
               return (
                 <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
                   <div className="flex items-center gap-2">

@@ -18,7 +18,8 @@ import { platformName } from '@/config/platforms';
  * a [조회 매핑] button → `CategoryLookupPickerModal` (that platform) → pick → `upsertMapping`.
  * Delete = `deleteMapping`. The useCases are **the parent's instances**.
  *
- * ⚠️ Lookup platforms = Coupang and 11st (11st browses the imported 11st list — FEATURE_2610_10 / D21 ③).
+ * ⚠️ Lookup platforms = Coupang, 11st and ESM (11st browses the imported 11st list — FEATURE_2610_10 / D21 ③ · ESM
+ *    the imported ESM list — FEATURE_2610_26 / D11 · D12).
  *    Naver is a backend seam only (later) — no [조회 매핑] for it.
  */
 interface CategoryMappingModalProps {
@@ -31,10 +32,12 @@ interface CategoryMappingModalProps {
   onClose: () => void;
 }
 
-// Platforms the lookup picker can open for (Coupang, 11st). Naver is a backend seam only → later.
-const LOOKUP_PLATFORMS: { platform: 'COUPANG' | 'ELEVENST'; label: string }[] = [
+// Platforms the lookup picker can open for (Coupang, 11st, ESM — FEATURE_2610_26 / D11). Naver is a backend seam
+// only → later.
+const LOOKUP_PLATFORMS: { platform: 'COUPANG' | 'ELEVENST' | 'ESM'; label: string }[] = [
   { platform: 'COUPANG', label: platformName('COUPANG') },
   { platform: 'ELEVENST', label: platformName('ELEVENST') },
+  { platform: 'ESM', label: platformName('ESM') },
 ];
 
 export function CategoryMappingModal({
@@ -48,7 +51,7 @@ export function CategoryMappingModal({
 }: CategoryMappingModalProps) {
   const [error, setError] = useState('');
   const [busyPlatform, setBusyPlatform] = useState<string | null>(null);
-  const [pickerPlatform, setPickerPlatform] = useState<'COUPANG' | 'NAVER' | 'ELEVENST' | null>(null);
+  const [pickerPlatform, setPickerPlatform] = useState<'COUPANG' | 'NAVER' | 'ELEVENST' | 'ESM' | null>(null);
 
   if (!open) return null;
 

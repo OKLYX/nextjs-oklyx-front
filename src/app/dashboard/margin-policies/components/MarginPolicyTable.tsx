@@ -41,6 +41,8 @@ export function MarginPolicyTable() {
   const [formSellerId, setFormSellerId] = useState<number | ''>('');
   const [formPlatform, setFormPlatform] = useState('');
   const [formPct, setFormPct] = useState('');
+  // FEATURE_2610_26 / D58 · D59: the Auction target margin (%) of an ESM preset; formPct is then the Gmarket one.
+  const [formAuctionPct, setFormAuctionPct] = useState('');
   // 표시 할인율은 0~0.5 decimal 로 그대로 입력 (originalPrice 역산은 백엔드).
   const [formDiscount, setFormDiscount] = useState('');
   // 최소 마진 기준 (FEATURE_2609_39 / PLAN D4). 빈 문자열 = 미사용 → 저장 시 null.
@@ -84,6 +86,7 @@ export function MarginPolicyTable() {
     setFormSellerId('');
     setFormPlatform('');
     setFormPct('');
+    setFormAuctionPct('');
     setFormDiscount('');
     setFormMinAmount('');
     setFormMinPct('');
@@ -96,6 +99,7 @@ export function MarginPolicyTable() {
     setFormSellerId(p.sellerId);
     setFormPlatform(p.platform);
     setFormPct(String(toPercent(p.marginRate)));
+    setFormAuctionPct(p.auctionMarginRate != null ? String(toPercent(p.auctionMarginRate)) : '');
     setFormDiscount(p.displayDiscountRate != null ? String(p.displayDiscountRate) : '');
     setFormMinAmount(p.minMarginAmount != null ? String(p.minMarginAmount) : '');
     setFormMinPct(p.minMarginRate != null ? String(toPercent(p.minMarginRate)) : '');
@@ -120,8 +124,23 @@ export function MarginPolicyTable() {
     }
     const pct = Number(formPct);
     if (formPct === '' || Number.isNaN(pct) || pct < 0 || pct > 100) {
-      setFormError('마진율은 0~100 사이의 숫자여야 합니다.');
+      // FEATURE_2610_26 / D74 ⑧: an ESM preset has two margin fields, so its message names the site.
+      setFormError(
+        formPlatform === 'ESM'
+          ? 'G마켓 목표 마진율은 0~100 사이의 숫자여야 합니다.'
+          : '마진율은 0~100 사이의 숫자여야 합니다.',
+      );
       return;
+    }
+    // FEATURE_2610_26 / D59: an ESM preset needs the Auction target margin too; other platforms send null.
+    let auctionRate: number | null = null;
+    if (formPlatform === 'ESM') {
+      const apct = Number(formAuctionPct);
+      if (formAuctionPct === '' || Number.isNaN(apct) || apct < 0 || apct > 100) {
+        setFormError('옥션 목표 마진율은 0~100 사이의 숫자여야 합니다.');
+        return;
+      }
+      auctionRate = toRate(apct);
     }
     let discount: number | undefined;
     if (formDiscount !== '') {
@@ -156,6 +175,7 @@ export function MarginPolicyTable() {
       sellerId: formSellerId,
       platform: formPlatform,
       marginRate: toRate(pct),
+      auctionMarginRate: auctionRate,
       displayDiscountRate: discount,
       minMarginAmount: minAmount,
       minMarginRate: minRate,
@@ -252,7 +272,10 @@ export function MarginPolicyTable() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">목표 마진율 (%)</label>
+              {/* FEATURE_2610_26 / D58: an ESM preset has one target margin per site — Gmarket here, Auction below. */}
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                {formPlatform === 'ESM' ? 'G마켓 목표 마진율 (%)' : '목표 마진율 (%)'}
+              </label>
               <Input
                 type="number"
                 min={0}
@@ -262,6 +285,24 @@ export function MarginPolicyTable() {
                 value={formPct}
                 onChange={(e) => setFormPct(e.target.value)}
               />
+              {formPlatform === 'ESM' && (
+                <>
+                  <label className="mb-1 mt-2 block text-xs font-medium text-gray-600">옥션 목표 마진율 (%)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.1}
+                    size="sm"
+                    value={formAuctionPct}
+                    onChange={(e) => setFormAuctionPct(e.target.value)}
+                  />
+                  {/* FEATURE_2610_26 / D61: the extra ESM+ fees are not in the price calculation. */}
+                  <p className="mt-2 text-xs text-gray-500">
+                    G마켓 · 옥션은 판매자 설정에 따라 제휴프로모션 대행 2% · SSG 연동 2% · 도착보장 1% · 해외판매 5.55% · 빅프로모션 2~3% 수수료가 더 붙습니다. 판매가 계산에는 들어가지 않으니 해당되면 그 사이트 목표 마진율에 더해 입력하세요.
+                  </p>
+                </>
+              )}
               {/* FEATURE_2610_10 / D18: the 11st price-comparison fee is not in the price calculation. */}
               {formPlatform === 'ELEVENST' && (
                 <p className="mt-2 text-xs text-gray-500">
@@ -370,11 +411,21 @@ export function MarginPolicyTable() {
                   </td>
                 </tr>
               ) : (
-                policies.map((p) => (
-                  <tr key={p.id} className="border-b border-gray-100 text-sm text-gray-900">
+                // FEATURE_2610_26 / D58: an ESM preset shows as two rows — 「G마켓」 with marginRate and 「옥션」 with
+                // auctionMarginRate; the other columns belong to the one preset and repeat on both rows (D59).
+                policies.flatMap((p) =>
+                  (p.platform === 'ESM'
+                    ? [
+                        { key: `${p.id}-gmkt`, label: 'G마켓', rate: p.marginRate },
+                        { key: `${p.id}-iac`, label: '옥션', rate: p.auctionMarginRate },
+                      ]
+                    : [{ key: `${p.id}`, label: platformDisplayName(p.platform), rate: p.marginRate }]
+                  ).map((row) => ({ p, row })),
+                ).map(({ p, row }) => (
+                  <tr key={row.key} className="border-b border-gray-100 text-sm text-gray-900">
                     <td className="px-4 py-3">{p.sellerName || sellerName(p.sellerId)}</td>
-                    <td className="px-4 py-3">{platformDisplayName(p.platform)}</td>
-                    <td className="px-4 py-3">{toPercent(p.marginRate)}%</td>
+                    <td className="px-4 py-3">{row.label}</td>
+                    <td className="px-4 py-3">{row.rate != null ? `${toPercent(row.rate)}%` : '—'}</td>
                     <td className="px-4 py-3">
                       {p.displayDiscountRate != null && p.displayDiscountRate > 0
                         ? p.displayDiscountRate

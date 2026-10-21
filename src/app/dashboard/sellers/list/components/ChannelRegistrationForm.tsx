@@ -38,7 +38,10 @@ export function ChannelRegistrationForm({
     mode: 'onBlur',
   });
   // useWatch, not watch() — watch() turns off React Compiler memoization for the whole component.
-  const isElevenst = useWatch({ control, name: 'platform' }) === 'ELEVENST';
+  const platform = useWatch({ control, name: 'platform' });
+  const isCoupang = platform === 'COUPANG';
+  const isElevenst = platform === 'ELEVENST';
+  const isEsm = platform === 'ESM';
 
   const onSubmit = async (data: CreateMarketplaceAccountForm) => {
     try {
@@ -101,8 +104,9 @@ export function ChannelRegistrationForm({
         )}
       </div>
 
-      {/* FEATURE_2610_13 / D5: the Coupang credential fields — an 11st account takes 「API 키」 alone. */}
-      {!isElevenst && (
+      {/* FEATURE_2610_13 / D5 · FEATURE_2610_26 / D40: each platform shows its own credential fields — Coupang the
+          four below, 11st 「API 키」 alone, ESM the four ESM fields; no platform chosen yet = none. */}
+      {isCoupang && (
         <>
           <div>
             <label htmlFor="vendorId" className="block text-sm font-medium mb-1">
@@ -191,6 +195,76 @@ export function ChannelRegistrationForm({
             <p className="mt-1 text-sm text-red-600">{formState.errors.apiKey.message}</p>
           )}
         </div>
+      )}
+
+      {/* FEATURE_2610_26 / D4 · D5: the ESM+ master ID, its secret key and both site seller IDs — all four required. */}
+      {isEsm && (
+        <>
+          <div>
+            <label htmlFor="esmMasterId" className="block text-sm font-medium mb-1">
+              ESM+ 마스터 ID <span className="text-red-600">*</span>
+            </label>
+            <input
+              {...register('esmMasterId')}
+              id="esmMasterId"
+              type="text"
+              disabled={isLoading}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {formState.errors.esmMasterId && (
+              <p className="mt-1 text-sm text-red-600">{formState.errors.esmMasterId.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="esmSecretKey" className="block text-sm font-medium mb-1">
+              비밀키 <span className="text-red-600">*</span>
+            </label>
+            <input
+              {...register('esmSecretKey')}
+              id="esmSecretKey"
+              type="password"
+              placeholder="ESM+ 비밀키를 입력하세요"
+              disabled={isLoading}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {formState.errors.esmSecretKey && (
+              <p className="mt-1 text-sm text-red-600">{formState.errors.esmSecretKey.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="gmarketSellerId" className="block text-sm font-medium mb-1">
+              G마켓 판매자 ID <span className="text-red-600">*</span>
+            </label>
+            <input
+              {...register('gmarketSellerId')}
+              id="gmarketSellerId"
+              type="text"
+              disabled={isLoading}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {formState.errors.gmarketSellerId && (
+              <p className="mt-1 text-sm text-red-600">{formState.errors.gmarketSellerId.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="auctionSellerId" className="block text-sm font-medium mb-1">
+              옥션 판매자 ID <span className="text-red-600">*</span>
+            </label>
+            <input
+              {...register('auctionSellerId')}
+              id="auctionSellerId"
+              type="text"
+              disabled={isLoading}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {formState.errors.auctionSellerId && (
+              <p className="mt-1 text-sm text-red-600">{formState.errors.auctionSellerId.message}</p>
+            )}
+          </div>
+        </>
       )}
 
       <div>

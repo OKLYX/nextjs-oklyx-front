@@ -23,6 +23,10 @@ export interface MarketplaceAccount {
   // FEATURE_2610_16 / D7: 11st only (null elsewhere) — the channel's A/S and return/exchange notice defaults.
   asNotice?: string | null;
   returnExchangeNotice?: string | null;
+  // FEATURE_2610_26 / D4: ESM only (null elsewhere) — the ESM+ master ID and the two site seller IDs (never the secret).
+  esmMasterId?: string | null;
+  gmarketSellerId?: string | null;
+  auctionSellerId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
