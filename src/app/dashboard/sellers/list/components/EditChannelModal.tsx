@@ -59,8 +59,9 @@ interface EditChannelModalProps {
  * list, or the master detail [배송 설정하기] lookup, FEATURE_2610_16 / D29) and saves every tab
  * with one [저장] (FEATURE_2610_16 / D22): channel PATCH → platform defaults PUT → fixed-cost PUT → shipping
  * PUT (only when changed). The body mounts on open, so the fixed-cost links and the shipping settings are
- * loaded fresh every time. When an 11st shipping save could not re-price some listings, a one-button notice
- * (「배송 설정 저장」) comes first and closing it closes this modal (D22 · FEATURE_2610_13 / D124).
+ * loaded fresh every time. When an 11st or ESM shipping save could not re-price some listings, a one-button notice
+ * (「배송 설정 저장」) comes first and closing it closes this modal (D22 · FEATURE_2610_13 / D124 · FEATURE_2610_26 /
+ * D65).
  */
 export function EditChannelModal(props: EditChannelModalProps) {
   if (!props.isOpen || !props.channel) {
@@ -139,6 +140,12 @@ function EditChannelModalContent({
     return new MarketplaceAccountUseCase(repository);
   }, []);
 
+  // FEATURE_2610_26 / D37: the ESM 「배송」 tab asks for the chosen place's bundle-fee policies (stable reference).
+  const loadEsmBundles = useCallback(
+    (placeNo: string) => shippingUseCase.listEsmBundlePolicies(channelId, placeNo),
+    [shippingUseCase, channelId],
+  );
+
   const closeAfterSave = async () => {
     onClose();
     await onSuccess();
@@ -157,25 +164,30 @@ function EditChannelModalContent({
         sellerId: channel.sellerId,
         platform: data.platform,
         accountAlias: data.accountAlias,
-        // FEATURE_2610_13 / D5: an 11st channel has no Coupang fields → blank values are omitted.
+        // FEATURE_2610_13 / D5 · FEATURE_2610_26 / D4: a channel fills only its own platform's fields → the blank
+        // ones are omitted.
         vendorId: data.vendorId || undefined,
         vendorUserId: data.vendorUserId || undefined,
         accessKey: data.accessKey || undefined,
-        // Blank secretKey / apiKey is omitted → backend keeps the existing key.
+        esmMasterId: data.esmMasterId || undefined,
+        gmarketSellerId: data.gmarketSellerId || undefined,
+        auctionSellerId: data.auctionSellerId || undefined,
+        // Blank secretKey / apiKey / esmSecretKey is omitted → backend keeps the existing key.
         secretKey: data.secretKey ? data.secretKey : undefined,
         apiKey: data.apiKey ? data.apiKey : undefined,
+        esmSecretKey: data.esmSecretKey ? data.esmSecretKey : undefined,
         // Blank template id = omitted → backend keeps existing (no clearing to
         // default); a value = replace.
         thumbnailTemplateId: data.thumbnailTemplateId ? Number(data.thumbnailTemplateId) : undefined,
         detailTemplateId: data.detailTemplateId ? Number(data.detailTemplateId) : undefined,
       });
       // The platform defaults join the same sequential save (FEATURE_2610_16 / D3 · D7): Coupang sends the
-      // suffix, 11st sends the two notices and never the suffix. On partial failure (an earlier step saved,
-      // this one failed) this throws → ChannelEditForm shows a banner and the modal stays open; retry re-runs
-      // every step in the same order (each PUT is a replace).
+      // suffix, 11st sends the two notices and never the suffix, ESM sends nothing (FEATURE_2610_26 / D57). On
+      // partial failure (an earlier step saved, this one failed) this throws → ChannelEditForm shows a banner and
+      // the modal stays open; retry re-runs every step in the same order (each PUT is a replace).
       if (channel.platform === 'ELEVENST') {
         await useCase.updateElevenstNotices(channel.id, notices);
-      } else {
+      } else if (channel.platform !== 'ESM') {
         await useCase.updateRegistrationNameSuffix(channel.id, {
           enabled: suffixConfig.optionCheckSuffixEnabled,
           suffix: suffixConfig.optionCheckSuffix,
@@ -186,10 +198,14 @@ function EditChannelModalContent({
       if (fixedCostItems !== null) {
         await fixedCostUseCase.setForAccount(channel.id, fixedCostItems);
       }
-      // FEATURE_2610_16 / D22: shipping goes last and only when the 「배송」 tab changed. An 11st save re-prices the listings.
+      // FEATURE_2610_16 / D22: shipping goes last and only when the 「배송」 tab changed. An 11st or ESM save
+      // re-prices the listings (FEATURE_2610_26 / D65).
       let recalcFailedCount = 0;
       if (shippingChange?.kind === 'elevenst') {
         const saved = await shippingUseCase.upsertElevenstConfig(channel.id, shippingChange.settings);
+        recalcFailedCount = saved.priceRecalcFailedCount ?? 0;
+      } else if (shippingChange?.kind === 'esm') {
+        const saved = await shippingUseCase.upsertEsmConfig(channel.id, shippingChange.settings);
         recalcFailedCount = saved.priceRecalcFailedCount ?? 0;
       } else if (shippingChange?.kind === 'coupang') {
         await shippingUseCase.upsertConfig(channel.id, shippingChange.config);
@@ -251,6 +267,7 @@ function EditChannelModalContent({
           shippingLoading={shippingLoading}
           shippingError={shippingError}
           onRetryShipping={() => void loadShipping()}
+          loadEsmBundles={loadEsmBundles}
           initialTab={initialTab}
         />
       </Modal>

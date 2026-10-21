@@ -10,27 +10,31 @@
  * ⚠️ A new marketplace adds its value here in its sales-channel work (D10).
  *    Mobile twin: `lib/core/utils/platform_display.dart` `kPlatforms`.
  */
-export const PLATFORMS = ['COUPANG', 'ELEVENST'];
+export const PLATFORMS = ['COUPANG', 'ELEVENST', 'ESM'];
 
 /**
- * Screen name of a platform value. The stored / API value stays `ELEVENST`; screens show 「11번가」.
- * Other platforms are returned unchanged.
+ * Screen name of a platform value. The stored / API values stay `ELEVENST` and `ESM`; screens show 「11번가」 and
+ * 「G마켓 · 옥션」 (FEATURE_2610_26 / D71). Other platforms are returned unchanged.
  *
  * ❌ Do not send the returned text to the server — it is display only.
  */
-export const platformDisplayName = (platform: string): string =>
-  platform === 'ELEVENST' ? '11번가' : platform;
+export const platformDisplayName = (platform: string): string => {
+  if (platform === 'ELEVENST') return '11번가';
+  if (platform === 'ESM') return 'G마켓 · 옥션';
+  return platform;
+};
 
 const PLATFORM_NAMES: Record<string, string> = {
   COUPANG: '쿠팡',
   NAVER: '네이버',
   ELEVENST: '11번가',
+  ESM: 'G마켓 · 옥션',
 };
 
 /**
- * Screen name of a platform value (FEATURE_2610_22 / D15 · D18): 「쿠팡」 · 「네이버」 · 「11번가」. A value
- * missing from the table is returned unchanged. The marketplace name tables and the platform select labels
- * use this.
+ * Screen name of a platform value (FEATURE_2610_22 / D15 · D18): 「쿠팡」 · 「네이버」 · 「11번가」 · 「G마켓 · 옥션」
+ * (FEATURE_2610_26 / D3). A value missing from the table is returned unchanged. The marketplace name tables and the
+ * platform select labels use this.
  *
  * ❌ Do not send the returned text to the server — it is display only.
  * ❌ `platformDisplayName` does not call this — its callers keep their current text (D18).

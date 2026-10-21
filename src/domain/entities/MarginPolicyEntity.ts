@@ -7,6 +7,8 @@ export interface MarginPolicyResponse {
   sellerName: string;
   platform: string;
   marginRate: number;
+  // FEATURE_2610_26 / D58 · D59: the Auction target margin of an ESM preset (marginRate = Gmarket); null elsewhere.
+  auctionMarginRate: number | null;
   // 표시 할인율 (0~0.5 decimal). originalPrice 역산용 (73). null = 할인 없음.
   displayDiscountRate: number | null;
   // 최소 마진 기준 (FEATURE_2609_39 / PLAN D4). 둘 다 null 허용 = 그 조건 미사용.
@@ -20,6 +22,8 @@ export interface MarginPolicyRequest {
   sellerId: number;
   platform: string;
   marginRate: number;
+  // FEATURE_2610_26 / D59: required on ESM (the server answers 400 without it), null on every other platform.
+  auctionMarginRate?: number | null;
   // 0~0.5 decimal. null/omit = 생성 시 할인 없음 / 수정 시 기존값 유지.
   displayDiscountRate?: number | null;
   // 🔴 displayDiscountRate 와 달리 null 은 「그대로 둔다」가 아니라 **삭제**다 — 백엔드가 그대로 써넣는다.

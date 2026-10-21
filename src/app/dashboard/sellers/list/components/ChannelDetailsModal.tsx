@@ -86,7 +86,9 @@ function ChannelDetailsContent({
   const [shipping, setShipping] = useState<ChannelShippingData | null>(null);
   const [shippingLoading, setShippingLoading] = useState(true);
   const [shippingError, setShippingError] = useState('');
+  const isCoupang = channel.platform === 'COUPANG';
   const isElevenst = channel.platform === 'ELEVENST';
+  const isEsm = channel.platform === 'ESM';
 
   // 인라인 async IIFE — 이펙트 본문에서 setState 를 동기 호출하지 않기 위한 프로젝트 관례.
   useEffect(() => {
@@ -165,8 +167,9 @@ function ChannelDetailsContent({
             <p className="text-sm text-gray-900">{channel.accountAlias || '-'}</p>
           </div>
 
-          {/* FEATURE_2610_16 / D10: the Coupang credential rows — an 11st channel shows none (its API key is never shown). */}
-          {!isElevenst && (
+          {/* FEATURE_2610_16 / D10 · FEATURE_2610_26 / D40: the Coupang credential rows on a Coupang channel only — an
+              11st channel shows none (its API key is never shown), an ESM channel its three IDs below. */}
+          {isCoupang && (
             <>
               <div>
                 <label className="block text-sm font-medium mb-1">판매자(벤더) ID</label>
@@ -181,6 +184,26 @@ function ChannelDetailsContent({
               <div>
                 <label className="block text-sm font-medium mb-1">Access Key</label>
                 <p className="text-sm text-gray-900 break-all">{channel.accessKey || '-'}</p>
+              </div>
+            </>
+          )}
+
+          {/* FEATURE_2610_26 / D4: the ESM identifiers — the secret key is never shown. */}
+          {isEsm && (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-1">ESM+ 마스터 ID</label>
+                <p className="text-sm text-gray-900">{channel.esmMasterId || '-'}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">G마켓 판매자 ID</label>
+                <p className="text-sm text-gray-900">{channel.gmarketSellerId || '-'}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">옥션 판매자 ID</label>
+                <p className="text-sm text-gray-900">{channel.auctionSellerId || '-'}</p>
               </div>
             </>
           )}
@@ -259,7 +282,10 @@ function ChannelDetailsContent({
         </div>
 
         <div role="tabpanel" hidden={activeTab !== 'platform'} className="space-y-4">
-          {isElevenst ? (
+          {/* FEATURE_2610_26 / D57: an ESM channel has no platform default — one line instead of fields. */}
+          {isEsm ? (
+            <p className="text-sm text-gray-500">G마켓 · 옥션은 따로 정할 플랫폼 기본값이 없습니다</p>
+          ) : isElevenst ? (
             NOTICE_TEXT_FIELDS.map((f) => (
               <div key={f.key}>
                 <label className="block text-sm font-medium mb-1">{f.label}</label>

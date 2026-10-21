@@ -144,12 +144,17 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
         sellerId,
         platform: data.platform,
         accountAlias: data.accountAlias,
-        // FEATURE_2610_13 / D5: an 11st account sends apiKey alone; the Coupang fields stay blank → omitted.
+        // FEATURE_2610_13 / D5 · FEATURE_2610_26 / D4: each platform fills only its own fields; the blank ones
+        // are omitted.
         vendorId: data.vendorId || undefined,
         vendorUserId: data.vendorUserId || undefined,
         accessKey: data.accessKey || undefined,
         secretKey: data.secretKey || undefined,
         apiKey: data.apiKey || undefined,
+        esmMasterId: data.esmMasterId || undefined,
+        esmSecretKey: data.esmSecretKey || undefined,
+        gmarketSellerId: data.gmarketSellerId || undefined,
+        auctionSellerId: data.auctionSellerId || undefined,
         // '' = unassigned = tenant-default fallback (not sent to backend).
         thumbnailTemplateId: data.thumbnailTemplateId ? Number(data.thumbnailTemplateId) : undefined,
         detailTemplateId: data.detailTemplateId ? Number(data.detailTemplateId) : undefined,
