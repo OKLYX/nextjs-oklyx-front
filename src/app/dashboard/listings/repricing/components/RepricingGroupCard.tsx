@@ -194,7 +194,7 @@ export function RepricingGroupCard({
       </p>
 
       <p className="text-xs text-gray-500">
-        이 마진은 <span className="font-medium">지금 팔면</span> 기준(현재 원가·택배비·박스비)입니다.
+        이 마진은 <span className="font-medium">지금 팔면</span> 기준(현재 상품 매입가·택배비·상자비)입니다.
         매출 화면의 순이익은 <span className="font-medium">팔린 것</span> 기준이라 숫자가 다릅니다.
       </p>
     </Card>
