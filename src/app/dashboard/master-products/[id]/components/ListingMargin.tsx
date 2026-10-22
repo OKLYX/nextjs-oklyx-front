@@ -19,7 +19,7 @@ import { formatPercent, formatWon } from '@/app/dashboard/listings/repricing/com
  *   「옥션」 line (2610_27 D3).
  * - `MarginBreakdown`: what opens under the option — one formula per site, headed 「G마켓」 · 「옥션」 on an ESM option
  *   (2610_28 D4 · D9 · D21).
- * - `SiteBreakdown`: one formula (2610_28 D3 · D5 · D7 · D10 · D12 ~ D15) — the price, 「− 상품 매입가」 with one line per
+ * - `SiteBreakdown`: one formula (2610_28 D3 · D5 · D7 · D10 · D12 ~ D15) — the price, 「− 상품 매입가」 with one lighter (단가 × 수량 = 금액) line per
  *   component, 「− 상자비」, 「− 택배비」, 「− 판매 수수료」, 「− 배송비 수수료」 (only when not 0), 「= 마진」, 「손익분기가」,
  *   「최소 마진 기준」 (only when set) and 「마켓 가격 확인: MM/DD HH:mm」 (only when known). When the margin cannot be
  *   calculated: the reason, the price and the check time only.
@@ -80,25 +80,62 @@ export function MarginSummary({ margin }: { margin: OptionMargin }) {
 }
 
 interface FormulaLineProps {
+  /** The operator column: '−' for a deducted amount, '=' for the margin, '' for the starting price. */
+  sign?: string;
   label: string;
   amount: ReactNode;
-  /** A component line under 「− 상품 매입가」 (2610_28 D7). */
-  indent?: boolean;
-  /** The 「= 마진」 line: a rule above, bold, red when under the minimum (2610_28 D4). */
+  /** The 「= 마진」 line: a rule above, bold, green or red (2610_28 D4). */
   total?: boolean;
   below?: boolean;
 }
 
-/** 2610_28 D4: one line of a formula — the name on the left in grey, the amount right-aligned in body color. */
-function FormulaLine({ label, amount, indent = false, total = false, below = false }: FormulaLineProps) {
+/**
+ * 2610_28 D4: one line that takes part in the calculation — operator column, name on the left, amount right-aligned.
+ * Reference lines (component detail, break-even, minimum) use `DetailLine` / `InfoLine` instead, so what is summed
+ * and what only explains it never look alike.
+ */
+function FormulaLine({ sign = '', label, amount, total = false, below = false }: FormulaLineProps) {
+  const tone = total ? (below ? 'text-red-600' : 'text-emerald-700') : 'text-gray-900';
   return (
     <div
-      className={`flex items-baseline justify-between gap-6 ${indent ? 'pl-3' : ''} ${
-        total ? 'mt-1 border-t border-gray-300 pt-1 font-semibold' : ''
+      className={`grid grid-cols-[0.75rem_1fr_auto] items-baseline gap-x-2 ${
+        total ? 'mt-1 border-t border-gray-300 pt-1.5 font-semibold' : ''
       }`}
     >
-      <span className={below ? 'text-red-600' : 'text-gray-600'}>{label}</span>
-      <span className={`tabular-nums ${below ? 'text-red-600' : 'text-gray-900'}`}>{amount}</span>
+      <span className={`text-center ${total ? tone : 'text-gray-400'}`}>{sign}</span>
+      <span className={total ? tone : 'text-gray-700'}>{label}</span>
+      <span className={`text-right tabular-nums ${tone}`}>{amount}</span>
+    </div>
+  );
+}
+
+/**
+ * A component under 「상품 매입가」 (2610_28 D7 · D14): explanation only, not added again — lighter, smaller, and the
+ * figures in parentheses as 「(단가 × 수량 = 금액)」.
+ */
+function DetailLine({ name, unitPrice, quantity, amount }: { name: string; unitPrice: number | null; quantity: number; amount: number | null }) {
+  return (
+    <div className="ml-5 grid grid-cols-[1fr_auto] items-baseline gap-x-3 border-l-2 border-gray-200 pl-2 text-[11px] text-gray-400">
+      <span className="truncate">{name}</span>
+      <span className="text-right tabular-nums">
+        {unitPrice == null || amount == null ? (
+          <>
+            (<span className="text-red-600">단가 없음</span> × {quantity})
+          </>
+        ) : (
+          `(${formatWon(unitPrice)} × ${quantity} = ${formatWon(amount)})`
+        )}
+      </span>
+    </div>
+  );
+}
+
+/** A reference line below the margin (break-even, minimum) — not part of the calculation. */
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 text-[11px] text-gray-500">
+      <span>{label}</span>
+      <span className="text-right tabular-nums">{value}</span>
     </div>
   );
 }
@@ -118,9 +155,11 @@ export function SiteBreakdown({ site, title, priceLabel, wide }: SiteBreakdownPr
   const minimum = minimumText(site);
   return (
     <div
-      className={`${wide ? 'w-full' : 'w-max max-w-full'} space-y-0.5 rounded border border-gray-200 bg-white px-3 py-2 text-xs`}
+      className={`${wide ? 'w-full' : 'w-max min-w-[18rem] max-w-full'} space-y-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs`}
     >
-      {title != null && <p className="font-medium text-gray-900">{title}</p>}
+      {title != null && (
+        <p className="border-b border-gray-200 pb-1 text-[11px] font-semibold text-gray-900">{title}</p>
+      )}
       {site.reason != null ? (
         <>
           <p className="text-gray-500">{site.reason}</p>
@@ -129,35 +168,46 @@ export function SiteBreakdown({ site, title, priceLabel, wide }: SiteBreakdownPr
       ) : (
         <>
           <FormulaLine label={firstLabel} amount={formatWon(site.judgedPrice)} />
-          <FormulaLine label="− 상품 매입가" amount={formatWon(site.costSum)} />
-          {site.components.map((component, index) => (
-            <FormulaLine
-              key={`${index}-${component.productName}`}
-              indent
-              label={`${component.productName} × ${component.quantity} =`}
-              amount={component.amount == null ? <span className="text-red-600">단가 없음</span> : formatWon(component.amount)}
-            />
-          ))}
-          <FormulaLine label="− 상자비" amount={formatWon(site.box)} />
-          <FormulaLine label="− 택배비" amount={formatWon(site.delivery)} />
+          <FormulaLine sign="−" label="상품 매입가" amount={formatWon(site.costSum)} />
+          {site.components.length > 0 && (
+            <div className="space-y-0.5 pb-0.5">
+              {site.components.map((component, index) => (
+                <DetailLine
+                  key={`${index}-${component.productName}`}
+                  name={component.productName}
+                  unitPrice={component.unitPrice}
+                  quantity={component.quantity}
+                  amount={component.amount}
+                />
+              ))}
+            </div>
+          )}
+          <FormulaLine sign="−" label="상자비" amount={formatWon(site.box)} />
+          <FormulaLine sign="−" label="택배비" amount={formatWon(site.delivery)} />
           <FormulaLine
-            label={`− 판매 수수료 (${formatPercent(site.commissionRate)}, 부가세 포함)`}
+            sign="−"
+            label={`판매 수수료 (${formatPercent(site.commissionRate)}, 부가세 포함)`}
             amount={formatWon(site.commissionAmount)}
           />
           {site.shippingFeeCommission != null && site.shippingFeeCommission > 0 && (
-            <FormulaLine label="− 배송비 수수료 (3.3%)" amount={formatWon(site.shippingFeeCommission)} />
+            <FormulaLine sign="−" label="배송비 수수료 (3.3%)" amount={formatWon(site.shippingFeeCommission)} />
           )}
           <FormulaLine
+            sign="="
             total
             below={site.below}
-            label={`= 마진 (${formatPercent(site.marginRate)})`}
+            label={`마진 (${formatPercent(site.marginRate)})`}
             amount={formatWon(site.marginAmount)}
           />
-          <FormulaLine label="손익분기가" amount={formatWon(site.breakEvenPrice)} />
-          {minimum !== '' && <FormulaLine label="최소 마진 기준" amount={minimum} />}
+          <div className="mt-1.5 space-y-0.5 border-t border-dashed border-gray-200 pt-1.5">
+            <InfoLine label="손익분기가" value={formatWon(site.breakEvenPrice)} />
+            {minimum !== '' && <InfoLine label="최소 마진 기준" value={minimum} />}
+          </div>
         </>
       )}
-      {site.marketPriceAt != null && <p className="text-gray-600">{marketCheckedText(site.marketPriceAt)}</p>}
+      {site.marketPriceAt != null && (
+        <p className="text-right text-[10px] text-gray-400">{marketCheckedText(site.marketPriceAt)}</p>
+      )}
     </div>
   );
 }
