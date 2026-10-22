@@ -421,3 +421,53 @@ export interface MasterFromChannelPreview {
   reusesExistingListing: boolean;
 }
 
+
+/**
+ * FEATURE_2610_27 / D2 · D5 · D11 · D12: the margin of one price — server `ListingMarginResponse.SiteMargin`.
+ * Every amount is null when the margin cannot be calculated; `reason` then says why.
+ */
+export interface SiteMargin {
+  /** The price live on the market; null = unknown. */
+  marketPrice: number | null;
+  systemPrice: number | null;
+  /** marketPrice ?? systemPrice (D2); for a preview = the price typed in. */
+  judgedPrice: number | null;
+  /** true = no market price, the system price was judged (D2). */
+  marketPriceMissing: boolean;
+  costSum: number | null;
+  delivery: number | null;
+  box: number | null;
+  feeAmount: number | null;
+  marginAmount: number | null;
+  /** 0.1234 = 12.34%. */
+  marginRate: number | null;
+  breakEvenPrice: number | null;
+  /** Under the margin preset's minimum amount or rate (D5). */
+  below: boolean;
+  reason: string | null;
+}
+
+/** FEATURE_2610_27 / D3 · D26: one option of `GET /api/admin/product-listings/{id}/margins`. */
+export interface OptionMargin {
+  optionId: number;
+  optionName: string;
+  /** KST wall clock 'yyyy-MM-ddTHH:mm:ss…' (D32); null = never confirmed. */
+  marketPriceAt: string | null;
+  /** The Gmarket margin on an ESM option. */
+  margin: SiteMargin;
+  /** The Auction margin of an ESM option; null elsewhere. */
+  auctionMargin: SiteMargin | null;
+}
+
+export interface ListingMarginResponse {
+  listingId: number;
+  platform: string;
+  options: OptionMargin[];
+}
+
+/** FEATURE_2610_27 / D6 · D20: `POST …/options/{optionId}/margin-preview` body. */
+export interface MarginPreviewRequest {
+  price: number;
+  /** true = the Auction price of an ESM option. */
+  auction: boolean;
+}

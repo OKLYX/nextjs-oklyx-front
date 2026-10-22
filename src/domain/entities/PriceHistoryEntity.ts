@@ -13,7 +13,8 @@ export type PriceChangeReason =
   | 'PRODUCT_EDIT'
   | 'PROPAGATION'
   | 'MANUAL'
-  | 'SETTLEMENT_FEEDBACK';
+  | 'SETTLEMENT_FEEDBACK'
+  | 'MARKET_SYNC';
 
 /** 🔴 enum 을 화면에 그대로 노출하지 않는다. 서버가 값을 더하면 여기에 한 줄 더한다. */
 const REASON_LABEL: Record<PriceChangeReason, string> = {
@@ -22,6 +23,7 @@ const REASON_LABEL: Record<PriceChangeReason, string> = {
   PRODUCT_EDIT: '상품 수정',
   PURCHASE_UPDATE: '매입가 변동',
   SETTLEMENT_FEEDBACK: '정산 수수료 반영',
+  MARKET_SYNC: '마켓 가격 따라감',
 };
 
 /** 모르는 값이 오면 원문을 보여준다 — 빈칸보다 낫다(서버가 enum 을 늘렸다는 신호가 된다). */

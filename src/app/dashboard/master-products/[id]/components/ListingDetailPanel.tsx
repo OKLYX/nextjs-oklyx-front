@@ -1,12 +1,15 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { TagChipsInput } from '@/presentation/components/TagChipsInput';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import type { OptionMargin } from '@/domain/entities/ListingRegistrationEntity';
 import { CopyIdButton } from './CopyIdButton';
+import { MarginBreakdown, MarginSummary } from './ListingMargin';
 import { MarketOptionLinkModal } from './MarketOptionLinkModal';
 
 const CHANNEL_ONLY_REASON = '마스터 옵션이 없는 채널 전용 옵션입니다';
@@ -97,13 +100,15 @@ interface ListingDetailPanelProps {
  * - 「노출상품명」: [수정] toggles view ↔ edit (a blank value cannot be saved). Local save only — the market gets it with
  *   [수정 요청].
  * - 「등록상품명」 (67/68): automatic value from the channel's active options → read only.
- * - Option table: option name / price / stock / option ID / [수정]. 🔴 **This is the one place that shows options,
- *   prices and stock** (the old matrix 「판매가」 column is gone). 🔴 There is no used/unused checkbox (2609_77/D57) —
+ * - Option table: option name / price / (ADMIN) margin / stock / option ID / [수정]. 🔴 **This is the one place that
+ *   shows options, prices and stock** (the old matrix 「판매가」 column is gone). 🔴 There is no used/unused checkbox (2609_77/D57) —
  *   the options to upload are picked only in the [마켓에 올리기] confirm · [⋯ > 올릴 옵션 고르기] window; here unused
  *   options are only dimmed + 「(미사용)」. [수정] does not edit the option, it goes to the editing place (2609_61/D7).
  *   When the option ID is empty and the listing is on a market, that cell shows [마켓 옵션 연결] (2609_74/D13) —
  *   disabled with a reason on an 11st or ESM listing (FEATURE_2610_13 / D128 · D130 · FEATURE_2610_26 / D41).
  * - Tags: the channel's raw tags (33). The current value is `generated[].tags` the matrix already has (no extra call).
+ * - Margin (FEATURE_2610_27 / D1 · D9 · D10 · D11): ADMIN only. Asked once when this panel opens and again whenever a save
+ *   changes a price — never from the market (D13). Clicking the margin opens the breakdown line under that option.
  *
  * Every save refreshes through the parent reload (onSaved).
  */
@@ -143,6 +148,61 @@ export function ListingDetailPanel({
 
   // 2609_74/D13: 쿠팡 옵션과 직접 이을 채널 옵션. null = 닫힘.
   const [linkTarget, setLinkTarget] = useState<{ optionId: number; name: string } | null>(null);
+
+  // FEATURE_2610_27: margins by option id (null = not loaded yet) and the options whose breakdown is open.
+  const [margins, setMargins] = useState<Record<number, OptionMargin> | null>(null);
+  const [marginsError, setMarginsError] = useState('');
+  const [openMargins, setOpenMargins] = useState<Set<number>>(new Set());
+  // A save reloads the options with new prices → this key changes → the margins are asked again.
+  const priceKey = options.map((o) => `${o.optionId}:${o.sellingPrice}:${o.auctionSellingPrice}`).join('|');
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let alive = true;
+    (async () => {
+      setMarginsError('');
+      try {
+        const res = await listingUseCase.getListingMargins(listingId);
+        if (alive) setMargins(Object.fromEntries(res.options.map((m) => [m.optionId, m])));
+      } catch (e: unknown) {
+        if (alive) setMarginsError(extractErrorMessage(e, '마진을 불러오지 못했습니다.'));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [listingUseCase, listingId, isAdmin, priceKey]);
+
+  const toggleMargin = (optionId: number) =>
+    setOpenMargins((prev) => {
+      const next = new Set(prev);
+      if (next.has(optionId)) next.delete(optionId);
+      else next.add(optionId);
+      return next;
+    });
+
+  const marginCell = (optionId: number) => {
+    if (marginsError) {
+      return (
+        <span className="text-gray-400" title={marginsError}>
+          –
+        </span>
+      );
+    }
+    if (margins == null) return <Spinner size={12} />;
+    const m = margins[optionId];
+    if (m == null) return <span className="text-gray-400">–</span>;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleMargin(optionId)}
+        aria-expanded={openMargins.has(optionId)}
+        className="w-full text-right hover:underline"
+      >
+        <MarginSummary margin={m} />
+      </button>
+    );
+  };
 
   const trimmedName = nameDraft.trim();
 
@@ -252,11 +312,12 @@ export function ListingDetailPanel({
         ) : options.length === 0 ? (
           <p className="px-3 py-2 text-xs text-gray-400">옵션 없음</p>
         ) : (
-          <table className="w-full min-w-[34rem] table-fixed text-xs">
+          <table className={`w-full ${isAdmin ? 'min-w-[43rem]' : 'min-w-[34rem]'} table-fixed text-xs`}>
             <thead className="border-b border-gray-200 bg-gray-100 text-left text-gray-600">
               <tr>
                 <th className="px-2 py-1.5 font-medium">옵션명</th>
                 <th className="w-28 px-2 py-1.5 text-right font-medium">가격</th>
+                {isAdmin && <th className="w-36 px-2 py-1.5 text-right font-medium">마진</th>}
                 <th className="w-16 px-2 py-1.5 text-right font-medium">재고</th>
                 <th className="w-40 px-2 py-1.5 font-medium">옵션 ID</th>
                 {isAdmin && <th className="w-14 px-2 py-1.5" aria-label="수정" />}
@@ -265,8 +326,10 @@ export function ListingDetailPanel({
             <tbody>
               {options.map((o) => {
                 const dim = o.active ? '' : 'text-gray-400';
+                const openMargin = isAdmin && openMargins.has(o.optionId) ? margins?.[o.optionId] : undefined;
                 return (
-                  <tr key={o.optionId} className="border-t border-gray-100">
+                  <Fragment key={o.optionId}>
+                  <tr className="border-t border-gray-100">
                     <td className={`truncate px-2 py-1.5 ${o.active ? 'text-gray-900' : dim}`} title={o.name}>
                       {o.name}
                       {!o.active && <span className="ml-1 text-[10px]">(미사용)</span>}
@@ -280,6 +343,9 @@ export function ListingDetailPanel({
                         </span>
                       )}
                     </td>
+                    {isAdmin && (
+                      <td className="px-2 py-1.5 text-right tabular-nums">{marginCell(o.optionId)}</td>
+                    )}
                     <td
                       className={`px-2 py-1.5 text-right tabular-nums ${
                         o.active && !o.stockInherited ? '' : 'text-gray-400'
@@ -340,6 +406,14 @@ export function ListingDetailPanel({
                       </td>
                     )}
                   </tr>
+                  {openMargin != null && (
+                    <tr className="border-t border-gray-100 bg-gray-50">
+                      <td colSpan={6} className="px-2 py-1.5">
+                        <MarginBreakdown margin={openMargin} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>
