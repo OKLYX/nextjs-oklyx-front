@@ -17,6 +17,8 @@ interface ChannelPriceModalProps {
   listingId: number;
   // "판매자명 · 플랫폼" — which cell is being edited (the matrix has many).
   channelLabel: string;
+  // FEATURE_2610_28 / D20 · D21: the listing's platform — the margin preview site of a non-ESM option.
+  platform: string;
   onSaved: () => void;
   onClose: () => void;
 }
@@ -34,6 +36,8 @@ interface ChannelPriceModalProps {
  * - FEATURE_2610_27 / D6 · D20 · D21 · D38: next to each input, the margin of the typed price (`MarginPreviewText`, asked
  *   300 ms after typing stops) — red when under the margin preset minimum. It never blocks a save: the margin policy
  *   is an input of the price calculation (2609_19 D9).
+ * - FEATURE_2610_28 / D16: clicking that margin (「▸」) opens its formula under the input row, as wide as the window; the
+ *   input row is `flex-wrap` so the formula can take a line of its own.
  * - FEATURE_2610_26 / D53 ②: a Gmarket · Auction (ESM) option (`auctionSellingPrice != null`) has two fields, 「G마켓」 and
  *   「옥션」, each with its own [기본값으로 변경]. An untouched field is sent as its current value when it was set by hand
  *   and as `null` when it is automatic, so saving one site never changes the other site's origin.
@@ -41,6 +45,7 @@ interface ChannelPriceModalProps {
 export function ChannelPriceModal({
   listingId,
   channelLabel,
+  platform,
   onSaved,
   onClose,
 }: ChannelPriceModalProps) {
@@ -273,7 +278,7 @@ export function ChannelPriceModal({
                     restoring: willRestore,
                     value,
                     empty,
-                    auction: false,
+                    site: 'GMARKET',
                     price: !willRestore && validRow(r.optionId) ? parsed(r.optionId) : null,
                     onChange: (v: string) => setDraft((prev) => ({ ...prev, [r.optionId]: v })),
                     onRestore: () => toggleRestore(r.optionId),
@@ -284,7 +289,7 @@ export function ChannelPriceModal({
                     restoring: auctionRestore,
                     value: auctionValue,
                     empty: auctionEmpty,
-                    auction: true,
+                    site: 'AUCTION',
                     price: !auctionRestore && validAuction(r.optionId) ? parsedAuction(r.optionId) : null,
                     onChange: (v: string) => setDraftAuction((prev) => ({ ...prev, [r.optionId]: v })),
                     onRestore: () => toggleRestoreAuction(r.optionId),
@@ -295,7 +300,7 @@ export function ChannelPriceModal({
                     <p className="mb-1 truncate text-sm text-gray-900">{r.optionName}</p>
                     {sites.map((site) => (
                       <div key={site.label} className="mt-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="flex min-w-0 flex-1 items-center gap-1">
                             <span className="text-xs text-gray-600">{site.label}</span>
                             {site.manual && (
@@ -316,14 +321,12 @@ export function ChannelPriceModal({
                             />
                             <span className="text-xs text-gray-500">원</span>
                           </div>
-                          <span className="w-32 shrink-0 text-right text-[11px]">
-                            <MarginPreviewText
-                              listingId={listingId}
-                              optionId={r.optionId}
-                              auction={site.auction}
-                              price={site.price}
-                            />
-                          </span>
+                          <MarginPreviewText
+                            listingId={listingId}
+                            optionId={r.optionId}
+                            site={site.site}
+                            price={site.price}
+                          />
                           <button
                             type="button"
                             onClick={site.onRestore}
@@ -354,7 +357,7 @@ export function ChannelPriceModal({
               }
               return (
                 <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {/* min-w-0 so a long option name truncates instead of squeezing the input. */}
                     <span className="flex min-w-0 flex-1 items-center gap-1">
                       <span className="truncate text-sm text-gray-900">{r.optionName}</span>
@@ -377,14 +380,12 @@ export function ChannelPriceModal({
                       />
                       <span className="text-xs text-gray-500">원</span>
                     </div>
-                    <span className="w-32 shrink-0 text-right text-[11px]">
-                      <MarginPreviewText
-                        listingId={listingId}
-                        optionId={r.optionId}
-                        auction={false}
-                        price={!willRestore && validRow(r.optionId) ? parsed(r.optionId) : null}
-                      />
-                    </span>
+                    <MarginPreviewText
+                      listingId={listingId}
+                      optionId={r.optionId}
+                      site={platform}
+                      price={!willRestore && validRow(r.optionId) ? parsed(r.optionId) : null}
+                    />
                     <button
                       type="button"
                       onClick={() => toggleRestore(r.optionId)}
