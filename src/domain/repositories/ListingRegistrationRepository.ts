@@ -32,6 +32,9 @@ import type {
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
   ChannelApplyOptionNamesResponse,
+  ListingMarginResponse,
+  MarginPreviewRequest,
+  SiteMargin,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -136,4 +139,8 @@ export interface ListingRegistrationRepository {
   setCategorySource(listingId: number, useMasterCategory: boolean): Promise<void>;
   /** 2609_45 → 2609_79: 「마켓 상품으로 시작」 미리보기 — 쓰기 없음(masterId 가 아직 없다). */
   masterFromChannelPreview(body: MasterFromChannelPreviewRequest): Promise<MasterFromChannelPreview>;
+  /** FEATURE_2610_27 / D1 · D10: every option's margin of one listing. No market call, nothing stored. */
+  getListingMargins(listingId: number): Promise<ListingMarginResponse>;
+  /** FEATURE_2610_27 / D6 · D20: the margin of a price typed in the [가격 설정] window. Nothing stored or sent. */
+  previewMargin(listingId: number, optionId: number, data: MarginPreviewRequest): Promise<SiteMargin>;
 }
