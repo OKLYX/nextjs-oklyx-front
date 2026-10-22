@@ -108,7 +108,8 @@ interface ListingDetailPanelProps {
  *   disabled with a reason on an 11st or ESM listing (FEATURE_2610_13 / D128 · D130 · FEATURE_2610_26 / D41).
  * - Tags: the channel's raw tags (33). The current value is `generated[].tags` the matrix already has (no extra call).
  * - Margin (FEATURE_2610_27 / D1 · D9 · D10 · D11): ADMIN only. Asked once when this panel opens and again whenever a save
- *   changes a price — never from the market (D13). Clicking the margin opens the breakdown line under that option.
+ *   changes a price — never from the market (D13). Clicking the margin (「▸」 closed · 「▾」 open) opens the breakdown
+ *   under that option — one formula per site (FEATURE_2610_28 / D4 · D8 · D9).
  *
  * Every save refreshes through the parent reload (onSaved).
  */
@@ -197,9 +198,12 @@ export function ListingDetailPanel({
         type="button"
         onClick={() => toggleMargin(optionId)}
         aria-expanded={openMargins.has(optionId)}
-        className="w-full text-right hover:underline"
+        className="flex w-full items-start justify-end gap-1 text-right hover:underline"
       >
-        <MarginSummary margin={m} />
+        <span>
+          <MarginSummary margin={m} />
+        </span>
+        <span className="text-gray-500">{openMargins.has(optionId) ? '▾' : '▸'}</span>
       </button>
     );
   };

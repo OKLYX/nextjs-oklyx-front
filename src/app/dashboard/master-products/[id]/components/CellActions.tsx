@@ -692,6 +692,7 @@ export function CellActions({
         <ChannelPriceModal
           listingId={listing.id}
           channelLabel={channelLabel}
+          platform={platform}
           onSaved={() => onReload()}
           onClose={() => setShowPrice(false)}
         />

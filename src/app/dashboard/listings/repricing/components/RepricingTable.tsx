@@ -16,7 +16,7 @@ export const formatPercent = (rate: number | null | undefined) =>
 
 /** 「손익분기가」 열 머리 설명(2609_44 / PLAN 용어). 이 한 문장이 열 이름의 뜻을 다 담는다. */
 const BREAK_EVEN_HINT =
-  '마진이 0이 되는 판매가입니다. 원가·택배비·박스비와 채널 수수료(부가세 포함)를 낸 뒤 남는 것이 없는 지점으로, 이 값 아래로 팔면 손해입니다.';
+  '마진이 0이 되는 판매가입니다. 상품 매입가·택배비·상자비와 채널 수수료(부가세 포함)를 낸 뒤 남는 것이 없는 지점으로, 이 값 아래로 팔면 손해입니다.';
 
 /** 지금 가격이 손익분기가 아래인가 = 마진이 음수라는 뜻(2609_44 Step 4). 둘 중 하나라도 없으면 판정하지 않는다. */
 const isBelowBreakEven = (row: RepricingRow) =>
@@ -104,9 +104,9 @@ export function RepricingTable({
   const costDetail = (row: RepricingRow) => {
     if (row.costSum == null) return <span className="text-xs text-gray-500">—</span>;
     const items: { label: string; value: number | null }[] = [
-      { label: '원가', value: row.costSum },
+      { label: '상품 매입가', value: row.costSum },
       { label: '택배', value: row.delivery },
-      { label: '박스', value: row.box },
+      { label: '상자', value: row.box },
       { label: '수수료', value: row.feeAmount },
     ];
     return (
