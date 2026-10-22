@@ -33,6 +33,9 @@ import type {
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
   ChannelApplyOptionNamesResponse,
+  ListingMarginResponse,
+  MarginPreviewRequest,
+  SiteMargin,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -234,5 +237,15 @@ export class ListingRegistrationUseCase {
     body: MasterFromChannelPreviewRequest,
   ): Promise<MasterFromChannelPreview> {
     return this.repository.masterFromChannelPreview(body);
+  }
+
+  /** FEATURE_2610_27 / D1 · D10: every option's margin of one listing (no market call). */
+  getListingMargins(listingId: number): Promise<ListingMarginResponse> {
+    return this.repository.getListingMargins(listingId);
+  }
+
+  /** FEATURE_2610_27 / D6 · D20: the margin of a typed price (nothing stored or sent). */
+  previewMargin(listingId: number, optionId: number, data: MarginPreviewRequest): Promise<SiteMargin> {
+    return this.repository.previewMargin(listingId, optionId, data);
   }
 }

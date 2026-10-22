@@ -11,6 +11,7 @@ import type {
 } from '@/domain/entities/ListingRegistrationEntity';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { MarginPreviewText } from './ListingMargin';
 
 interface ChannelPriceModalProps {
   listingId: number;
@@ -30,8 +31,9 @@ interface ChannelPriceModalProps {
  * - [기본값으로 변경] = that field is sent as `null` → the server recalculates it back to the automatic price (D3).
  * - Saving **also pushes to the market** (D4); the result (pushed / skipped / failed) is shown inside the modal.
  * - Inactive options are hidden (same rule as the stock modal, D10). Their values stay on the server.
- * - ⚠️ There is no below-margin warning (D9). The margin policy is an input of the price calculation and never
- *   blocks a save.
+ * - FEATURE_2610_27 / D6 · D20 · D21 · D38: next to each input, the margin of the typed price (`MarginPreviewText`, asked
+ *   300 ms after typing stops) — red when under the margin preset minimum. It never blocks a save: the margin policy
+ *   is an input of the price calculation (2609_19 D9).
  * - FEATURE_2610_26 / D53 ②: a Gmarket · Auction (ESM) option (`auctionSellingPrice != null`) has two fields, 「G마켓」 and
  *   「옥션」, each with its own [기본값으로 변경]. An untouched field is sent as its current value when it was set by hand
  *   and as `null` when it is automatic, so saving one site never changes the other site's origin.
@@ -271,6 +273,8 @@ export function ChannelPriceModal({
                     restoring: willRestore,
                     value,
                     empty,
+                    auction: false,
+                    price: !willRestore && validRow(r.optionId) ? parsed(r.optionId) : null,
                     onChange: (v: string) => setDraft((prev) => ({ ...prev, [r.optionId]: v })),
                     onRestore: () => toggleRestore(r.optionId),
                   },
@@ -280,6 +284,8 @@ export function ChannelPriceModal({
                     restoring: auctionRestore,
                     value: auctionValue,
                     empty: auctionEmpty,
+                    auction: true,
+                    price: !auctionRestore && validAuction(r.optionId) ? parsedAuction(r.optionId) : null,
                     onChange: (v: string) => setDraftAuction((prev) => ({ ...prev, [r.optionId]: v })),
                     onRestore: () => toggleRestoreAuction(r.optionId),
                   },
@@ -310,6 +316,14 @@ export function ChannelPriceModal({
                             />
                             <span className="text-xs text-gray-500">원</span>
                           </div>
+                          <span className="w-32 shrink-0 text-right text-[11px]">
+                            <MarginPreviewText
+                              listingId={listingId}
+                              optionId={r.optionId}
+                              auction={site.auction}
+                              price={site.price}
+                            />
+                          </span>
                           <button
                             type="button"
                             onClick={site.onRestore}
@@ -363,6 +377,14 @@ export function ChannelPriceModal({
                       />
                       <span className="text-xs text-gray-500">원</span>
                     </div>
+                    <span className="w-32 shrink-0 text-right text-[11px]">
+                      <MarginPreviewText
+                        listingId={listingId}
+                        optionId={r.optionId}
+                        auction={false}
+                        price={!willRestore && validRow(r.optionId) ? parsed(r.optionId) : null}
+                      />
+                    </span>
                     <button
                       type="button"
                       onClick={() => toggleRestore(r.optionId)}

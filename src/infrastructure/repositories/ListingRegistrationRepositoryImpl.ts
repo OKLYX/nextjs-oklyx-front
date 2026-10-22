@@ -36,6 +36,9 @@ import type {
   MasterFromChannelPreviewRequest,
   MasterFromChannelPreview,
   ChannelApplyOptionNamesResponse,
+  ListingMarginResponse,
+  MarginPreviewRequest,
+  SiteMargin,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -316,6 +319,23 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     body: MasterFromChannelPreviewRequest,
   ): Promise<MasterFromChannelPreview> {
     const response = await axiosInstance.post(`${masterBase}/from-channel/preview`, body);
+    return response.data.data;
+  }
+
+  async getListingMargins(listingId: number): Promise<ListingMarginResponse> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/margins`);
+    return response.data.data;
+  }
+
+  async previewMargin(
+    listingId: number,
+    optionId: number,
+    data: MarginPreviewRequest,
+  ): Promise<SiteMargin> {
+    const response = await axiosInstance.post(
+      `${listingBase}/${listingId}/options/${optionId}/margin-preview`,
+      data,
+    );
     return response.data.data;
   }
 }
