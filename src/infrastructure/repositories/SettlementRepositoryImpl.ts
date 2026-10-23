@@ -14,6 +14,7 @@ import type {
   ReconLineQuery,
   ReconLineView,
   ReconReport,
+  SettlementMonthSummary,
   SettlementSyncResult,
   SettlementSyncTarget,
 } from '@/domain/entities/Settlement';
@@ -49,6 +50,11 @@ export class SettlementRepositoryImpl implements SettlementRepository {
     const response = await axiosInstance.get('/api/admin/settlement/by-sale-month', {
       params: { accountId: query.accountId, from: query.from, to: query.to },
     });
+    return response.data.data;
+  }
+
+  async getMonthSummary(): Promise<SettlementMonthSummary> {
+    const response = await axiosInstance.get('/api/admin/settlement/month-summary');
     return response.data.data;
   }
 

@@ -34,7 +34,7 @@ function lastMonthRange(): { from: string; to: string } {
   };
 }
 
-function recentDaysRange(days: number): { from: string; to: string } {
+export function recentDaysRange(days: number): { from: string; to: string } {
   const today = new Date();
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (days - 1));
   return { from: toDateInput(start), to: toDateInput(today) };

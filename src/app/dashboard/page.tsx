@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
-import { PageContainer } from '@/presentation/components/PageContainer';
+import { DashboardHome } from './components/home/DashboardHome';
 
 export default function DashboardPage() {
   const resetNavigation = useNavigationStore((state) => state.resetNavigation);
@@ -12,9 +12,5 @@ export default function DashboardPage() {
     resetNavigation();
   }, [resetNavigation]);
 
-  return (
-    <PageContainer title="Welcome to OCLYX">
-      <></>
-    </PageContainer>
-  );
+  return <DashboardHome />;
 }
