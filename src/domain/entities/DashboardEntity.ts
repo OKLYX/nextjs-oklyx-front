@@ -19,7 +19,7 @@ export type DashboardCardType =
   | 'CHANNEL_SALES_CHART';
 
 /** Period a card reads — the backend `DashboardPeriod` (D22 · D23). */
-export type DashboardPeriod = 'TODAY' | 'DAYS_7' | 'DAYS_30' | 'THIS_MONTH';
+export type DashboardPeriod = 'TODAY' | 'DAYS_7' | 'DAYS_30' | 'THIS_MONTH' | 'LAST_MONTH';
 
 /** One stored card. */
 export interface DashboardCardSetting {

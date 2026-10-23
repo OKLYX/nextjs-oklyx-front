@@ -10,7 +10,7 @@ import type { CardData } from './useCardData';
 /** Class of the remove button — the grid does not start a drag on it (`dragConfig.cancel`). */
 export const REMOVE_BUTTON_CLASS = 'dashboard-card-remove';
 
-/** Class of the in-card selectors (period · 「전체 | 채널」) — the same as the list screens' small selects. */
+/** Class of the in-card selectors (seller · period · 「전체 | 채널」) — the same as the list screens' small selects. */
 export const CARD_SELECT_CLASS =
   'px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500';
 
@@ -20,7 +20,7 @@ interface DashboardCardFrameProps {
   href: string;
   editing: boolean;
   onRemove: () => void;
-  /** Controls at the right end of the title row (period selector · 「전체 | 채널」). */
+  /** Controls at the right end of the title row (seller selector · period selector · 「전체 | 채널」). */
   action?: ReactNode;
   children: ReactNode;
 }
