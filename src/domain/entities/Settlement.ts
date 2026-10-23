@@ -272,6 +272,22 @@ export interface ReconLineQuery {
   unmatched?: boolean;
 }
 
+/**
+ * This month's payouts summed across sellers and channels — `GET /api/admin/settlement/month-summary`
+ * (FEATURE_2610_29 D26 · D30). The server picks this month in KST; a payout belongs to the month of its confirmed
+ * payout date, else its scheduled payout date.
+ *
+ * 🔴 Not the {@link PayoutQuery} axis (the scheduled payout date) — do not rebuild this from `getPayouts`.
+ */
+export interface SettlementMonthSummary {
+  /** 「이번 달 지급 예정 총액」 */
+  total: number;
+  /** 「지금까지 지급된 금액」 — the `PAID` part of `total`. */
+  paid: number;
+  /** 「남은 지급 예정 금액」 = `total − paid`. */
+  remaining: number;
+}
+
 const SETTLEMENT_TYPE_LABELS: Record<string, string> = {
   WEEKLY: '주정산',
   MONTHLY: '월정산',

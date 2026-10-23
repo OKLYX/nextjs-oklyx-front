@@ -2,6 +2,7 @@ import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { SalesStatsRepository } from '@/domain/repositories/SalesStatsRepository';
 import type {
   ChannelSales,
+  DailySales,
   ProductProfit,
   SalesLine,
   SellerSales,
@@ -46,6 +47,13 @@ export class SalesStatsRepositoryImpl implements SalesStatsRepository {
     if (params.from) query.from = params.from;
     if (params.to) query.to = params.to;
     const response = await axiosInstance.get('/api/admin/sales/lines', { params: query });
+    return response.data.data;
+  }
+
+  async getDailySales(params: SalesStatsParams): Promise<DailySales[]> {
+    const response = await axiosInstance.get('/api/admin/sales/daily', {
+      params: this.toQuery(params),
+    });
     return response.data.data;
   }
 

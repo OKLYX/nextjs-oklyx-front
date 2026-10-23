@@ -11,11 +11,15 @@ import type {
   ReconLineQuery,
   ReconLineView,
   ReconReport,
+  SettlementMonthSummary,
   SettlementSyncResult,
   SettlementSyncTarget,
 } from '@/domain/entities/Settlement';
 
-/** 정산 유스케이스 (FEATURE_2609_30 / 05). 목록·상세·매출 화면이 공유한다. */
+/**
+ * Settlement use case (FEATURE_2609_30 / 05). Shared by the payout list, the payout detail, the sales screen and the
+ * dashboard payout card (FEATURE_2610_29).
+ */
 export class SettlementUseCase {
   constructor(private repository: SettlementRepository) {}
 
@@ -31,6 +35,11 @@ export class SettlementUseCase {
   /** 판매월 기준 정산 — 정산 건 목록과 축이 반대다(판매 → 정산). */
   async getSaleMonthSettlements(query: SaleMonthQuery): Promise<SaleMonthSettlement[]> {
     return this.repository.getSaleMonthSettlements(query);
+  }
+
+  /** This month's payout sums — the dashboard payout card (FEATURE_2610_29 D30). */
+  async getMonthSummary(): Promise<SettlementMonthSummary> {
+    return this.repository.getMonthSummary();
   }
 
   async getPayout(payoutId: number): Promise<PayoutDetail> {
