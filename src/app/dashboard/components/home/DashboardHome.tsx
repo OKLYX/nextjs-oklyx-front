@@ -6,10 +6,13 @@ import { gridBounds } from 'react-grid-layout/core';
 import 'react-grid-layout/css/styles.css';
 import { DASHBOARD_CARD_SPECS, WEB_GRID } from '@/config/dashboardGrid';
 import { DashboardUseCase } from '@/application/usecases/DashboardUseCase';
+import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { DashboardRepositoryImpl } from '@/infrastructure/repositories/DashboardRepositoryImpl';
+import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { DashboardCardType, DashboardPeriod } from '@/domain/entities/DashboardEntity';
+import type { Seller } from '@/domain/entities/SellerEntity';
 import { Button } from '@/presentation/components/ui/Button';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -45,6 +48,7 @@ type LoadState = 'loading' | 'error' | 'ready';
  */
 export function DashboardHome() {
   const useCase = useMemo(() => new DashboardUseCase(new DashboardRepositoryImpl()), []);
+  const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
   const { width, containerRef, mounted } = useContainerWidth();
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [admin, setAdmin] = useState(false);
@@ -52,6 +56,7 @@ export function DashboardHome() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pick, setPick] = useState<DashboardCardType | ''>('');
+  const [sellers, setSellers] = useState<Seller[]>([]);
 
   const load = useCallback(async () => {
     setLoadState('loading');
@@ -71,6 +76,16 @@ export function DashboardHome() {
     };
     loadInitialLayout();
   }, [load]);
+
+  // FEATURE_2610_30 D37: the chart cards' seller list, read once when an admin opens the dashboard. After a failure
+  // the selectors offer 「전체」 alone and the cards stay as they are.
+  useEffect(() => {
+    if (!admin) return;
+    sellerUseCase
+      .getAll()
+      .then(setSellers)
+      .catch(() => setSellers([]));
+  }, [admin, sellerUseCase]);
 
   const save = async (next: WebCard[]): Promise<boolean> => {
     try {
@@ -133,9 +148,23 @@ export function DashboardHome() {
       case 'RESERVED_SHIPMENTS':
         return <ReservedShipmentCard {...common} />;
       case 'DAILY_SALES_CHART':
-        return <DailySalesChartCard period={card.period ?? 'DAYS_7'} onPeriodChange={onPeriodChange} {...common} />;
+        return (
+          <DailySalesChartCard
+            period={card.period ?? 'DAYS_7'}
+            onPeriodChange={onPeriodChange}
+            sellers={sellers}
+            {...common}
+          />
+        );
       case 'CHANNEL_SALES_CHART':
-        return <ChannelSalesChartCard period={card.period ?? 'DAYS_7'} onPeriodChange={onPeriodChange} {...common} />;
+        return (
+          <ChannelSalesChartCard
+            period={card.period ?? 'DAYS_7'}
+            onPeriodChange={onPeriodChange}
+            sellers={sellers}
+            {...common}
+          />
+        );
     }
   };
 
