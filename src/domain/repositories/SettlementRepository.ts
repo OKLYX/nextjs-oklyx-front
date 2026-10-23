@@ -10,6 +10,7 @@ import type {
   ReconLineQuery,
   ReconLineView,
   ReconReport,
+  SettlementMonthSummary,
   SettlementSyncResult,
   SettlementSyncTarget,
 } from '@/domain/entities/Settlement';
@@ -36,6 +37,11 @@ export interface SettlementRepository {
    * 판매월 기준 정산 — "그 달 판매가 언제 정산됐나". 🔴 위 두 목록과 축이 반대다(판매 → 정산).
    */
   getSaleMonthSettlements(query: SaleMonthQuery): Promise<SaleMonthSettlement[]>;
+  /**
+   * This month's payout sums for the dashboard payout card (FEATURE_2610_29 D30) — no parameter, the server picks the
+   * month. 🔴 Its date basis differs from `getPayouts` (confirmed payout date, else scheduled).
+   */
+  getMonthSummary(): Promise<SettlementMonthSummary>;
   /** 묶음 1건 + 조정 + 검증식 요약. 리포트가 필요한 화면은 `getReport` 를 쓴다(같은 값을 포함한다). */
   getPayout(payoutId: number): Promise<PayoutDetail>;
   /** 라벨·미분류 필터는 <b>서버가</b> 적용한다. */

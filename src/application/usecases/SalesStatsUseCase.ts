@@ -1,6 +1,7 @@
 import type { SalesStatsRepository } from '@/domain/repositories/SalesStatsRepository';
 import type {
   ChannelSales,
+  DailySales,
   ProductProfit,
   SalesLine,
   SellerSales,
@@ -11,7 +12,10 @@ import type {
   SalesStatsParams,
 } from '@/application/dto/SalesDTOs';
 
-/** 매출 집계 유스케이스 (FEATURE_2609_30). 매출 현황·상품별 수익성 두 탭이 공유한다. */
+/**
+ * Sales aggregate use case (FEATURE_2609_30). Shared by the 「통합 매출 조회」 · 「채널별 매출」 · 「상품별 매출」 tabs
+ * and the dashboard sales cards (FEATURE_2610_29).
+ */
 export class SalesStatsUseCase {
   constructor(private repository: SalesStatsRepository) {}
 
@@ -30,5 +34,10 @@ export class SalesStatsUseCase {
   /** ④ 판매 내역 — 채널별 매출 화면 전용. 🔴 `accountId` 필수. */
   async getSalesLines(params: SalesLinesParams): Promise<SalesLine[]> {
     return this.repository.getSalesLines(params);
+  }
+
+  /** ⑤ Sales per sale date — the dashboard chart (FEATURE_2610_29 D22). */
+  async getDailySales(params: SalesStatsParams): Promise<DailySales[]> {
+    return this.repository.getDailySales(params);
   }
 }

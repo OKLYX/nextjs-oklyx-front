@@ -130,6 +130,19 @@ export interface ProductProfit {
   uncategorized: boolean;
 }
 
+/**
+ * ⑤ One sale date of the dashboard sales chart. `GET /api/admin/sales/daily` (FEATURE_2610_29 D22).
+ * One row per date of the period, a date without sales included with zeros.
+ */
+export interface DailySales {
+  /** `yyyy-MM-dd` sale date. */
+  date: string;
+  /** Same amount as `SellerSales.grossSales` (before discount). */
+  grossSales: number;
+  /** Orders of that date in that amount (an order cancelled in full is not counted). */
+  orderCount: number;
+}
+
 /** 알 수 없는 코드는 원문 그대로 — 두 번째 마켓이 붙어도 화면이 빈칸이 되지 않는다. */
 export const platformLabel = (platform: string): string => platformName(platform);
 

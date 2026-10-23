@@ -1,5 +1,6 @@
 import type {
   ChannelSales,
+  DailySales,
   ProductProfit,
   SalesLine,
   SellerSales,
@@ -19,10 +20,15 @@ import type {
 export interface SalesStatsRepository {
   /** ① 판매자별 요약. */
   getSellerSummary(params: SalesStatsParams): Promise<SellerSales[]>;
-  /** ② 채널(계정)별. 판매자 행을 펼칠 때 그 판매자로 좁혀 부른다. */
+  /**
+   * ② Per channel (account). Without `sellerId` the result is not narrowed to a seller (the 「채널별 매출」 tab and the
+   * dashboard cards); the summary screen narrows it to one seller when a seller row is expanded.
+   */
   getChannelSales(params: SalesStatsParams): Promise<ChannelSales[]>;
   /** ③ 상품별 수익성. `crossChannel` 은 서버 파라미터라 값이 바뀌면 재조회한다. */
   getProductProfit(params: ProductProfitParams): Promise<ProductProfit[]>;
   /** ④ 판매 내역 — 한 채널의 주문 라인 목록. 🔴 `accountId` 필수(없으면 서버 400). */
   getSalesLines(params: SalesLinesParams): Promise<SalesLine[]>;
+  /** ⑤ Sales per sale date — the dashboard chart (FEATURE_2610_29 D22). `sellerId` is not used. */
+  getDailySales(params: SalesStatsParams): Promise<DailySales[]>;
 }
