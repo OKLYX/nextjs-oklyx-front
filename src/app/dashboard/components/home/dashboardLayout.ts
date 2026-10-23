@@ -8,7 +8,12 @@ import {
   allowedWidths,
   effectivePeriod,
 } from '@/config/dashboardGrid';
-import { currentMonthRange, recentDaysRange, toDateInput } from '@/app/dashboard/sales/components/PeriodFilter';
+import {
+  currentMonthRange,
+  lastMonthRange,
+  recentDaysRange,
+  toDateInput,
+} from '@/app/dashboard/sales/components/PeriodFilter';
 import type {
   DashboardCardType,
   DashboardLayout,
@@ -210,5 +215,7 @@ export function periodRange(period: DashboardPeriod): { from: string; to: string
       return recentDaysRange(30);
     case 'THIS_MONTH':
       return currentMonthRange();
+    case 'LAST_MONTH':
+      return lastMonthRange();
   }
 }

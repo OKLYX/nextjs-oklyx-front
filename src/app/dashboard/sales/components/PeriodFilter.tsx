@@ -26,7 +26,7 @@ export function currentMonthRange(): { from: string; to: string } {
   };
 }
 
-function lastMonthRange(): { from: string; to: string } {
+export function lastMonthRange(): { from: string; to: string } {
   const today = new Date();
   return {
     from: toDateInput(new Date(today.getFullYear(), today.getMonth() - 1, 1)),

@@ -77,8 +77,8 @@ export const DASHBOARD_CARD_SPECS: Record<DashboardCardType, DashboardCardSpec> 
   SETTLEMENT_PAYOUTS: { title: '정산 지급', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, href: ROUTES.SETTLEMENT_PAYOUTS, periods: [], defaultPeriod: null },
   PURCHASE_LIST: { title: '구매목록 남은 품목', adminOnly: true, minW: 1, minH: 1, initW: 1, initH: 1, href: ROUTES.PURCHASE_LIST, periods: [], defaultPeriod: null },
   RESERVED_SHIPMENTS: { title: '예약 발송', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
-  DAILY_SALES_CHART: { title: '날짜별 매출 · 주문 수', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, href: ROUTES.SALES_SUMMARY, periods: ['DAYS_7', 'DAYS_30'], defaultPeriod: 'DAYS_7' },
-  CHANNEL_SALES_CHART: { title: '채널별 매출', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, href: ROUTES.SALES_BY_CHANNEL, periods: ['DAYS_7', 'DAYS_30'], defaultPeriod: 'DAYS_7' },
+  DAILY_SALES_CHART: { title: '날짜별 매출 · 주문 수', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, href: ROUTES.SALES_SUMMARY, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7' },
+  CHANNEL_SALES_CHART: { title: '채널별 매출', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, href: ROUTES.SALES_BY_CHANNEL, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7' },
 };
 
 /** Picker and selector labels of the periods (D22 · D23). */
@@ -87,6 +87,7 @@ export const PERIOD_LABELS: Record<DashboardPeriod, string> = {
   DAYS_7: '최근 7일',
   DAYS_30: '최근 30일',
   THIS_MONTH: '이번 달',
+  LAST_MONTH: '지난 달',
 };
 
 /** Widths the card may take: the D7 widths at or above its minimum. */
@@ -99,8 +100,12 @@ export function allowedHeights(type: DashboardCardType): number[] {
   return WEB_GRID.heights.filter((h) => h >= DASHBOARD_CARD_SPECS[type].minH);
 }
 
-/** The stored period when the card offers it, otherwise the card's default period; null = the card has no period. */
+/**
+ * A stored 「최근 30일」 is 「이번 달」 when the card offers 「이번 달」 (FEATURE_2610_30 D33); otherwise the stored period
+ * when the card offers it, else the card's default period; null = the card has no period.
+ */
 export function effectivePeriod(type: DashboardCardType, period: DashboardPeriod | null): DashboardPeriod | null {
   const spec = DASHBOARD_CARD_SPECS[type];
+  if (period === 'DAYS_30' && spec.periods.includes('THIS_MONTH')) return 'THIS_MONTH';
   return period !== null && spec.periods.includes(period) ? period : spec.defaultPeriod;
 }

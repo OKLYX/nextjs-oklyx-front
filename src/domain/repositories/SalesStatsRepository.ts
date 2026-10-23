@@ -21,14 +21,18 @@ export interface SalesStatsRepository {
   /** ① 판매자별 요약. */
   getSellerSummary(params: SalesStatsParams): Promise<SellerSales[]>;
   /**
-   * ② Per channel (account). Without `sellerId` the result is not narrowed to a seller (the 「채널별 매출」 tab and the
-   * dashboard cards); the summary screen narrows it to one seller when a seller row is expanded.
+   * ② Per channel (account). Without `sellerId` the result is not narrowed to a seller (the 「채널별 매출」 tab, the
+   * dashboard 「기간 매출」 card and the dashboard 「채널별 매출」 card on 「전체」); the summary screen narrows it to one seller
+   * when a seller row is expanded, the dashboard 「채널별 매출」 card when a seller is picked (FEATURE_2610_30 D35).
    */
   getChannelSales(params: SalesStatsParams): Promise<ChannelSales[]>;
   /** ③ 상품별 수익성. `crossChannel` 은 서버 파라미터라 값이 바뀌면 재조회한다. */
   getProductProfit(params: ProductProfitParams): Promise<ProductProfit[]>;
   /** ④ 판매 내역 — 한 채널의 주문 라인 목록. 🔴 `accountId` 필수(없으면 서버 400). */
   getSalesLines(params: SalesLinesParams): Promise<SalesLine[]>;
-  /** ⑤ Sales per sale date — the dashboard chart (FEATURE_2610_29 D22). `sellerId` is not used. */
+  /**
+   * ⑤ Sales per sale date — the dashboard chart (FEATURE_2610_29 D22). `sellerId` narrows it to one seller; without it
+   * there is no seller filter (FEATURE_2610_30 D34).
+   */
   getDailySales(params: SalesStatsParams): Promise<DailySales[]>;
 }

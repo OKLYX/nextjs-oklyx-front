@@ -11,7 +11,8 @@ export type CardData<T> =
 
 /**
  * Loads a card's data when the card mounts and again when `load` changes (FEATURE_2610_29 D20 — once on open, no
- * polling). Pass a `useCallback` whose dependencies are the card's period.
+ * polling). Pass a `useCallback` whose dependencies are the card's period and, on the chart cards, its seller
+ * (FEATURE_2610_30 D34 · D35).
  */
 export function useCardData<T>(load: () => Promise<T>): CardData<T> {
   const [state, setState] = useState<CardData<T>>({ status: 'loading' });
