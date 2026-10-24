@@ -9,6 +9,7 @@ import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { Spinner } from '@/presentation/components/Spinner';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { ReceiptEditModal } from './ReceiptEditModal';
 
 /**
@@ -103,6 +104,32 @@ export function ReceiptDetailModal({ receiptId, sellers, onClose, onEdited }: Re
               원본 열기
             </a>
           </div>
+          <DataCardSwitch
+            placement="nested"
+            renderCards={() =>
+              // Narrow-screen cards (FEATURE_2610_31 D14): the app's receipt line — product name, then
+              // 「수량 N · 금액 (@단가)」 with 「 · 기준가 미반영」 (a blank amount reads 「미기입」).
+              detail.lines.map((line, index) => (
+                <DataCard
+                  key={index}
+                  body={
+                    <div>
+                      <p className="text-base text-gray-900">{line.productName}</p>
+                      <p className="text-sm text-gray-500">
+                        수량 {line.quantity} ·{' '}
+                        {line.totalAmount == null
+                          ? '미기입'
+                          : `${formatAmount(line.totalAmount)}원${
+                              line.unitPrice != null ? ` (@${formatAmount(line.unitPrice)})` : ''
+                            }`}
+                        {line.reflectToBasePrice ? '' : ' · 기준가 미반영'}
+                      </p>
+                    </div>
+                  }
+                />
+              ))
+            }
+          >
           <table className="w-full text-sm">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr className="text-gray-600">
@@ -135,6 +162,7 @@ export function ReceiptDetailModal({ receiptId, sellers, onClose, onEdited }: Re
               ))}
             </tbody>
           </table>
+          </DataCardSwitch>
         </div>
       )}
       <ReceiptEditModal

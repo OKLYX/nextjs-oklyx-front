@@ -9,6 +9,7 @@ import type { PendingSyncResponse } from '@/domain/entities/ListingRegistrationE
 import { PendingSyncTable } from './components/PendingSyncTable';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 
 interface Banner {
   text: string;
@@ -33,6 +34,7 @@ export default function ListingsSyncPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<number[]>([]);
+  const showCards = useShowCards();
 
   const [isSweeping, setIsSweeping] = useState(false);
   const [sweepBanner, setSweepBanner] = useState<Banner | null>(null);
@@ -132,8 +134,9 @@ export default function ListingsSyncPage() {
         )}
       </Card>
 
-      {/* Section 2: pending market-sync */}
-      <Card>
+      {/* Section 2: pending market-sync. In narrow-screen card view the box is not drawn and the cards run edge to
+          edge (FEATURE_2610_31 D25 · D30). */}
+      <Card bare={showCards}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-gray-900">마켓 반영 대기</h2>
           <Button
@@ -154,7 +157,7 @@ export default function ListingsSyncPage() {
         )}
         {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-        <div className="list-table-scroll">
+        <div className={showCards ? undefined : 'list-table-scroll'}>
           {isLoading ? (
             <div className="flex min-h-32 items-center justify-center">
               <Spinner size={24} label="불러오는 중..." />

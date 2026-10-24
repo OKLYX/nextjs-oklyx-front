@@ -488,7 +488,7 @@ export function PayoutListContainer() {
       />
 
       {/* 🔴 축 전환은 필터 <b>위</b>다 — 아래 표가 무엇을 뜻하는지 먼저 정해야 필터가 읽힌다. */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 max-md:flex-wrap">
         {([
           { key: 'payout', label: '정산 기준' },
           { key: 'saleMonth', label: '판매월 기준' },
@@ -506,7 +506,7 @@ export function PayoutListContainer() {
             {tab.label}
           </button>
         ))}
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-gray-500 max-md:min-w-0 max-md:truncate">
           {viewMode === 'payout'
             ? '정산 건에서 어떤 판매였는지 내려다봅니다.'
             : '판매에서 언제 정산됐는지 올려다봅니다.'}

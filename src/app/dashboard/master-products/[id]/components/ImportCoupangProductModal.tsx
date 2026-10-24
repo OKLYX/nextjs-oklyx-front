@@ -267,8 +267,8 @@ export function ImportCoupangProductModal({
         {sellerName} · {platformDisplayName(platform)}
       </p>
 
-      <div className="mb-3 flex shrink-0 items-center gap-2">
-        <label className="text-sm text-gray-700" htmlFor="coupang-product-id">
+      <div className="mb-3 flex shrink-0 items-center gap-2 max-md:flex-wrap">
+        <label className="text-sm text-gray-700 max-md:min-w-0 max-md:truncate" htmlFor="coupang-product-id">
           쿠팡 상품 ID
         </label>
         <input
@@ -437,7 +437,7 @@ export function ImportCoupangProductModal({
       )}
 
       <div className="mt-4 flex shrink-0 flex-col items-end gap-1">
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 max-md:flex-wrap">
           <button
             type="button"
             onClick={onClose}

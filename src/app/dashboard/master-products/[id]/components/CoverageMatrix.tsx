@@ -1182,7 +1182,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           ⚠️ 이 고정은 `dashboard/layout.tsx` 의 `<main>` 이 `overflow-x-clip` 이어야 동작한다
           (`auto` 면 세로축까지 스크롤 영역으로 계산돼 sticky 가 죽는다). */}
       <div className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 bg-page px-4 py-2 md:-mx-6 md:px-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 max-md:flex-wrap">
           <button
             type="button"
             onClick={() => router.push(listReturnHref(ROUTES.MASTER_PRODUCTS, searchParams))}
@@ -1190,7 +1190,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           >
             ← 목록
           </button>
-          <h1 className="text-xl font-semibold text-gray-900">
+          <h1 className="text-xl font-semibold text-gray-900 max-md:min-w-0 max-md:truncate">
             {matrix ? matrix.masterName : '커버리지 매트릭스'}
           </h1>
           <Button
@@ -1203,7 +1203,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           </Button>
         </div>
         {isAdmin && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-md:flex-wrap">
             <button
               type="button"
               onClick={handleBatchAdd}

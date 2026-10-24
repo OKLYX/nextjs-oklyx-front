@@ -258,10 +258,10 @@ export function ClipboardFillModal({
 
         {/* 2층 — 어느 항목을 채울지 */}
         <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-900">채울 항목</h3>
+          <div className="mb-2 flex items-center justify-between max-md:flex-wrap">
+            <h3 className="text-sm font-semibold text-gray-900 max-md:min-w-0 max-md:truncate">채울 항목</h3>
             {fillable.length > 0 && (
-              <div className="flex gap-2 text-xs">
+              <div className="flex gap-2 text-xs max-md:flex-wrap">
                 <button
                   type="button"
                   onClick={() => setKeys(new Set(fillable))}

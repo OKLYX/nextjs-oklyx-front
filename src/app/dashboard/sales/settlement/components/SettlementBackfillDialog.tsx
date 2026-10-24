@@ -89,7 +89,7 @@ export function SettlementBackfillDialog({
               </select>
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-gray-700">시작월</span>
                 <select
@@ -134,7 +134,7 @@ export function SettlementBackfillDialog({
           <p className="mt-4 rounded bg-blue-50 px-3 py-2 text-sm text-blue-800">{progress}</p>
         )}
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-2 max-md:flex-wrap">
           <button
             type="button"
             onClick={onClose}

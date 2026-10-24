@@ -23,7 +23,7 @@ export function CrossChannelToggle({ crossChannel, disabled, onChange }: CrossCh
   return (
     <div className="flex flex-col gap-1">
       <span className="text-sm font-medium text-gray-700">보기 방식</span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 max-md:flex-wrap">
         {options.map((option) => (
           <button
             key={String(option.value)}

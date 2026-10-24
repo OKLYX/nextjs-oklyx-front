@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 import type { StockBalance, StockMovement } from '@/domain/entities/StockEntity';
 import { StockMovementTable } from '../../components/StockMovementTable';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface StockSearchTableProps {
   balances: StockBalance[];
@@ -33,11 +34,57 @@ export function StockSearchTable({
   historyError,
   onToggle,
 }: StockSearchTableProps) {
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D33): the app's balance line — 「▸ product」, the seller, the on-hand
+  // count on the right (red with a note when negative). A tap opens the movements right under the card, above the
+  // next card.
+  const renderCards = () =>
+    balances.map((balance) => {
+      const key = balanceKey(balance);
+      const isExpanded = expandedKey === key;
+      const negative = balance.onHand < 0;
+      return (
+        <Fragment key={key}>
+          <DataCard
+            onClick={() => onToggle(balance)}
+            body={
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base text-gray-900">
+                    {isExpanded ? '▾' : '▸'} {balance.productName}
+                  </p>
+                  <p className="text-[11px] text-gray-500">{balance.sellerName}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className={`text-[15px] font-bold ${negative ? 'text-red-600' : 'text-gray-900'}`}>
+                    {balance.onHand}
+                  </p>
+                  {negative && <p className="text-[10px] text-red-600">입고 기록이 빠졌을 수 있습니다</p>}
+                </div>
+              </div>
+            }
+          />
+          {isExpanded && (
+            <div className="bg-gray-50 px-4 py-3">
+              <StockMovementTable
+                movements={movements}
+                isLoading={isHistoryLoading}
+                error={historyError}
+                showSeller={false}
+                emptyMessage="이 기간(최근 30일)에 기록된 이동이 없습니다."
+                cardPlacement="nested"
+              />
+            </div>
+          )}
+        </Fragment>
+      );
+    });
+
   return (
     <TableCard
       isLoading={isLoading}
       isEmpty={balances.length === 0}
       emptyMessage="조회 결과가 없습니다."
+      renderCards={renderCards}
     >
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-200">
@@ -76,6 +123,7 @@ export function StockSearchTable({
                         error={historyError}
                         showSeller={false}
                         emptyMessage="이 기간(최근 30일)에 기록된 이동이 없습니다."
+                        cardPlacement="nested"
                       />
                     </td>
                   </tr>

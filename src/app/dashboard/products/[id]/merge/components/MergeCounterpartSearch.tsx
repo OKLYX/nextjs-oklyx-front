@@ -99,7 +99,7 @@ export function MergeCounterpartSearch({
         물품을, 그 밖의 말은 상품명·브랜드·설명에서 찾습니다.
       </p>
       <form
-        className="flex items-end gap-2"
+        className="flex items-end gap-2 max-md:flex-wrap"
         onSubmit={(event) => {
           event.preventDefault();
           void search();
@@ -122,7 +122,7 @@ export function MergeCounterpartSearch({
       {results.length > 0 && (
         <ul className="mt-4 divide-y divide-gray-100 border-t border-gray-100">
           {results.map((product) => (
-            <li key={product.id} className="flex items-center justify-between gap-3 py-2">
+            <li key={product.id} className="flex items-center justify-between gap-3 py-2 max-md:flex-wrap">
               <div className="flex min-w-0 items-center gap-3">
                 <ResultThumbnail
                   product={product}

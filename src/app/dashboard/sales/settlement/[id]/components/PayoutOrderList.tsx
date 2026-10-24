@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import type { ReconLineView } from '@/domain/entities/Settlement';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 import { ReconLineTable } from './ReconLineTable';
 
 /**
@@ -45,6 +46,7 @@ export function PayoutOrderList({
   onCopyIdentifiers,
 }: PayoutOrderListProps) {
   const [query, setQuery] = useState('');
+  const showCards = useShowCards();
 
   const visible = useMemo(() => {
     const needle = query.replace(/\s+/g, '').toLowerCase();
@@ -54,7 +56,8 @@ export function PayoutOrderList({
   const isEmpty = !loading && !error && lines.length === 0;
 
   return (
-    <section className="bg-white rounded-lg shadow">
+    // Narrow-screen card view: the box is not drawn and the cards run edge to edge (FEATURE_2610_31 D30).
+    <section className={showCards ? undefined : 'bg-white rounded-lg shadow'}>
       <div className="px-6 py-4 flex flex-wrap items-center gap-x-3 gap-y-2">
         <h2 className="text-sm font-semibold text-gray-900">이 정산에 포함된 주문</h2>
         {!loading && !error && lines.length > 0 && (
@@ -90,14 +93,16 @@ export function PayoutOrderList({
       ) : query && visible.length === 0 ? (
         <div className="px-6 pb-6 text-sm text-gray-500">검색 결과가 없습니다.</div>
       ) : (
-        // ⚠️ 높이는 표를 감싼 이 래퍼가 갖는다 — `ReconLineTable` 안에 두면 로딩·에러·빈 상태에도
-        //    빈 스크롤 상자가 생긴다.
-        <div className="max-h-[60vh] overflow-y-auto">
+        // ⚠️ The height belongs to this wrapper around the table, not to `ReconLineTable` — there it would leave an
+        //    empty scroll box during loading, error and empty states. In the narrow-screen card view the card list
+        //    takes the same height (`cardsListClassName`) and this wrapper takes none (FEATURE_2610_31 D30).
+        <div className={showCards ? undefined : 'max-h-[60vh] overflow-y-auto'}>
           <ReconLineTable
             lines={visible}
             loading={loading}
             error={error}
             stickyHeader
+            cardsListClassName="max-h-[60vh] overflow-y-auto"
             onCopyIdentifiers={onCopyIdentifiers}
           />
         </div>

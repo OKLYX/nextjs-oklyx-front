@@ -12,6 +12,7 @@ import { PageContainer } from '@/presentation/components/PageContainer';
 import { Button } from '@/presentation/components/ui/Button';
 import { Card } from '@/presentation/components/ui/Card';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 import { parseQuery, toApiParams, toSearchParams, type ReceiptListQuery } from '../receiptListQuery';
 import { ReceiptDetailModal } from './ReceiptDetailModal';
 
@@ -113,14 +114,14 @@ export function ReceiptList() {
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">기간</label>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 max-md:flex-wrap">
               <input
                 type="date"
                 value={from}
                 onChange={(e) => updateQuery({ from: e.target.value })}
                 className={INPUT_CLASS}
               />
-              <span className="text-sm text-gray-500">~</span>
+              <span className="text-sm text-gray-500 max-md:min-w-0 max-md:truncate">~</span>
               <input
                 type="date"
                 value={to}
@@ -151,7 +152,7 @@ export function ReceiptList() {
               e.preventDefault();
               handleSearch();
             }}
-            className="flex items-end gap-2"
+            className="flex items-end gap-2 max-md:flex-wrap"
           >
             <div>
               <label className="block text-xs text-gray-500 mb-1">상품 이름</label>
@@ -174,6 +175,35 @@ export function ReceiptList() {
         error={error}
         isEmpty={rows.length === 0}
         emptyMessage="영수증이 없습니다."
+        renderCards={() =>
+          // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value (「결제 판매자」 · 「카드」 only
+          // while the table shows them); a tap opens the receipt like a row tap.
+          rows.map((row) => (
+            <DataCard
+              key={row.id}
+              onClick={() => setOpenReceiptId(row.id)}
+              fields={[
+                { label: '날짜', value: row.purchasedOn },
+                ...(soleSeller
+                  ? []
+                  : [
+                      { label: '결제 판매자', value: row.payerSellerName },
+                      { label: '카드', value: row.cardAlias ?? '카드 없음' },
+                    ]),
+                { label: '상품', value: productSummary(row) },
+                {
+                  label: '금액 합',
+                  value:
+                    row.totalAmount == null ? (
+                      <span className="text-gray-400">미기입</span>
+                    ) : (
+                      <span className="text-gray-900">{formatAmount(row.totalAmount)}원</span>
+                    ),
+                },
+              ]}
+            />
+          ))
+        }
       >
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">

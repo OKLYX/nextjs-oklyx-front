@@ -126,7 +126,7 @@ export function RepricingGroupCard({
             {selectedOptionIds.length.toLocaleString('ko-KR')}
             {unsavedCount > 0 && ` · 미저장 ${unsavedCount.toLocaleString('ko-KR')}`}
           </span>
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-md:flex-wrap">
             <Button
               type="button"
               size="sm"

@@ -105,7 +105,7 @@ export function MasterImagePickerModal({
         )}
       </div>
 
-      <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
+      <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3 max-md:flex-wrap">
         <button
           type="button"
           onClick={onClose}

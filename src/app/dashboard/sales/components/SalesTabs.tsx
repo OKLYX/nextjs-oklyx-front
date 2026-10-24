@@ -21,7 +21,7 @@ export function SalesTabs() {
   const pathname = usePathname();
 
   return (
-    <div className="flex items-center gap-2 border-b border-gray-200">
+    <div className="flex items-center gap-2 border-b border-gray-200 max-md:flex-wrap">
       {TABS.map((tab) => {
         const isActive = pathname === tab.href;
         return (

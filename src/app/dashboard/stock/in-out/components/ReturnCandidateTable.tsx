@@ -1,6 +1,8 @@
 'use client';
 
 import type { ReturnCandidate } from '@/domain/entities/StockEntity';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 
 interface ReturnCandidateTableProps {
   candidates: ReturnCandidate[];
@@ -22,8 +24,45 @@ export function ReturnCandidateTable({
   error,
   onSelect,
 }: ReturnCandidateTableProps) {
+  const showCards = useShowCards();
+
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D30 · D37): the app's return pick line — product name, then
+  // 「주문번호 · 반품 N / 입고 N · 남은 N · 상태 · 회수」 and [반품입고] in the button row. No field is added at the
+  // bottom (D37): the table's 「회수」 is already the last part of that line.
+  const renderCards = () =>
+    candidates.map((candidate) => (
+      <DataCard
+        key={candidate.orderClaimId}
+        body={
+          <div>
+            <p className="truncate text-sm text-gray-900">{candidate.itemName ?? '—'}</p>
+            <p className="text-[11px] text-gray-500">
+              {[
+                candidate.externalOrderId,
+                `반품 ${candidate.claimQty} / 입고 ${candidate.receivedQty} · 남은 ${candidate.remainingQty}`,
+                candidate.claimStatus,
+                candidate.collectStatus,
+              ]
+                .filter((part) => part != null)
+                .join(' · ')}
+            </p>
+          </div>
+        }
+        actions={
+          <button
+            type="button"
+            onClick={() => onSelect(candidate)}
+            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
+          >
+            반품입고
+          </button>
+        }
+      />
+    ));
+
   return (
-    <div className="p-6 space-y-3">
+    // Narrow-screen card view: no box padding — the heading sits in the page padding (FEATURE_2610_31 D30).
+    <div className={showCards ? 'space-y-3' : 'p-6 space-y-3'}>
       <h2 className="text-base font-semibold text-gray-900">반품 대기 (반품입고 확인)</h2>
 
       {error && (
@@ -37,7 +76,7 @@ export function ReturnCandidateTable({
       ) : candidates.length === 0 ? (
         <p className="text-sm text-gray-500">반품입고를 기다리는 건이 없습니다.</p>
       ) : (
-        <div className="list-table-scroll">
+        <DataCardSwitch placement="page" renderCards={renderCards} className="list-table-scroll">
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
@@ -88,7 +127,7 @@ export function ReturnCandidateTable({
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       )}
     </div>
   );

@@ -8,6 +8,8 @@ import type { ProductImage } from '@/domain/entities/ProductImage';
 import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
 import { ImageLightbox } from '@/presentation/components/ImageLightbox';
+import { DragNotice } from '@/presentation/components/WideScreenOnly';
+import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 import { MasterImagePickerModal, type PickerImage } from './MasterImagePickerModal';
 import { MasterPoolManageModal } from './MasterPoolManageModal';
 
@@ -114,6 +116,8 @@ export function MasterImagePool({
   // Clicking an Active-card field tag highlights that field card on the right for 2s.
   const [highlightedField, setHighlightedField] = useState<string | null>(null);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Below 768px the photos are not draggable and one notice line sits above the pool (FEATURE_2610_31 D19).
+  const isMobile = useIsMobile();
   const fieldCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // ---- Source tab ----
@@ -604,7 +608,7 @@ export function MasterImagePool({
     return (
       <div
         key={entry.token}
-        draggable
+        draggable={!isMobile}
         onDragStart={(e) => e.dataTransfer.setData('text/plain', String(entry.token))}
         className="cursor-grab overflow-hidden rounded border border-gray-200 p-2 active:cursor-grabbing"
       >
@@ -656,7 +660,7 @@ export function MasterImagePool({
     return (
       <div
         key={pi.id}
-        draggable
+        draggable={!isMobile}
         onDragStart={(e) => e.dataTransfer.setData('text/plain', dragToken)}
         className="relative cursor-grab rounded border border-gray-200 p-1 active:cursor-grabbing"
       >
@@ -692,6 +696,7 @@ export function MasterImagePool({
     <div className="space-y-2">
       {error && <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
 
+      <DragNotice />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* ---- Left: source chips + list (top), Active Image (bottom) — mirrors the right column ---- */}
         <div className="space-y-3">
@@ -726,7 +731,7 @@ export function MasterImagePool({
           {/* Source list (selected chip). Master actions sit top-right, like the field [선택] button. */}
           <div className="flex h-64 flex-col rounded-lg border border-gray-200 p-3">
             {activeTab === 'master' && (
-              <div className="mb-2 flex items-center justify-end gap-1.5">
+              <div className="mb-2 flex items-center justify-end gap-1.5 max-md:flex-wrap">
                 <button
                   type="button"
                   onClick={() => setManageOpen(true)}

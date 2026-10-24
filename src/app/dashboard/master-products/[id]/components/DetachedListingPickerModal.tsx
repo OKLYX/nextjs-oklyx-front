@@ -98,7 +98,7 @@ export function DetachedListingPickerModal({
         {sellerName} · {platformDisplayName(platform)}
       </p>
 
-      <div className="my-3 flex items-center gap-2">
+      <div className="my-3 flex items-center gap-2 max-md:flex-wrap">
         <input
           type="text"
           aria-label="판매상품 검색어"

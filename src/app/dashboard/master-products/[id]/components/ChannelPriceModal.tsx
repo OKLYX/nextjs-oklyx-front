@@ -417,7 +417,7 @@ export function ChannelPriceModal({
       )}
 
       <div className="mt-5 flex flex-col items-end gap-1">
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 max-md:flex-wrap">
           <button
             type="button"
             onClick={onClose}

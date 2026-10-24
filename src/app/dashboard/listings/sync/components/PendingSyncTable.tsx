@@ -2,6 +2,7 @@
 
 import type { PendingSyncResponse } from '@/domain/entities/ListingRegistrationEntity';
 import { platformDisplayName } from '@/config/platforms';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 interface PendingSyncTableProps {
   rows: PendingSyncResponse[];
@@ -20,7 +21,33 @@ export function PendingSyncTable({ rows, selected, onToggle }: PendingSyncTableP
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D13 · D22): the row checkbox at the top-left, every table column as
+  // label · value.
+  const renderCards = () =>
+    rows.map((row) => (
+      <DataCard
+        key={row.productListingId}
+        selection={{
+          checked: selected.includes(row.productListingId),
+          onChange: () => onToggle(row.productListingId),
+          label: `${row.masterProductName} 선택`,
+        }}
+        fields={[
+          { label: '마스터명', value: row.masterProductName },
+          { label: '판매자', value: row.seller },
+          { label: '플랫폼', value: platformDisplayName(row.platform) },
+          {
+            label: '상태',
+            value: (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">{row.status}</span>
+            ),
+          },
+        ]}
+      />
+    ));
+
   return (
+    <DataCardSwitch placement="page" renderCards={renderCards}>
     <table>
       <thead className="bg-gray-100 border-b border-gray-200">
         <tr className="text-left text-sm text-gray-600">
@@ -53,5 +80,6 @@ export function PendingSyncTable({ rows, selected, onToggle }: PendingSyncTableP
         ))}
       </tbody>
     </table>
+    </DataCardSwitch>
   );
 }

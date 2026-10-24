@@ -66,7 +66,7 @@ export function ShareActionCell({
   const disabled = actions.pendingKey === shareKey(productId, share.sellerId);
   const stop = (e: MouseEvent) => e.stopPropagation();
   return (
-    <div className="flex items-center justify-end gap-1" onClick={stop}>
+    <div className="flex items-center justify-end gap-1 max-md:flex-wrap" onClick={stop}>
       {share.state === 'OPEN' && (
         <>
           <button

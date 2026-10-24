@@ -27,7 +27,7 @@ export function PurchaseListToolbar({
         재고 고려 <span className="text-xs">(준비 중)</span>
       </label>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-2 max-md:flex-wrap">
         {/* 주문내역 동기화: 마켓플레이스에서 최신 주문을 가져온 뒤 구매목록을 재구성 */}
         <button
           onClick={onSyncOrders}

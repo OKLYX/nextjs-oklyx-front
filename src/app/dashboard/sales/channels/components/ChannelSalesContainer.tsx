@@ -13,6 +13,7 @@ import { ChannelSummaryCard } from './ChannelSummaryCard';
 import { ChannelSalesLines } from './ChannelSalesLines';
 import { ChannelSaleRecords } from './ChannelSaleRecords';
 import { Button } from '@/presentation/components/ui/Button';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 
 /** `yyyy-MM-dd` 모양일 때만 URL 값을 믿는다 — 아무 문자열이나 그대로 서버에 보내면 400 이 난다. */
 const asDate = (value: string | null): string | null =>
@@ -79,6 +80,9 @@ export function ChannelSalesContainer() {
   //    위 요약 카드의 합계는 서버가 낸 값 그대로 둔다(걸러냈다고 매출이 줄지는 않는다).
   const [hideCanceled, setHideCanceled] = useState(false);
   const [hidePending, setHidePending] = useState(false);
+
+  // Narrow-screen card view of the lists (FEATURE_2610_31 D13 · D30).
+  const showCards = useShowCards();
 
   // 프리셋을 빠르게 연타하면 응답이 역순으로 도착할 수 있다 — 마지막 요청의 결과만 반영한다.
   const requestIdRef = useRef(0);
@@ -236,9 +240,10 @@ export function ChannelSalesContainer() {
 
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-gray-900">상품별 매출</h2>
-            {/* 🔴 `list-table-scroll`(최소폭 736px + nowrap)을 쓰지 않는다 — 판매 내역과 같은 이유로
-                상품명이 길면 표가 가로로 밀린다(사용자 요청 2026-09-10). */}
-            <div className="bg-white rounded-lg shadow px-6 py-4">
+            {/* 🔴 No `list-table-scroll` (min width 736px + nowrap) — for the same reason as the sale records, a long
+                product name would push the table sideways (user request 2026-09-10). In the narrow-screen card view the
+                box is not drawn and the cards run edge to edge (FEATURE_2610_31 D30). */}
+            <div className={showCards ? undefined : 'bg-white rounded-lg shadow px-6 py-4'}>
               <ChannelSalesLines
                 rows={products.filter((row) => row.accountId === selected.accountId)}
                 isLoading={productsLoading}

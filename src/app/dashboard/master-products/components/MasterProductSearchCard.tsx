@@ -75,7 +75,7 @@ export function MasterProductSearchCard({
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="flex flex-col gap-4 sm:flex-row max-md:flex-wrap">
           <div className="sm:w-40">
             <label className="block text-sm font-medium text-gray-700 mb-2">페이지당 개수</label>
             <select

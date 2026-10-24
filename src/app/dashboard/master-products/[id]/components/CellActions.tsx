@@ -470,7 +470,7 @@ export function CellActions({
     // `contents` = 액션 묶음과 알림 줄이 부모(판매상품 행)의 flex 흐름에 그대로 들어간다 —
     // 액션은 행 오른쪽 끝, 알림 줄은 `basis-full` 로 행 아래 한 줄을 차지한다.
     <div className="contents">
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5 max-md:flex-wrap">
         {primary === 'upload' && !categoryBlocked && (
           <button
             type="button"
