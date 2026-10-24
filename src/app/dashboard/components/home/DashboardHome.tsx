@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
 import { gridBounds } from 'react-grid-layout/core';
 import 'react-grid-layout/css/styles.css';
-import { DASHBOARD_CARD_SPECS, NARROW_GRID, WEB_GRID } from '@/config/dashboardGrid';
+import { DASHBOARD_CARD_SPECS, NARROW_GRID, WEB_GRID, narrowHeight } from '@/config/dashboardGrid';
 import { DashboardUseCase } from '@/application/usecases/DashboardUseCase';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { DashboardRepositoryImpl } from '@/infrastructure/repositories/DashboardRepositoryImpl';
@@ -47,7 +47,7 @@ type LoadState = 'loading' | 'error' | 'ready';
  *   1 · 2 high, not under its minimum), ✕ removes it, 「카드 넣기」 adds one at the bottom. [편집 완료] saves to the
  *   server; until then nothing is saved.
  * - Outside edit mode a tap on a card opens its screen; a period change is saved at once.
- * - Below 768px (FEATURE_2610_31 D8 · D17 · D18): the cards sit on `NARROW_GRID` (2 columns, one row high) in the
+ * - Below 768px (FEATURE_2610_31 D8 · D17 · D18): the cards sit on `NARROW_GRID` (2 columns; `narrowHeight` tall) in the
  *   mobile app's places (`toNarrowCards`), with no [편집]. A period change saves the stored web places with the new
  *   period, so web edits in progress stay unsaved until [편집 완료] on a wide screen.
  */
@@ -249,12 +249,11 @@ export function DashboardHome() {
             className="grid"
             style={{
               gridTemplateColumns: `repeat(${NARROW_GRID.cols}, minmax(0, 1fr))`,
-              gridAutoRows: `${NARROW_GRID.rowHeight}px`,
               gap: `${NARROW_GRID.gap}px`,
             }}
           >
             {narrowCards.map((card) => (
-              <div key={card.type} style={{ gridColumn: `span ${card.w}` }}>
+              <div key={card.type} style={{ gridColumn: `span ${card.w}`, height: `${narrowHeight(card.type)}px` }}>
                 {renderCard(card, true)}
               </div>
             ))}

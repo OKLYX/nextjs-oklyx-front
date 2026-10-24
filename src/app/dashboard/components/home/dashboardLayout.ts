@@ -140,7 +140,7 @@ export function toWebCards(layout: DashboardLayout): WebCard[] {
   return cards;
 }
 
-/** One card the narrow-screen grid draws (FEATURE_2610_31 D17) — width in `NARROW_GRID` cells, one row high. */
+/** One card the narrow-screen grid draws (FEATURE_2610_31 D17) — width in `NARROW_GRID` cells, height from `narrowHeight`. */
 export interface NarrowCard {
   type: DashboardCardType;
   /** The period the card reads; null = the card has no period. */
