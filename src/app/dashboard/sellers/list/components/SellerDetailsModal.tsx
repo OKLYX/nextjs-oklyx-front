@@ -128,7 +128,7 @@ export function SellerDetailsModal({
           </div>
         )}
 
-        <div className="border-t p-6 flex gap-2">
+        <div className="border-t p-6 flex gap-2 max-md:flex-wrap">
           {seller && onEditClick && (
             <button
               onClick={() => onEditClick(seller.id)}

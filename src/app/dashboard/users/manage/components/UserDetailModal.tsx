@@ -280,7 +280,7 @@ export function UserDetailModal({
           </div>
         </div>
 
-        <div className="flex gap-4 mt-6">
+        <div className="flex gap-4 mt-6 max-md:flex-wrap">
           <button
             onClick={handleSave}
             disabled={

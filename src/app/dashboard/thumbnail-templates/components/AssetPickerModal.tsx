@@ -127,7 +127,7 @@ export function AssetPickerModal({ isOpen, onClose, onSelect, useCase, onAssetsC
       onClose={onClose}
       title="고정 이미지 선택"
     >
-      <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-3">
+      <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-3 max-md:flex-wrap">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -143,7 +143,7 @@ export function AssetPickerModal({ isOpen, onClose, onSelect, useCase, onAssetsC
           onChange={handleUploadFile}
           hidden
         />
-        <span className="text-xs text-gray-500">JPG / PNG</span>
+        <span className="text-xs text-gray-500 max-md:min-w-0 max-md:truncate">JPG / PNG</span>
       </div>
 
       {error && <p className="mx-5 mt-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

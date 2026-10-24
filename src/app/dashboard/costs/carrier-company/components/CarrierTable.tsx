@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react';
 import type { Carrier } from '@/domain/entities/CarrierEntity';
 import { CarrierPlatformCodes } from './CarrierPlatformCodes';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface CarrierTableProps {
   carriers: Carrier[];
@@ -23,11 +24,65 @@ export function CarrierTable({
   // Single expansion: only one carrier's platform codes are shown at a time.
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D33): the app's carrier card — name, active chip at the right end;
+  // the name button opens the platform codes inside the card.
+  const renderCards = () =>
+    carriers.map((carrier) => (
+      <DataCard
+        key={carrier.id}
+        title={
+          <button
+            type="button"
+            onClick={() => setExpandedId((prev) => (prev === carrier.id ? null : carrier.id))}
+            aria-expanded={expandedId === carrier.id}
+            className="flex items-center gap-2 text-left font-semibold hover:text-blue-600 transition-colors"
+          >
+            <span className="text-xs text-gray-400">{expandedId === carrier.id ? '▼' : '▶'}</span>
+            {carrier.name}
+          </button>
+        }
+        trailing={
+          <button
+            type="button"
+            onClick={() => onToggleActive(carrier)}
+            aria-label={carrier.isActive ? '비활성화' : '활성화'}
+            className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+              carrier.isActive
+                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {carrier.isActive ? '활성' : '비활성'}
+          </button>
+        }
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => onEdit(carrier)}
+              className="px-3 py-1 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              수정
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(carrier)}
+              className="px-3 py-1 border border-red-300 rounded text-sm text-red-600 hover:bg-red-50 transition-colors"
+            >
+              삭제
+            </button>
+          </>
+        }
+        expansion={expandedId === carrier.id ? <CarrierPlatformCodes carrierId={carrier.id} /> : undefined}
+      />
+    ));
+
   return (
     <TableCard
       isLoading={isLoading}
       isEmpty={carriers.length === 0}
       emptyMessage="등록된 택배사가 없습니다."
+      renderCards={renderCards}
     >
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-200">

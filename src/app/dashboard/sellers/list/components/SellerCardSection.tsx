@@ -8,6 +8,7 @@ import type { SellerCard } from '@/domain/entities/SellerCardEntity';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { SellerCardModal } from './SellerCardModal';
 
 interface SellerCardSectionProps {
@@ -88,6 +89,37 @@ export function SellerCardSection({ sellerId, sellerName }: SellerCardSectionPro
     }
   };
 
+  // Narrow-screen cards (FEATURE_2610_31 D22 · D25): every table column as label · value, the row buttons at the
+  // bottom — floating cards, the section sits inside a seller row.
+  const renderCards = () =>
+    cards.map((card) => (
+      <DataCard
+        key={card.id}
+        fields={[
+          { label: '별칭', value: card.alias },
+          { label: '가려진 번호', value: card.maskedNumber },
+        ]}
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => openEdit(card)}
+              className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+            >
+              수정
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteCard(card)}
+              className="px-2 py-0.5 text-xs border border-gray-300 rounded text-red-600 hover:bg-red-50"
+            >
+              삭제
+            </button>
+          </>
+        }
+      />
+    ));
+
   return (
     <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
       <div className="flex items-center justify-between mb-3">
@@ -110,7 +142,7 @@ export function SellerCardSection({ sellerId, sellerName }: SellerCardSectionPro
           등록된 카드가 없습니다.
         </div>
       ) : (
-        <div className="bg-white rounded-md border border-gray-200 list-table-scroll">
+        <DataCardSwitch placement="nested" renderCards={renderCards} className="bg-white rounded-md border border-gray-200 list-table-scroll">
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
@@ -146,7 +178,7 @@ export function SellerCardSection({ sellerId, sellerName }: SellerCardSectionPro
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       )}
 
       <SellerCardModal

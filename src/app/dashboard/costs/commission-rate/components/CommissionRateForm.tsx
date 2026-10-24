@@ -220,7 +220,7 @@ export function CommissionRateForm({
         )}
       </div>
 
-      <div className="flex gap-3 pt-4 border-t">
+      <div className="flex gap-3 pt-4 border-t max-md:flex-wrap">
         <button
           type="button"
           onClick={() => {
