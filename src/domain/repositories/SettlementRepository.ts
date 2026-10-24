@@ -38,10 +38,11 @@ export interface SettlementRepository {
    */
   getSaleMonthSettlements(query: SaleMonthQuery): Promise<SaleMonthSettlement[]>;
   /**
-   * This month's payout sums for the dashboard payout card (FEATURE_2610_29 D30) — no parameter, the server picks the
-   * month. 🔴 Its date basis differs from `getPayouts` (confirmed payout date, else scheduled).
+   * This month's payout sums for the dashboard payout card (FEATURE_2610_29 D30) — the server picks the month;
+   * `sellerId` narrows to one seller (absent = every seller). 🔴 Its date basis differs from `getPayouts` (confirmed
+   * payout date, else scheduled).
    */
-  getMonthSummary(): Promise<SettlementMonthSummary>;
+  getMonthSummary(sellerId?: number): Promise<SettlementMonthSummary>;
   /** 묶음 1건 + 조정 + 검증식 요약. 리포트가 필요한 화면은 `getReport` 를 쓴다(같은 값을 포함한다). */
   getPayout(payoutId: number): Promise<PayoutDetail>;
   /** 라벨·미분류 필터는 <b>서버가</b> 적용한다. */
