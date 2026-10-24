@@ -38,8 +38,8 @@ export class SettlementUseCase {
   }
 
   /** This month's payout sums — the dashboard payout card (FEATURE_2610_29 D30). */
-  async getMonthSummary(): Promise<SettlementMonthSummary> {
-    return this.repository.getMonthSummary();
+  async getMonthSummary(sellerId?: number): Promise<SettlementMonthSummary> {
+    return this.repository.getMonthSummary(sellerId);
   }
 
   async getPayout(payoutId: number): Promise<PayoutDetail> {

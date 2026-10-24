@@ -164,7 +164,7 @@ export function DashboardHome() {
       case 'PERIOD_SALES':
         return <PeriodSalesCard period={card.period ?? 'THIS_MONTH'} onPeriodChange={onPeriodChange} {...common} />;
       case 'SETTLEMENT_PAYOUTS':
-        return <PayoutCard {...common} narrow={narrow} />;
+        return <PayoutCard sellers={sellers} {...common} narrow={narrow} />;
       case 'PURCHASE_LIST':
         return <PurchaseListCard {...common} />;
       case 'RESERVED_SHIPMENTS':

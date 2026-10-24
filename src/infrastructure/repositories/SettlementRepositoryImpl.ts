@@ -53,8 +53,10 @@ export class SettlementRepositoryImpl implements SettlementRepository {
     return response.data.data;
   }
 
-  async getMonthSummary(): Promise<SettlementMonthSummary> {
-    const response = await axiosInstance.get('/api/admin/settlement/month-summary');
+  async getMonthSummary(sellerId?: number): Promise<SettlementMonthSummary> {
+    const response = await axiosInstance.get('/api/admin/settlement/month-summary', {
+      params: sellerId != null ? { sellerId } : undefined,
+    });
     return response.data.data;
   }
 
