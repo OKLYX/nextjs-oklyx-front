@@ -75,7 +75,7 @@ export function PeriodSalesCard({ period, onPeriodChange, editing, onRemove }: P
   };
 
   const stepToggle = sellerChannels.length >= 2 && (
-    <div className="flex overflow-hidden rounded border border-gray-300 text-xs" onClick={stopTap}>
+    <div className="flex overflow-hidden rounded border border-gray-300 text-xs max-md:flex-wrap" onClick={stopTap}>
       <button
         type="button"
         onClick={() => setChannelPage(null)}
@@ -100,7 +100,7 @@ export function PeriodSalesCard({ period, onPeriodChange, editing, onRemove }: P
       editing={editing}
       onRemove={onRemove}
       action={
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 max-md:flex-wrap">
           <PeriodSelect periods={spec.periods} value={period} onChange={changePeriod} />
           {stepToggle}
         </div>
@@ -131,7 +131,7 @@ export function PeriodSalesCard({ period, onPeriodChange, editing, onRemove }: P
                   </p>
                 </div>
               </div>
-              <div className="flex items-center justify-center gap-2" onClick={stopTap}>
+              <div className="flex items-center justify-center gap-2 max-md:flex-wrap" onClick={stopTap}>
                 <button
                   type="button"
                   aria-label="이전"

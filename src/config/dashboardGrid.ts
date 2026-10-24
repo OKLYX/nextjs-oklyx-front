@@ -35,6 +35,22 @@ export const WEB_GRID = {
   heights: [1, 2],
 } as const;
 
+/**
+ * Dashboard grid below 768px (FEATURE_2610_31 D17) — the mobile app's grid (`MobileGrid` in
+ * `lib/features/dashboard/presentation/utils/dashboard_grid_spec.dart`): 2 columns, every card one row high.
+ * ⚠️ Same numbers as the app — change both together.
+ */
+export const NARROW_GRID = {
+  /** Columns across. */
+  cols: 2,
+  /** Height of the one row a card takes, in px. */
+  rowHeight: 104,
+  /** Space between cells in px, both directions. */
+  gap: 12,
+  /** Card widths in cells. */
+  widths: [1, 2],
+} as const;
+
 export interface DashboardCardSpec {
   /** Card title on the card and in the picker. */
   title: string;
@@ -46,6 +62,9 @@ export interface DashboardCardSpec {
   /** Size a new card gets (D15). */
   initW: number;
   initH: number;
+  /** Smallest width / width of a card without a mobile place, in `NARROW_GRID` cells — the app's `minWidth` · `initialWidth` (FEATURE_2610_31 D17). */
+  narrowMinW: number;
+  narrowInitW: number;
   /** Screen a tap opens (D21). */
   href: string;
   /** Periods the card offers, in selector order; empty = no period (D22 · D23). */
@@ -69,16 +88,16 @@ export const DASHBOARD_CARD_ORDER: DashboardCardType[] = [
 ];
 
 export const DASHBOARD_CARD_SPECS: Record<DashboardCardType, DashboardCardSpec> = {
-  PAID_ORDERS: { title: '결제완료 주문 수', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
-  NEW_ORDERS: { title: '새 주문 수', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
-  OPEN_CLAIMS: { title: '처리 안 된 반품 · 교환', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, href: ROUTES.ORDERS_CLAIMS, periods: [], defaultPeriod: null },
-  UNANSWERED_INQUIRIES: { title: '답 안 한 고객문의', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, href: ROUTES.ORDERS_INQUIRIES, periods: [], defaultPeriod: null },
-  PERIOD_SALES: { title: '기간 매출', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, href: ROUTES.SALES_SUMMARY, periods: ['TODAY', 'DAYS_7', 'THIS_MONTH'], defaultPeriod: 'THIS_MONTH' },
-  SETTLEMENT_PAYOUTS: { title: '정산 지급', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, href: ROUTES.SETTLEMENT_PAYOUTS, periods: [], defaultPeriod: null },
-  PURCHASE_LIST: { title: '구매목록 남은 품목', adminOnly: true, minW: 1, minH: 1, initW: 1, initH: 1, href: ROUTES.PURCHASE_LIST, periods: [], defaultPeriod: null },
-  RESERVED_SHIPMENTS: { title: '예약 발송', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
-  DAILY_SALES_CHART: { title: '날짜별 매출 · 주문 수', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, href: ROUTES.SALES_SUMMARY, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7' },
-  CHANNEL_SALES_CHART: { title: '채널별 매출', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, href: ROUTES.SALES_BY_CHANNEL, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7' },
+  PAID_ORDERS: { title: '결제완료 주문 수', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
+  NEW_ORDERS: { title: '새 주문 수', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
+  OPEN_CLAIMS: { title: '처리 안 된 반품 · 교환', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.ORDERS_CLAIMS, periods: [], defaultPeriod: null },
+  UNANSWERED_INQUIRIES: { title: '답 안 한 고객문의', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.ORDERS_INQUIRIES, periods: [], defaultPeriod: null },
+  PERIOD_SALES: { title: '기간 매출', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_SUMMARY, periods: ['TODAY', 'DAYS_7', 'THIS_MONTH'], defaultPeriod: 'THIS_MONTH' },
+  SETTLEMENT_PAYOUTS: { title: '정산 지급', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SETTLEMENT_PAYOUTS, periods: [], defaultPeriod: null },
+  PURCHASE_LIST: { title: '구매목록 남은 품목', adminOnly: true, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.PURCHASE_LIST, periods: [], defaultPeriod: null },
+  RESERVED_SHIPMENTS: { title: '예약 발송', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, narrowMinW: 2, narrowInitW: 2, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
+  DAILY_SALES_CHART: { title: '날짜별 매출 · 주문 수', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_SUMMARY, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7' },
+  CHANNEL_SALES_CHART: { title: '채널별 매출', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_BY_CHANNEL, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7' },
 };
 
 /** Picker and selector labels of the periods (D22 · D23). */
@@ -93,6 +112,11 @@ export const PERIOD_LABELS: Record<DashboardPeriod, string> = {
 /** Widths the card may take: the D7 widths at or above its minimum. */
 export function allowedWidths(type: DashboardCardType): number[] {
   return WEB_GRID.widths.filter((w) => w >= DASHBOARD_CARD_SPECS[type].minW);
+}
+
+/** Widths the card may take below 768px: the `NARROW_GRID` widths at or above its narrow minimum (FEATURE_2610_31 D17). */
+export function narrowAllowedWidths(type: DashboardCardType): number[] {
+  return NARROW_GRID.widths.filter((w) => w >= DASHBOARD_CARD_SPECS[type].narrowMinW);
 }
 
 /** Heights the card may take: the D7 heights at or above its minimum. */

@@ -54,7 +54,7 @@ export function DailySalesChartCard({ period, onPeriodChange, sellers, editing, 
       editing={editing}
       onRemove={onRemove}
       action={
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 max-md:flex-wrap">
           <SellerSelect sellers={sellers} value={sellerId} onChange={setSellerId} />
           <PeriodSelect periods={spec.periods} value={period} onChange={onPeriodChange} />
         </div>
