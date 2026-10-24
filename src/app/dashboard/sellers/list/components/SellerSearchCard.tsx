@@ -34,13 +34,13 @@ export function SellerSearchCard({
           />
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between max-md:flex-wrap">
           <div>
             {resultCount > 0 && (
               <p className="text-sm text-gray-600">검색 결과 {resultCount}개</p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-md:flex-wrap">
             <button
               onClick={onCreateClick}
               className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"

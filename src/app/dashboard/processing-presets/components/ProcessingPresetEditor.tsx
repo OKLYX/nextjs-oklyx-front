@@ -293,7 +293,7 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
     <PageContainer
       title={presetId ? '이미지 처리 프리셋 수정' : '이미지 처리 프리셋 생성'}
       action={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-md:flex-wrap">
           <button
             type="button"
             onClick={() => router.push(ROUTES.PROCESSING_PRESETS)}
@@ -405,7 +405,7 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
                     삭제
                   </button>
                 </div>
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3 max-md:flex-wrap">
                   <div className="shrink-0">
                     <span className="block text-xs font-medium text-gray-600">이미지</span>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -457,7 +457,7 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <label className="block">
                     <span className="block text-xs font-medium text-gray-600">
                       불투명도 {op.opacity.toFixed(2)}
@@ -500,8 +500,8 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
         {/* Approximate preview (CSS overlays over a switchable sample background + object) */}
         <Card>
           <h2 className="mb-3 text-sm font-semibold text-gray-700">미리보기</h2>
-          <div className="mb-1 flex items-center gap-2">
-            <span className="w-8 shrink-0 text-xs text-gray-500">배경</span>
+          <div className="mb-1 flex items-center gap-2 max-md:flex-wrap">
+            <span className="w-8 shrink-0 text-xs text-gray-500 max-md:min-w-0 max-md:truncate">배경</span>
             <div className="flex flex-wrap gap-1">
               {SAMPLE_BACKGROUNDS.map((s, i) => (
                 <button
@@ -519,8 +519,8 @@ export function ProcessingPresetEditor({ presetId }: ProcessingPresetEditorProps
               ))}
             </div>
           </div>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="w-8 shrink-0 text-xs text-gray-500">물체</span>
+          <div className="mb-3 flex items-center gap-2 max-md:flex-wrap">
+            <span className="w-8 shrink-0 text-xs text-gray-500 max-md:min-w-0 max-md:truncate">물체</span>
             <div className="flex flex-wrap items-center gap-1">
               {SAMPLE_OBJECTS.map((o, i) => (
                 <button

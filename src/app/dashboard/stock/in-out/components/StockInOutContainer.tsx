@@ -17,6 +17,7 @@ import { StockInOutForm, type MovementPrefill } from './StockInOutForm';
 import { StockInOutTable } from './StockInOutTable';
 import { PurchaseCandidateTable } from './PurchaseCandidateTable';
 import { ReturnCandidateTable } from './ReturnCandidateTable';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 
 /**
  * 「입고 · 조정」 screen (FEATURE_2609_28 / PLAN D6~D10 · D22).
@@ -35,6 +36,7 @@ export function StockInOutContainer() {
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [prefill, setPrefill] = useState<MovementPrefill | null>(null);
+  const showCards = useShowCards();
 
   const [purchaseCandidates, setPurchaseCandidates] = useState<PurchaseCandidate[]>([]);
   const [isPurchaseLoading, setIsPurchaseLoading] = useState(false);
@@ -160,8 +162,9 @@ export function StockInOutContainer() {
         />
       </div>
 
+      {/* Narrow-screen card view: the three list boxes are not drawn (FEATURE_2610_31 D30). */}
       {stockLinked === true && (
-        <div className="bg-white rounded-lg shadow">
+        <div className={showCards ? undefined : 'bg-white rounded-lg shadow'}>
           <PurchaseCandidateTable
             candidates={purchaseCandidates}
             isLoading={isPurchaseLoading}
@@ -171,7 +174,7 @@ export function StockInOutContainer() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow">
+      <div className={showCards ? undefined : 'bg-white rounded-lg shadow'}>
         <ReturnCandidateTable
           candidates={returnCandidates}
           isLoading={isReturnLoading}
@@ -180,7 +183,7 @@ export function StockInOutContainer() {
         />
       </div>
 
-      <div className="bg-white rounded-lg shadow">
+      <div className={showCards ? undefined : 'bg-white rounded-lg shadow'}>
         <StockInOutTable
           movements={movements}
           sellers={sellers}

@@ -4,6 +4,7 @@ import type { PlatformFixedCost } from '@/domain/entities/FixedCost';
 import { formatFixedCostAmount } from '@/domain/entities/FixedCost';
 import { platformLabel } from '@/domain/entities/Settlement';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface FixedCostTableProps {
   items: PlatformFixedCost[];
@@ -16,8 +17,51 @@ const HEADERS = ['플랫폼', '항목명', '월 금액', '부과 임계', '상�
 
 /** 고정비 카탈로그 목록. 금액·임계의 소유자는 이 화면이다(PLAN 2609_33 D1). */
 export function FixedCostTable({ items, isLoading, onEditClick, onDeleteClick }: FixedCostTableProps) {
+  // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value, the row buttons at the bottom.
+  const renderCards = () =>
+    items.map((item) => (
+      <DataCard
+        key={item.id}
+        fields={[
+          { label: '플랫폼', value: platformLabel(item.platform) },
+          { label: '항목명', value: item.name },
+          { label: '월 금액', value: `${formatFixedCostAmount(item.amount)}원` },
+          { label: '부과 임계', value: `${formatFixedCostAmount(item.thresholdAmount)}원` },
+          {
+            label: '상태',
+            value: (
+              <span
+                className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                  item.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {item.active ? '사용' : '중지'}
+              </span>
+            ),
+          },
+        ]}
+        actions={
+          <>
+            <button
+              onClick={() => onEditClick(item)}
+              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+            >
+              수정
+            </button>
+            <button
+              onClick={() => onDeleteClick(item)}
+              className="px-3 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+            >
+              삭제
+            </button>
+          </>
+        }
+      />
+    ));
+
   return (
     <TableCard
+      renderCards={renderCards}
       isLoading={isLoading}
       isEmpty={items.length === 0}
       emptyMessage="등록된 고정비 항목이 없습니다."

@@ -113,7 +113,7 @@ export function EnvBadge() {
             className="mb-2 w-full rounded-md border border-gray-300 px-2 py-1 text-gray-900"
           />
 
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 max-md:flex-wrap">
             <button
               type="button"
               onClick={() => save(null)}

@@ -19,7 +19,7 @@ interface InquiryTypeTabsProps {
 
 export function InquiryTypeTabs({ types, value, onChange, disabled }: InquiryTypeTabsProps) {
   return (
-    <div className="flex gap-1 border-b border-gray-200">
+    <div className="flex gap-1 border-b border-gray-200 max-md:flex-wrap">
       {types.map((type) => {
         const isActive = value === type.code;
         return (

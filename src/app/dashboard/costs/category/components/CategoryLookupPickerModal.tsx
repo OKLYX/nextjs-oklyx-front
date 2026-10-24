@@ -122,7 +122,7 @@ export function CategoryLookupPickerModal({
   return (
     <Modal isOpen onClose={onClose} title={`카테고리 조회 (${platformDisplayName(platform)})`}>
 
-        <div className="flex border-b">
+        <div className="flex border-b max-md:flex-wrap">
           <button
             onClick={() => setTab('tree')}
             className={`flex-1 px-4 py-2 text-sm font-medium ${
@@ -156,7 +156,7 @@ export function CategoryLookupPickerModal({
           )}
           {tab === 'tree' ? (
             <div className="space-y-3">
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-md:flex-wrap">
                 <input
                   type="text"
                   value={keyword}
@@ -235,7 +235,7 @@ export function CategoryLookupPickerModal({
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-md:flex-wrap">
                 <input
                   type="text"
                   value={productName}

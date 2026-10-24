@@ -7,6 +7,9 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { CategoryTreeColumns } from '@/presentation/components/CategoryTreeColumns';
+import { DataCard, DataCardList } from '@/presentation/components/DataCard';
+import { useIsMobile } from '@/presentation/hooks/useIsMobile';
+import { platformDisplayName } from '@/config/platforms';
 import type { Category, CategoryTreeNode } from '@/domain/entities/CategoryEntity';
 import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
 import { CategoryUseCase } from '@/application/usecases/CategoryUseCase';
@@ -38,6 +41,7 @@ type PlatformCategoryPick = { platformCategoryId: string; name: string; namePath
  */
 export function CategoryContainer() {
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const isMobile = useIsMobile();
 
   // Search
   const [searchInput, setSearchInput] = useState('');
@@ -322,9 +326,10 @@ export function CategoryContainer() {
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
       )}
 
-      {/* Search-only list */}
-      <div className="bg-white rounded-lg shadow p-4 space-y-3">
-        <div className="flex gap-2">
+      {/* Search-only list. Below 768px the box has no frame and the results are the app's category cards
+          (FEATURE_2610_31 D30 · D35). */}
+      <div className="space-y-3 md:bg-white md:rounded-lg md:shadow md:p-4">
+        <div className="flex gap-2 max-md:flex-wrap">
           <input
             type="text"
             value={searchInput}
@@ -360,6 +365,26 @@ export function CategoryContainer() {
               {totalMatches}건 중 {results.length}건 표시
               {totalMatches > results.length && ' — 더 구체적으로 검색하세요'}
             </p>
+            {isMobile ? (
+              <DataCardList placement="page" className="max-h-72 overflow-y-auto">
+                {results.map((cat) => (
+                  <DataCard
+                    key={cat.id}
+                    onClick={() => void handleSelectResult(cat)}
+                    selected={selected?.id === cat.id}
+                    title={<span className="text-base font-semibold">{cat.name}</span>}
+                    badges={badge(isMapped(cat.id))}
+                    trailing={<span className="text-base text-gray-500">›</span>}
+                    body={
+                      <p className="text-xs text-gray-500">
+                        {platformDisplayName(cat.platform)}
+                        {cat.createdDate ? ` | ${cat.createdDate.replace('T', ' ').split('.')[0]}` : ''}
+                      </p>
+                    }
+                  />
+                ))}
+              </DataCardList>
+            ) : (
             <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg max-h-72 overflow-y-auto">
               {results.map((cat) => (
                 <li key={cat.id}>
@@ -375,6 +400,7 @@ export function CategoryContainer() {
                 </li>
               ))}
             </ul>
+            )}
           </>
         )}
       </div>

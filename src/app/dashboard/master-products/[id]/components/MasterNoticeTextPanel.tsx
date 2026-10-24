@@ -79,7 +79,7 @@ export function MasterNoticeTextPanel({ master, useCase, onSaved }: MasterNotice
 
   return (
     <div className="space-y-3 p-4">
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-gray-200 max-md:flex-wrap">
         {NOTICE_TABS.map((t) => (
           <button
             key={t}

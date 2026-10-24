@@ -139,7 +139,7 @@ export function DetailImageGroupModal({ useCase, onClose, onChanged }: DetailIma
       <div className="min-h-40 flex-1 space-y-3 overflow-y-auto p-5">
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 max-md:flex-wrap">
           <input
             type="text"
             value={newName}

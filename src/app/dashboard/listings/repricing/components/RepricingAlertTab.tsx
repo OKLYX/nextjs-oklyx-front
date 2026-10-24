@@ -464,7 +464,7 @@ export function RepricingAlertTab({
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-3 pb-1.5 text-sm text-gray-700">
+          <div className="flex items-center gap-3 pb-1.5 text-sm text-gray-700 max-md:flex-wrap">
             <label className="flex items-center gap-1">
               <input
                 type="radio"

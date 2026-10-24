@@ -2,6 +2,7 @@
 
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface CarrierRateTableProps {
   carrierRates: CarrierRate[];
@@ -28,8 +29,33 @@ export function CarrierRateTable({
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14): the app's carrier-rate card — carrier, 「기본값」 badge at the right end,
+  // then 「비용」 · 「유형」 · 「가격 적용」 lines. A tap calls `onRowClick` like a row tap.
+  const renderCards = () =>
+    carrierRates.map((rate) => (
+      <DataCard
+        key={rate.id}
+        onClick={() => onRowClick?.(rate)}
+        selected={selectedId === rate.id}
+        title={rate.carrier}
+        trailing={
+          rate.isDefault ? (
+            <span className="rounded bg-green-100 px-2 py-1 text-xs text-gray-900">기본값</span>
+          ) : undefined
+        }
+        body={
+          <div className="space-y-1 text-sm text-gray-900">
+            <p>비용: {rate.cost.toLocaleString()}원</p>
+            <p>유형: {rate.type}</p>
+            <p>가격 적용: {rate.effectiveDate}</p>
+          </div>
+        }
+      />
+    ));
+
   return (
     <TableCard
+      renderCards={renderCards}
       isLoading={isLoading && hasSearched}
       isEmpty={carrierRates.length === 0}
       emptyMessage={

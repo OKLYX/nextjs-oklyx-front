@@ -46,7 +46,7 @@ export function CompletedPurchaseFilter({
         />
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-2 max-md:flex-wrap">
         <button
           onClick={onReset}
           disabled={isLoading}

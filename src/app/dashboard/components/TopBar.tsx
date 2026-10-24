@@ -42,8 +42,8 @@ export function TopBar() {
   };
 
   return (
-    <header className="flex items-center justify-end px-6 py-3 bg-white">
-      <div className="flex items-center gap-3">
+    <header className="flex items-center justify-end px-4 md:px-6 py-3 bg-white max-md:flex-wrap">
+      <div className="flex items-center gap-3 max-md:flex-wrap">
         {/* 🔴 클립보드는 여기 없다 — 오른쪽 도구 툴바(`ToolRail`)의 도구다. 상단바로 되돌리지 말 것. */}
         {/* 알림 종 (FEATURE_2609_51) — 숫자는 AlertBell 이 alertStore 에서 직접 읽는다.
             🔴 TopBar 에 알림 prop 을 추가하지 않는다. */}

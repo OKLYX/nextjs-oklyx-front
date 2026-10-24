@@ -74,6 +74,8 @@ import {
 } from '../../[id]/components/categoryMetaValidation';
 import { Input } from '@/presentation/components/ui/Input';
 import { Card } from '@/presentation/components/ui/Card';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
@@ -223,6 +225,7 @@ export function MasterProductCreateForm({
   // The popup and its lookups are `/api/admin/**` → ADMIN only (D12).
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.role === 'ADMIN';
+  const showCards = useShowCards();
   // 2609_79 / UX D71: 마켓 모드의 옵션 원형(이름 = 마켓 옵션명, 구성 수량 비움). 초기화도 이 값으로 돌아간다.
   const marketOptions = useMemo(() => (market ? marketOptionsOf(market.preview) : null), [market]);
   const [name, setName] = useState(
@@ -1251,7 +1254,9 @@ export function MasterProductCreateForm({
             </div>
           )}
           <div className="min-w-0">
-      <Card>
+      {/* Narrow-screen card view: the box is not drawn so the picked-product cards run edge to edge (FEATURE_2610_31
+          D30). */}
+      <Card bare={showCards}>
         {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
         {/* 2609_46: 구성상품이 폼의 첫 항목이다 — 조합이 곧 마스터의 정체성이라, 조합을 확정하고
@@ -1262,7 +1267,7 @@ export function MasterProductCreateForm({
               구성상품 ({selectedIds.length}개 선택)
             </label>
             {/* 검색 = 버튼/Enter 로 실행, 결과는 아래 목록(카테고리 검색과 동일한 형식). 클릭 시 추가. */}
-            <div className="mb-2 flex gap-2">
+            <div className="mb-2 flex gap-2 max-md:flex-wrap">
               <input
                 className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100"
                 placeholder="상품명으로 검색"
@@ -1356,7 +1361,48 @@ export function MasterProductCreateForm({
             )}
 
             {/* 선택된 구성상품만 목록으로. */}
-            <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
+            <DataCardSwitch
+              placement="page"
+              ready={selectedProducts.length > 0}
+              className="max-h-64 overflow-y-auto rounded border border-gray-200"
+              listClassName="max-h-64 overflow-y-auto"
+              renderCards={() =>
+                // Narrow-screen cards (FEATURE_2610_31 D14 · D30): the app's picked-product card — photo, the name
+                // (opens the product detail), 「브랜드」 · 「가격」 lines and ✕ at the bottom.
+                selectedProducts.map((p) => (
+                  <DataCard
+                    key={p.id}
+                    image={renderThumb(p)}
+                    title={
+                      <button
+                        type="button"
+                        onClick={() => setDetailProduct(p)}
+                        className="text-left font-semibold text-blue-600 hover:underline"
+                      >
+                        {p.productName}
+                      </button>
+                    }
+                    body={
+                      <div className="text-sm text-gray-500">
+                        <p>브랜드: {p.brand || '—'}</p>
+                        <p>가격: {formatWon(p.price)}</p>
+                      </div>
+                    }
+                    actions={
+                      <button
+                        type="button"
+                        onClick={() => toggleProduct(p.id)}
+                        disabled={optionFormOpen || componentsLocked}
+                        className="rounded px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="구성상품 제거"
+                      >
+                        ✕
+                      </button>
+                    }
+                  />
+                ))
+              }
+            >
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-gray-100 border-b border-gray-200 text-xs text-gray-500">
                   <tr>
@@ -1407,7 +1453,7 @@ export function MasterProductCreateForm({
                   )}
                 </tbody>
               </table>
-            </div>
+            </DataCardSwitch>
 
             {componentsError && (
               <p className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -1502,7 +1548,7 @@ export function MasterProductCreateForm({
               )}
 
               {/* 이름 검색 → 결과 클릭 시 트리를 그 위치로 펼치고(leaf 면 바로 선택). */}
-              <div className="mb-2 flex gap-2">
+              <div className="mb-2 flex gap-2 max-md:flex-wrap">
                 <input
                   className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100"
                   placeholder="카테고리 이름으로 검색"
@@ -1638,7 +1684,7 @@ export function MasterProductCreateForm({
                 <label className="mb-1 block text-xs font-medium text-gray-600">
                   템플릿 필드값 (선택)
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {fields.map((f) => (
                     <div key={f.key}>
                       <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>
@@ -1702,7 +1748,7 @@ export function MasterProductCreateForm({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">기본 택배비 *</label>
                 <select
@@ -1776,7 +1822,7 @@ export function MasterProductCreateForm({
           </div>
         </fieldset>
 
-        <div className="mt-6 flex items-center justify-end gap-2 border-t border-gray-200 pt-6">
+        <div className="mt-6 flex items-center justify-end gap-2 border-t border-gray-200 pt-6 max-md:flex-wrap">
           {saveBlockReason && (
             <span className="mr-auto text-[11px] text-amber-700">{saveBlockReason}</span>
           )}

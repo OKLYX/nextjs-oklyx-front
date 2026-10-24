@@ -148,7 +148,7 @@ export function SellerContainer() {
         />
 
         {hasSearched && sellers.length > 0 && totalPages > 1 && (
-          <div className="bg-white rounded-lg shadow px-6 py-4 flex items-center justify-center gap-2">
+          <div className="bg-white rounded-lg shadow px-6 py-4 flex items-center justify-center gap-2 max-md:flex-wrap">
             <button
               onClick={() => handlePageChange(Math.max(0, currentPage - 1))}
               disabled={currentPage === 0 || isLoading}

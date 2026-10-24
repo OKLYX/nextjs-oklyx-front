@@ -79,7 +79,7 @@ export function MasterShippingTabs({
 
   return (
     <div className="space-y-2">
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-gray-200 max-md:flex-wrap">
         {tabs.map((t) => (
           <button
             key={t}

@@ -143,7 +143,7 @@ export function ProductPicker({
   }
 
   const searchRow = (
-    <div className="flex gap-2">
+    <div className="flex gap-2 max-md:flex-wrap">
       <input
         type="text"
         value={keyword}

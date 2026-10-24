@@ -29,7 +29,7 @@ interface RepricingTabsProps {
 
 export function RepricingTabs({ value, onChange, disabled }: RepricingTabsProps) {
   return (
-    <div className="flex gap-1 border-b border-gray-200">
+    <div className="flex gap-1 border-b border-gray-200 max-md:flex-wrap">
       {TABS.map((tab) => {
         const isActive = value === tab;
         return (

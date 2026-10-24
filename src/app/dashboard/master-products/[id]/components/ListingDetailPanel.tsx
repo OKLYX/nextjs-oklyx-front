@@ -9,6 +9,7 @@ import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import type { OptionMargin } from '@/domain/entities/ListingRegistrationEntity';
 import { CopyIdButton } from './CopyIdButton';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { MarginBreakdown, MarginSummary } from './ListingMargin';
 import { MarketOptionLinkModal } from './MarketOptionLinkModal';
 
@@ -208,6 +209,108 @@ export function ListingDetailPanel({
     );
   };
 
+  // The option ID cell and the [수정] button of an option — shared by the table and the narrow-screen cards.
+  const optionIdCell = (o: (typeof options)[number]) => (
+    <>
+      {/* 2609_61/D2: 옵션 ID 는 승인 후에 생긴다 — 없다고 경고색으로 그리지 않는다. */}
+      {o.platformOptionId ? (
+        <span className="flex min-w-0 items-center gap-1">
+          <span className={`truncate font-mono tabular-nums ${o.active ? 'text-gray-600' : 'text-gray-400'}`}>
+            {o.platformOptionId}
+          </span>
+          <CopyIdButton value={o.platformOptionId} />
+        </span>
+      ) : isAdmin && onMarket && o.masterOptionId !== undefined ? (
+        // 2609_74/D13: the listing is on a market but the option ID is empty → a person links it.
+        // undefined = channel options not loaded yet / failed — whether an option ID exists is unknown.
+        // FEATURE_2610_13 / D128 · D130 · FEATURE_2610_26 / D41: on an 11st or ESM listing the button
+        // stays visible but disabled, with the reason in `title`.
+        <button
+          type="button"
+          onClick={() => setLinkTarget({ optionId: o.optionId, name: o.name })}
+          disabled={OPTION_LINK_UNSUPPORTED_REASONS[platform] != null}
+          title={OPTION_LINK_UNSUPPORTED_REASONS[platform]}
+          className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100 disabled:text-gray-400 disabled:hover:bg-transparent"
+        >
+          마켓 옵션 연결
+        </button>
+      ) : (
+        <span className="text-gray-400" title={OPTION_ID_PENDING_HINT}>
+          –
+        </span>
+      )}
+    </>
+  );
+
+  const editButton = (o: (typeof options)[number]) => (
+    <button
+      type="button"
+      onClick={o.masterOptionId == null ? undefined : () => onEditMasterOption(o.masterOptionId as number)}
+      disabled={o.masterOptionId == null}
+      title={
+        o.masterOptionId === null
+          ? CHANNEL_ONLY_REASON
+          : o.masterOptionId === undefined
+            ? OPTION_LINK_UNKNOWN_REASON
+            : undefined
+      }
+      className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100 disabled:text-gray-400 disabled:hover:bg-transparent"
+    >
+      수정
+    </button>
+  );
+
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D25): the app's option card — bold name, then 「가격」 · 「마진」 (admin,
+  // tap to open the breakdown) · 「재고」 · 「옵션 ID」 lines and [수정] at the bottom. Floating cards — the panel sits inside a
+  // matrix row.
+  const renderOptionCards = () =>
+    options.map((o) => {
+      const dim = o.active ? 'text-gray-900' : 'text-gray-400';
+      const openMargin = isAdmin && openMargins.has(o.optionId) ? margins?.[o.optionId] : undefined;
+      return (
+        <DataCard
+          key={o.optionId}
+          title={
+            <span className={dim}>
+              {o.name}
+              {!o.active && <span className="ml-1 text-[10px]">(미사용)</span>}
+            </span>
+          }
+          body={
+            <div className="space-y-0.5 text-xs">
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-gray-500">가격:</span>
+                <span className={`tabular-nums ${dim}`}>
+                  {formatSitePrices(o.sellingPrice, o.auctionSellingPrice)}
+                </span>
+                {o.priceManual && (
+                  <span className="rounded bg-amber-50 px-1 text-[10px] text-amber-800">수동</span>
+                )}
+              </div>
+              {isAdmin && (
+                <div className="flex flex-wrap items-start gap-1">
+                  <span className="text-gray-500">마진:</span>
+                  {marginCell(o.optionId)}
+                </div>
+              )}
+              {openMargin != null && <MarginBreakdown margin={openMargin} />}
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-gray-500">재고:</span>
+                <span className={`tabular-nums ${o.active && !o.stockInherited ? 'text-gray-900' : 'text-gray-500'}`}>
+                  {o.stock}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-gray-500">옵션 ID:</span>
+                {optionIdCell(o)}
+              </div>
+            </div>
+          }
+          actions={isAdmin ? editButton(o) : undefined}
+        />
+      );
+    });
+
   const trimmedName = nameDraft.trim();
 
   const startEditName = () => {
@@ -308,7 +411,12 @@ export function ListingDetailPanel({
       {/* 옵션 표 — 옵션·가격·재고를 보여주는 유일한 자리.
           ⚠️ 열 폭이 고정이라 좁은 칸([상품 관계 한눈에 보기] 오른쪽 20rem)에서는 옵션명 칸이 눌려 깨진다 →
           표에 최소폭을 주고 이 상자 안에서만 가로 스크롤한다(사용자 결정 2026-10-08). 표 안에 드롭다운 없음. */}
-      <div className="overflow-x-auto rounded border border-gray-200 bg-white">
+      <DataCardSwitch
+        placement="nested"
+        renderCards={renderOptionCards}
+        ready={options.length > 0}
+        className="overflow-x-auto rounded border border-gray-200 bg-white"
+      >
         {optionsLoading && options.length === 0 ? (
           <div className="px-3 py-2">
             <Spinner size={12} label="옵션 불러오는 중" />
@@ -357,58 +465,8 @@ export function ListingDetailPanel({
                     >
                       {o.stock}
                     </td>
-                    <td className="px-2 py-1.5">
-                      {/* 2609_61/D2: 옵션 ID 는 승인 후에 생긴다 — 없다고 경고색으로 그리지 않는다. */}
-                      {o.platformOptionId ? (
-                        <span className="flex min-w-0 items-center gap-1">
-                          <span className={`truncate font-mono tabular-nums ${o.active ? 'text-gray-600' : dim}`}>
-                            {o.platformOptionId}
-                          </span>
-                          <CopyIdButton value={o.platformOptionId} />
-                        </span>
-                      ) : isAdmin && onMarket && o.masterOptionId !== undefined ? (
-                        // 2609_74/D13: the listing is on a market but the option ID is empty → a person links it.
-                        // undefined = channel options not loaded yet / failed — whether an option ID exists is unknown.
-                        // FEATURE_2610_13 / D128 · D130 · FEATURE_2610_26 / D41: on an 11st or ESM listing the button
-                        // stays visible but disabled, with the reason in `title`.
-                        <button
-                          type="button"
-                          onClick={() => setLinkTarget({ optionId: o.optionId, name: o.name })}
-                          disabled={OPTION_LINK_UNSUPPORTED_REASONS[platform] != null}
-                          title={OPTION_LINK_UNSUPPORTED_REASONS[platform]}
-                          className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100 disabled:text-gray-400 disabled:hover:bg-transparent"
-                        >
-                          마켓 옵션 연결
-                        </button>
-                      ) : (
-                        <span className="text-gray-400" title={OPTION_ID_PENDING_HINT}>
-                          –
-                        </span>
-                      )}
-                    </td>
-                    {isAdmin && (
-                      <td className="px-2 py-1.5 text-right">
-                        <button
-                          type="button"
-                          onClick={
-                            o.masterOptionId == null
-                              ? undefined
-                              : () => onEditMasterOption(o.masterOptionId as number)
-                          }
-                          disabled={o.masterOptionId == null}
-                          title={
-                            o.masterOptionId === null
-                              ? CHANNEL_ONLY_REASON
-                              : o.masterOptionId === undefined
-                                ? OPTION_LINK_UNKNOWN_REASON
-                                : undefined
-                          }
-                          className="rounded border border-gray-300 px-1.5 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-100 disabled:text-gray-400 disabled:hover:bg-transparent"
-                        >
-                          수정
-                        </button>
-                      </td>
-                    )}
+                    <td className="px-2 py-1.5">{optionIdCell(o)}</td>
+                    {isAdmin && <td className="px-2 py-1.5 text-right">{editButton(o)}</td>}
                   </tr>
                   {openMargin != null && (
                     <tr className="border-t border-gray-100 bg-gray-50">
@@ -423,7 +481,7 @@ export function ListingDetailPanel({
             </tbody>
           </table>
         )}
-      </div>
+      </DataCardSwitch>
 
       {/* 태그·이미지·상세페이지 = 한 번 더 접는다(자주 보지 않는 값). */}
       <div>

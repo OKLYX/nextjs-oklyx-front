@@ -62,7 +62,7 @@ export function RenameCategoryModal({
         />
       </div>
 
-      <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
+      <div className="flex gap-2 justify-end pt-4 border-t border-gray-200 max-md:flex-wrap">
         <button
           onClick={onClose}
           disabled={isSubmitting}

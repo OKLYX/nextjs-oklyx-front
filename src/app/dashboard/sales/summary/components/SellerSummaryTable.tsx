@@ -13,6 +13,8 @@ import {
 import { SellerChannelRows } from './SellerChannelRows';
 import { Card } from '@/presentation/components/ui/Card';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
+import { SalesValueRow } from '../../components/SalesValueRow';
 import { Button } from '@/presentation/components/ui/Button';
 
 interface SellerSummaryTableProps {
@@ -97,12 +99,93 @@ export function SellerSummaryTable({
   // 한 행이라도 원가 스냅샷이 없으면 합계도 모르는 값이다 — 부분합을 총계처럼 보이면 안 된다.
   const totalProfitReady = rows.length > 0 && rows.every((row) => row.costBasisReady);
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D33): the app's seller sales card — 「▸ seller」, then 「판매수량」 · 「매출액」 ·
+  // 「할인」 · 「고정비」 · 「순이익(추정)」 · 「정산 추정 금액」 lines; a tap opens the channel rows inside the card. The totals card
+  // comes last, like the table's footer row.
+  const renderCards = () => [
+    ...rows.map((row) => {
+      const isExpanded = expandedSellerId === row.sellerId;
+      return (
+        <DataCard
+          key={row.sellerId}
+          onClick={() => onToggle(row.sellerId)}
+          title={
+            <span className="font-semibold">
+              {isExpanded ? '▾' : '▸'} {row.sellerName}
+            </span>
+          }
+          body={
+            <div className="space-y-0.5">
+              <SalesValueRow
+                label="판매수량"
+                value={
+                  row.holdQty > 0
+                    ? `${row.netQty.toLocaleString('ko-KR')} (대기 ${row.holdQty})`
+                    : row.netQty.toLocaleString('ko-KR')
+                }
+                hint={row.holdQty > 0 ? '환불대기 수량입니다. 아직 확정이 아니라 매출에서 빼지 않았습니다' : undefined}
+              />
+              <SalesValueRow label="매출액" value={formatMoney(row.grossSales)} bold />
+              <SalesValueRow label="할인" value={formatMoney(row.discount)} />
+              <SalesValueRow label="고정비" value={formatFixedCost(row.fixedCost)} hint={FIXED_COST_HINT_MIXED} />
+              <SalesValueRow
+                label="순이익(추정)"
+                value={formatProfit(row)}
+                hint={row.costBasisReady ? undefined : PROFIT_PENDING_HINT}
+              />
+              <SalesValueRow label="정산 추정 금액" sub="기간 무관 · 미지급 잔액" value={formatMoney(row.pendingPayout)} />
+            </div>
+          }
+          expansion={
+            isExpanded ? (
+              <SellerChannelRows
+                channels={channels}
+                isLoading={channelsLoading}
+                error={channelsError}
+                payouts={payouts}
+                payoutsLoading={payoutsLoading}
+                payoutsError={payoutsError}
+                onOpenChannel={onOpenChannel}
+                onOpenPayout={onOpenPayout}
+              />
+            ) : undefined
+          }
+        />
+      );
+    }),
+    <DataCard
+      key="total"
+      title={<span className="font-semibold">합계</span>}
+      body={
+        <div className="space-y-0.5">
+          <SalesValueRow label="판매수량" value={totals.netQty.toLocaleString('ko-KR')} bold />
+          <SalesValueRow label="매출액" value={formatMoney(totals.grossSales)} bold />
+          <SalesValueRow label="할인" value={formatMoney(totals.discount)} bold />
+          <SalesValueRow label="고정비" value={formatFixedCost(totals.fixedCost)} bold />
+          <SalesValueRow
+            label="순이익(추정)"
+            value={totalProfitReady ? formatMoney(totals.estNetProfit) : '—'}
+            hint={totalProfitReady ? undefined : PROFIT_PENDING_HINT}
+            bold
+          />
+          <SalesValueRow
+            label="정산 추정 금액"
+            sub="기간 무관 · 미지급 잔액"
+            value={formatMoney(totals.pendingPayout)}
+            bold
+          />
+        </div>
+      }
+    />,
+  ];
+
   return (
     // 첫 조회에만 로딩 블록. 기간을 바꾼 재조회는 이전 값을 지우지 않고 위에 로딩 줄만 띄운다(깜빡임 방지).
     <TableCard
       isLoading={loading && rows.length === 0}
       isEmpty={rows.length === 0}
       emptyMessage="해당 기간에 판매된 주문이 없습니다."
+      renderCards={renderCards}
     >
       {loading && rows.length > 0 && (
         <div className="px-6 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-200">

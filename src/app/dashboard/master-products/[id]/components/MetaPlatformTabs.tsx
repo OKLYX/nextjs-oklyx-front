@@ -26,7 +26,7 @@ export function MetaPlatformTabs({ children }: MetaPlatformTabsProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-gray-200 max-md:flex-wrap">
         {META_PLATFORMS.map((p) => (
           <button
             key={p}

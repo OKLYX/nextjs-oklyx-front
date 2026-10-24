@@ -1,20 +1,22 @@
 'use client';
 
 /**
- * 사진 확대 보기(라이트박스) 공용 컴포넌트.
+ * Shared photo zoom view (lightbox).
  * File: src/presentation/components/ImageLightbox.tsx
  *
- * **용도**: 썸네일 격자에서 사진 한 장을 눌렀을 때 크게 보여준다. 이미지 격자를 그리는 화면은
- *   자체 확대 팝업을 만들지 말고 **반드시 이 컴포넌트를 쓴다**(물품 갤러리 · 마스터 이미지 풀 ·
- *   중복 물품 병합 — 상대 물품 검색 결과 · 좌우 요약 칸 · 대표 사진 고르기).
+ * **Purpose**: shows one photo large when it is tapped in a thumbnail grid or on a narrow-screen list card photo.
+ *   A screen that draws a photo grid does not build its own zoom popup — it **must use this component** (product
+ *   gallery · master image pool · duplicate product merge — the other product's search results · the left/right
+ *   summary cells · the main photo picker). The narrow-screen card photos open it through `ZoomableThumb`
+ *   (FEATURE_2610_31 D34).
  *
- * **동작**
- *   - 열림 여부는 `index` 하나가 소유한다(`null` = 닫힘). 호출부는 "몇 번째를 보고 있는지"만 들면 된다.
- *   - ◀ ▶ 버튼과 ← → 키로 앞뒤 사진 이동(끝에서 순환하지 않는다 — 몇 장인지 감이 유지된다).
- *   - 닫기는 공용 `Modal` 이 소유한다(✕ · ESC). 제목에 `n / 전체` 를 함께 보여준다.
- *   - [원본 열기]는 새 탭. 저장한 원본을 그대로 띄우는 용도라 모달 안에서 더 키우지 않는다.
+ * **Behaviour**
+ *   - `index` alone owns whether it is open (`null` = closed). The caller only holds "which one is shown".
+ *   - ◀ ▶ buttons and ← → keys move between photos (no wrap at the ends — the sense of how many stays).
+ *   - Closing belongs to the shared `Modal` (✕ · ESC). The title shows `n / total` too.
+ *   - [원본 열기] opens a new tab. It shows the stored original as it is, so it is not enlarged further in the modal.
  *
- * **사용 예제**
+ * **Usage**
  * ```tsx
  * const [zoom, setZoom] = useState<number | null>(null);
  * <img onClick={() => setZoom(index)} className="cursor-zoom-in" … />
@@ -26,9 +28,9 @@
  * />
  * ```
  *
- * ⚠️ `images` 는 렌더용 src 다 — 저장값(`imageUrl`)을 그대로 넘기지 말고 `resolveThumbUrl` 을 통과시킨다.
- * ⚠️ 썸네일이 드래그 가능한 카드 안에 있으면 `<img draggable={false}>` 를 유지할 것(드래그는 카드가 받는다).
- * ❌ 호출부에서 `fixed inset-0` 백드롭을 새로 만들지 않는다 — 껍데기는 `Modal` 이 소유한다.
+ * ⚠️ `images` are render srcs — do not pass the stored value (`imageUrl`) as it is; pass it through `resolveThumbUrl`.
+ * ⚠️ When a thumbnail sits in a draggable card, keep `<img draggable={false}>` (the card takes the drag).
+ * ❌ Do not build a `fixed inset-0` backdrop in the caller — `Modal` owns the shell.
  */
 
 import { useEffect } from 'react';
@@ -83,7 +85,7 @@ export function ImageLightbox({ images, index, onIndexChange, onClose }: ImageLi
         </a>
       }
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 max-md:flex-wrap">
         <button
           type="button"
           onClick={() => onIndexChange(index - 1)}

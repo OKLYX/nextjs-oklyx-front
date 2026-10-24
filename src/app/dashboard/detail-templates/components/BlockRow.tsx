@@ -164,7 +164,7 @@ export function BlockRow({
   const alignControl = (fallback: string) => (
     <div>
       <span className={labelCls}>정렬</span>
-      <div className="mt-1 flex gap-1">
+      <div className="mt-1 flex gap-1 max-md:flex-wrap">
         {ALIGN_OPTIONS.map((a) => {
           const active = (block.align ?? fallback) === a.value;
           return (
@@ -196,7 +196,7 @@ export function BlockRow({
     return (
       <div>
         <span className={labelCls}>너비(%)</span>
-        <div className="mt-1 flex items-center gap-2">
+        <div className="mt-1 flex items-center gap-2 max-md:flex-wrap">
           <button
             type="button"
             onClick={() => setWidth(value - 10)}
@@ -206,7 +206,7 @@ export function BlockRow({
           >
             −
           </button>
-          <span className="w-12 text-center text-sm text-gray-900">{value}%</span>
+          <span className="w-12 text-center text-sm text-gray-900 max-md:min-w-0 max-md:truncate">{value}%</span>
           <button
             type="button"
             onClick={() => setWidth(value + 10)}
@@ -418,7 +418,7 @@ export function BlockRow({
                 </p>
               ) : creatingGroup ? (
                 <>
-                  <div className="mt-1 flex gap-2">
+                  <div className="mt-1 flex gap-2 max-md:flex-wrap">
                     <input
                       type="text"
                       value={newGroupName}

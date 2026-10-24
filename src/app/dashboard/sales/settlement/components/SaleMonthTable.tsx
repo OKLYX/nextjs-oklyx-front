@@ -5,6 +5,7 @@ import type { SaleMonthSettlement } from '@/domain/entities/Settlement';
 import { formatMoney, monthLabel } from '@/domain/entities/Settlement';
 import { Card } from '@/presentation/components/ui/Card';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 import { Button } from '@/presentation/components/ui/Button';
 
 /**
@@ -59,11 +60,65 @@ export function SaleMonthTable({ rows, loading, error, onRetry }: SaleMonthTable
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value, one card per row; a month paid
+  // in several parts adds its subtotal card (gray, like the table's subtotal row — the two-column cell is one value
+  // under the first column's label).
+  const renderCards = () =>
+    groupByMonth(rows).flatMap((group) => [
+      ...group.rows.map((row) => (
+        <DataCard
+          key={`${row.saleMonth}-${row.settlementDate}-${row.paid}`}
+          fields={[
+            { label: '판매월', value: monthLabel(row.saleMonth) },
+            { label: '지급일', value: row.settlementDate ?? '—' },
+            {
+              label: '지급',
+              value: row.paid ? <span className="text-green-700">완료</span> : <span className="text-gray-500">예정</span>,
+            },
+            { label: '판매 건수', value: row.orders.toLocaleString('ko-KR') },
+            { label: '판매액', value: formatMoney(row.saleAmount) },
+            { label: '정산액', value: formatMoney(row.settlementAmount) },
+          ]}
+        />
+      )),
+      ...(group.rows.length > 1
+        ? [
+            <DataCard
+              key={`${group.month}-total`}
+              muted
+              fields={[
+                { label: '판매월', value: <span className="font-semibold">{monthLabel(group.month)} 합계</span> },
+                { label: '지급일', value: `${group.rows.length}번에 나눠 정산` },
+                {
+                  label: '판매 건수',
+                  value: (
+                    <span className="font-semibold">
+                      {sum(group.rows, (row) => row.orders).toLocaleString('ko-KR')}
+                    </span>
+                  ),
+                },
+                {
+                  label: '판매액',
+                  value: <span className="font-semibold">{formatMoney(sum(group.rows, (row) => row.saleAmount))}</span>,
+                },
+                {
+                  label: '정산액',
+                  value: (
+                    <span className="font-semibold">{formatMoney(sum(group.rows, (row) => row.settlementAmount))}</span>
+                  ),
+                },
+              ]}
+            />,
+          ]
+        : []),
+    ]);
+
   return (
     <TableCard
       isLoading={loading && rows.length === 0}
       isEmpty={rows.length === 0}
       emptyMessage="이 기간에 정산된 판매가 없습니다. 아직 정산되지 않은 판매는 여기 나오지 않습니다."
+      renderCards={renderCards}
     >
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-200">

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
 import { Pagination } from '@/presentation/components/Pagination';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { detailHrefWithReturn } from '@/infrastructure/utils/listReturn';
@@ -150,6 +151,46 @@ export function MasterProductList() {
     }
   };
 
+  // Narrow-screen cards (FEATURE_2610_31 D14): the app's master row — photo, name, 「구성상품」 · 「옵션」 counts and [삭제] on
+  // the right. A tap opens the master like a row tap.
+  const renderCards = () =>
+    masters.map((m) => (
+      <DataCard
+        key={m.id}
+        onClick={() => router.push(detailHrefWithReturn(ROUTES.MASTER_PRODUCT_DETAIL(m.id), searchKey))}
+        image={
+          <div className="h-12 w-12 overflow-hidden rounded bg-gray-100">
+            {m.sourceImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={resolveThumbUrl(m.sourceImageUrl)} alt={m.name} className="h-full w-full object-contain" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">없음</span>
+            )}
+          </div>
+        }
+        title={<span className="font-semibold">{m.name}</span>}
+        trailing={
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteTarget(m);
+            }}
+            disabled={busyId === m.id}
+            className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            삭제
+          </button>
+        }
+        body={
+          <div className="text-sm text-gray-900">
+            <p>구성상품: {m.components.length}</p>
+            <p>옵션: {m.options.length}</p>
+          </div>
+        }
+      />
+    ));
+
   if (!isAdmin) {
     return (
       <PageContainer>
@@ -174,7 +215,12 @@ export function MasterProductList() {
 
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-      <div className="rounded-lg bg-white shadow list-table-scroll">
+      <DataCardSwitch
+        placement="page"
+        renderCards={renderCards}
+        ready={!isLoading && masters.length > 0}
+        className="rounded-lg bg-white shadow list-table-scroll"
+      >
         {isLoading ? (
           <div className="flex min-h-32 items-center justify-center">
             <Spinner size={24} label="불러오는 중..." />
@@ -245,7 +291,7 @@ export function MasterProductList() {
             </tbody>
           </table>
         )}
-      </div>
+      </DataCardSwitch>
 
       {totalPages > 1 && (
         <Pagination

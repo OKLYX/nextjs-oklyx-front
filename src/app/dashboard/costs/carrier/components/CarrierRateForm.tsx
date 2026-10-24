@@ -258,7 +258,7 @@ export function CarrierRateForm({
         />
       </div>
 
-      <div className="flex justify-between gap-3 pt-4 border-t">
+      <div className="flex justify-between gap-3 pt-4 border-t max-md:flex-wrap">
         {onOpenDeleteConfirm && (
           <Button
             type="button"
@@ -269,7 +269,7 @@ export function CarrierRateForm({
             삭제
           </Button>
         )}
-        <div className="flex gap-3 ml-auto">
+        <div className="flex gap-3 ml-auto max-md:flex-wrap">
           <button
             type="button"
             onClick={handleCancel}

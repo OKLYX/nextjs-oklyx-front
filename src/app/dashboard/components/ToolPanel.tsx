@@ -6,35 +6,47 @@ import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 import { findTool } from './toolRegistry';
 
 /**
- * 도구 툴바가 여는 **오른쪽 고정 패널** (FEATURE_2609_68).
+ * **Fixed right panel** opened by the tool bar (FEATURE_2609_68).
  *
- * **용도**: 툴바(`ToolRail`)에서 고른 도구의 본문을 그리는 작업 표면. 팝업이 아니다 —
- *   뒤 화면의 스크롤·입력을 막지 않는다.
- * **파일**: src/app/dashboard/components/ToolPanel.tsx
- * **쓰는 곳**: `dashboard/layout.tsx` **한 곳뿐**이다.
- * **본문**: `toolRegistry.tsx` 의 `Body` 를 열린 도구 키로 찾아 그린다 — 레이아웃이 넘기지 않는다
- *   (도구가 둘이 된 뒤로 레이아웃이 어느 본문인지 고르게 두면 목록이 두 곳으로 갈라진다).
+ * **Purpose**: the work surface that draws the body of the tool picked on the tool bar (`ToolRail`). Not a popup —
+ *   it does not block scrolling or input on the screen behind it.
+ * **File**: src/app/dashboard/components/ToolPanel.tsx
+ * **Used in**: `dashboard/layout.tsx` **only**.
+ * **Body**: looks up `Body` in `toolRegistry.tsx` by the open tool key — the layout does not pass it
+ *   (with two or more tools, letting the layout pick the body would split the list into two places).
  *
- * **자리 규칙**
- * - `lg`(1024px) 이상: 본문을 **밀어낸다** — 미는 일은 레이아웃 오른쪽 칼럼의 `lg:pr-[32rem]` 이 한다.
- * - `lg` 미만: 본문을 **덮는다**. 백드롭 없음.
- * - 닫기 = 툴바 아이콘을 다시 누르거나 머리줄의 닫기 버튼, `Esc`.
+ * **Placement**
+ * - `lg` (1024px) and up: **pushes** the content — the layout right column's `lg:pr-[32rem]` does the pushing.
+ * - Below `lg`: **covers** the content. No backdrop.
+ * - Below 768px: the same place, left of the tool bar — the tool bar stays visible to open, close and switch tools
+ *   (FEATURE_2610_31 D38).
+ * - Below 768px while the tool bar is collapsed (the window narrowed from 768px or wider with a tool open): the panel
+ *   is hidden (`max-md:hidden`), not closed — `openTool` and the tool body's state stay, and expanding the bar with
+ *   [‹] or widening to 768px or more shows it again (FEATURE_2610_31 D41).
+ * - Close = tap the tool icon on the tool bar again, the close button in the header, or `Esc`. Below 768px the
+ *   tool bar's collapse button [›] also closes it (FEATURE_2610_31 D44).
  *
- * **사용 예제**
+ * **Usage**
  * ```tsx
  * <ToolPanel />
  * ```
  *
- * ⚠️ 폭은 `w-[min(28rem,calc(100vw-4rem))]` **하나**로 정한다. `right-16` 으로 4rem(툴바 폭) 띄워 놓고
- *    `w-full max-w-md` 를 주면 28rem 이 안 걸리는 폭에서 왼쪽으로 4rem 넘쳐 가로 스크롤이 생긴다.
- *    28rem 은 레이아웃의 `lg:pr-[32rem]`(패널 28 + 툴바 4)과 **같은 수**다. 🔴 `4rem` 세 자리
- *    (`right-16` · `calc(100vw-4rem)` · `32rem`)는 `ToolRail` 의 `w-16` 을 따라간다 — 함께 바꾼다.
- * ⚠️ 바깥 클릭으로는 닫지 않는다 — 패널을 보면서 폼을 만지는 것이 목적이라 바깥 클릭이 정상 동선이다.
- * ❌ `ui/Modal` 로 만들지 말 것 · 백드롭(`fixed inset-0`) · `z-50` 금지 — `npm run lint:ui` 가 잡는다.
+ * ⚠️ The width is **one** value, `w-[min(28rem,calc(100vw-4rem))]`. With `right-16` keeping 4rem (the tool bar
+ *    width) free, a `w-full max-w-md` would overflow 4rem to the left at widths where 28rem does not apply and add
+ *    a horizontal scroll bar. 28rem is **the same number** as the layout's `lg:pr-[32rem]` (panel 28 + tool bar 4).
+ *    🔴 The three `4rem` places (`right-16` · `calc(100vw-4rem)` · `32rem`) follow `ToolRail`'s `w-16` — change
+ *    them together.
+ * ⚠️ An outside click does not close it — the point is to touch the form while looking at the panel, so outside
+ *    clicks are the normal path.
+ * ❌ Do not build it with `ui/Modal` · no backdrop (`fixed inset-0`) · no `z-50` — `npm run lint:ui` catches them.
  */
 export function ToolPanel() {
   const openTool = useToolPanelStore((s) => s.openTool);
   const close = useToolPanelStore((s) => s.close);
+  // Below 768px a collapsed tool bar hides the panel with CSS (max-md:hidden) and does not close it — the panel stays
+  // mounted, so the tool's search text and results are still there when the bar is expanded or the width reaches 768px
+  // (FEATURE_2610_31 D41).
+  const railCollapsed = useToolPanelStore((s) => s.railCollapsed);
   const titleId = useId();
 
   // Esc 로 닫는다. 닫혀 있을 때는 리스너를 걸지 않는다.
@@ -56,7 +68,9 @@ export function ToolPanel() {
   return (
     <aside
       aria-labelledby={titleId}
-      className="fixed inset-y-0 right-16 z-40 w-[min(28rem,calc(100vw-4rem))] overflow-y-auto border-l border-gray-200 bg-white shadow-lg"
+      className={`fixed inset-y-0 right-16 z-40 w-[min(28rem,calc(100vw-4rem))] overflow-y-auto border-l border-gray-200 bg-white shadow-lg ${
+        railCollapsed ? 'max-md:hidden' : ''
+      }`}
     >
       <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2">
         <h2 id={titleId} className="truncate text-sm font-semibold text-gray-900">

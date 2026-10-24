@@ -2,6 +2,7 @@
 
 import type { UnmappedOrder } from '@/domain/entities/PurchaseListEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface UnmappedOrdersSectionProps {
   orders: UnmappedOrder[];
@@ -11,8 +12,28 @@ interface UnmappedOrdersSectionProps {
 export function UnmappedOrdersSection({ orders, isLoading }: UnmappedOrdersSectionProps) {
   if (isLoading || orders.length === 0) return null;
 
+  // Narrow-screen cards (FEATURE_2610_31 D14): the app's unmapped-order line — name, 「옵션ID … · 주문 N건」 and
+  // 「총 주문수량 N」 on the right.
+  const renderCards = () =>
+    orders.map((order) => (
+      <DataCard
+        key={order.externalItemId}
+        body={
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-gray-900">{order.itemName || '(이름 없음)'}</p>
+              <p className="text-[11px] text-gray-500">
+                옵션ID {order.externalItemId} · 주문 {order.orderCount}건
+              </p>
+            </div>
+            <p className="shrink-0 text-xs font-semibold text-amber-800">총 주문수량 {order.purchasableQty}</p>
+          </div>
+        }
+      />
+    ));
+
   return (
-    <TableCard className="border border-amber-200">
+    <TableCard className="border border-amber-200" renderCards={renderCards}>
       <div className="px-6 py-4 border-b border-amber-200 bg-amber-50">
         <h2 className="text-lg font-semibold text-amber-800">등록 필요</h2>
         <p className="mt-1 text-xs text-amber-700">

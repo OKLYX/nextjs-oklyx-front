@@ -6,6 +6,8 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import { PurchaseGroupDetail } from './PurchaseGroupDetail';
 import { ShareActionCell, TargetMetTag, type ShareActions } from './purchaseShareUi';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
+import { ZoomableThumb } from '@/presentation/components/ZoomableThumb';
 
 /** 'list' = rows to buy · 'skipped' = the 「오늘 넘김」 group (FEATURE_2610_09 D67). */
 export type PurchaseListTableVariant = 'list' | 'skipped';
@@ -50,9 +52,77 @@ export function PurchaseListTable({
   shareActions,
 }: PurchaseListTableProps) {
   const text = VARIANT_TEXT[variant];
+
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D33 · D34): the app's purchase card — photo (tap = zoom), bold name,
+  // 「브랜드」 · 「필요 수량」 · 「매입 완료 수량」 lines and the large 「매입 필요 수량」 at the bottom-right; the seller view's share
+  // buttons at the bottom. A tap opens the group detail right under the card, above the next card.
+  const renderCards = () =>
+    items.map((item) => {
+      const isExpanded = expandedProductId === item.productId;
+      const rowShare = filterSellerId != null ? item.shares[0] : undefined;
+      return (
+        <Fragment key={item.productId}>
+          <DataCard
+            onClick={() => onToggle(item.productId)}
+            image={
+              <ZoomableThumb
+                src={productImages[item.productId] ?? null}
+                alt={item.productName}
+                imgClassName="h-[104px] w-[104px] rounded border border-gray-200 bg-gray-50 object-cover"
+                placeholder={
+                  <div className="flex h-[104px] w-[104px] items-center justify-center rounded border border-gray-200 bg-gray-50 text-xs text-gray-300">
+                    없음
+                  </div>
+                }
+              />
+            }
+            title={item.productName}
+            badges={rowShare ? <TargetMetTag share={rowShare} /> : undefined}
+            trailing={<span className="text-gray-400">{isExpanded ? '▲' : '▼'}</span>}
+            body={
+              <div className="flex items-end justify-between gap-2">
+                <div className="min-w-0 text-[13px] font-medium text-gray-500">
+                  <p className="truncate">브랜드 : {item.brand?.trim() || '-'}</p>
+                  <p className="truncate">필요 수량 : {item.neededQty}</p>
+                  <p className="truncate">매입 완료 수량 : {item.purchasedQty}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[11px] text-gray-500">매입 필요 수량</p>
+                  <p
+                    className={`text-2xl font-bold leading-tight ${
+                      item.remainingQty > 0 ? 'text-amber-800' : 'text-green-700'
+                    }`}
+                  >
+                    {item.remainingQty}
+                  </p>
+                </div>
+              </div>
+            }
+            actions={
+              rowShare ? (
+                <ShareActionCell productId={item.productId} share={rowShare} actions={shareActions} />
+              ) : undefined
+            }
+          />
+          {isExpanded && (
+            <div className="bg-gray-50 px-4 py-4">
+              <PurchaseGroupDetail
+                item={item}
+                sellers={sellers}
+                filterSellerId={filterSellerId}
+                stockLinked={stockLinked}
+                onRecorded={onRecorded}
+                shareActions={shareActions}
+              />
+            </div>
+          )}
+        </Fragment>
+      );
+    });
+
   return (
     // 카드 머리말(제목·안내)이 로딩·빈 상태에서도 남아야 해 상태 행은 tbody 가 그대로 그린다.
-    <TableCard>
+    <TableCard renderCards={!isLoading && !error && items.length > 0 ? renderCards : undefined}>
       <div className="px-6 py-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900">{text.title}</h2>
         <p className="mt-1 text-xs text-gray-500">{text.hint}</p>

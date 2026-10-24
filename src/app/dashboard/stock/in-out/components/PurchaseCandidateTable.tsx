@@ -1,6 +1,8 @@
 'use client';
 
 import type { PurchaseCandidate } from '@/domain/entities/StockEntity';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 
 interface PurchaseCandidateTableProps {
   candidates: PurchaseCandidate[];
@@ -21,8 +23,44 @@ export function PurchaseCandidateTable({
   error,
   onSelect,
 }: PurchaseCandidateTableProps) {
+  const showCards = useShowCards();
+
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D30 · D37): the app's purchase pick line — product name, then
+  // 「구매일 · 판매자 · 구매 N / 입고 N · 남은 N」; the table's 「단가」 at the bottom and [입고] in the button row.
+  const renderCards = () =>
+    candidates.map((candidate) => (
+      <DataCard
+        key={candidate.purchaseRecordId}
+        body={
+          <div>
+            <p className="truncate text-sm text-gray-900">{candidate.productName}</p>
+            <p className="text-[11px] text-gray-500">
+              {candidate.purchasedOn} · {candidate.sellerName} · 구매 {candidate.purchasedQty} / 입고{' '}
+              {candidate.receivedQty} · 남은 {candidate.remainingQty}
+            </p>
+          </div>
+        }
+        extraFields={[
+          {
+            label: '단가',
+            value: candidate.unitPrice == null ? '미기입' : candidate.unitPrice.toLocaleString('ko-KR'),
+          },
+        ]}
+        actions={
+          <button
+            type="button"
+            onClick={() => onSelect(candidate)}
+            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
+          >
+            입고
+          </button>
+        }
+      />
+    ));
+
   return (
-    <div className="p-6 space-y-3">
+    // Narrow-screen card view: no box padding — the heading sits in the page padding (FEATURE_2610_31 D30).
+    <div className={showCards ? 'space-y-3' : 'p-6 space-y-3'}>
       <h2 className="text-base font-semibold text-gray-900">입고 대기 (구매 후 미입고)</h2>
 
       {error && (
@@ -38,7 +76,7 @@ export function PurchaseCandidateTable({
           입고 대기 중인 구매기록이 없습니다. (구매목록의 [입고]가 재고까지 함께 기록합니다)
         </p>
       ) : (
-        <div className="list-table-scroll">
+        <DataCardSwitch placement="page" renderCards={renderCards} className="list-table-scroll">
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
@@ -86,7 +124,7 @@ export function PurchaseCandidateTable({
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       )}
     </div>
   );

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { QuantityStepper } from '@/presentation/components/QuantityStepper';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { getImageUrl } from '@/infrastructure/utils/imageUrl';
@@ -244,7 +245,7 @@ export function MasterCompositionForm({
           <label className="mb-1 block text-xs font-medium text-gray-600">
             구성상품 ({selectedIds.length}개 선택)
           </label>
-          <div className="mb-2 flex gap-2">
+          <div className="mb-2 flex gap-2 max-md:flex-wrap">
             <input
               className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
               placeholder="상품명으로 검색"
@@ -307,7 +308,42 @@ export function MasterCompositionForm({
             바뀝니다.
           </p>
 
-          <div className="max-h-64 overflow-y-auto rounded border border-gray-200">
+          <DataCardSwitch
+            placement="page"
+            ready={selectedIds.length > 0}
+            className="max-h-64 overflow-y-auto rounded border border-gray-200"
+            listClassName="max-h-64 overflow-y-auto"
+            renderCards={() =>
+              // Narrow-screen cards (FEATURE_2610_31 D14 · D30): the app's picked-product card — photo, name,
+              // 「브랜드」 · 「가격」 lines and ✕ on the right.
+              selectedIds.map((pid) => {
+                const p = productById.get(pid);
+                return (
+                  <DataCard
+                    key={pid}
+                    image={p ? renderThumb(p) : <div className="h-10 w-10 rounded border border-gray-200 bg-gray-100" />}
+                    title={<span className="font-semibold">{nameOf(pid)}</span>}
+                    trailing={
+                      <button
+                        type="button"
+                        onClick={() => removeComponent(pid)}
+                        className="rounded px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                        aria-label="구성상품 제거"
+                      >
+                        ✕
+                      </button>
+                    }
+                    body={
+                      <div className="text-sm text-gray-900">
+                        <p>브랜드: {p?.brand || '—'}</p>
+                        <p>가격: {formatWon(p?.price)}</p>
+                      </div>
+                    }
+                  />
+                );
+              })
+            }
+          >
             <table className="w-full text-sm">
               <thead className="sticky top-0 border-b border-gray-200 bg-gray-100 text-xs text-gray-500">
                 <tr>
@@ -358,7 +394,7 @@ export function MasterCompositionForm({
                 )}
               </tbody>
             </table>
-          </div>
+          </DataCardSwitch>
         </div>
 
         {/* ── 옵션 × 구성상품 수량 격자 ──────────────────────────────────── */}
@@ -370,7 +406,53 @@ export function MasterCompositionForm({
             마켓에 등록돼 판매 중인 옵션은 이름 수정·삭제가 막혀 있고, 구성 수량은 수정할 수 있습니다.
           </p>
 
-          <div className="overflow-x-auto rounded border border-gray-200">
+          <DataCardSwitch
+            placement="page"
+            ready={drafts.length > 0}
+            className="overflow-x-auto rounded border border-gray-200"
+            renderCards={() =>
+              // Narrow-screen cards (FEATURE_2610_31 D13 · D14 · D30): the app's option card — the option name
+              // input and ✕ on the first line, then one 「component name · quantity」 line per picked product.
+              drafts.map((d) => (
+                <DataCard
+                  key={d.key}
+                  body={
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-900"
+                          value={d.name}
+                          placeholder="옵션명"
+                          onChange={(e) => setDraftName(d.key, e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeDraft(d.key)}
+                          disabled={d.locked}
+                          title={d.locked ? LOCKED_DELETE_REASON : undefined}
+                          className="rounded px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label="옵션 제거"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {selectedIds.map((pid) => (
+                        <div key={pid} className="flex items-center gap-2 text-sm text-gray-900">
+                          <span className="min-w-0 flex-1">{nameOf(pid)}</span>
+                          <QuantityStepper
+                            className="w-24"
+                            ariaLabel={`${d.name || '옵션'} · ${nameOf(pid)} 수량`}
+                            value={d.qty[pid] ?? ''}
+                            onChange={(next) => setDraftQty(d.key, pid, next)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  }
+                />
+              ))
+            }
+          >
             <table className="w-full text-sm">
               <thead className="border-b border-gray-200 bg-gray-100 text-xs text-gray-500">
                 <tr>
@@ -432,7 +514,7 @@ export function MasterCompositionForm({
                 )}
               </tbody>
             </table>
-          </div>
+          </DataCardSwitch>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button

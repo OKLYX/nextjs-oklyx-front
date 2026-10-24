@@ -2,6 +2,7 @@
 
 import type { User } from '@/domain/entities/User';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface UserTableProps {
   users: User[];
@@ -59,8 +60,28 @@ export function UserTable({
 
   const paginationPages = getPaginationPages();
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D37): the app's member card — name, then 「이메일」 · 「역할」 · 「가입일」 lines;
+  // the table's No. at the bottom. The page buttons stay under the cards.
+  const renderCards = () =>
+    users.map((user, index) => (
+      <DataCard
+        key={user.id}
+        onClick={onRowClick ? () => onRowClick(user) : undefined}
+        title={user.name}
+        body={
+          <div className="text-sm text-gray-900">
+            <p>이메일: {user.email}</p>
+            <p>역할: {user.role}</p>
+            <p>가입일: {formatDate(user.createdAt)}</p>
+          </div>
+        }
+        extraFields={[{ label: 'No.', value: currentPage * 20 + index + 1 }]}
+      />
+    ));
+
   return (
     <TableCard
+      renderCards={renderCards}
       error={error}
       isLoading={isLoading}
       loadingMessage="조회 중..."
@@ -101,7 +122,7 @@ export function UserTable({
       </table>
 
       {totalPages > 1 && (
-        <div className="border-t border-gray-200 px-6 py-4 flex items-center justify-center gap-2">
+        <div className="border-t border-gray-200 px-6 py-4 flex items-center justify-center gap-2 max-md:flex-wrap">
           <button
             onClick={() => onPageChange(Math.max(0, currentPage - 1))}
             disabled={currentPage === 0 || isLoading}

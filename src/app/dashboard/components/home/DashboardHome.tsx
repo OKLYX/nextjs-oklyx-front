@@ -4,18 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
 import { gridBounds } from 'react-grid-layout/core';
 import 'react-grid-layout/css/styles.css';
-import { DASHBOARD_CARD_SPECS, WEB_GRID } from '@/config/dashboardGrid';
+import { DASHBOARD_CARD_SPECS, NARROW_GRID, WEB_GRID } from '@/config/dashboardGrid';
 import { DashboardUseCase } from '@/application/usecases/DashboardUseCase';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { DashboardRepositoryImpl } from '@/infrastructure/repositories/DashboardRepositoryImpl';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
-import type { DashboardCardType, DashboardPeriod } from '@/domain/entities/DashboardEntity';
+import type { DashboardCardType, DashboardLayout, DashboardPeriod } from '@/domain/entities/DashboardEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { Button } from '@/presentation/components/ui/Button';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
 import { PageContainer } from '@/presentation/components/PageContainer';
+import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 import { AlertCountCard } from './AlertCountCard';
 import { ChannelSalesChartCard } from './ChannelSalesChartCard';
 import { CARD_SELECT_CLASS, REMOVE_BUTTON_CLASS } from './DashboardCardFrame';
@@ -29,6 +30,7 @@ import {
   fromGridLayout,
   placeAtBottom,
   toGridLayout,
+  toNarrowCards,
   toWebCards,
   toWebRequest,
   visibleTypes,
@@ -45,12 +47,17 @@ type LoadState = 'loading' | 'error' | 'ready';
  *   1 · 2 high, not under its minimum), ✕ removes it, 「카드 넣기」 adds one at the bottom. [편집 완료] saves to the
  *   server; until then nothing is saved.
  * - Outside edit mode a tap on a card opens its screen; a period change is saved at once.
+ * - Below 768px (FEATURE_2610_31 D8 · D17 · D18): the cards sit on `NARROW_GRID` (2 columns, one row high) in the
+ *   mobile app's places (`toNarrowCards`), with no [편집]. A period change saves the stored web places with the new
+ *   period, so web edits in progress stay unsaved until [편집 완료] on a wide screen.
  */
 export function DashboardHome() {
   const useCase = useMemo(() => new DashboardUseCase(new DashboardRepositoryImpl()), []);
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
   const { width, containerRef, mounted } = useContainerWidth();
+  const isMobile = useIsMobile();
   const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [layout, setLayout] = useState<DashboardLayout | null>(null);
   const [admin, setAdmin] = useState(false);
   const [cards, setCards] = useState<WebCard[]>([]);
   const [editing, setEditing] = useState(false);
@@ -61,9 +68,10 @@ export function DashboardHome() {
   const load = useCallback(async () => {
     setLoadState('loading');
     try {
-      const layout = await useCase.getLayout();
-      setAdmin(layout.admin);
-      setCards(toWebCards(layout));
+      const loaded = await useCase.getLayout();
+      setLayout(loaded);
+      setAdmin(loaded.admin);
+      setCards(toWebCards(loaded));
       setLoadState('ready');
     } catch {
       setLoadState('error');
@@ -89,9 +97,10 @@ export function DashboardHome() {
 
   const save = async (next: WebCard[]): Promise<boolean> => {
     try {
-      const layout = await useCase.saveWebLayout(toWebRequest(next));
-      setAdmin(layout.admin);
-      setCards(toWebCards(layout));
+      const saved = await useCase.saveWebLayout(toWebRequest(next));
+      setLayout(saved);
+      setAdmin(saved.admin);
+      setCards(toWebCards(saved));
       return true;
     } catch (e) {
       toast.error(extractErrorMessage(e, '대시보드를 저장하지 못했습니다.'));
@@ -116,6 +125,18 @@ export function DashboardHome() {
     void save(next);
   };
 
+  // Narrow screen (D18): save the stored web places with the new period — the cards on screen only get the period,
+  // so the places of a web edit in progress stay unsaved.
+  const changeNarrowPeriod = (type: DashboardCardType, period: DashboardPeriod) => {
+    if (layout === null) return;
+    setCards((current) => current.map((card) => (card.type === type ? { ...card, period } : card)));
+    const stored = toWebCards(layout).map((card) => (card.type === type ? { ...card, period } : card));
+    useCase
+      .saveWebLayout(toWebRequest(stored))
+      .then(setLayout)
+      .catch((e) => toast.error(extractErrorMessage(e, '대시보드를 저장하지 못했습니다.')));
+  };
+
   const removeCard = (type: DashboardCardType) => setCards((current) => current.filter((card) => card.type !== type));
 
   const addCard = () => {
@@ -126,10 +147,11 @@ export function DashboardHome() {
 
   const addable = visibleTypes(admin).filter((type) => !cards.some((card) => card.type === type));
 
-  const renderCard = (card: WebCard) => {
+  const renderCard = (card: Pick<WebCard, 'type' | 'period'>, narrow: boolean) => {
     const spec = DASHBOARD_CARD_SPECS[card.type];
-    const common = { editing, onRemove: () => removeCard(card.type) };
-    const onPeriodChange = (period: DashboardPeriod) => changePeriod(card.type, period);
+    const common = { editing: narrow ? false : editing, onRemove: () => removeCard(card.type) };
+    const onPeriodChange = (period: DashboardPeriod) =>
+      narrow ? changeNarrowPeriod(card.type, period) : changePeriod(card.type, period);
     switch (card.type) {
       case 'PAID_ORDERS':
         return <AlertCountCard title={spec.title} href={spec.href} field="paidOrders" {...common} />;
@@ -168,8 +190,17 @@ export function DashboardHome() {
     }
   };
 
+  // The period on screen is the shared card period (`cards`) — a narrow change shows before the save returns.
+  const narrowCards =
+    layout === null
+      ? []
+      : toNarrowCards(layout).map((card) => ({
+          ...card,
+          period: cards.find((entry) => entry.type === card.type)?.period ?? card.period,
+        }));
+
   const action =
-    loadState !== 'ready' ? undefined : editing ? (
+    loadState !== 'ready' || isMobile ? undefined : editing ? (
       <div className="flex flex-wrap items-center gap-2">
         <select
           aria-label="카드 넣기"
@@ -213,7 +244,23 @@ export function DashboardHome() {
         {loadState === 'ready' && cards.length === 0 && (
           <StateBlock variant="empty" message="보일 카드가 없습니다. [편집]에서 카드를 넣으세요." />
         )}
-        {loadState === 'ready' && mounted && (
+        {loadState === 'ready' && isMobile && (
+          <div
+            className="grid"
+            style={{
+              gridTemplateColumns: `repeat(${NARROW_GRID.cols}, minmax(0, 1fr))`,
+              gridAutoRows: `${NARROW_GRID.rowHeight}px`,
+              gap: `${NARROW_GRID.gap}px`,
+            }}
+          >
+            {narrowCards.map((card) => (
+              <div key={card.type} style={{ gridColumn: `span ${card.w}` }}>
+                {renderCard(card, true)}
+              </div>
+            ))}
+          </div>
+        )}
+        {loadState === 'ready' && !isMobile && mounted && (
           <ReactGridLayout
             width={width}
             layout={toGridLayout(cards)}
@@ -229,7 +276,7 @@ export function DashboardHome() {
             onLayoutChange={(layout) => setCards((current) => fromGridLayout(current, layout))}
           >
             {cards.map((card) => (
-              <div key={card.type}>{renderCard(card)}</div>
+              <div key={card.type}>{renderCard(card, false)}</div>
             ))}
           </ReactGridLayout>
         )}

@@ -13,6 +13,7 @@ import { DetailImageGroupRepositoryImpl } from '@/infrastructure/repositories/De
 import type { DetailTemplateResponse } from '@/domain/entities/DetailTemplateEntity';
 import { DetailImageGroupModal } from './DetailImageGroupModal';
 import { Button } from '@/presentation/components/ui/Button';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 export function DetailTemplateList() {
   const router = useRouter();
@@ -66,6 +67,49 @@ export function DetailTemplateList() {
     }
   };
 
+  // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value, the row button at the bottom;
+  // a tap opens the template like a row tap.
+  const renderCards = () =>
+    templates.map((t) => (
+      <DataCard
+        key={t.id}
+        onClick={() => router.push(ROUTES.DETAIL_TEMPLATE_EDIT(t.id))}
+        fields={[
+          { label: 'ID', value: t.id },
+          { label: '이름', value: <span className="font-medium">{t.name}</span> },
+          {
+            label: '기본',
+            value: t.isDefault && (
+              <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">기본</span>
+            ),
+          },
+          {
+            label: '활성',
+            value: (
+              <span
+                className={`rounded px-2 py-0.5 text-xs ${
+                  t.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {t.active ? '활성' : '비활성'}
+              </span>
+            ),
+          },
+          { label: '블록수', value: t.blockCount ?? t.blocks?.length ?? 0 },
+        ]}
+        actions={
+          <button
+            type="button"
+            onClick={() => handleDelete(t.id)}
+            disabled={deletingId === t.id}
+            className="rounded border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            {deletingId === t.id ? '삭제 중...' : '삭제'}
+          </button>
+        }
+      />
+    ));
+
   if (!isAdmin) {
     return (
       <PageContainer>
@@ -80,7 +124,7 @@ export function DetailTemplateList() {
     <PageContainer
       title="상세 템플릿"
       action={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-md:flex-wrap">
           <button
             type="button"
             onClick={() => setGroupModalOpen(true)}
@@ -112,7 +156,7 @@ export function DetailTemplateList() {
           등록된 템플릿이 없습니다.
         </div>
       ) : (
-        <div className="rounded-lg bg-white shadow list-table-scroll">
+        <DataCardSwitch placement="page" renderCards={renderCards} className="rounded-lg bg-white shadow list-table-scroll">
           <table className="text-sm">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr className="text-left text-gray-600">
@@ -167,7 +211,7 @@ export function DetailTemplateList() {
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       )}
     </PageContainer>
   );

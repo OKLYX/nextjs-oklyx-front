@@ -3,6 +3,7 @@
 import type { PayoutSummary } from '@/domain/entities/Settlement';
 import { Card } from '@/presentation/components/ui/Card';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 import {
   channelLabel,
   formatDateRange,
@@ -87,12 +88,46 @@ export function PayoutTable({ rows, loading, error, onOpen, onRetry }: PayoutTab
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14): the app's payout tile — channel with the paid amount on the right, the
+  // seller, 「유형 · 판매기간 (인식월)」, 「지급일 · 상태」 and the amount-check badge. A tap opens the payout.
+  const renderCards = () =>
+    rows.map((row) => {
+      const badge = reconBadge(row);
+      return (
+        <DataCard
+          key={row.payoutId}
+          onClick={() => onOpen(row.payoutId)}
+          title={<span className="font-semibold">{channelLabel(row)}</span>}
+          trailing={<span className="text-sm font-semibold text-gray-900">{formatMoney(row.finalAmount)}</span>}
+          body={
+            <div className="text-[13px] text-gray-900">
+              <p className="text-xs text-gray-500">{row.sellerName ?? '—'}</p>
+              <p className="mt-1.5">
+                {settlementTypeLabel(row.settlementType)} · 판매기간{' '}
+                {formatDateRange(row.recognitionFrom, row.recognitionTo)} ({row.revenueRecognitionMonth ?? '—'})
+              </p>
+              <p>
+                지급일 {row.finalSettlementDate ?? row.settlementDate ?? '—'} ·{' '}
+                <span className={row.paymentCheckNeeded ? 'text-amber-800' : 'text-gray-500'}>
+                  {payoutStatusText(row)}
+                </span>
+              </p>
+              <span className={`mt-1.5 inline-block px-2 py-1 rounded border text-xs ${badge.className}`}>
+                {badge.text}
+              </span>
+            </div>
+          }
+        />
+      );
+    });
+
   return (
     // 첫 조회에만 로딩 블록. 필터를 바꾼 재조회는 이전 값을 지우지 않는다(깜빡임 방지).
     <TableCard
       isLoading={loading && rows.length === 0}
       isEmpty={rows.length === 0}
       emptyMessage="아직 수신된 정산 내역이 없습니다. [갱신] 을 눌러 불러오세요."
+      renderCards={renderCards}
     >
       {loading && rows.length > 0 && (
         <div className="px-6 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-200">

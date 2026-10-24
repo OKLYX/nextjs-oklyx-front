@@ -880,7 +880,7 @@ export function MasterOptionEditor({
               <li
                 key={row.key}
                 id={row.optionId != null ? `master-option-${row.optionId}` : undefined}
-                className={`flex items-center justify-between rounded border px-3 py-2 text-sm text-gray-900 ${
+                className={`flex items-center justify-between rounded border px-3 py-2 text-sm text-gray-900 max-md:flex-wrap ${
                   row.optionId != null && highlight?.optionId === row.optionId
                     ? highlight.fading
                       ? 'border-gray-200 bg-transparent transition-colors duration-[2000ms]'
@@ -911,7 +911,7 @@ export function MasterOptionEditor({
                     <span className="text-gray-500">· 수량 {row.items[0]?.quantity ?? 0}</span>
                   )}
                 </span>
-                <span className="flex gap-2">
+                <span className="flex gap-2 max-md:flex-wrap">
                   <button
                     type="button"
                     onClick={row.onEdit}
@@ -1005,7 +1005,7 @@ export function MasterOptionEditor({
                 [수정 요청]을 눌러야 전송됩니다.
               </p>
             )}
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">택배비</label>
                 <select
@@ -1105,7 +1105,7 @@ export function MasterOptionEditor({
               </details>
             )}
 
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex gap-2 max-md:flex-wrap">
               <button
                 type="button"
                 onClick={handleSubmit}

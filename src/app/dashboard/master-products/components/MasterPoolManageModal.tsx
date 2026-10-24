@@ -90,9 +90,9 @@ export function MasterPoolManageModal({ images, onDelete, onClose }: MasterPoolM
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3">
-        <span className="text-xs text-gray-500">{selected.length}개 선택</span>
-        <div className="flex gap-2">
+      <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3 max-md:flex-wrap">
+        <span className="text-xs text-gray-500 max-md:min-w-0 max-md:truncate">{selected.length}개 선택</span>
+        <div className="flex gap-2 max-md:flex-wrap">
           <button
             type="button"
             onClick={onClose}

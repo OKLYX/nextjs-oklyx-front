@@ -219,7 +219,7 @@ export function ChannelFixedCostFields({
                     </div>
                   )}
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 max-md:flex-wrap">
                     <div className="flex-1">
                       <label
                         htmlFor={`appliedFrom-${row.fixedCostId}`}

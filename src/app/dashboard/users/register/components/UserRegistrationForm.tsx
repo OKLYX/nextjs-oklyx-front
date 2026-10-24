@@ -125,7 +125,7 @@ export function UserRegistrationForm({
             <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-1">
               이메일
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-md:flex-wrap">
               <input
                 id="email"
                 type="email"

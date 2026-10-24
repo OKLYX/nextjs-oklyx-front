@@ -190,7 +190,7 @@ export function ChannelStockModal({
         </>
       )}
 
-      <div className="mt-5 flex justify-end gap-2">
+      <div className="mt-5 flex justify-end gap-2 max-md:flex-wrap">
         <button
           type="button"
           onClick={onClose}

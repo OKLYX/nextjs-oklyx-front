@@ -4,6 +4,8 @@ import type { SalesLine } from '@/domain/entities/SalesSummary';
 import { formatMoney } from '@/domain/entities/SalesSummary';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 
 /**
  * 판매 내역 — 이 채널의 매출이 <b>어느 주문에서</b> 나왔는지 (FEATURE_2609_34).
@@ -61,6 +63,7 @@ export function ChannelSaleRecords({
     (row) => !(hideCanceled && row.cancelQty > 0) && !(hidePending && row.holdQty > 0)
   );
   const hiddenCount = rows.length - visible.length;
+  const showCards = useShowCards();
 
   const filters = (
     <div className="flex flex-wrap items-center gap-4 px-4 py-3 border-b border-gray-200 bg-gray-50 text-xs">
@@ -113,12 +116,47 @@ export function ChannelSaleRecords({
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D30): the app's sale line — 「판매일 · 주문번호」, the product name
+  // (two lines), 「취소 N | 판매 N (대기 N) · 단가」 and 「매출 · 할인」; a line with a cancel or a hold is tinted red.
+  const renderCards = () =>
+    visible.map((row) => (
+      <DataCard
+        key={row.orderLineId}
+        body={
+          <div className={`text-sm text-gray-900 ${row.cancelQty > 0 || row.holdQty > 0 ? 'bg-red-50' : ''}`}>
+            <p className="text-xs text-gray-500">
+              {formatSoldAt(row.orderedAt)} · {row.externalOrderId}
+            </p>
+            <p className="line-clamp-2 break-words">
+              {row.itemName ?? '—'}
+              {row.masterProductName == null && <span className="text-gray-300"> (상품 미연결)</span>}
+            </p>
+            <p className="mt-1 text-[13px]">
+              취소{' '}
+              <span className={row.cancelQty > 0 ? 'font-semibold text-red-600' : 'text-gray-300'}>
+                {row.cancelQty.toLocaleString('ko-KR')}
+              </span>{' '}
+              | 판매 {row.netQty.toLocaleString('ko-KR')}
+              {row.holdQty > 0 && <span className="text-red-600"> (대기 {row.holdQty.toLocaleString('ko-KR')})</span>}
+              {' · 단가 '}
+              {formatMoney(row.unitPrice)}
+            </p>
+            <p className="text-[13px] font-semibold">
+              매출 {formatMoney(row.grossSales)} · 할인 {formatMoney(row.discount)}
+            </p>
+          </div>
+        }
+      />
+    ));
+
   return (
-    <Card padded={false} className="overflow-hidden">
+    // Narrow-screen card view: the box is not drawn and the cards run edge to edge (FEATURE_2610_31 D30).
+    <Card padded={false} className={showCards ? undefined : 'overflow-hidden'} bare={showCards}>
       {filters}
       {visible.length === 0 ? (
         <StateBlock variant="empty" message="걸러낸 조건에 맞는 주문이 없습니다." />
       ) : (
+        <DataCardSwitch placement="page" renderCards={renderCards}>
         <table className="w-full table-fixed text-sm">
           {/* 🔴 상품 칸은 다른 칸의 약 2배다 — 상품명이 길어서 가로 스크롤을 만들던 자리라 여기만 넓힌다. */}
           <colgroup>
@@ -204,6 +242,7 @@ export function ChannelSaleRecords({
             ))}
           </tbody>
         </table>
+        </DataCardSwitch>
       )}
     </Card>
   );

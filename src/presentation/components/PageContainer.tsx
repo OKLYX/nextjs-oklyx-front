@@ -83,8 +83,8 @@ export function PageContainer({ children, title, action }: PageContainerProps) {
     <div className="-m-4 md:-m-6 p-4 md:p-6 bg-page min-h-full">
       <div className={`${CONTENT_WIDTH} space-y-6`}>
         {title && (
-          <div className={action ? 'flex items-center justify-between gap-4' : undefined}>
-            <h1 className="text-2xl font-bold text-gray-900 truncate">{title}</h1>
+          <div className={action ? 'flex items-center justify-between gap-4 max-md:flex-wrap' : undefined}>
+            <h1 className="text-2xl font-bold text-gray-900 truncate max-md:min-w-0">{title}</h1>
             {action}
           </div>
         )}

@@ -13,6 +13,7 @@ import type { MarginPolicyResponse } from '@/domain/entities/MarginPolicyEntity'
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { Button } from '@/presentation/components/ui/Button';
 import { Input } from '@/presentation/components/ui/Input';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 // marginRate is a 0~1 decimal on the backend; the UI works in whole percents.
 // Round-trips (0.15 -> 15% -> 0.15) are guarded against float error.
@@ -220,6 +221,61 @@ export function MarginPolicyTable() {
     );
   }
 
+  // FEATURE_2610_26 / D58: an ESM preset shows as two rows — 「G마켓」 with marginRate and 「옥션」 with
+  // auctionMarginRate; the other columns belong to the one preset and repeat on both rows (D59).
+  // The table and the narrow-screen cards draw the same rows.
+  const policyRows = policies.flatMap((p) =>
+    (p.platform === 'ESM'
+      ? [
+          { key: `${p.id}-gmkt`, label: 'G마켓', rate: p.marginRate },
+          { key: `${p.id}-iac`, label: '옥션', rate: p.auctionMarginRate },
+        ]
+      : [{ key: `${p.id}`, label: platformDisplayName(p.platform), rate: p.marginRate }]
+    ).map((row) => ({ p, row })),
+  );
+
+  // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value, the row buttons at the bottom.
+  const renderCards = () =>
+    policyRows.map(({ p, row }) => (
+      <DataCard
+        key={row.key}
+        fields={[
+          { label: '판매자', value: p.sellerName || sellerName(p.sellerId) },
+          { label: '플랫폼', value: row.label },
+          { label: '목표 마진율', value: row.rate != null ? `${toPercent(row.rate)}%` : '—' },
+          {
+            label: '표시 할인율',
+            value: p.displayDiscountRate != null && p.displayDiscountRate > 0 ? p.displayDiscountRate : '-',
+          },
+          {
+            label: '최소 마진액',
+            value: p.minMarginAmount != null ? `${p.minMarginAmount.toLocaleString('ko-KR')}원` : '—',
+          },
+          { label: '최소 마진율', value: p.minMarginRate != null ? `${toPercent(p.minMarginRate)}%` : '—' },
+        ]}
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => openEdit(p)}
+              disabled={busyId === p.id}
+              className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+            >
+              수정
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDelete(p)}
+              disabled={busyId === p.id}
+              className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              삭제
+            </button>
+          </>
+        }
+      />
+    ));
+
   return (
     <PageContainer
       title="마진 프리셋"
@@ -362,7 +418,7 @@ export function MarginPolicyTable() {
               둘 중 하나라도 밑돌면 대응 필요로 표시됩니다. 비워두면 이 판매자·채널은 경고하지 않습니다.
             </p>
           </div>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex gap-2 max-md:flex-wrap">
             <button
               type="button"
               onClick={handleSubmit}
@@ -385,7 +441,12 @@ export function MarginPolicyTable() {
 
       {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-      <div className="rounded-lg bg-white shadow list-table-scroll">
+      <DataCardSwitch
+        placement="page"
+        renderCards={renderCards}
+        ready={!isLoading && policyRows.length > 0}
+        className="rounded-lg bg-white shadow list-table-scroll"
+      >
         {isLoading ? (
           <div className="flex min-h-32 items-center justify-center">
             <Spinner size={24} label="불러오는 중..." />
@@ -411,17 +472,7 @@ export function MarginPolicyTable() {
                   </td>
                 </tr>
               ) : (
-                // FEATURE_2610_26 / D58: an ESM preset shows as two rows — 「G마켓」 with marginRate and 「옥션」 with
-                // auctionMarginRate; the other columns belong to the one preset and repeat on both rows (D59).
-                policies.flatMap((p) =>
-                  (p.platform === 'ESM'
-                    ? [
-                        { key: `${p.id}-gmkt`, label: 'G마켓', rate: p.marginRate },
-                        { key: `${p.id}-iac`, label: '옥션', rate: p.auctionMarginRate },
-                      ]
-                    : [{ key: `${p.id}`, label: platformDisplayName(p.platform), rate: p.marginRate }]
-                  ).map((row) => ({ p, row })),
-                ).map(({ p, row }) => (
+                policyRows.map(({ p, row }) => (
                   <tr key={row.key} className="border-b border-gray-100 text-sm text-gray-900">
                     <td className="px-4 py-3">{p.sellerName || sellerName(p.sellerId)}</td>
                     <td className="px-4 py-3">{row.label}</td>
@@ -465,7 +516,7 @@ export function MarginPolicyTable() {
             </tbody>
           </table>
         )}
-      </div>
+      </DataCardSwitch>
     </PageContainer>
   );
 }

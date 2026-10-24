@@ -19,7 +19,8 @@ import { CreateChannelModal } from './CreateChannelModal';
 import { ChannelDetailsModal } from './ChannelDetailsModal';
 import { EditChannelModal } from './EditChannelModal';
 import { DeleteChannelConfirmation } from './DeleteChannelConfirmation';
-import { platformDisplayName } from '@/config/platforms';
+import { platformDisplayName, platformName } from '@/config/platforms';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 interface SellerChannelSectionProps {
   sellerId: number;
@@ -187,6 +188,40 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
     }
   };
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D25 · D37): the app's channel tile — platform, status chip and › at
+  // the right end, 「별칭」 · 「벤더 ID」 lines, the 11st key warning; the table's Access Key at the bottom. Floating
+  // cards — the section sits inside a seller row. A tap opens the channel like a row tap.
+  const renderCards = () =>
+    channels.map((channel) => (
+      <DataCard
+        key={channel.id}
+        onClick={() => setSelectedChannel(channel)}
+        title={<span className="text-base font-semibold">{platformName(channel.platform)}</span>}
+        trailing={
+          <>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                channel.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              {channel.isActive ? '활성' : '비활성'}
+            </span>
+            <span className="text-base text-gray-500">›</span>
+          </>
+        }
+        body={
+          <div className="text-sm text-gray-500">
+            <p>별칭: {channel.accountAlias || '-'}</p>
+            <p>벤더 ID: {channel.vendorId || '-'}</p>
+            {channel.elevenstKeyRenewalNeeded && (
+              <p className="text-xs text-amber-800">11번가 키가 곧 멈춥니다 — 셀러오피스 API 관리에서 갱신하세요</p>
+            )}
+          </div>
+        }
+        extraFields={[{ label: 'Access Key', value: channel.accessKey || '-' }]}
+      />
+    ));
+
   return (
     <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
       <div className="flex items-center justify-between mb-3">
@@ -215,7 +250,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
           등록된 판매채널이 없습니다.
         </div>
       ) : (
-        <div className="bg-white rounded-md border border-gray-200 list-table-scroll">
+        <DataCardSwitch placement="nested" renderCards={renderCards} className="bg-white rounded-md border border-gray-200 list-table-scroll">
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
@@ -258,7 +293,7 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       )}
 
       <CreateChannelModal

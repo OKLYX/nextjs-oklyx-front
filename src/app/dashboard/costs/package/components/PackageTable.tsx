@@ -3,6 +3,7 @@
 import type { Package } from '@/domain/entities/PackageEntity';
 import { BOX_KIND_LABEL, boxKindOf } from '@/domain/entities/PackageEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 import { BoxShape, boxScale, maxBoxExtentCm } from '@/presentation/components/BoxShape';
 import { formatPackageSize, sizeIsUnset } from './packageSize';
 
@@ -55,10 +56,74 @@ export function PackageTable({
     </div>
   ) : null;
 
+  // The photo when there is one, otherwise a shape in the box's proportions (PLAN 2609_40 D26). The photo is scaled
+  // by the same ratio — the scale must not change with whether there is a photo. Shared by the table and the cards.
+  const boxPicture = (pkg: Package) => (
+    <div className="flex items-end justify-center" style={{ height: BOX_CELL_PX, width: BOX_CELL_PX }}>
+      {pkg.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={pkg.imageUrl}
+          alt={`${pkg.type} 상자 사진`}
+          className="rounded border border-gray-200 object-contain"
+          style={{
+            height: BOX_CELL_PX * boxScale(pkg, referenceCm),
+            width: BOX_CELL_PX * boxScale(pkg, referenceCm),
+          }}
+        />
+      ) : (
+        <BoxShape
+          widthCm={pkg.widthCm}
+          lengthCm={pkg.lengthCm}
+          heightCm={pkg.heightCm}
+          size={BOX_CELL_PX}
+          referenceCm={referenceCm}
+        />
+      )}
+    </div>
+  );
+
+  const boxKind = (pkg: Package) =>
+    boxKindOf(pkg) === 'RECYCLED' ? (
+      <span className="inline-block px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium whitespace-nowrap">
+        {BOX_KIND_LABEL.RECYCLED}
+      </span>
+    ) : (
+      <span className="text-sm text-gray-900 whitespace-nowrap">{BOX_KIND_LABEL.PURCHASED}</span>
+    );
+
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D37): the app's box card — type, 「기본값」 badge at the right end, cost
+  // and size lines; the table's box picture and kind at the bottom.
+  const renderCards = () =>
+    packages.map((pkg) => (
+      <DataCard
+        key={pkg.id}
+        onClick={() => onRowClick?.(pkg)}
+        selected={selectedId === pkg.id}
+        title={pkg.type || '-'}
+        trailing={
+          pkg.isDefault ? (
+            <span className="rounded bg-green-100 px-2 py-1 text-xs text-green-700">기본값</span>
+          ) : undefined
+        }
+        body={
+          <div className="space-y-1 text-sm text-gray-900">
+            <p>비용: {formatCost(pkg.cost)}</p>
+            <p className={sizeIsUnset(pkg) ? 'text-gray-500' : undefined}>사이즈: {formatPackageSize(pkg)}</p>
+          </div>
+        }
+        extraFields={[
+          { label: '상자', value: boxPicture(pkg) },
+          { label: '유형', value: boxKind(pkg) },
+        ]}
+      />
+    ));
+
   return (
     <>
       {errorBanner}
       <TableCard
+        renderCards={renderCards}
         isLoading={isLoading}
         isEmpty={packages.length === 0}
         emptyMessage={hasFilter ? '조회 결과가 없습니다.' : '등록된 상자가 없습니다.'}
@@ -91,47 +156,9 @@ export function PackageTable({
                   selectedId === pkg.id ? 'bg-blue-50' : ''
                 }`}
               >
-                {/* 사진이 있으면 사진, 없으면 치수 비율 도형(PLAN 2609_40 D26).
-                    사진도 같은 배율로 줄여 그린다 — 사진 유무로 크기 잣대가 달라지면 안 된다 */}
-                <td className="px-6 py-3">
-                  <div
-                    className="flex items-end justify-center"
-                    style={{ height: BOX_CELL_PX, width: BOX_CELL_PX }}
-                  >
-                    {pkg.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={pkg.imageUrl}
-                        alt={`${pkg.type} 상자 사진`}
-                        className="rounded border border-gray-200 object-contain"
-                        style={{
-                          height: BOX_CELL_PX * boxScale(pkg, referenceCm),
-                          width: BOX_CELL_PX * boxScale(pkg, referenceCm),
-                        }}
-                      />
-                    ) : (
-                      <BoxShape
-                        widthCm={pkg.widthCm}
-                        lengthCm={pkg.lengthCm}
-                        heightCm={pkg.heightCm}
-                        size={BOX_CELL_PX}
-                        referenceCm={referenceCm}
-                      />
-                    )}
-                  </div>
-                </td>
+                <td className="px-6 py-3">{boxPicture(pkg)}</td>
                 <td className="px-6 py-3 text-sm text-gray-900">{pkg.type || '-'}</td>
-                <td className="px-6 py-3 text-sm">
-                  {boxKindOf(pkg) === 'RECYCLED' ? (
-                    <span className="inline-block px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium whitespace-nowrap">
-                      {BOX_KIND_LABEL.RECYCLED}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-gray-900 whitespace-nowrap">
-                      {BOX_KIND_LABEL.PURCHASED}
-                    </span>
-                  )}
-                </td>
+                <td className="px-6 py-3 text-sm">{boxKind(pkg)}</td>
                 <td
                   className={`px-6 py-3 text-sm ${sizeIsUnset(pkg) ? 'text-gray-400' : 'text-gray-900'}`}
                 >

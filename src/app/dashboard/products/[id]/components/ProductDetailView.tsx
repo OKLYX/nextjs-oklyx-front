@@ -191,11 +191,11 @@ export function ProductDetailView({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 max-md:flex-wrap">
         <Button variant="secondary" size="sm" onClick={() => router.push(backHref)}>
           ← 목록
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-md:flex-wrap">
           {clipNotice && <span className="text-sm text-gray-600">{clipNotice}</span>}
           {barcodeNotice && <span className="text-sm text-gray-600">{barcodeNotice}</span>}
           <Button variant="secondary" onClick={handlePickProduct} disabled={isPicking}>

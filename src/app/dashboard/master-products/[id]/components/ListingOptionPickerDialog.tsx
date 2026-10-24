@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
 import { Spinner } from '@/presentation/components/Spinner';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
@@ -232,6 +233,42 @@ export function ListingOptionPickerDialog({
         ) : prices.length === 0 ? (
           <p className="text-gray-400">옵션 없음</p>
         ) : (
+          <DataCardSwitch
+            placement="nested"
+            renderCards={() =>
+              // Narrow-screen cards (FEATURE_2610_31 D13 · D14): the app's option row — checkbox, name, price,
+              // 🔒 on the right for an option already on the market.
+              prices.map((p) => {
+                const locked = p.onMarket === true && p.active !== false;
+                const checked = selected.has(p.optionId);
+                const tone = checked ? 'text-gray-900' : 'text-gray-500';
+                return (
+                  <DataCard
+                    key={p.optionId}
+                    selection={{
+                      checked,
+                      onChange: () => toggle(p.optionId),
+                      label: `${p.optionName ?? `옵션 #${p.optionId}`} 선택`,
+                      disabled: busy || locked,
+                    }}
+                    trailing={
+                      locked ? (
+                        <span className="text-[10px] text-gray-500" title={MARKET_OPTION_LOCK_REASON}>
+                          🔒
+                        </span>
+                      ) : undefined
+                    }
+                    body={
+                      <div className={`text-sm ${tone}`}>
+                        <p>{p.optionName ?? `옵션 #${p.optionId}`}</p>
+                        <p className="tabular-nums">{formatSitePrices(p.sellingPrice, p.auctionSellingPrice)}</p>
+                      </div>
+                    }
+                  />
+                );
+              })
+            }
+          >
           <table className="w-full table-fixed text-sm">
             <thead className="border-b border-gray-200 bg-gray-100 text-left text-gray-600">
               <tr>
@@ -276,6 +313,7 @@ export function ListingOptionPickerDialog({
               })}
             </tbody>
           </table>
+          </DataCardSwitch>
         )}
         {hasLocked && <p className="text-xs text-amber-700">{MARKET_OPTION_LOCK_REASON}</p>}
         {gen !== null && selected.size === 0 && (

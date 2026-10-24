@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { Button } from '@/presentation/components/ui/Button';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { CarrierOption, StoredInvoice } from '@/application/dto/ShippingLabelDTOs';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { InternalStageBadge } from './InternalStageBadge';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 interface StoredInvoiceEditorProps {
   useCase: ShippingLabelUseCase;
@@ -77,13 +78,78 @@ export function StoredInvoiceEditor({ useCase, externalOrderId, carrierOptions, 
 
   if (invoices.length === 0) return null;
 
+  // The carrier · invoice editor of one bundle — in the table row, or right under the card (FEATURE_2610_31 D29).
+  const editor = (invoice: StoredInvoice) => (
+    <div className="flex flex-wrap items-center gap-2">
+      <select
+        value={carrierValue}
+        onChange={(e) => setCarrierValue(e.target.value)}
+        aria-label="택배사"
+        className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+      >
+        {carrierOptions.map((option) => (
+          <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
+            {option.carrierName}
+          </option>
+        ))}
+      </select>
+      <input
+        type="text"
+        value={invoiceValue}
+        onChange={(e) => setInvoiceValue(e.target.value)}
+        aria-label="송장번호"
+        className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+      />
+      <Button
+        size="sm"
+        onClick={() => void save(invoice)}
+        disabled={carrierValue === '' || invoiceValue.trim() === '' || savingId !== null}
+      >
+        {savingId === invoice.orderShipmentId ? <Spinner label="저장 중..." /> : '저장'}
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => setEditingId(null)} disabled={savingId !== null}>
+        취소
+      </Button>
+    </div>
+  );
+
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D29): the app's invoice card — bold shipment number with the stage
+  // badge, 「택배사 · 송장번호」 and [송장 수정] on the right; the editor opens right under the card. Floating cards —
+  // the editor sits in popups.
+  const renderCards = () =>
+    invoices.map((invoice) => (
+      <Fragment key={invoice.orderShipmentId}>
+        <DataCard
+          title={invoice.externalShipmentId}
+          badges={<InternalStageBadge stage={invoice.internalStage} />}
+          trailing={
+            carrierOptions.length > 0 ? (
+              <Button size="sm" variant="secondary" onClick={() => open(invoice)} disabled={savingId !== null}>
+                송장 수정
+              </Button>
+            ) : undefined
+          }
+          body={
+            <p className="text-xs text-gray-500">
+              {carrierName(invoice.carrierCode)} · {invoice.invoiceNumber ?? '-'}
+            </p>
+          }
+        />
+        {editingId === invoice.orderShipmentId && <div className="bg-gray-50 px-4 py-2">{editor(invoice)}</div>}
+      </Fragment>
+    ));
+
   return (
     <div className="space-y-2">
       <h4 className="text-sm font-semibold text-gray-900">송장</h4>
       {actionError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">{actionError}</div>
       )}
-      <div className="border border-gray-200 rounded-lg overflow-x-auto">
+      <DataCardSwitch
+        placement="nested"
+        renderCards={renderCards}
+        className="border border-gray-200 rounded-lg overflow-x-auto"
+      >
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr className="text-left text-xs font-medium text-gray-500">
@@ -102,37 +168,7 @@ export function StoredInvoiceEditor({ useCase, externalOrderId, carrierOptions, 
                 </td>
                 {editingId === invoice.orderShipmentId ? (
                   <td colSpan={3} className="px-4 py-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select
-                        value={carrierValue}
-                        onChange={(e) => setCarrierValue(e.target.value)}
-                        aria-label="택배사"
-                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      >
-                        {carrierOptions.map((option) => (
-                          <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
-                            {option.carrierName}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        value={invoiceValue}
-                        onChange={(e) => setInvoiceValue(e.target.value)}
-                        aria-label="송장번호"
-                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => void save(invoice)}
-                        disabled={carrierValue === '' || invoiceValue.trim() === '' || savingId !== null}
-                      >
-                        {savingId === invoice.orderShipmentId ? <Spinner label="저장 중..." /> : '저장'}
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => setEditingId(null)} disabled={savingId !== null}>
-                        취소
-                      </Button>
-                    </div>
+                    {editor(invoice)}
                   </td>
                 ) : (
                   <>
@@ -151,7 +187,7 @@ export function StoredInvoiceEditor({ useCase, externalOrderId, carrierOptions, 
             ))}
           </tbody>
         </table>
-      </div>
+      </DataCardSwitch>
     </div>
   );
 }

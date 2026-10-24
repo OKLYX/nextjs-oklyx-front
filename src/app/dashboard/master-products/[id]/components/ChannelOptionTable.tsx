@@ -9,6 +9,7 @@ import type {
 } from '@/domain/entities/MasterProductEntity';
 import type { ListingOptionSummary } from '@/domain/entities/ListingRegistrationEntity';
 import { CopyIdButton } from './CopyIdButton';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { platformDisplayName } from '@/config/platforms';
 import { formatSitePrices } from './ListingDetailPanel';
 
@@ -145,10 +146,76 @@ export function ChannelOptionTable({
     return <p className="p-4 text-sm text-gray-500">이 마스터에 연결된 판매채널이 없습니다.</p>;
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D25): the app's option card — one card per master option with the
+  // option name, 🔒 and [옵션 수정] on the title row, then each channel block (label, product ID, price / stock,
+  // option ID) under a divider. Floating cards — the table sits inside a matrix row.
+  const renderCards = () =>
+    masterOptions.map((opt) => (
+      <DataCard
+        key={opt.id}
+        title={<span className="font-medium">{opt.name}</span>}
+        badges={
+          opt.marketRegistered === true ? (
+            <span title="마켓에 등록돼 판매 중 — 삭제할 수 없습니다 (이름·구성 수량은 수정 가능)">🔒</span>
+          ) : undefined
+        }
+        trailing={
+          <button
+            type="button"
+            onClick={() => onEditMasterOption(opt.id)}
+            className="rounded border border-blue-300 px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+          >
+            옵션 수정
+          </button>
+        }
+        body={
+          <div className="divide-y divide-gray-200 text-sm">
+            {columns.map((col) => {
+              const option = col.byMasterOptionId.get(opt.id);
+              const active = option?.active !== false;
+              return (
+                <div key={col.productListingId} className="space-y-1 py-2">
+                  <div
+                    className={`font-medium ${isOrphanColumn(col.label) ? 'text-amber-700' : 'text-gray-500'}`}
+                  >
+                    {col.label}
+                  </div>
+                  {col.platformProductId ? (
+                    <div className="flex items-center gap-1">
+                      <span className="font-mono text-xs tabular-nums text-gray-900">
+                        상품ID {col.platformProductId}
+                      </span>
+                      <CopyIdButton value={col.platformProductId} />
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-500" title="마켓 등록 후 부여">
+                      상품ID –
+                    </div>
+                  )}
+                  {option == null ? (
+                    <div className="text-gray-500">–</div>
+                  ) : (
+                    <>
+                      <div className={active ? 'text-gray-900' : 'text-gray-500'}>
+                        {active
+                          ? `${formatSitePrices(option.sellingPrice, option.auctionSellingPrice)} / ${option.stockQuantity ?? option.maxStock}`
+                          : '미사용'}
+                      </div>
+                      <OptionIdCell value={option.platformOptionId ?? null} />
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        }
+      />
+    ));
+
   return (
     <div className="space-y-4 p-4">
       {/* 🔴 채널이 늘면 표가 화면을 넘는다 → 가로 스크롤 + 첫 열 고정. */}
-      <div className="overflow-x-auto">
+      <DataCardSwitch placement="nested" renderCards={renderCards} className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-left align-top">
@@ -230,7 +297,7 @@ export function ChannelOptionTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </DataCardSwitch>
 
       {/* 2609_61/D10: 마스터 옵션이 없는 채널 전용 옵션은 행이 없다 → 아래에 셀별로 모은다. */}
       {channelOnlyColumns.length > 0 && (

@@ -1,30 +1,33 @@
 'use client';
 
 /**
- * 수량 입력(스테퍼) 공용 컴포넌트.
+ * Shared quantity input (stepper).
  * File: src/presentation/components/QuantityStepper.tsx
  *
- * **용도**: 구성상품 수량처럼 **1 이상의 정수**를 넣는 칸. 오른쪽에 붙은 ▲▼ 를 마우스로 눌러
- *   값을 올리고 내린다(키보드 ↑↓ 도 같다). 수량 칸을 새로 만들 때는 맨 `<input>` 대신 이것을 쓴다
- *   (「마켓 상품 추가하기」 창 · 옵션 추가/수정 폼 · 구성상품 변경 격자).
+ * **Purpose**: a field for **an integer of 1 or more**, like a component quantity. The ▲▼ attached on the right raise
+ *   and lower the value with the mouse (keyboard ↑↓ do the same). A new quantity field uses this instead of a bare
+ *   `<input>` (「마켓 상품 추가하기」 window · option add/edit form · component change grid · the parcel quantity of the
+ *   narrow-screen cards of the order detail and the shipping label preview — FEATURE_2610_31 D28).
  *
- * **문자열 계약**: 값은 `string` 이다 — 입력 중에는 숫자로 바꾸지 않는다(지우는 순간 값이 튄다).
- *   빈 문자열을 그대로 올려 보내므로 **검증·숫자 변환은 호출부가 제출 직전에 한 번만** 한다.
- *   타자는 걸러내지 않는다(기존 `type="text" inputMode="numeric"` 칸과 동작이 같다).
+ * **String contract**: the value is a `string` — it is not turned into a number while typing (the value would jump the
+ *   moment it is cleared). An empty string is passed up as is, so **validation and number conversion happen once, in
+ *   the caller, right before submit**. Typing is not filtered (same behaviour as the existing
+ *   `type="text" inputMode="numeric"` fields).
  *
- * **▲▼ 가 하는 일**: 현재 값을 숫자로 읽어 `step` 만큼 더하거나 뺀 뒤 `[min, max]` 로 자른다.
- *   - 비었거나 숫자가 아니면 `min` 부터 시작한다(빈 칸에서 ▲▼ 아무거나 → `min`).
- *   - 끝에 닿으면 해당 버튼이 비활성된다(`min` 이하에서 ▼, `max` 이상에서 ▲).
- *   - ⚠️ 잘못된 값(`min=1` 인데 `0`)에서도 ▲ 를 누르면 유효 범위로 올라온다. 그 칸이 왜 잘못됐는지
- *     알리는 일은 호출부 안내 문구 소관이다 — 이 컴포넌트는 입력을 막지 않는다.
+ * **What ▲▼ do**: read the current value as a number, add or subtract `step`, then clamp to `[min, max]`.
+ *   - Empty or not a number starts from `min` (either ▲ or ▼ on an empty field → `min`).
+ *   - At an end the matching button is disabled (▼ at or below `min`, ▲ at or above `max`).
+ *   - ⚠️ From a wrong value (`0` with `min=1`) ▲ still brings it into range. Telling why the field is wrong is the
+ *     caller's message (the caller may also pass `invalid` for a red border) — this component does not block input.
  *
  * **Props**
- * - `value` / `onChange(next: string)` — 완전 controlled. 내부 state 없음.
- * - `min`(기본 1) · `max`(선택) · `step`(기본 1)
- * - `disabled` · `title` · `ariaLabel` — 라벨이 화면에 없는 격자 칸이면 `ariaLabel` 을 준다.
- * - `className` — **폭 등 레이아웃만**(`w-24`). 테두리·여백 재정의 ❌.
+ * - `value` / `onChange(next: string)` — fully controlled. No internal state.
+ * - `min` (default 1) · `max` (optional) · `step` (default 1)
+ * - `disabled` · `title` · `ariaLabel` — give `ariaLabel` in a grid cell with no visible label.
+ * - `className` — **layout only, like width** (`w-24`). ❌ No border or padding override.
+ * - `invalid` (default false) — red border when the caller judges the value wrong.
  *
- * **사용 예제**
+ * **Usage**
  * ```tsx
  * <QuantityStepper
  *   className="w-24"
@@ -35,9 +38,9 @@
  * />
  * ```
  *
- * ⚠️ ▲▼ 는 탭 순서에서 빠진다(`tabIndex={-1}`) — 수량 칸이 여러 개인 격자에서 탭이 칸→칸으로
- *    흐르게 하려는 것이다. 키보드 사용자는 입력칸에서 ↑↓ 로 같은 일을 한다.
- * ❌ 재고수량처럼 `min=0` 이 뜻을 갖는 칸에 그대로 쓰지 말 것 — `min` 을 명시해 넘긴다.
+ * ⚠️ ▲▼ are left out of the tab order (`tabIndex={-1}`) — so that in a grid of many quantity fields Tab moves field to
+ *    field. Keyboard users do the same with ↑↓ in the input.
+ * ❌ Do not use it as is for a field where `min=0` has a meaning, like a stock quantity — pass `min` explicitly.
  */
 
 import { KeyboardEvent } from 'react';
@@ -58,6 +61,8 @@ interface QuantityStepperProps {
   title?: string;
   /** 폭 등 레이아웃 보정용 클래스. */
   className?: string;
+  /** true = the value is wrong — red border (the caller decides; FEATURE_2610_31 D28). */
+  invalid?: boolean;
 }
 
 export function QuantityStepper({
@@ -70,6 +75,7 @@ export function QuantityStepper({
   ariaLabel,
   title,
   className,
+  invalid = false,
 }: QuantityStepperProps) {
   const parsed = Number(value);
   const current = value.trim() !== '' && Number.isFinite(parsed) ? parsed : null;
@@ -105,7 +111,8 @@ export function QuantityStepper({
   return (
     <div
       className={[
-        'inline-flex items-stretch overflow-hidden rounded border border-gray-300 bg-white focus-within:ring-2 focus-within:ring-blue-500',
+        'inline-flex items-stretch overflow-hidden rounded border bg-white focus-within:ring-2 focus-within:ring-blue-500',
+        invalid ? 'border-red-500 ring-2 ring-red-300' : 'border-gray-300',
         disabled ? 'bg-gray-100' : '',
         className ?? '',
       ]

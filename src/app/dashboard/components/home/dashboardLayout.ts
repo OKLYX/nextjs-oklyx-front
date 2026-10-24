@@ -7,6 +7,7 @@ import {
   allowedHeights,
   allowedWidths,
   effectivePeriod,
+  narrowAllowedWidths,
 } from '@/config/dashboardGrid';
 import {
   currentMonthRange,
@@ -137,6 +138,69 @@ export function toWebCards(layout: DashboardLayout): WebCard[] {
     );
   }
   return cards;
+}
+
+/** One card the narrow-screen grid draws (FEATURE_2610_31 D17) — width in `NARROW_GRID` cells, one row high. */
+export interface NarrowCard {
+  type: DashboardCardType;
+  /** The period the card reads; null = the card has no period. */
+  period: DashboardPeriod | null;
+  w: number;
+}
+
+/** First visit below 768px — the app's default cards (`_defaultTypes` in `dashboard_layout.dart`), in the D8 order. */
+const NARROW_DEFAULT_TYPES: DashboardCardType[] = [
+  'PAID_ORDERS',
+  'NEW_ORDERS',
+  'OPEN_CLAIMS',
+  'UNANSWERED_INQUIRIES',
+  'DAILY_SALES_CHART',
+  'CHANNEL_SALES_CHART',
+];
+
+/** A narrow card with its first width and default period. */
+function newNarrowCard(type: DashboardCardType): NarrowCard {
+  const spec = DASHBOARD_CARD_SPECS[type];
+  return { type, period: spec.defaultPeriod, w: spec.narrowInitW };
+}
+
+/**
+ * Stored cards → the cards the narrow-screen grid draws (FEATURE_2610_31 D8 · D17) — the same rules as the app's
+ * `toMobileCards` (`lib/features/dashboard/presentation/utils/dashboard_layout.dart`).
+ *
+ * 1. Not saved yet → the default cards of the role.
+ * 2. Admin cards are dropped for a non-admin.
+ * 3. Cards with a mobile place come first by that place; a stored width the spec does not have shrinks to the
+ *    largest allowed width below it, not under the minimum.
+ * 4. Cards without a mobile place (added on the web) follow in the D8 order with their first width.
+ *
+ * ⚠️ Read only — the web never saves the mobile places (`PUT /api/dashboard/layout/mobile` is not called, D18).
+ */
+export function toNarrowCards(layout: DashboardLayout): NarrowCard[] {
+  if (!layout.saved) {
+    return NARROW_DEFAULT_TYPES.filter((type) => layout.admin || !DASHBOARD_CARD_SPECS[type].adminOnly).map(
+      newNarrowCard,
+    );
+  }
+  const visible = new Set(visibleTypes(layout.admin));
+  const shown = layout.cards.filter((card) => visible.has(card.cardType));
+  const placed = shown
+    .filter((card) => card.mobileOrder !== null && card.mobileW !== null)
+    .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
+  const unplaced = DASHBOARD_CARD_ORDER.filter((type) =>
+    shown.some((card) => card.cardType === type && (card.mobileOrder === null || card.mobileW === null)),
+  );
+  return [
+    ...placed.map((card) => ({
+      type: card.cardType,
+      period: effectivePeriod(card.cardType, card.period),
+      w: shrink(card.mobileW ?? 0, narrowAllowedWidths(card.cardType)),
+    })),
+    ...unplaced.map((type) => ({
+      ...newNarrowCard(type),
+      period: effectivePeriod(type, shown.find((card) => card.cardType === type)?.period ?? null),
+    })),
+  ];
 }
 
 /** Grid layout of the cards (`i` = card type). `minW` / `minH` feed the size constraint below. */

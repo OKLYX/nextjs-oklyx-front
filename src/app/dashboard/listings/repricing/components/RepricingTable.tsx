@@ -2,6 +2,7 @@
 
 import { Button } from '@/presentation/components/ui/Button';
 import { Spinner } from '@/presentation/components/Spinner';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import type { RepricingRow } from '@/domain/entities/RepricingEntity';
 import { basePriceText, parsePrice, previewMargin, sanitizePriceInput } from './priceDraft';
 import { pushBlockLabel, pushBlockOf, type RecentActionMap } from './rowActions';
@@ -155,7 +156,7 @@ export function RepricingTable({
               parsed == null ? 'border-red-500 bg-red-50' : 'border-blue-500 bg-blue-50'
             }`}
           />
-          <div className="flex gap-1">
+          <div className="flex gap-1 max-md:flex-wrap">
             <Button
               size="sm"
               disabled={disabled || parsed == null}
@@ -300,10 +301,97 @@ export function RepricingTable({
     );
   };
 
+  // Narrow-screen cards (FEATURE_2610_31 D13 · D22): every table column as label · value with the row checkbox at the
+  // top-left and [마켓 반영] in the button row; 「전체 선택」 sits above the cards. Floating cards — the table sits
+  // inside a group card.
+  const renderCards = () =>
+    rows.map((row) => {
+      const alert = row.below && recent[row.optionId] == null;
+      const belowBreakEven = isBelowBreakEven(row);
+      return (
+        <DataCard
+          key={row.optionId}
+          selection={{
+            checked: selected.includes(row.optionId),
+            onChange: () => onToggle(row.optionId),
+            label: `${row.listingName} ${row.optionName} 선택`,
+            disabled: disabled || row.excluded === 'UNCALCULABLE',
+          }}
+          fields={[
+            {
+              label: '상품(셀) / 옵션',
+              value: (
+                <>
+                  <p className="font-medium">{row.listingName}</p>
+                  <p className="text-xs text-gray-500">{row.optionName}</p>
+                  {(alert || row.excluded != null) && (
+                    <div className="mt-1 flex flex-wrap items-center justify-end gap-1">
+                      {alert && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">대응 필요</span>
+                      )}
+                      {row.excluded === 'MANUAL' && (
+                        <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600">재계산 제외</span>
+                      )}
+                      {row.excluded === 'UNCALCULABLE' && row.excludedReason && (
+                        <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600">
+                          {row.excludedReason}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </>
+              ),
+            },
+            {
+              label: '현재가',
+              value: (
+                <span className={belowBreakEven ? 'font-semibold text-red-700' : undefined}>
+                  {formatWon(row.judgedPrice)}
+                </span>
+              ),
+            },
+            { label: '현재 마진', value: marginCell(row) },
+            {
+              label: '손익분기가',
+              value: (
+                <>
+                  <span>{formatWon(row.breakEvenPrice)}</span>
+                  {belowBreakEven && (
+                    <span className="ml-1 text-red-700" aria-label="현재가가 손익분기가보다 낮습니다">
+                      ⚠
+                    </span>
+                  )}
+                </>
+              ),
+            },
+            { label: '새 판매가', value: priceCell(row) },
+            { label: '비용 내역', value: costDetail(row) },
+            { label: '반영', value: statusCell(row) },
+          ]}
+          actions={pushCell(row)}
+        />
+      );
+    });
+
   return (
     // 🔴 `table-fixed` + colgroup 으로 열 폭을 카드 안에 가둔다(2609_44 / PLAN D5) — 폭 합이 100% 라
     //    어떤 화면 폭에서도 표가 카드를 넘지 않는다. 넘치던 원인은 `list-table-scroll`(최소폭 736px +
     //    nowrap)이었고, 그래서 이 표는 그 클래스를 쓰지 않는다.
+    <DataCardSwitch
+      placement="nested"
+      renderCards={renderCards}
+      cardsToolbar={
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            disabled={disabled || selectableIds.length === 0}
+            onChange={(e) => onToggleAll(selectableIds, e.target.checked)}
+          />
+          전체 선택
+        </label>
+      }
+    >
     <table className="w-full table-fixed text-sm">
       <colgroup>
         <col className="w-[4%]" />
@@ -426,5 +514,6 @@ export function RepricingTable({
         })}
       </tbody>
     </table>
+    </DataCardSwitch>
   );
 }

@@ -4,6 +4,7 @@ import type { BoxSaving } from '@/domain/entities/PackingSavingsEntity';
 import { formatSaving, savingToneClass } from '@/domain/entities/PackingSavingsEntity';
 import { BoxShape } from '@/presentation/components/BoxShape';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface BoxSavingsTableProps {
   rows: BoxSaving[];
@@ -26,12 +27,66 @@ interface BoxSavingsTableProps {
  * ⚠️ 정렬은 서버가 합계 내림차순으로 준다. 표시 전용이다.
  */
 export function BoxSavingsTable({ rows, isLoading, error }: BoxSavingsTableProps) {
+  // The 「상자」 cell — shared by the table and the narrow-screen cards.
+  const boxCell = (row: BoxSaving) => (
+    <span className="flex items-center gap-2">
+      {/* 사진이 있으면 사진, 없으면 치수 비율 도형(PLAN 2609_40 D26) */}
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center">
+        {row.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={row.imageUrl}
+            alt={`${row.type} 상자 사진`}
+            className="h-11 w-11 rounded border border-gray-200 object-contain"
+          />
+        ) : (
+          <BoxShape widthCm={row.widthCm} lengthCm={row.lengthCm} heightCm={row.heightCm} />
+        )}
+      </span>
+      <span>
+        {row.type}
+        {row.boxKind === 'RECYCLED' && (
+          <span className="ml-2 rounded bg-green-50 px-1.5 py-0.5 text-xs text-green-700">재활용</span>
+        )}
+      </span>
+    </span>
+  );
+
+  // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value.
+  const renderCards = () =>
+    rows.map((row) => (
+      <DataCard
+        key={row.packageId}
+        fields={[
+          { label: '상자', value: boxCell(row) },
+          { label: '박스 수', value: row.parcelCount.toLocaleString('ko-KR') },
+          {
+            label: '상자 절약',
+            value: <span className={savingToneClass(row.boxSaving)}>{formatSaving(row.boxSaving)}</span>,
+          },
+          {
+            label: '택배 절약',
+            value: <span className={savingToneClass(row.deliverySaving)}>{formatSaving(row.deliverySaving)}</span>,
+          },
+          {
+            label: '합계',
+            value: (
+              <span className={`font-semibold ${savingToneClass(row.totalSaving)}`}>
+                {formatSaving(row.totalSaving)}
+              </span>
+            ),
+          },
+        ]}
+      />
+    ));
+
   return (
     <TableCard
       isLoading={isLoading && rows.length === 0}
       isEmpty={rows.length === 0}
       error={error || undefined}
       emptyMessage="이 기간에 포장한 박스가 없습니다."
+      renderCards={renderCards}
     >
       {isLoading && rows.length > 0 && (
         <div className="px-6 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
@@ -51,35 +106,7 @@ export function BoxSavingsTable({ rows, isLoading, error }: BoxSavingsTableProps
         <tbody className="divide-y divide-gray-200">
           {rows.map((row) => (
             <tr key={row.packageId}>
-              <td className="px-6 py-3 text-sm text-gray-700">
-                <span className="flex items-center gap-2">
-                  {/* 사진이 있으면 사진, 없으면 치수 비율 도형(PLAN 2609_40 D26) */}
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center">
-                    {row.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={row.imageUrl}
-                        alt={`${row.type} 상자 사진`}
-                        className="h-11 w-11 rounded border border-gray-200 object-contain"
-                      />
-                    ) : (
-                      <BoxShape
-                        widthCm={row.widthCm}
-                        lengthCm={row.lengthCm}
-                        heightCm={row.heightCm}
-                      />
-                    )}
-                  </span>
-                  <span>
-                    {row.type}
-                    {row.boxKind === 'RECYCLED' && (
-                      <span className="ml-2 rounded bg-green-50 px-1.5 py-0.5 text-xs text-green-700">
-                        재활용
-                      </span>
-                    )}
-                  </span>
-                </span>
-              </td>
+              <td className="px-6 py-3 text-sm text-gray-700">{boxCell(row)}</td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">
                 {row.parcelCount.toLocaleString('ko-KR')}
               </td>

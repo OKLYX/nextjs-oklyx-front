@@ -30,7 +30,8 @@ interface ListViewStore {
 export const useListViewStore = create<ListViewStore>()(
   persist(
     (set) => ({
-      viewMode: 'table',
+      // First view below 768px = cards (FEATURE_2610_31 D13). A mode the user picked stays in localStorage.
+      viewMode: 'card',
       toggleViewMode: () =>
         set((state) => ({ viewMode: state.viewMode === 'table' ? 'card' : 'table' })),
       setViewMode: (viewMode) => set({ viewMode }),

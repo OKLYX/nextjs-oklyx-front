@@ -48,7 +48,7 @@ export function DetailPagePane({
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex rounded-lg bg-gray-100 p-1">
+      <div className="inline-flex rounded-lg bg-gray-100 p-1 max-md:flex-wrap">
         {SUBS.map((s) => (
           <button
             key={s.key}

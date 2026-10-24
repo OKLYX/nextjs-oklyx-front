@@ -289,7 +289,7 @@ export function CategoryMetaFields({
       </div>
 
       {tabbed && (
-        <div className="mb-3 flex gap-1 border-b border-gray-200">
+        <div className="mb-3 flex gap-1 border-b border-gray-200 max-md:flex-wrap">
           {tabs.map((t) => (
             <button
               key={t.key}
@@ -328,7 +328,7 @@ export function CategoryMetaFields({
                   {isPairRequired(p) && <span className="text-red-600"> *</span>}
                   <span className="ml-1 font-normal text-gray-400">(중량·용량 중 택1)</span>
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 max-md:flex-wrap">
                   <select
                     className="w-24 shrink-0 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
                     value={unit}

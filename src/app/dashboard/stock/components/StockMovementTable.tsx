@@ -5,6 +5,7 @@ import {
   STOCK_MOVEMENT_TYPE_LABELS,
   STOCK_REASON_LABELS,
 } from '@/domain/entities/StockEntity';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 /**
  * 재고 원장 이력 표 (FEATURE_2609_28).
@@ -27,6 +28,8 @@ interface StockMovementTableProps {
   /** 이미 판매자로 좁혀진 문맥(잔량 행 펼침 등)에서는 열을 숨긴다. */
   showSeller?: boolean;
   emptyMessage?: string;
+  /** Where the narrow-screen cards sit (FEATURE_2610_31 D25): `page` (default) or `nested` (inside a table row). */
+  cardPlacement?: 'page' | 'nested';
 }
 
 export function StockMovementTable({
@@ -35,6 +38,7 @@ export function StockMovementTable({
   error,
   showSeller = true,
   emptyMessage = '이력이 없습니다.',
+  cardPlacement = 'page',
 }: StockMovementTableProps) {
   if (error) {
     return (
@@ -56,8 +60,53 @@ export function StockMovementTable({
     return <p className="text-sm text-gray-500">{emptyMessage}</p>;
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D37): the app's movement line — 「MM-DD」, the product name, then
+  // 「유형 · 사유 · 판매자 · 처리자」 (「사유」 「기타」 with a note reads 「기타 · 메모」; the seller shows even where the
+  // table hides its column — the app line always has it) and the signed quantity on the right; the table's 「메모」
+  // at the bottom when the reason is not 「기타」.
+  const renderCards = () =>
+    movements.map((movement) => {
+      const note = movement.reasonNote?.trim() ?? '';
+      const reasonText =
+        movement.reason === 'ETC' && note
+          ? `기타 · ${note}`
+          : movement.reason
+            ? (STOCK_REASON_LABELS[movement.reason] ?? movement.reason)
+            : '';
+      const detail = [
+        STOCK_MOVEMENT_TYPE_LABELS[movement.movementType] ?? movement.movementType,
+        reasonText,
+        movement.sellerName,
+        movement.createdBy ?? '',
+      ]
+        .filter((part) => part)
+        .join(' · ');
+      return (
+        <DataCard
+          key={movement.id}
+          body={
+            <div className="flex items-start gap-2">
+              <span className="w-[46px] shrink-0 text-xs text-gray-500">
+                {movement.movedOn.length >= 10 ? movement.movedOn.slice(5, 10) : movement.movedOn}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium text-gray-900">{movement.productName}</p>
+                <p className="line-clamp-2 text-[11px] text-gray-500">{detail}</p>
+              </div>
+              <span
+                className={`shrink-0 text-sm font-bold ${movement.quantity >= 0 ? 'text-blue-700' : 'text-red-600'}`}
+              >
+                {movement.quantity >= 0 ? `+${movement.quantity}` : `−${Math.abs(movement.quantity)}`}
+              </span>
+            </div>
+          }
+          extraFields={[{ label: '메모', value: movement.reason === 'ETC' ? '' : (movement.reasonNote ?? '') }]}
+        />
+      );
+    });
+
   return (
-    <div className="list-table-scroll">
+    <DataCardSwitch placement={cardPlacement} renderCards={renderCards} className="list-table-scroll">
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-200">
           <tr>
@@ -100,6 +149,6 @@ export function StockMovementTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </DataCardSwitch>
   );
 }
