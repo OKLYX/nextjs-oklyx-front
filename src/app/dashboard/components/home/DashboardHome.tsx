@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
 import { gridBounds } from 'react-grid-layout/core';
 import 'react-grid-layout/css/styles.css';
-import { DASHBOARD_CARD_SPECS, NARROW_GRID, WEB_GRID, narrowHeight } from '@/config/dashboardGrid';
+import { DASHBOARD_CARD_SPECS, NARROW_GRID, WEB_GRID, channelChartRows, narrowHeight } from '@/config/dashboardGrid';
 import { DashboardUseCase } from '@/application/usecases/DashboardUseCase';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { DashboardRepositoryImpl } from '@/infrastructure/repositories/DashboardRepositoryImpl';
@@ -147,7 +147,7 @@ export function DashboardHome() {
 
   const addable = visibleTypes(admin).filter((type) => !cards.some((card) => card.type === type));
 
-  const renderCard = (card: Pick<WebCard, 'type' | 'period'>, narrow: boolean) => {
+  const renderCard = (card: Pick<WebCard, 'type' | 'period'>, narrow: boolean, h: number) => {
     const spec = DASHBOARD_CARD_SPECS[card.type];
     const common = { editing: narrow ? false : editing, onRemove: () => removeCard(card.type) };
     const onPeriodChange = (period: DashboardPeriod) =>
@@ -184,6 +184,8 @@ export function DashboardHome() {
             period={card.period ?? 'DAYS_7'}
             onPeriodChange={onPeriodChange}
             sellers={sellers}
+            rows={channelChartRows(narrow, h)}
+            narrow={narrow}
             {...common}
           />
         );
@@ -254,7 +256,7 @@ export function DashboardHome() {
           >
             {narrowCards.map((card) => (
               <div key={card.type} style={{ gridColumn: `span ${card.w}`, height: `${narrowHeight(card.type)}px` }}>
-                {renderCard(card, true)}
+                {renderCard(card, true, 1)}
               </div>
             ))}
           </div>
@@ -275,7 +277,7 @@ export function DashboardHome() {
             onLayoutChange={(layout) => setCards((current) => fromGridLayout(current, layout))}
           >
             {cards.map((card) => (
-              <div key={card.type}>{renderCard(card, false)}</div>
+              <div key={card.type}>{renderCard(card, false, card.h)}</div>
             ))}
           </ReactGridLayout>
         )}
