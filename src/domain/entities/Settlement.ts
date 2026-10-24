@@ -273,7 +273,7 @@ export interface ReconLineQuery {
 }
 
 /**
- * This month's payouts summed across sellers and channels — `GET /api/admin/settlement/month-summary`
+ * This month's payouts summed across channels (one seller or every seller) — `GET /api/admin/settlement/month-summary`
  * (FEATURE_2610_29 D26 · D30). The server picks this month in KST; a payout belongs to the month of its confirmed
  * payout date, else its scheduled payout date.
  *
