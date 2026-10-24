@@ -29,8 +29,8 @@ const spec = DASHBOARD_CARD_SPECS.SETTLEMENT_PAYOUTS;
  * The seller selector narrows the sums to one seller, like the chart cards: it starts at 「전체」 and is not saved.
  *
  * Both widths use the app's two tiers — the total on top, paid on the left and remaining on the right under it.
- * - Wide: one grid row (120px), so the total's label and amount share a line and the type is smaller.
- * - Narrow (`narrowTall`): each label above its amount.
+ * - Wide: two grid rows high (`minH: 2`), so the tiers get room; a stored one-row card grows to two on load.
+ * - Narrow (`narrowTall`): the same tiers, tighter.
  */
 export function PayoutCard({ sellers, editing, onRemove, narrow }: PayoutCardProps) {
   const useCase = useMemo(() => new SettlementUseCase(new SettlementRepositoryImpl()), []);
@@ -66,19 +66,19 @@ export function PayoutCard({ sellers, editing, onRemove, narrow }: PayoutCardPro
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-1">
-              <div className="flex min-w-0 items-baseline gap-2">
-                <p className="shrink-0 text-xs text-gray-500">이번 달 지급 예정 총액</p>
-                <p className="truncate text-base leading-5 font-bold text-gray-900">{formatMoney(total)}원</p>
+            <div className="flex h-full flex-col justify-center gap-5 px-1">
+              <div className="min-w-0">
+                <p className="truncate text-sm text-gray-500">이번 달 지급 예정 총액</p>
+                <p className="mt-1 truncate text-2xl font-bold text-gray-900">{formatMoney(total)}원</p>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-4 border-t border-gray-200 pt-4">
                 <div className="min-w-0">
-                  <p className="truncate text-xs text-gray-500">지금까지 지급된 금액</p>
-                  <p className="truncate text-sm font-bold text-gray-900">{formatMoney(paid)}원</p>
+                  <p className="truncate text-sm text-gray-500">지금까지 지급된 금액</p>
+                  <p className="mt-1 truncate text-lg font-bold text-gray-900">{formatMoney(paid)}원</p>
                 </div>
                 <div className="min-w-0 text-right">
-                  <p className="truncate text-xs text-gray-500">남은 지급 예정 금액</p>
-                  <p className="truncate text-sm font-bold text-gray-900">{formatMoney(remaining)}원</p>
+                  <p className="truncate text-sm text-gray-500">남은 지급 예정 금액</p>
+                  <p className="mt-1 truncate text-lg font-bold text-gray-900">{formatMoney(remaining)}원</p>
                 </div>
               </div>
             </div>

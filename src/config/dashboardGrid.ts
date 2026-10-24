@@ -98,7 +98,7 @@ export const DASHBOARD_CARD_SPECS: Record<DashboardCardType, DashboardCardSpec> 
   OPEN_CLAIMS: { title: '처리 안 된 반품 · 교환', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.ORDERS_CLAIMS, periods: [], defaultPeriod: null },
   UNANSWERED_INQUIRIES: { title: '답 안 한 고객문의', adminOnly: false, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.ORDERS_INQUIRIES, periods: [], defaultPeriod: null },
   PERIOD_SALES: { title: '기간 매출', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_SUMMARY, periods: ['TODAY', 'DAYS_7', 'THIS_MONTH'], defaultPeriod: 'THIS_MONTH' },
-  SETTLEMENT_PAYOUTS: { title: '정산 지급', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SETTLEMENT_PAYOUTS, periods: [], defaultPeriod: null, narrowTall: true },
+  SETTLEMENT_PAYOUTS: { title: '정산 지급', adminOnly: true, minW: 2, minH: 2, initW: 2, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SETTLEMENT_PAYOUTS, periods: [], defaultPeriod: null, narrowTall: true },
   PURCHASE_LIST: { title: '구매목록 남은 품목', adminOnly: true, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.PURCHASE_LIST, periods: [], defaultPeriod: null },
   RESERVED_SHIPMENTS: { title: '예약 발송', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, narrowMinW: 2, narrowInitW: 2, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
   DAILY_SALES_CHART: { title: '날짜별 매출 · 주문 수', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_SUMMARY, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7', narrowTall: true },
