@@ -168,7 +168,7 @@ export function ElevenstShippingFields({
       {showPlaces && (
         <section className="space-y-2">
           <h3 className="text-sm font-semibold text-gray-900">출고지 · 반품/교환지</h3>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {renderPlace('출고지', ELEVENST_KEYS.outboundSeq, outbound)}
             {renderPlace('반품/교환지', ELEVENST_KEYS.returnSeq, returns)}
           </div>
@@ -177,7 +177,7 @@ export function ElevenstShippingFields({
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-gray-900">배송</h3>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {renderSelect('배송 가능 지역', ELEVENST_KEYS.areaCode, ELEVENST_AREA_OPTIONS)}
           {renderSelect('배송 방법', ELEVENST_KEYS.method, ELEVENST_METHOD_OPTIONS)}
           {method === '01' && (
@@ -215,7 +215,7 @@ export function ElevenstShippingFields({
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-gray-900">배송비</h3>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {renderSelect('배송비 종류', ELEVENST_KEYS.feeType, ELEVENST_FEE_TYPE_OPTIONS)}
           {renderSelect('결제 방법', ELEVENST_KEYS.payType, ELEVENST_PAY_TYPE_OPTIONS)}
           {(feeType === '02' || feeType === '03') && renderAmount('배송비', ELEVENST_KEYS.fee)}
@@ -235,7 +235,7 @@ export function ElevenstShippingFields({
               <p className="text-xs text-gray-500">구간을 넣지 않으면 기본값을 그대로 씁니다.</p>
             )}
             {tiers.map((tier, index) => (
-              <div key={index} className="flex items-center gap-2 text-sm">
+              <div key={index} className="flex items-center gap-2 text-sm max-md:flex-wrap">
                 <input
                   type="number"
                   min={1}
@@ -245,7 +245,7 @@ export function ElevenstShippingFields({
                   className={inputClass}
                   aria-label={`${index + 1}구간 시작 수량`}
                 />
-                <span className="shrink-0 text-gray-600">개 이상</span>
+                <span className="shrink-0 text-gray-600 max-md:min-w-0 max-md:truncate">개 이상</span>
                 {index < tiers.length - 1 ? (
                   <>
                     <input
@@ -271,7 +271,7 @@ export function ElevenstShippingFields({
                   className={inputClass}
                   aria-label={`${index + 1}구간 배송비`}
                 />
-                <span className="shrink-0 text-gray-600">원</span>
+                <span className="shrink-0 text-gray-600 max-md:min-w-0 max-md:truncate">원</span>
                 <button
                   type="button"
                   onClick={() => removeTier(index)}
@@ -297,7 +297,7 @@ export function ElevenstShippingFields({
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-gray-900">추가 배송비 · 반품/교환</h3>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {renderAmount('제주 추가 배송비', ELEVENST_KEYS.jejuFee)}
           {renderAmount('도서산간 추가 배송비', ELEVENST_KEYS.islandFee)}
           {renderAmount('반품 배송비(편도)', ELEVENST_KEYS.returnFee)}

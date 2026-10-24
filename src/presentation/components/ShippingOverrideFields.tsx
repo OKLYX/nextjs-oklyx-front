@@ -174,7 +174,7 @@ export function ShippingOverrideFields({
   ) => (
     <div>
       <label className={labelClass}>{label}</label>
-      <div className="flex gap-2">
+      <div className="flex gap-2 max-md:flex-wrap">
         {options.map((o) => (
           <button
             key={o.value}
@@ -250,7 +250,7 @@ export function ShippingOverrideFields({
               <p className="text-xs text-gray-500">출고지 목록을 불러오는 중...</p>
             ) : outbound.length > 0 ? (
               value.outboundShippingPlaceCode ? (
-                <div className="flex items-center justify-between gap-3 rounded-md border border-gray-200 p-3">
+                <div className="flex items-center justify-between gap-3 rounded-md border border-gray-200 p-3 max-md:flex-wrap">
                   <div className="min-w-0 text-sm">
                     <p className="truncate font-medium text-gray-900">
                       {outboundName || value.outboundShippingPlaceCode}
@@ -259,7 +259,7 @@ export function ShippingOverrideFields({
                       <p className="truncate text-xs text-gray-500">{value.outboundShippingPlaceCode}</p>
                     )}
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 gap-2 max-md:flex-wrap">
                     <button
                       type="button"
                       onClick={() => setOutboundPickerOpen(true)}
@@ -328,7 +328,7 @@ export function ShippingOverrideFields({
         {/* Delivery settings */}
         <section className="space-y-2">
           <h3 className="text-sm font-semibold text-gray-900">배송설정</h3>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {renderToggle(
               '도서산간 배송',
               value.remoteAreaDeliverable,
@@ -459,7 +459,7 @@ export function ShippingOverrideFields({
           </div>
 
           {/* 배송방법 = 배송비 유형 하단, 추가 안내문구 = 배송방법 옆 (주문제작/설치배송 시). */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div>
               <label className={labelClass}>배송방법</label>
               <select
@@ -537,7 +537,7 @@ export function ShippingOverrideFields({
               <p className="text-xs text-gray-500">반품지 목록을 불러오는 중...</p>
             ) : returns.length > 0 ? (
               value.returnCenterCode ? (
-                <div className="flex items-start justify-between gap-3 rounded-md border border-gray-200 p-3">
+                <div className="flex items-start justify-between gap-3 rounded-md border border-gray-200 p-3 max-md:flex-wrap">
                   <div className="min-w-0 text-sm">
                     <p className="truncate font-medium text-gray-900">
                       {value.returnChargeName || value.returnCenterCode}
@@ -549,7 +549,7 @@ export function ShippingOverrideFields({
                       <p className="truncate text-xs text-gray-500">{value.returnContactNumber}</p>
                     )}
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 gap-2 max-md:flex-wrap">
                     <button
                       type="button"
                       onClick={() => setReturnPickerOpen(true)}
@@ -625,7 +625,7 @@ export function ShippingOverrideFields({
                   disabled={disabled}
                   className={inputClass}
                 />
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div>
                     <label className={labelClass}>반품지명</label>
                     <input
@@ -686,7 +686,7 @@ export function ShippingOverrideFields({
         <section className="space-y-2">
           <h3 className="text-sm font-semibold text-gray-900">반품 배송비</h3>
           <div className="rounded-md border border-gray-200 p-3 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div>
                 <label className={labelClass}>초도배송(편도)</label>
                 <input

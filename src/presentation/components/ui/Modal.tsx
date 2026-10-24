@@ -277,7 +277,7 @@ export function Modal({
             </div>
 
             {footer && (
-              <div className="flex shrink-0 justify-end gap-3 p-6 pt-4">{footer}</div>
+              <div className="flex shrink-0 justify-end gap-3 p-6 pt-4 max-md:flex-wrap">{footer}</div>
             )}
           </Dialog.Content>
         </Dialog.Portal>

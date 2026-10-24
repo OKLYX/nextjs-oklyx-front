@@ -12,10 +12,10 @@ export interface TreeNode<TId extends string | number> {
 }
 
 /**
- * 카테고리 트리 miller-columns 드릴다운(Finder 컬럼뷰). 부모별 자식을 컬럼으로
- * append 하며 좌→우로 탐색하고, leaf 클릭 시 선택을 확정한다.
+ * Category tree as miller columns (Finder column view). Appends each parent's children as a column and is browsed
+ * left → right; a leaf click confirms the pick.
  *
- * 마스터 **생성 모달**과 표준 카테고리 **관리 화면** 양쪽에서 재사용한다(중복 구현 금지).
+ * Reused by the master **create form** and the standard category **management screen** (do not build a second one).
  *
  * @example
  * const browseTree = useCallback((pid?: number) => categoryUseCase.browseTree(pid), [categoryUseCase]);
@@ -25,26 +25,32 @@ export interface TreeNode<TId extends string | number> {
  *   onSelectLeaf={(leaf) => { setSelectedCategoryId(leaf.id); setSelectedCategoryName(leaf.name); }}
  * />
  *
- * ⚠️ 필수 규칙:
- * - `browse` 는 부모가 주입한다(`categoryUseCase.browseTree`). 컴포넌트 내부에서 신규 useCase 를
- *   만들지 말 것. 재-mount 무한 루프를 피하려면 부모에서 `useCallback` 으로 감싼 안정된 참조를 넘긴다.
- * - 노드는 얇게(id/name/leaf) 유지 — 매핑 배지·부모 정보는 노드에 싣지 않고, leaf 선택 시
- *   부모(관리 화면 우측 패널)가 별도로 fetch 한다.
- * - `onSelectLeaf` 는 leaf 에서만 발화한다(비-leaf 는 드릴다운만).
- * - `expandTo`(선택) = root→…→target 조상 id 체인. 넘기면 그 경로로 컬럼을 펼쳐 target 을 노출한다
- *   (검색 결과에서 항목을 골랐을 때 트리로 되짚어 보여주는 용도). 값이 바뀔 때마다 그 경로로 재구성한다.
+ * ⚠️ Required rules:
+ * - The parent injects `browse` (`categoryUseCase.browseTree`). Do not create a new use case inside the component.
+ *   Pass a stable reference wrapped in `useCallback` in the parent to avoid an endless re-mount loop.
+ * - Keep nodes thin (id/name/leaf) — mapping badges and parent info are not on the node; on a leaf pick the parent
+ *   (the management screen's right panel) fetches them separately.
+ * - `onSelectLeaf` fires on leaves only (a non-leaf only drills down).
+ * - `expandTo` (optional) = the root→…→target ancestor id chain. When given, the columns open along that path to
+ *   show the target (used to trace a search result back in the tree). The columns are rebuilt whenever it changes.
  *
- * ⚠️ 카테고리 추가(관리 화면 전용, optional):
- * - `addMode` + `onCreateCategory` 를 함께 넘기면 **각 컬럼(=layer) 최상단에 `+ 여기에 추가` 버튼**이
- *   뜬다. 그 컬럼의 부모(=컬럼의 `parentId`) 밑에 새 카테고리를 만든다(root 컬럼 = 최상위 추가).
- * - `addMode` 에서 leaf 를 클릭하면 빈 자식 컬럼이 펼쳐져 그 leaf 밑에 **첫 자식**도 추가할 수 있다
- *   (leaf 는 자식이 생기면 비-leaf 로 전환 → 상품 선택 대상에서 빠짐).
- * - `onCreateCategory(parentId, name)` 는 부모가 실제 생성(+검색 캐시 무효화)을 담당한다. 성공 후
- *   컴포넌트가 해당 컬럼(과 부모 컬럼)만 재조회해 새 노드를 보여준다(전체 remount 안 함 → 위치 보존).
- * - 두 prop 모두 optional → 넘기지 않는 기존 사용처(생성 모달 등)엔 `+` UI 가 없다.
+ * ⚠️ Below 768px (FEATURE_2610_31 D36): only the last column is drawn, as wide as the tree, with a path row above
+ *   it — 「전체 › {step} › …」. 「전체」 goes back to the first column; a step goes back to that step's children
+ *   column (same rule as the app's `category_tree_list.dart`). A step is listed while its children column is open.
+ *   CSS only (`max-md:` classes) — the column state is the same at every width.
  *
- * ⚠️ id 타입(`TId`)은 `browse` 에서 추론된다 — 표준 카테고리 = number, 마켓 카테고리 고르는 창 = 마켓 코드
- * string(`CategoryLookupPickerModal`). 값을 해석하지 않고 `browse` 에 그대로 돌려준다.
+ * ⚠️ Adding a category (management screen only, optional):
+ * - With `addMode` + `onCreateCategory`, **a `+ 여기에 추가` button at the top of each column (= layer)** appears.
+ *   It creates a category under that column's parent (= the column's `parentId`); the root column = add at the top.
+ * - In `addMode` a leaf click opens an empty child column so a **first child** can be added under that leaf
+ *   (a leaf turns non-leaf once it has a child → no longer a product pick).
+ * - `onCreateCategory(parentId, name)` does the real create (+ search cache invalidation) in the parent. After
+ *   success the component reloads only that column (and its parent column) to show the new node (no full remount
+ *   → the position stays).
+ * - Both props are optional → existing callers that do not pass them (the create form etc.) get no `+` UI.
+ *
+ * ⚠️ The id type (`TId`) is inferred from `browse` — standard category = number, the market category picker =
+ * market code string (`CategoryLookupPickerModal`). The value is not interpreted, only handed back to `browse`.
  */
 interface CategoryTreeColumnsProps<TId extends string | number> {
   browse: (parentId?: TId) => Promise<TreeNode<TId>[]>;
@@ -236,17 +242,51 @@ export function CategoryTreeColumns<TId extends string | number = number>({
     }
   }, [columns, selectedId]);
 
+  // Path row below 768px: 「전체」 = the first column only; step i = show the children column of path[i] (D36).
+  const goRoot = () => {
+    setAddingCol(null);
+    setColumns((prev) => prev.slice(0, 1));
+    setPath([]);
+  };
+  const goStep = (i: number) => {
+    setAddingCol(null);
+    setColumns((prev) => prev.slice(0, i + 2));
+    setPath((prev) => prev.slice(0, i + 1));
+  };
+
   const canAdd = Boolean(addMode && onCreateCategory);
+  const lastCol = columns.length - 1;
 
   return (
     <div
       ref={containerRef}
-      className="flex gap-2 overflow-x-auto rounded border border-gray-200 bg-gray-50 p-2"
+      className="flex gap-2 overflow-x-auto rounded border border-gray-200 bg-gray-50 p-2 max-md:flex-col"
     >
+      <nav aria-label="카테고리 경로" className="flex flex-wrap items-center gap-1 text-sm md:hidden">
+        <button type="button" onClick={goRoot} className="rounded px-1 text-gray-900 hover:bg-gray-100">
+          전체
+        </button>
+        {path.map((node, i) =>
+          i + 1 <= lastCol ? (
+            <span key={String(node.id)} className="flex items-center gap-1">
+              <span className="text-gray-500">›</span>
+              <button
+                type="button"
+                onClick={() => goStep(i)}
+                className="rounded px-1 text-gray-900 hover:bg-gray-100"
+              >
+                {node.name}
+              </button>
+            </span>
+          ) : null
+        )}
+      </nav>
       {columns.map((column, col) => (
         <div
           key={col}
-          className="min-w-[200px] shrink-0 rounded border border-gray-200 bg-white"
+          className={`min-w-[200px] shrink-0 rounded border border-gray-200 bg-white ${
+            col === lastCol ? 'max-md:w-full max-md:min-w-0' : 'max-md:hidden'
+          }`}
         >
           {/* Add-category row at the top of each layer (management screen, add-mode). */}
           {canAdd && !column.loading && (
@@ -265,7 +305,7 @@ export function CategoryTreeColumns<TId extends string | number = number>({
                     placeholder="새 카테고리 이름"
                     className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 max-md:flex-wrap">
                     <button
                       type="button"
                       onClick={() => void submitAdd(col)}
