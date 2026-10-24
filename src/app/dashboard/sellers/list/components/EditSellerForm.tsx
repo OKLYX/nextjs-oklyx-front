@@ -146,7 +146,7 @@ export function EditSellerForm({
         )}
       </div>
 
-      <div className="flex gap-2 pt-2">
+      <div className="flex gap-2 pt-2 max-md:flex-wrap">
         <button
           type="button"
           onClick={handleCancel}

@@ -214,7 +214,7 @@ export function ElevenstCancelRequests({
                 </p>
               </div>
               {isAdmin && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 max-md:flex-wrap">
                   <Button variant="danger" size="sm" disabled={isSending} onClick={() => setApproveTarget(request)}>
                     취소 승인
                   </Button>

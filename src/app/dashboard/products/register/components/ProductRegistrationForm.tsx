@@ -341,7 +341,7 @@ export function ProductRegistrationForm({
             <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
               바코드 ID
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-md:flex-wrap">
               <div className="flex-1">
                 <Input
                   id="barcodeId"
@@ -407,7 +407,7 @@ export function ProductRegistrationForm({
             {errors.barcodeId && <p className="text-red-600 text-sm mt-1">{errors.barcodeId.message}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="brand" className="block text-sm font-medium text-gray-900 mb-1">
                 브랜드
@@ -451,7 +451,7 @@ export function ProductRegistrationForm({
 
           <div className="border-t border-gray-200 pt-4 space-y-4">
           <h3 className="text-base font-semibold text-gray-900">중량 / 수량</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
                 내용물 양
@@ -499,7 +499,7 @@ export function ProductRegistrationForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="countQuantity" className="block text-sm font-medium text-gray-900 mb-1">
                 개수
@@ -554,7 +554,7 @@ export function ProductRegistrationForm({
 
           <div className="border-t border-gray-200 pt-4 space-y-4">
             <h3 className="text-base font-semibold text-gray-900">부피</h3>
-            <div className={embedded ? 'flex flex-col gap-6' : 'flex flex-col sm:flex-row gap-6'}>
+            <div className={embedded ? 'flex flex-col gap-6' : 'flex flex-col sm:flex-row gap-6 max-md:flex-wrap'}>
               <VolumeDiagram embedded={embedded} />
               <div className="flex-1 space-y-4">
                 <div>

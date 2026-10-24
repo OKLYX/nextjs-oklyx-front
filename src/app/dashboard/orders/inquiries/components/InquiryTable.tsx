@@ -7,6 +7,8 @@ import type { Inquiry, InquiryStatus } from '@/domain/entities/InquiryEntity';
 import { channelOptionLabel } from '@/app/dashboard/orders/components/OrderSearchCard';
 import { Pagination } from '@/presentation/components/Pagination';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { Button } from '@/presentation/components/ui/Button';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface InquiryTableProps {
   inquiries: Inquiry[];
@@ -83,10 +85,61 @@ export function InquiryTable({
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D31 · D37): the app's inquiry card — bold 「문의일」 with the status badge
+  // on the right (「미답변」 in the brand colour), the product, the content (two lines), the channel and 「답변일 …」;
+  // the table's 「유형」 at the bottom. A tap opens the inquiry like a row tap; the 「문의일」 sort sits above the cards.
+  const renderCards = () =>
+    inquiries.map((inquiry) => {
+      const content = inquiry.content?.trim();
+      return (
+        <DataCard
+          key={inquiry.id}
+          onClick={() => router.push(`${ROUTES.ORDERS_INQUIRIES}/${inquiry.id}`)}
+          title={<span className="line-clamp-1">{formatDate(inquiry.inquiredAt)}</span>}
+          trailing={
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] ${
+                inquiry.status === 'UNANSWERED' ? 'bg-brand text-gray-900' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              {INQUIRY_STATUS_LABEL[inquiry.status]}
+            </span>
+          }
+          body={
+            <div className="space-y-1.5">
+              <p className="truncate text-[13px] text-gray-500">{inquiry.itemName ?? '-'}</p>
+              <p className="line-clamp-2 text-sm text-gray-900">{content ? content : '-'}</p>
+              <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                <span>{channelOptionLabel(inquiry.marketplaceAccountId, inquiry.accountAlias)}</span>
+                {inquiry.answeredAt && <span>답변일 {formatDate(inquiry.answeredAt)}</span>}
+              </p>
+            </div>
+          }
+          extraFields={[{ label: '유형', value: typeLabelMap[inquiry.inquiryType] ?? inquiry.inquiryType }]}
+        />
+      );
+    });
+
   return (
     <TableCard
       isLoading={isLoading}
       loadingMessage="조회 중..."
+      renderCards={renderCards}
+      cardsToolbar={
+        <div className="flex items-center gap-2 max-md:flex-wrap">
+          <select
+            aria-label="정렬"
+            value="inquiredAt"
+            onChange={() => undefined}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          >
+            <option value="inquiredAt">문의일</option>
+          </select>
+          <Button type="button" variant="secondary" size="sm" onClick={onToggleSort}>
+            {sortDir === 'asc' ? '▲' : '▼'}
+          </Button>
+        </div>
+      }
       isEmpty={!hasSearched || inquiries.length === 0}
       emptyMessage={hasSearched ? emptyMessage : '조회 조건을 선택하고 [조회]를 눌러 주세요.'}
     >

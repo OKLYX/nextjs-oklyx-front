@@ -159,8 +159,8 @@ export function ProductRelationPanel({
       <div className="space-y-3 p-4">
         {view.kind === 'list' && (
           <>
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-gray-900">
+            <div className="flex items-center justify-between gap-2 max-md:flex-wrap">
+              <h2 className="text-sm font-semibold text-gray-900 max-md:min-w-0 max-md:truncate">
                 구성상품{componentIds ? ` ${componentIds.length}개` : ''}
               </h2>
               {mode === 'create' ? (
@@ -203,7 +203,7 @@ export function ProductRelationPanel({
 
             <div className="border-t border-gray-200 pt-3">
               <p className="mb-1 text-xs font-medium text-gray-600">다른 물품 찾아보기</p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-md:flex-wrap">
                 <Input
                   size="sm"
                   className="min-w-0 flex-1"

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Copy } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import type { ReconLineView } from '@/domain/entities/Settlement';
 import {
   causeLabel,
@@ -34,6 +35,8 @@ interface ReconLineTableProps {
    * 들러붙어 다른 섹션을 덮는다.
    */
   stickyHeader?: boolean;
+  /** Height limit and scroll of the narrow-screen card list (the parent's scroll box, FEATURE_2610_31 D30). */
+  cardsListClassName?: string;
   onCopyIdentifiers: (line: ReconLineView) => void;
 }
 
@@ -46,6 +49,7 @@ export function ReconLineTable({
   loading,
   error,
   stickyHeader = false,
+  cardsListClassName,
   onCopyIdentifiers,
 }: ReconLineTableProps) {
   const [copiedKey, setCopiedKey] = useState('');
@@ -66,8 +70,59 @@ export function ReconLineTable({
     return <div className="px-6 py-4 text-sm text-gray-500">해당하는 판매 건이 없습니다.</div>;
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D30): the app's sale line — product name with [식별자 복사] on the
+  // right, the cause tag, 「주문번호 · 옵션ID」, 「인식일 · 지급일 · 정산유형」, then
+  // 「판매 · 수수료 (율) · 정산 · 차액」; an unmatched line has a gray background.
+  const renderCards = () =>
+    lines.map((line, index) => {
+      const key = lineKey(line, index);
+      const tag = line.unmatched ? '미분류 · 합계 포함' : line.label === 'NONE' ? '' : causeLabel(line.label);
+      return (
+        <DataCard
+          key={key}
+          muted={line.unmatched}
+          title={<span className="font-semibold">{line.productName ?? '—'}</span>}
+          trailing={
+            <button
+              type="button"
+              onClick={() => {
+                onCopyIdentifiers(line);
+                setCopiedKey(key);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100"
+            >
+              <Copy size={12} />
+              {copiedKey === key ? '복사됨' : '식별자 복사'}
+            </button>
+          }
+          body={
+            <div className="text-xs text-gray-500">
+              {tag && <p>{tag}</p>}
+              <p>
+                주문번호 {line.externalOrderId ?? '—'} · 옵션ID {line.platformOptionId ?? '—'}
+              </p>
+              <p>
+                인식일 {line.recognitionDate ?? '—'} · 지급일 {line.settlementDate ?? '—'} ·{' '}
+                {settlementTypeLabel(line.settlementType)}
+              </p>
+              <p className="mt-1 text-gray-900">
+                판매 {formatMoney(line.saleAmount)} · 수수료 {formatMoney(line.serviceFee)} (
+                {formatRatio(line.serviceFeeRatio)}) · 정산 {formatMoney(line.settlementAmount)} · 차액{' '}
+                {formatSigned(line.diff)}
+              </p>
+            </div>
+          }
+        />
+      );
+    });
+
   return (
-    <div className="list-table-scroll border-t border-gray-200">
+    <DataCardSwitch
+      placement="page"
+      renderCards={renderCards}
+      className="list-table-scroll border-t border-gray-200"
+      listClassName={cardsListClassName}
+    >
       <table className="w-full">
         <thead className={`bg-gray-100 border-b border-gray-200 ${stickyHeader ? 'sticky top-0 z-10' : ''}`}>
           <tr className="text-left text-xs font-medium text-gray-500">
@@ -129,6 +184,6 @@ export function ReconLineTable({
           })}
         </tbody>
       </table>
-    </div>
+    </DataCardSwitch>
   );
 }

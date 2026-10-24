@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { ReconBlockB as BlockB, ReconLineView } from '@/domain/entities/Settlement';
 import { causeLabel, formatMoney, formatSigned } from '@/domain/entities/Settlement';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 import { ReconLineTable } from './ReconLineTable';
 
 /**
@@ -47,9 +48,11 @@ export function ReconBlockB({
 }: ReconBlockBProps) {
   // 라벨이 없는데 미분류 보기로 열린 화면 — 원인 분해가 아니라 미분류 목록이다(PLAN 2609_32 D9-1).
   const unmatchedView = unmatchedOnly && blockB.labels.length === 0;
+  const showCards = useShowCards();
 
   return (
-    <section className="bg-white rounded-lg shadow">
+    // Narrow-screen card view: the box is not drawn and the line cards run edge to edge (FEATURE_2610_31 D30).
+    <section className={showCards ? undefined : 'bg-white rounded-lg shadow'}>
       <div className="p-6 space-y-4">
         <div className="flex flex-wrap items-start gap-3">
           <div className="space-y-1">

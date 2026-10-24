@@ -121,7 +121,7 @@ export function MasterFieldValuesPanel({
           {fields.length === 0 && (
             <p className="text-sm text-gray-500">기본 템플릿에 정의된 필드가 없습니다.</p>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {fields.map((f) => (
               <div key={f.key}>
                 <label className="mb-1 block text-xs font-medium text-gray-600">{f.label}</label>

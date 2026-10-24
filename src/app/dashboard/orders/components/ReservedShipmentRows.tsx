@@ -3,6 +3,7 @@
 import { Fragment, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { Button } from '@/presentation/components/ui/Button';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type {
   CarrierOption,
@@ -46,6 +47,11 @@ interface ReservedShipmentRowsProps {
   carrierOptions: CarrierOption[];
   /** 작업이 성공하면 부른다 — 부모가 행을 다시 불러온다. */
   onChanged: () => void;
+  /**
+   * Where the narrow-screen cards sit (FEATURE_2610_31 D25): `page` (default — 「출고관리」) or `nested` (the order
+   * detail popup).
+   */
+  cardPlacement?: 'page' | 'nested';
 }
 
 /**
@@ -59,7 +65,13 @@ interface ReservedShipmentRowsProps {
  * ❌ 판정을 서버와 다르게 만들지 않는다 — 버튼 노출만 가르고 거절은 서버 문구를 그대로 보여준다.
  * ❌ 예약(묶음) 단위로 묶어 그리지 않는다 — 사용자 단위는 주문이다(D30).
  */
-export function ReservedShipmentRows({ rows, useCase, carrierOptions, onChanged }: ReservedShipmentRowsProps) {
+export function ReservedShipmentRows({
+  rows,
+  useCase,
+  carrierOptions,
+  onChanged,
+  cardPlacement = 'page',
+}: ReservedShipmentRowsProps) {
   const [busy, setBusy] = useState<{ id: number; action: Action } | null>(null);
   const [actionError, setActionError] = useState('');
   const [editing, setEditing] = useState<{ id: number; kind: 'time' | 'invoice' } | null>(null);
@@ -99,12 +111,133 @@ export function ReservedShipmentRows({ rows, useCase, carrierOptions, onChanged 
   const label = (row: ReservedShipmentRow, action: Action, text: string, loading: string) =>
     busy?.id === row.id && busy.action === action ? <Spinner label={loading} /> : text;
 
+  // The row buttons — shared by the table and the narrow-screen cards.
+  const rowButtons = (row: ReservedShipmentRow) => (
+    <>
+      {isEditable(row) && (
+        <Button size="sm" variant="secondary" onClick={() => openTime(row)} disabled={busy !== null}>
+          시각 변경
+        </Button>
+      )}
+      {isInvoiceEditable(row) && carrierOptions.length > 0 && (
+        <Button size="sm" variant="secondary" onClick={() => openInvoice(row)} disabled={busy !== null}>
+          송장 수정
+        </Button>
+      )}
+      {row.status === 'STOPPED' && row.result === 'FAILED' && (
+        <Button size="sm" onClick={() => void act(row, 'retry')} disabled={busy !== null}>
+          {label(row, 'retry', '다시 시도', '실행 중...')}
+        </Button>
+      )}
+      {isOpen(row) && row.status !== 'RUNNING' && (
+        <Button size="sm" variant="secondary" onClick={() => void act(row, 'cancel')} disabled={busy !== null}>
+          {label(row, 'cancel', '예약 취소', '처리 중...')}
+        </Button>
+      )}
+    </>
+  );
+
+  // The [시각 변경] · [송장 수정] editor under a row (table) or right under a card (FEATURE_2610_31 D29).
+  const editor = (row: ReservedShipmentRow, kind: 'time' | 'invoice') =>
+    kind === 'time' ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="datetime-local"
+          value={timeValue}
+          onChange={(e) => setTimeValue(e.target.value)}
+          aria-label="새 예약 시각"
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+        />
+        <Button size="sm" onClick={() => void act(row, 'time')} disabled={timeValue === '' || busy !== null}>
+          {label(row, 'time', '저장', '저장 중...')}
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => setEditing(null)} disabled={busy !== null}>
+          취소
+        </Button>
+      </div>
+    ) : (
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={carrierValue}
+          onChange={(e) => setCarrierValue(e.target.value)}
+          aria-label="택배사"
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+        >
+          {carrierOptions.map((option) => (
+            <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
+              {option.carrierName}
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          value={invoiceValue}
+          onChange={(e) => setInvoiceValue(e.target.value)}
+          aria-label="송장번호"
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+        />
+        <Button
+          size="sm"
+          onClick={() => void act(row, 'invoice')}
+          disabled={carrierValue === '' || invoiceValue.trim() === '' || busy !== null}
+        >
+          {label(row, 'invoice', '저장', '저장 중...')}
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => setEditing(null)} disabled={busy !== null}>
+          취소
+        </Button>
+      </div>
+    );
+
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D29): the app's reservation card — bold order number with the result,
+  // status and 「지연 실행」 chips, 「예정 · 실행」, 「송장」, the reason (red when failed) and the row buttons; the editor
+  // opens right under the card, above the next card.
+  const renderCards = () =>
+    rows.map((row) => (
+      <Fragment key={row.id}>
+        <DataCard
+          title={row.externalOrderId}
+          badges={
+            <>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{RESULT_LABEL[row.result]}</span>
+              {isOpen(row) && (row.status === 'RUNNING' || row.status === 'STOPPED') && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+                  {STATUS_LABEL[row.status]}
+                </span>
+              )}
+              {row.firstRunKind === 'DELAYED' && (
+                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-900">지연 실행</span>
+              )}
+            </>
+          }
+          body={
+            <div className="text-xs text-gray-500">
+              <p>
+                예정 {formatKstWallClock(row.executeAt)} · 실행{' '}
+                {row.lastRunAt ? formatKstWallClock(row.lastRunAt) : '-'}
+              </p>
+              <p>송장 {row.invoiceNumber ?? '-'}</p>
+              {row.failureReason && (
+                <p className={row.result === 'FAILED' ? 'text-red-700' : undefined}>{row.failureReason}</p>
+              )}
+            </div>
+          }
+          actions={rowButtons(row)}
+        />
+        {editing?.id === row.id && <div className="bg-gray-50 px-4 py-2">{editor(row, editing.kind)}</div>}
+      </Fragment>
+    ));
+
   return (
     <div className="space-y-2">
       {actionError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">{actionError}</div>
       )}
-      <div className="border border-gray-200 rounded-lg overflow-x-auto">
+      <DataCardSwitch
+        placement={cardPlacement}
+        renderCards={renderCards}
+        className="border border-gray-200 rounded-lg overflow-x-auto"
+      >
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr className="text-left text-xs font-medium text-gray-500">
@@ -138,82 +271,13 @@ export function ReservedShipmentRows({ rows, useCase, carrierOptions, onChanged 
                   <td className="px-4 py-2 whitespace-nowrap">{row.invoiceNumber ?? '-'}</td>
                   <td className={`px-4 py-2 ${row.result === 'FAILED' ? 'text-red-700' : ''}`}>{row.failureReason ?? '-'}</td>
                   <td className="px-4 py-2">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {isEditable(row) && (
-                        <Button size="sm" variant="secondary" onClick={() => openTime(row)} disabled={busy !== null}>
-                          시각 변경
-                        </Button>
-                      )}
-                      {isInvoiceEditable(row) && carrierOptions.length > 0 && (
-                        <Button size="sm" variant="secondary" onClick={() => openInvoice(row)} disabled={busy !== null}>
-                          송장 수정
-                        </Button>
-                      )}
-                      {row.status === 'STOPPED' && row.result === 'FAILED' && (
-                        <Button size="sm" onClick={() => void act(row, 'retry')} disabled={busy !== null}>
-                          {label(row, 'retry', '다시 시도', '실행 중...')}
-                        </Button>
-                      )}
-                      {isOpen(row) && row.status !== 'RUNNING' && (
-                        <Button size="sm" variant="secondary" onClick={() => void act(row, 'cancel')} disabled={busy !== null}>
-                          {label(row, 'cancel', '예약 취소', '처리 중...')}
-                        </Button>
-                      )}
-                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">{rowButtons(row)}</div>
                   </td>
                 </tr>
                 {editing?.id === row.id && (
                   <tr>
                     <td colSpan={7} className="px-4 py-2 bg-gray-50">
-                      {editing.kind === 'time' ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <input
-                            type="datetime-local"
-                            value={timeValue}
-                            onChange={(e) => setTimeValue(e.target.value)}
-                            aria-label="새 예약 시각"
-                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                          />
-                          <Button size="sm" onClick={() => void act(row, 'time')} disabled={timeValue === '' || busy !== null}>
-                            {label(row, 'time', '저장', '저장 중...')}
-                          </Button>
-                          <Button size="sm" variant="secondary" onClick={() => setEditing(null)} disabled={busy !== null}>
-                            취소
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <select
-                            value={carrierValue}
-                            onChange={(e) => setCarrierValue(e.target.value)}
-                            aria-label="택배사"
-                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                          >
-                            {carrierOptions.map((option) => (
-                              <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
-                                {option.carrierName}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="text"
-                            value={invoiceValue}
-                            onChange={(e) => setInvoiceValue(e.target.value)}
-                            aria-label="송장번호"
-                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => void act(row, 'invoice')}
-                            disabled={carrierValue === '' || invoiceValue.trim() === '' || busy !== null}
-                          >
-                            {label(row, 'invoice', '저장', '저장 중...')}
-                          </Button>
-                          <Button size="sm" variant="secondary" onClick={() => setEditing(null)} disabled={busy !== null}>
-                            취소
-                          </Button>
-                        </div>
-                      )}
+                      {editor(row, editing.kind)}
                     </td>
                   </tr>
                 )}
@@ -221,7 +285,7 @@ export function ReservedShipmentRows({ rows, useCase, carrierOptions, onChanged 
             ))}
           </tbody>
         </table>
-      </div>
+      </DataCardSwitch>
     </div>
   );
 }

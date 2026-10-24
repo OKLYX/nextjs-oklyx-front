@@ -13,6 +13,8 @@ import {
   formatProfit,
 } from '@/domain/entities/SalesSummary';
 import { ChannelPayoutList } from '../../components/ChannelPayoutList';
+import { SalesValueRow } from '../../components/SalesValueRow';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 interface SellerChannelRowsProps {
   channels: ChannelSales[];
@@ -74,7 +76,69 @@ export function SellerChannelRows({
     return <div className="py-2 text-sm text-gray-500">이 판매자에게 연결된 판매채널이 없습니다.</div>;
   }
 
+  // Hover text of a channel's fixed cost — shared by the table and the narrow-screen cards.
+  const fixedCostTitle = (channel: ChannelSales) =>
+    channel.platform === 'ELEVENST'
+      ? (channel.fixedCost ?? 0) > 0
+        ? `${channel.fixedCostMonths ?? 0}개월분 · ${ELEVENST_FIXED_COST_HINT}`
+        : ELEVENST_FIXED_COST_HINT
+      : (channel.fixedCost ?? 0) > 0
+        ? `${channel.fixedCostMonths ?? 0}개월분`
+        : undefined;
+
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D25): the app's channel block — 「└ channel」 with [정산 내역 →] on the
+  // right, 「매출액」 · 「할인」 · 「고정비」 · 「순이익(추정)」 · 「정산 추정 금액」 · 「지급확정」 lines, then the channel's payouts. A tap
+  // opens the channel like a row tap. Floating cards — the rows sit inside a seller row.
+  const renderCards = () =>
+    channels.map((channel) => {
+      const channelPayouts = payouts.filter((payout) => payout.accountId === channel.accountId);
+      return (
+        <DataCard
+          key={channel.accountId}
+          onClick={() => onOpenChannel(channel.accountId)}
+          title={<span className="font-semibold text-blue-600">└ {channelLabel(channel)}</span>}
+          trailing={
+            !payoutsLoading && channelPayouts.length > 0 ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenPayout(channelPayouts[0].payoutId);
+                }}
+                className="text-sm text-blue-700 hover:underline"
+              >
+                정산 내역 →
+              </button>
+            ) : undefined
+          }
+          body={
+            <div className="space-y-0.5">
+              <SalesValueRow label="매출액" value={formatMoney(channel.grossSales)} bold />
+              <SalesValueRow label="할인" value={formatMoney(channel.discount)} />
+              <SalesValueRow label="고정비" value={formatFixedCost(channel.fixedCost)} hint={fixedCostTitle(channel)} />
+              <SalesValueRow
+                label="순이익(추정)"
+                value={formatProfit(channel)}
+                hint={channel.costBasisReady ? undefined : PROFIT_PENDING_HINT}
+              />
+              <SalesValueRow label="정산 추정 금액" sub="기간 무관 · 미지급 잔액" value={formatMoney(channel.pendingPayout)} />
+              <SalesValueRow label="지급확정" sub="기간 내 입금" value={formatMoney(channel.paidAmount)} />
+              <div className="pl-3 pt-1 text-xs" onClick={(e) => e.stopPropagation()}>
+                <ChannelPayoutList
+                  payouts={channelPayouts}
+                  isLoading={payoutsLoading}
+                  error={payoutsError}
+                  onOpen={onOpenPayout}
+                />
+              </div>
+            </div>
+          }
+        />
+      );
+    });
+
   return (
+    <DataCardSwitch placement="nested" renderCards={renderCards}>
     <table className="w-full text-sm">
       <thead className="bg-gray-100 border-b border-gray-200">
         <tr className="text-gray-500">
@@ -108,18 +172,7 @@ export function SellerChannelRows({
               <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.grossSales)}</td>
               <td className="px-3 py-2 text-right text-gray-500">{formatMoney(channel.discount)}</td>
               {/* 🔴 경고색을 쓰지 않는다 — 정상 비용이다. 순이익이 `—`(원가 미확정)여도 이 칸은 숫자다(D6). */}
-              <td
-                className="px-3 py-2 text-right text-gray-700"
-                title={
-                  channel.platform === 'ELEVENST'
-                    ? (channel.fixedCost ?? 0) > 0
-                      ? `${channel.fixedCostMonths ?? 0}개월분 · ${ELEVENST_FIXED_COST_HINT}`
-                      : ELEVENST_FIXED_COST_HINT
-                    : (channel.fixedCost ?? 0) > 0
-                      ? `${channel.fixedCostMonths ?? 0}개월분`
-                      : undefined
-                }
-              >
+              <td className="px-3 py-2 text-right text-gray-700" title={fixedCostTitle(channel)}>
                 {formatFixedCost(channel.fixedCost)}
               </td>
               <td
@@ -170,5 +223,6 @@ export function SellerChannelRows({
         })}
       </tbody>
     </table>
+    </DataCardSwitch>
   );
 }

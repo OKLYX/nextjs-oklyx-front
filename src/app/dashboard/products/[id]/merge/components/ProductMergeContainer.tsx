@@ -589,7 +589,7 @@ function SideCard({
 }) {
   return (
     <Card className={isKeep ? 'ring-2 ring-blue-500' : undefined}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 max-md:flex-wrap">
         <label className={`flex items-center gap-2 ${selectable ? 'cursor-pointer' : 'cursor-default'}`}>
           <input
             type="radio"

@@ -93,7 +93,7 @@ export function ClaimRejectForm({
         </div>
       )}
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2 max-md:flex-wrap">
         {/* 기본 포커스는 취소 — 되돌릴 수 없는 쪽에 엔터가 떨어지면 안 된다. */}
         <button
           autoFocus

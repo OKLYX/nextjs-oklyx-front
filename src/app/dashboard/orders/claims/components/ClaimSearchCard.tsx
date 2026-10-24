@@ -55,7 +55,7 @@ export function ClaimSearchCard({
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">판매자</label>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-md:flex-wrap">
             <select
               value={selectedSellerId}
               onChange={(e) => onSellerChange(e.target.value === '' ? '' : Number(e.target.value))}
@@ -107,13 +107,13 @@ export function ClaimSearchCard({
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between max-md:flex-wrap">
           <div>
             {resultCount > 0 && (
               <p className="text-sm text-gray-600">{resultCount}개의 결과</p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-md:flex-wrap">
             {syncDisabledReason && <p className="text-xs text-gray-500">{syncDisabledReason}</p>}
             <button
               onClick={onSync}

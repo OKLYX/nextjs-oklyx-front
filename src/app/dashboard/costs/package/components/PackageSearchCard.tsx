@@ -39,8 +39,8 @@ export function PackageSearchCard({
 }: PackageSearchCardProps) {
   return (
     <Card>
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-4">
-        <div className="flex flex-col sm:flex-row gap-2 flex-1">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-4 max-md:flex-wrap">
+        <div className="flex flex-col sm:flex-row gap-2 flex-1 max-md:flex-wrap">
           <input
             type="text"
             placeholder="패키지 타입 검색..."

@@ -103,7 +103,7 @@ export function MasterBasketControls({ addTarget, allowClear }: MasterBasketCont
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 max-md:flex-wrap">
       {addTarget != null && (
         <Button variant="secondary" onClick={handleAdd} disabled={!mounted || inBasket}>
           {inBasket ? '바구니에 담김' : '바구니에 담기'}
@@ -133,7 +133,7 @@ export function MasterBasketControls({ addTarget, allowClear }: MasterBasketCont
                 ))}
               </ul>
             )}
-            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-4 py-2">
+            <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-4 py-2 max-md:flex-wrap">
               {allowClear && (
                 <Button
                   size="sm"

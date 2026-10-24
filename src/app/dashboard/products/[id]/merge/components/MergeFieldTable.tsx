@@ -2,6 +2,8 @@
 
 import { purchasePlaceNames, type Product } from '@/domain/entities/Product';
 import { Card } from '@/presentation/components/ui/Card';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 import {
   MERGE_FIELDS,
   fieldText,
@@ -46,9 +48,66 @@ export function MergeFieldTable({
   const rows = MERGE_FIELDS.filter(({ key }) => !isSameField(keep, discard, key));
   const showPurchasePlaces = !isSamePurchasePlaces(keep, discard);
   const mergedPlaceNames = purchasePlaceNames({ purchasePlaces: mergedPurchasePlaces(keep, discard) });
+  const showCards = useShowCards();
+
+  // Narrow-screen cards (FEATURE_2610_31 D22 · D30): every table column as label · value; the merged purchase-place
+  // cell (two columns wide) is one value under the first column's label.
+  const renderCards = () => [
+    ...rows.map(({ key, label }) => (
+      <DataCard
+        key={key}
+        fields={[
+          { label: '항목', value: label },
+          {
+            label: '남길 쪽',
+            value: (
+              <ValueRadio
+                name={`merge-field-${key}`}
+                checked={choices[key] === keepSide}
+                value={fieldText(keep, key)}
+                empty={fieldValue(keep, key) === null}
+                disabled={disabled}
+                onSelect={() => onChange(key, keepSide)}
+              />
+            ),
+          },
+          {
+            label: '버릴 쪽',
+            value: (
+              <>
+                <ValueRadio
+                  name={`merge-field-${key}`}
+                  checked={choices[key] === discardSide}
+                  value={fieldText(discard, key)}
+                  empty={fieldValue(discard, key) === null}
+                  disabled={disabled}
+                  onSelect={() => onChange(key, discardSide)}
+                />
+                {key === 'barcodeId' && barcodeConflict && (
+                  <p className="mt-2 text-sm text-red-600">{barcodeConflict}</p>
+                )}
+              </>
+            ),
+          },
+        ]}
+      />
+    )),
+    ...(showPurchasePlaces
+      ? [
+          <DataCard
+            key="purchase-places"
+            fields={[
+              { label: '항목', value: '구매처' },
+              { label: '남길 쪽', value: `합쳐짐 — ${mergedPlaceNames}` },
+            ]}
+          />,
+        ]
+      : []),
+  ];
 
   return (
-    <Card title="항목별로 어느 값을 쓸지">
+    // Narrow-screen card view: the box is not drawn and the cards run edge to edge (FEATURE_2610_31 D30).
+    <Card title="항목별로 어느 값을 쓸지" bare={showCards}>
       {rows.length === 0 && !showPurchasePlaces ? (
         <p className="text-sm text-gray-600">두 물품의 값이 모두 같습니다. 고를 것이 없습니다.</p>
       ) : (
@@ -56,6 +115,7 @@ export function MergeFieldTable({
           <p className="mb-4 text-sm text-gray-600">
             값이 같은 항목은 숨겼습니다. 고르지 않은 항목은 남길 물품의 값이 그대로 남습니다.
           </p>
+          <DataCardSwitch placement="page" renderCards={renderCards}>
           <table className="w-full text-sm">
             <thead className="border-b border-gray-200 bg-gray-100">
               <tr className="text-left text-gray-600">
@@ -103,6 +163,7 @@ export function MergeFieldTable({
               )}
             </tbody>
           </table>
+          </DataCardSwitch>
         </>
       )}
     </Card>

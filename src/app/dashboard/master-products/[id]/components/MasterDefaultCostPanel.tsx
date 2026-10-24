@@ -90,7 +90,7 @@ export function MasterDefaultCostPanel({
       {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">기본 택배비 *</label>
             {isEditing ? (

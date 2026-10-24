@@ -8,6 +8,8 @@ import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelU
 import type { InternalLabelPreview, ShippingLabelExportRow } from '@/application/dto/ShippingLabelDTOs';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { QuantityStepper } from '@/presentation/components/QuantityStepper';
 
 /**
  * 송장 접수시트 미리보기·택배수량 편집 모달 (Shipping Label V2)
@@ -170,7 +172,39 @@ export function ShippingLabelPreviewModal({
         <div className="py-16 text-center text-gray-500">발송 대상 주문이 없습니다.</div>
       ) : (
         <div className="flex-1 overflow-y-auto">
-          <div className="border border-gray-200 rounded-lg list-table-scroll">
+          <DataCardSwitch
+            placement="nested"
+            className="border border-gray-200 rounded-lg list-table-scroll"
+            renderCards={() =>
+              // Narrow-screen cards (FEATURE_2610_31 D14 · D28): the app's sheet line — bold receiver, address head,
+              // the product, 「내품수량 N」 and 「택배수량」 with the shared quantity stepper (min 1).
+              rows.map((row) => (
+                <DataCard
+                  key={row.rowKey}
+                  title={row.receiverName}
+                  body={
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">{addressHead(row.address)}</p>
+                      <p className="text-[13px] text-gray-900">{row.productName}</p>
+                      <div className="flex items-center gap-2 pt-1 text-xs">
+                        <span className="text-gray-500">내품수량 {row.quantity}</span>
+                        <span className="flex-1" />
+                        <span className="text-gray-900">택배수량</span>
+                        <QuantityStepper
+                          className="w-24"
+                          min={1}
+                          ariaLabel={`${row.productName} 택배수량`}
+                          value={String(row.parcelQuantity)}
+                          onChange={(next) => handleParcelChange(row.rowKey, next)}
+                          invalid={invalidRowKey === row.rowKey}
+                        />
+                      </div>
+                    </div>
+                  }
+                />
+              ))
+            }
+          >
             <table>
               <thead className="bg-gray-100 border-b border-gray-200">
                 <tr className="text-left text-xs font-medium text-gray-500">
@@ -205,7 +239,7 @@ export function ShippingLabelPreviewModal({
                 ))}
               </tbody>
             </table>
-          </div>
+          </DataCardSwitch>
         </div>
       )}
 
@@ -215,7 +249,7 @@ export function ShippingLabelPreviewModal({
         </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-6">
+      <div className="flex justify-end gap-2 pt-6 max-md:flex-wrap">
         <button
           onClick={handleClose}
           className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"

@@ -14,6 +14,7 @@ import type {
 } from '@/domain/entities/PurchaseListEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ShareActionCell, TargetMetTag, type ShareActions } from './purchaseShareUi';
@@ -409,7 +410,7 @@ export function PurchaseGroupDetail({
           {/* D71 ③: no stock switch — the stock link setting decides; the notice shows only while it is on. */}
           {stockLinked && <span className="text-xs text-gray-400">입고하면 재고에 바로 더해집니다</span>}
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 max-md:flex-wrap">
             <button
               type="button"
               onClick={toggleHistory}
@@ -518,7 +519,27 @@ export function PurchaseGroupDetail({
 
       {/* Seller shares — 「전체」 only; the seller view puts the buttons on the product row (D59 · D83). */}
       {filterSellerId == null && (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <DataCardSwitch
+          placement="nested"
+          className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+          renderCards={() =>
+            // Narrow-screen cards (FEATURE_2610_31 D14 · D25): the app's seller-share block — seller name and the
+            // target tag, 「필요 · 매입 완료 · 매입 필요」 in one line, the share buttons at the bottom.
+            item.shares.map((share) => (
+              <DataCard
+                key={share.sellerId}
+                title={<span className="text-[13px] font-semibold">{share.sellerName}</span>}
+                badges={<TargetMetTag share={share} />}
+                body={
+                  <p className="text-xs text-gray-500">
+                    필요 {share.neededQty} · 매입 완료 {share.purchasedQty} · 매입 필요 {share.remainingQty}
+                  </p>
+                }
+                actions={<ShareActionCell productId={item.productId} share={share} actions={shareActions} />}
+              />
+            ))
+          }
+        >
           <table className="w-full text-sm">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr className="text-gray-600">
@@ -546,7 +567,7 @@ export function PurchaseGroupDetail({
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       )}
 
       {/* 채널 칩 — 표시 필터일 뿐 헤더 숫자는 그대로다(D10) */}
@@ -571,7 +592,60 @@ export function PurchaseGroupDetail({
       </div>
 
       {/* Lines — order lines are read-only; a manual line takes quantity · seller · removal (D23 · D24 · D77). */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <DataCardSwitch
+        placement="nested"
+        ready={visibleLines.length > 0}
+        className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+        renderCards={() =>
+          // Narrow-screen cards (FEATURE_2610_31 D14 · D25): the app's line tile — channel, order number and
+          // 「필요 N」 in one line; a manual line adds the quantity input, the seller picker and [제거] below.
+          visibleLines.map((line) => {
+            const isManual = line.source === 'MANUAL' && line.manualQty > 0;
+            const busy = pendingLineId === line.itemId;
+            return (
+              <DataCard
+                key={line.itemId}
+                body={
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="min-w-0 flex-[4] truncate font-semibold text-gray-900">{channelLabel(line)}</span>
+                      <span className="min-w-0 flex-[5] truncate text-gray-500">{line.externalOrderId ?? '—'}</span>
+                      <span className="shrink-0 font-medium text-gray-900">필요 {line.neededQty}</span>
+                    </div>
+                    {isManual && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <ManualQtyInput
+                          key={`${line.itemId}-${line.manualQty}`}
+                          value={line.manualQty}
+                          disabled={busy}
+                          onSave={(qty) => void saveManualQty(line, qty)}
+                        />
+                        <span className="flex-1" />
+                        {!soleSeller && (
+                          <ManualSellerPicker
+                            sellers={sellers}
+                            currentSellerId={line.sellerId}
+                            disabled={busy}
+                            onPick={(id) => void changeManualSeller(line, id)}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setRemoveTarget(line)}
+                          className="px-2 py-0.5 text-xs border border-gray-300 rounded text-red-600 hover:bg-red-50"
+                        >
+                          제거
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                }
+              />
+            );
+          })
+        }
+      >
         <table className="w-full text-sm">
           <thead className="bg-gray-100 border-b border-gray-200">
             <tr className="text-gray-600">
@@ -635,7 +709,7 @@ export function PurchaseGroupDetail({
             })}
           </tbody>
         </table>
-      </div>
+      </DataCardSwitch>
 
       <ConfirmDialog
         isOpen={removeTarget !== null}
@@ -680,7 +754,7 @@ function ManualQtyInput({
   const [text, setText] = useState(String(value));
   const valid = isIntStr(text) && Number(text) >= 1 && Number(text) !== value;
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex items-center justify-end gap-1 max-md:flex-wrap">
       <input
         type="number"
         min={1}
@@ -727,7 +801,7 @@ function ManualSellerPicker({
     );
   }
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1 max-md:flex-wrap">
       <select
         value=""
         disabled={disabled}

@@ -35,7 +35,7 @@ export function ProductListingDetailsCard({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between max-md:flex-wrap">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
@@ -45,7 +45,7 @@ export function ProductListingDetailsCard({
           </button>
           <h1 className="text-3xl font-bold">판매 상품 상세정보</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-md:flex-wrap">
           {actionsNotice}
           <button
             onClick={onEdit}
@@ -83,7 +83,7 @@ export function ProductListingDetailsCard({
       </div>
 
       {/* Category & Logistics */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border border-gray-200 rounded-lg p-6 bg-white">
           <div className="space-y-4">
             <div>

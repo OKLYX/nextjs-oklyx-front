@@ -14,6 +14,7 @@ import {
   priceChangeReasonLabel,
   type PriceChangeRow,
 } from '@/domain/entities/PriceHistoryEntity';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { formatWon } from './RepricingTable';
 
 /** `yyyy-MM-dd` (로컬 기준). 🔴 `toISOString()` 은 UTC 로 밀려 KST 에서 하루가 어긋난다. */
@@ -145,6 +146,33 @@ export function RepricingHistoryTab({
     return presetRange.from === range.from && presetRange.to === range.to;
   };
 
+  // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value.
+  const renderCards = () =>
+    rows.map((row) => (
+      <DataCard
+        key={row.id}
+        fields={[
+          { label: '변경 시각', value: formatChangedAt(row.createdAt) },
+          { label: '상품(셀)', value: row.listingName ?? '—' },
+          { label: '옵션', value: row.optionName ?? '—' },
+          { label: '채널', value: row.platform ?? '—' },
+          {
+            label: '이전가 → 새 가격',
+            value: (
+              <>
+                <span className="text-gray-500">{formatWon(row.oldPrice)}</span>
+                <span className="px-1 text-gray-400">→</span>
+                <span className="font-medium">{formatWon(row.newPrice)}</span>
+              </>
+            ),
+          },
+          { label: '증감', value: <DiffCell diff={row.diff} /> },
+          { label: '사유', value: priceChangeReasonLabel(row.reason) },
+          { label: '변경자', value: row.createdBy ?? '-' },
+        ]}
+      />
+    ));
+
   return (
     <>
       <Card>
@@ -207,7 +235,7 @@ export function RepricingHistoryTab({
               className="rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
             />
           </div>
-          <div className="flex items-center gap-2 pb-0.5">
+          <div className="flex items-center gap-2 pb-0.5 max-md:flex-wrap">
             {PRESETS.map((preset) => (
               <button
                 key={preset.label}
@@ -245,7 +273,7 @@ export function RepricingHistoryTab({
           </p>
         </Card>
       ) : (
-        <div className="rounded-lg bg-white shadow list-table-scroll">
+        <DataCardSwitch placement="page" renderCards={renderCards} className="rounded-lg bg-white shadow list-table-scroll">
           <table className="w-full">
             <thead className="border-b border-gray-200 bg-gray-100">
               <tr className="text-left text-xs font-medium text-gray-500">
@@ -282,7 +310,7 @@ export function RepricingHistoryTab({
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       )}
     </>
   );

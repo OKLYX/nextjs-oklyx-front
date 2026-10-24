@@ -103,11 +103,11 @@ export function SyncProgressModal({
       title={heading}
       disableClose={isRunning}
       footer={
-        <div className="flex w-full items-center justify-between gap-2">
-          <p className="text-xs text-gray-500">
+        <div className="flex w-full items-center justify-between gap-2 max-md:flex-wrap">
+          <p className="text-xs text-gray-500 max-md:min-w-0 max-md:truncate">
             {isRunning ? '진행 중인 채널은 끝까지 조회한 뒤 멈춥니다.' : ''}
           </p>
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-md:flex-wrap">
             {isRunning ? (
               <button
                 onClick={onCancel}

@@ -48,6 +48,7 @@ export function ReservedShipmentHistory({ useCase, externalOrderId, onChanged }:
         rows={rows}
         useCase={useCase}
         carrierOptions={[]}
+        cardPlacement="nested"
         onChanged={() => {
           setTick((t) => t + 1);
           onChanged();

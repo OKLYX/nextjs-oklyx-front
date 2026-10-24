@@ -115,7 +115,7 @@ export function CategoryMappingModal({
             return (
               <div
                 key={platform}
-                className="border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-3"
+                className="border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-3 max-md:flex-wrap"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-800">{label}</p>
@@ -128,7 +128,7 @@ export function CategoryMappingModal({
                     <p className="text-xs text-gray-400">미매핑</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 whitespace-nowrap">
+                <div className="flex items-center gap-2 whitespace-nowrap max-md:flex-wrap">
                   {busy && <Spinner size={16} />}
                   <button
                     onClick={() => setPickerPlatform(platform)}

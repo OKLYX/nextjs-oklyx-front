@@ -91,7 +91,7 @@ export function ClaimReasonForm({ claim, action, isSending, onSubmit, onCancel }
         </div>
       )}
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2 max-md:flex-wrap">
         <button
           autoFocus
           onClick={onCancel}

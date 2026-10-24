@@ -371,7 +371,7 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
     <PageContainer
       title={templateId ? '상세 템플릿 수정' : '상세 템플릿 생성'}
       action={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-md:flex-wrap">
           <button
             type="button"
             onClick={() => router.push(ROUTES.DETAIL_TEMPLATES)}
@@ -607,7 +607,7 @@ export function DetailTemplateEditor({ templateId }: DetailTemplateEditorProps) 
                   }`}
                 >
                   {content}
-                  <div className="absolute right-1 top-1 flex gap-1">
+                  <div className="absolute right-1 top-1 flex gap-1 max-md:flex-wrap">
                     <button
                       type="button"
                       onClick={(e) => {

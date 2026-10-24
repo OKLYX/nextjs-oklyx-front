@@ -2,6 +2,7 @@
 
 import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import {
   BARCODE_TONE_CLASS,
   barcodeResultText,
@@ -35,7 +36,29 @@ export function BarcodeExtractResultModal({ result, onClose }: BarcodeExtractRes
         <p className="text-sm text-gray-700">
           {result.requested}개 중 {result.extracted}개를 채웠습니다.
         </p>
-        <div className="border border-gray-300 rounded-lg bg-white">
+        <DataCardSwitch
+          placement="nested"
+          className="border border-gray-300 rounded-lg bg-white"
+          renderCards={() =>
+            // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value.
+            result.items.map((item) => (
+              <DataCard
+                key={item.productId}
+                fields={[
+                  { label: '물품명', value: item.productName },
+                  {
+                    label: '결과',
+                    value: (
+                      <span className={BARCODE_TONE_CLASS[barcodeResultTone(item.status)]}>
+                        {barcodeResultText(item)}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            ))
+          }
+        >
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
@@ -54,7 +77,7 @@ export function BarcodeExtractResultModal({ result, onClose }: BarcodeExtractRes
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       </div>
     </Modal>
   );

@@ -3,6 +3,7 @@
 import type { CommissionRate } from '@/domain/entities/CommissionRateEntity';
 import type { Category } from '@/domain/entities/CategoryEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface CommissionRateTableProps {
   commissionRates: CommissionRate[];
@@ -40,8 +41,29 @@ export function CommissionRateTable({
     return null;
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D23 · D37): the app's commission-rate row — platform, category
+  // (「기본값」 when there is none), rate in % at the right end; the table's ID at the bottom. The app's 「기본값」 chip
+  // is left out (the web rate has no default flag).
+  const renderCards = () =>
+    commissionRates.map((rate) => (
+      <DataCard
+        key={rate.id}
+        onClick={() => onRowClick(rate)}
+        selected={selectedId === rate.id}
+        title={<span className="text-base font-normal">{rate.platform}</span>}
+        trailing={<span className="text-[11px] font-medium text-gray-500">{(rate.rate * 100).toFixed(2)}%</span>}
+        body={
+          <p className="text-sm text-gray-500">
+            {rate.categoryId === null ? '기본값' : getCategoryName(rate.categoryId)}
+          </p>
+        }
+        extraFields={[{ label: 'ID', value: rate.id }]}
+      />
+    ));
+
   return (
     <TableCard
+      renderCards={renderCards}
       isLoading={isLoading}
       isEmpty={commissionRates.length === 0}
       emptyMessage="조회 결과가 없습니다."

@@ -27,6 +27,8 @@ import type {
 import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { QuantityStepper } from '@/presentation/components/QuantityStepper';
 import { InternalStageBadge } from './InternalStageBadge';
 import { ReservedShipmentHistory } from './ReservedShipmentHistory';
 import { StoredInvoiceEditor } from './StoredInvoiceEditor';
@@ -689,7 +691,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
           {(canSheet || canShip || canCancel) && (
             <div className="mt-6 border-t border-gray-200 pt-6">
               {/* 탭 모양은 ClaimTypeTabs 와 같은 관용구(밑줄) — 모달 안이라 컴포넌트로 빼지 않는다. */}
-              <div className="flex gap-1 border-b border-gray-200">
+              <div className="flex gap-1 border-b border-gray-200 max-md:flex-wrap">
                 {ACTION_TABS.map((tab) => {
                   const isAvailable = tabAvailability[tab.key];
                   const isActive = activeTab === tab.key;
@@ -750,7 +752,40 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                         <div className="py-10 text-center text-gray-500">발송 대상 라인이 없습니다.</div>
                       ) : (
                         <div className="mt-4">
-                          <div className="border border-gray-200 rounded-lg list-table-scroll">
+                          <DataCardSwitch
+                            placement="nested"
+                            className="border border-gray-200 rounded-lg list-table-scroll"
+                            renderCards={() =>
+                              // Narrow-screen cards (FEATURE_2610_31 D14 · D28 · D37): the app's sheet line — address
+                              // head, the product (two lines), 「내품수량 N」 and 「택배수량」 with the shared
+                              // quantity stepper (min 1); the table's 「이름」 at the bottom.
+                              rows.map((row) => (
+                                <DataCard
+                                  key={row.rowKey}
+                                  body={
+                                    <div className="space-y-1">
+                                      <p className="text-xs text-gray-500">{addressHead(row.address)}</p>
+                                      <p className="line-clamp-2 text-[13px] text-gray-900">{row.productName}</p>
+                                      <div className="flex items-center gap-2 pt-1 text-xs">
+                                        <span className="text-gray-500">내품수량 {row.quantity}</span>
+                                        <span className="flex-1" />
+                                        <span className="text-gray-900">택배수량</span>
+                                        <QuantityStepper
+                                          className="w-24"
+                                          min={1}
+                                          ariaLabel={`${row.productName} 택배수량`}
+                                          value={String(row.parcelQuantity)}
+                                          onChange={(next) => handleParcelChange(row.rowKey, next)}
+                                          invalid={invalidRowKey === row.rowKey}
+                                        />
+                                      </div>
+                                    </div>
+                                  }
+                                  extraFields={[{ label: '이름', value: row.receiverName }]}
+                                />
+                              ))
+                            }
+                          >
                             <table>
                               <thead className="bg-gray-100 border-b border-gray-200">
                                 <tr className="text-left text-xs font-medium text-gray-500">
@@ -785,7 +820,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                                 ))}
                               </tbody>
                             </table>
-                          </div>
+                          </DataCardSwitch>
                         </div>
                       )}
                     </div>
@@ -984,9 +1019,21 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                       <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
                         발송처리에 실패한 박스가 있습니다.
                       </div>
+                      {/* Below 768px: one red box per failed box, 「박스 ID · 코드 · 메시지」 — the app's failure lines
+                          (FEATURE_2610_31 D27). Marketplace wording verbatim (D6). */}
+                      <div className="mt-3 space-y-2 md:hidden">
+                        {result.failed.map((box) => (
+                          <p
+                            key={box.shipmentBoxId}
+                            className="rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-800"
+                          >
+                            {box.shipmentBoxId} · {box.resultCode} · {box.message}
+                          </p>
+                        ))}
+                      </div>
                       {/* Same columns/tone as ShipmentConfirmModal's failure table, deliberately not
                           extracted into a shared component (2609_01 D5). Coupang wording verbatim (D6). */}
-                      <div className="mt-3 border border-gray-200 rounded-lg list-table-scroll">
+                      <div className="mt-3 hidden border border-gray-200 rounded-lg list-table-scroll md:block">
                         <table>
                           <thead className="bg-gray-100 border-b border-gray-200">
                             <tr className="text-left text-xs font-medium text-gray-500">
@@ -1195,8 +1242,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
           {/* 왼쪽 = 발주처리 하나만. 발주는 발송·취소와 달리 배타적 선택이 아니라 앞 단계라
               탭에 넣지 않고 항상 보이는 자리에 둔다(PLAN 2609_17 D14).
               대상이 아니면 왼쪽 칸은 빈 채로 두고 오른쪽 버튼 자리는 그대로 유지한다. */}
-          <div className="flex items-center justify-between gap-3 pt-6">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3 pt-6 max-md:flex-wrap">
+            <div className="flex items-center gap-3 max-md:flex-wrap">
               {/* FEATURE_2610_17 / D67 — a reserved sale takes [입고완료 처리] in the [발주처리] slot. */}
               {canStockConfirm &&
                 (stockConfirmed ? (
@@ -1240,7 +1287,7 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
                 ))}
             </div>
 
-            <div className="flex shrink-0 gap-2">
+            <div className="flex shrink-0 gap-2 max-md:flex-wrap">
               <button
                 onClick={handleClose}
                 className="px-4 py-2 bg-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-400 transition-colors"

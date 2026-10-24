@@ -829,7 +829,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                     />
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 max-md:flex-wrap">
                     <button
                       type="button"
                       onClick={handleAddOption}
@@ -848,12 +848,12 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                 </div>
               ) : (
                 <div key={item.option.id} className="p-4 bg-gray-50 rounded border border-gray-200">
-                  <div className="flex justify-between items-start mb-3">
+                  <div className="flex justify-between items-start mb-3 max-md:flex-wrap">
                     <div>
                       <p className="font-medium">{item.option.optionName}</p>
                       <p className="text-sm text-gray-600">판매가: ₩{item.option.sellingPrice.toLocaleString()}</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 max-md:flex-wrap">
                       <button
                         type="button"
                         onClick={() => handleEditOption(item.option, item.products)}
@@ -1025,7 +1025,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                 {/* 마진율로 판매가 설정 */}
                 <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                   <label className="block text-sm font-medium text-gray-700 mb-2">마진율로 판매가 설정</label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 max-md:flex-wrap">
                     <input
                       type="number"
                       value={newOptionMarginRate}
@@ -1066,7 +1066,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
                 />
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-2 max-md:flex-wrap">
                 <button
                   type="button"
                   onClick={handleAddOption}
@@ -1089,7 +1089,7 @@ export function ProductListingEditSinglePageForm({ listingId }: ProductListingEd
 
       {/* Final Submit Button */}
       <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 -mx-8 px-8">
-        <div className="flex gap-2">
+        <div className="flex gap-2 max-md:flex-wrap">
           <button
             onClick={() => router.push(ROUTES.SALES_PRODUCTS_RETRIEVE)}
             className="flex-1 bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-lg hover:bg-gray-400"

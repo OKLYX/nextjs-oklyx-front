@@ -1,6 +1,8 @@
 'use client';
 
 import { Card } from '@/presentation/components/ui/Card';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 import type { MarketSource } from './marketSource';
 import { platformName } from '@/config/platforms';
 
@@ -24,8 +26,10 @@ const STATUS_LABEL: Record<string, string> = {
 export function MarketSourceCard({ market }: { market: MarketSource }) {
   const { preview } = market;
   const label = platformName(market.platform);
+  const showCards = useShowCards();
   return (
-    <Card title="마켓 상품" className="mb-4 space-y-2">
+    // Narrow-screen card view: the box is not drawn and the option cards run edge to edge (FEATURE_2610_31 D30).
+    <Card title="마켓 상품" className="mb-4 space-y-2" bare={showCards}>
       <p className="text-sm text-gray-900">
         <span className="font-medium">{preview.productName ?? '(이름 없음)'}</span>
         <span className="text-gray-500">
@@ -40,7 +44,26 @@ export function MarketSourceCard({ market }: { market: MarketSource }) {
           마스터에 붙입니다 — 주문·고객문의·정산 기록이 함께 따라옵니다.
         </p>
       )}
-      <div className="overflow-x-auto rounded border border-gray-200">
+      <DataCardSwitch
+        placement="page"
+        ready={preview.options.length > 0}
+        className="overflow-x-auto rounded border border-gray-200"
+        renderCards={() =>
+          // Narrow-screen cards (FEATURE_2610_31 D14): the app's option card — option name, 「판매가」 · 「재고」 lines.
+          preview.options.map((o) => (
+            <DataCard
+              key={o.platformOptionId ?? o.itemName}
+              title={<span className="font-semibold">{o.itemName}</span>}
+              body={
+                <div className="text-sm text-gray-500">
+                  <p>판매가: {o.salePrice.toLocaleString('ko-KR')}</p>
+                  <p>재고: {o.stockQuantity ?? '—'}</p>
+                </div>
+              }
+            />
+          ))
+        }
+      >
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-100 text-xs text-gray-500">
             <tr>
@@ -61,7 +84,7 @@ export function MarketSourceCard({ market }: { market: MarketSource }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </DataCardSwitch>
       <p className="text-[11px] text-gray-500">
         옵션은 {label} 상품 그대로 만들어지고 이름을 바꿀 수 없습니다 — 옵션마다 구성 수량만 입력하세요.
         판매가·재고는 {label} 값을 그대로 씁니다. 사진은 채우지 않으니 이미지 칸에 직접 올리세요. 저장하면

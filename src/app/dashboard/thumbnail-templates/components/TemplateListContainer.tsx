@@ -9,6 +9,7 @@ import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTempla
 import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
 import type { ThumbnailTemplate } from '@/domain/entities/ThumbnailEntity';
 import { Button } from '@/presentation/components/ui/Button';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 export function TemplateListContainer() {
   const router = useRouter();
@@ -54,6 +55,50 @@ export function TemplateListContainer() {
     }
   };
 
+  // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value, the row button at the bottom;
+  // a tap opens the template like a row tap.
+  const renderCards = () =>
+    templates.map((t) => (
+      <DataCard
+        key={t.id}
+        onClick={() => router.push(ROUTES.THUMBNAIL_TEMPLATE_EDIT(t.id))}
+        fields={[
+          { label: 'ID', value: t.id },
+          { label: '이름', value: <span className="font-medium">{t.name}</span> },
+          {
+            label: '기본',
+            value: t.isDefault && (
+              <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">기본</span>
+            ),
+          },
+          { label: '캔버스', value: `${t.canvasWidth}×${t.canvasHeight}` },
+          { label: '요소', value: t.elements?.length ?? 0 },
+          {
+            label: '활성',
+            value: (
+              <span
+                className={`rounded px-2 py-0.5 text-xs ${
+                  t.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {t.active ? '활성' : '비활성'}
+              </span>
+            ),
+          },
+        ]}
+        actions={
+          <button
+            type="button"
+            onClick={() => handleDelete(t.id)}
+            disabled={deletingId === t.id}
+            className="rounded border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            {deletingId === t.id ? '삭제 중...' : '삭제'}
+          </button>
+        }
+      />
+    ));
+
   return (
     <PageContainer
       title="썸네일 템플릿"
@@ -77,7 +122,7 @@ export function TemplateListContainer() {
           등록된 템플릿이 없습니다.
         </div>
       ) : (
-        <div className="rounded-lg bg-white shadow list-table-scroll">
+        <DataCardSwitch placement="page" renderCards={renderCards} className="rounded-lg bg-white shadow list-table-scroll">
           <table className="text-sm">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr className="text-left text-gray-600">
@@ -136,7 +181,7 @@ export function TemplateListContainer() {
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       )}
     </PageContainer>
   );

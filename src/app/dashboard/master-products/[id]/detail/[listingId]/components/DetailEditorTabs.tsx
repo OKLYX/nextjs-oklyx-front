@@ -55,7 +55,7 @@ export function DetailEditorTabs({
 
   return (
     <div className="rounded-lg bg-white shadow">
-      <div className="flex gap-1 border-b border-gray-200 px-2">
+      <div className="flex gap-1 border-b border-gray-200 px-2 max-md:flex-wrap">
         {TABS.map((t) => (
           <button
             key={t.key}

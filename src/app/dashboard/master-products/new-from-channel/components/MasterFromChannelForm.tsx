@@ -504,7 +504,7 @@ export function MasterFromChannelForm() {
         </div>
 
         {/* ② 상품 식별자 — 라벨·입력 방식은 선택된 플랫폼이 정한다 */}
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-2 max-md:flex-wrap">
           <div className="w-64">
             <Input
               id="market-entry-product-id"
@@ -596,7 +596,7 @@ export function MasterFromChannelForm() {
             )}
             {candidateError && <p className="text-[11px] text-red-700">{candidateError}</p>}
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-md:flex-wrap">
               <input
                 className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
                 placeholder="물품 이름으로 검색"
@@ -655,7 +655,7 @@ export function MasterFromChannelForm() {
           {/* ⑦ 마스터 이름 검색(UX D75) */}
           {masterSearchOpen && (
             <Card title="마스터 찾기" className="mt-4 space-y-2">
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-md:flex-wrap">
                 <input
                   className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
                   placeholder="마스터 이름 · 상품 ID · 옵션 ID"

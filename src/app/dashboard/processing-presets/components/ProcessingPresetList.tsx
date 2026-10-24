@@ -10,6 +10,7 @@ import { ProcessingPresetUseCase } from '@/application/usecases/ProcessingPreset
 import { ProcessingPresetRepositoryImpl } from '@/infrastructure/repositories/ProcessingPresetRepositoryImpl';
 import type { ProcessingPreset } from '@/domain/entities/ProcessingPresetEntity';
 import { Button } from '@/presentation/components/ui/Button';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 export function ProcessingPresetList() {
   const router = useRouter();
@@ -59,6 +60,56 @@ export function ProcessingPresetList() {
     }
   };
 
+  // Narrow-screen cards (FEATURE_2610_31 D22): every table column as label · value, the row button at the bottom;
+  // a tap opens the preset like a row tap.
+  const renderCards = () =>
+    presets.map((p) => (
+      <DataCard
+        key={p.id}
+        onClick={() => router.push(ROUTES.PROCESSING_PRESET_EDIT(p.id))}
+        fields={[
+          { label: 'ID', value: p.id },
+          {
+            label: '이름',
+            value: (
+              <span className="font-medium">
+                <span className="align-middle">{p.name}</span>
+                {p.operations?.some((o) => o.type === 'colorAdjust') && (
+                  <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs font-normal text-blue-700 align-middle">
+                    색보정
+                  </span>
+                )}
+              </span>
+            ),
+          },
+          // The column is 「오버레이 수」, so colorAdjust operations are not counted (same as the table).
+          { label: '오버레이 수', value: p.operations?.filter((o) => o.type === 'overlay').length ?? 0 },
+          {
+            label: '활성',
+            value: (
+              <span
+                className={`rounded px-2 py-0.5 text-xs ${
+                  p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {p.active ? '활성' : '비활성'}
+              </span>
+            ),
+          },
+        ]}
+        actions={
+          <button
+            type="button"
+            onClick={() => handleDelete(p.id)}
+            disabled={deletingId === p.id}
+            className="rounded border border-red-300 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            {deletingId === p.id ? '삭제 중...' : '삭제'}
+          </button>
+        }
+      />
+    ));
+
   if (!isAdmin) {
     return (
       <PageContainer>
@@ -92,7 +143,7 @@ export function ProcessingPresetList() {
           등록된 프리셋이 없습니다.
         </div>
       ) : (
-        <div className="rounded-lg bg-white shadow list-table-scroll">
+        <DataCardSwitch placement="page" renderCards={renderCards} className="rounded-lg bg-white shadow list-table-scroll">
           <table className="text-sm">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr className="text-left text-gray-600">
@@ -149,7 +200,7 @@ export function ProcessingPresetList() {
               ))}
             </tbody>
           </table>
-        </div>
+        </DataCardSwitch>
       )}
     </PageContainer>
   );

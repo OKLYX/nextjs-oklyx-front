@@ -180,7 +180,7 @@ export function PackageInputForm({
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             가로 (cm)
@@ -315,7 +315,7 @@ export function PackageInputForm({
         )}
       </div>
 
-      <div className="flex gap-3 pt-4 border-t">
+      <div className="flex gap-3 pt-4 border-t max-md:flex-wrap">
         <button
           type="button"
           onClick={() => {

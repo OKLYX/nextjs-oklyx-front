@@ -145,7 +145,7 @@ export function ChannelOptionNameModal({
               const empty = !willRestore && value.trim() === '';
               return (
                 <li key={r.optionId} className="rounded border border-gray-200 px-3 py-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 max-md:flex-wrap">
                     <input
                       type="text"
                       disabled={willRestore || isSaving}
@@ -198,7 +198,7 @@ export function ChannelOptionNameModal({
         </>
       )}
 
-      <div className="mt-5 flex justify-end gap-2">
+      <div className="mt-5 flex justify-end gap-2 max-md:flex-wrap">
         <button
           type="button"
           onClick={onClose}

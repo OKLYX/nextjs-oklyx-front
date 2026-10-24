@@ -352,7 +352,7 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
       <PageContainer>
         <div className="bg-white rounded-lg shadow p-6 space-y-3">
           <p className="text-sm text-red-600">{error || '지급 묶음을 찾을 수 없습니다.'}</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-md:flex-wrap">
             <Button
               type="button"
               onClick={() => setReloadTick((tick) => tick + 1)}
@@ -407,7 +407,7 @@ export function PayoutDetailContainer({ payoutId }: PayoutDetailContainerProps) 
             ) · 지급액 {formatMoney(payout.finalAmount)}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 max-md:flex-wrap">
           {markable &&
             (payout.status === 'PAID' ? (
               <Button

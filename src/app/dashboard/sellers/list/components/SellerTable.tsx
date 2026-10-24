@@ -6,6 +6,7 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import { SellerChannelSection } from './SellerChannelSection';
 import { SellerCardSection } from './SellerCardSection';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
 
 interface SellerTableProps {
   sellers: Seller[];
@@ -41,8 +42,47 @@ export function SellerTable({
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D33 · D37): the app's seller card — fold button on the left, name,
+  // 「사업자: …」; the table's ID at the bottom; the channels and payment cards open inside the card.
+  const renderCards = () =>
+    sellers.map((seller) => {
+      const isExpanded = expandedIds.has(seller.id);
+      return (
+        <DataCard
+          key={seller.id}
+          onClick={onRowClick ? () => onRowClick(seller.id) : undefined}
+          image={
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleExpanded(seller.id);
+              }}
+              aria-label={isExpanded ? '판매채널 접기' : '판매채널 펼치기'}
+              aria-expanded={isExpanded}
+              className="text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+            </button>
+          }
+          title={<span className="text-base">{seller.sellerName}</span>}
+          body={<p className="text-xs text-gray-500">사업자: {seller.businessRegistration}</p>}
+          extraFields={[{ label: 'ID', value: seller.id }]}
+          expansion={
+            isExpanded ? (
+              <>
+                <SellerChannelSection sellerId={seller.id} sellerName={seller.sellerName} />
+                {sellers.length !== 1 && <SellerCardSection sellerId={seller.id} sellerName={seller.sellerName} />}
+              </>
+            ) : undefined
+          }
+        />
+      );
+    });
+
   return (
     <TableCard
+      renderCards={renderCards}
       isLoading={isLoading}
       isEmpty={!hasSearched || sellers.length === 0}
       emptyMessage={hasSearched ? '검색 결과가 없습니다.' : '검색을 수행해주세요.'}

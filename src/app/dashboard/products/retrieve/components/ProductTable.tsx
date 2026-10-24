@@ -2,10 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/config/routes';
-import { DataCard } from '@/presentation/components/DataCard';
-import { ViewModeToggle } from '@/presentation/components/ViewModeToggle';
-import { useIsMobile } from '@/presentation/hooks/useIsMobile';
-import { useListViewStore } from '@/infrastructure/stores/listViewStore';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { ZoomableThumb } from '@/presentation/components/ZoomableThumb';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 import { detailHrefWithReturn } from '@/infrastructure/utils/listReturn';
 import { formatKrw } from '@/infrastructure/utils/money';
@@ -40,11 +38,6 @@ export function ProductTable({
   const router = useRouter();
   const openDetail = (id: number) =>
     router.push(detailHrefWithReturn(ROUTES.PRODUCT_DETAIL(id), listQuery));
-  const isMobile = useIsMobile();
-  const viewMode = useListViewStore((state) => state.viewMode);
-  // Card view is a narrow-screen affordance only; md+ always shows the table.
-  const showCards = isMobile && viewMode === 'card';
-
   // 전체 선택은 **현재 페이지 기준**이다(PLAN D10 — 화면에 보이는 것만 건드린다).
   const allSelected = products.length > 0 && products.every((p) => selectedIds.includes(p.id));
 
@@ -124,20 +117,70 @@ export function ProductTable({
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D13 · D14 · D34 · D37): the app's product card — photo (tap = zoom),
+  // bold name, 「브랜드」 · 「Barcode」 · 「가격」 lines; the table's 「번호」 · 「물품ID」 · 「구매처」 · 「판매채널」 · 「상태」 · 「등록일」 at the
+  // bottom; the row checkbox at the top-left. A tap opens the detail like a row tap.
+  const renderCards = () =>
+    products.map((product, index) => (
+      <DataCard
+        key={product.id}
+        onClick={() => openDetail(product.id)}
+        selection={{
+          checked: selectedIds.includes(product.id),
+          onChange: () => onToggle(product.id),
+          label: `${product.productName} 선택`,
+        }}
+        image={
+          <ZoomableThumb
+            src={getProductThumbUrl(product.imageUrl, product.id)}
+            alt={product.productName}
+            imgClassName="h-[110px] w-[110px] bg-gray-200 object-contain"
+            placeholder={
+              <div className="flex h-[110px] w-[110px] items-center justify-center bg-gray-200 text-xs text-gray-500">
+                없음
+              </div>
+            }
+          />
+        }
+        title={<span className="line-clamp-1">{product.productName}</span>}
+        body={
+          <div className="space-y-1 text-xs text-gray-900">
+            {product.brand && <p className="truncate">브랜드: {product.brand}</p>}
+            {product.barcodeId && <p className="truncate">Barcode: {product.barcodeId}</p>}
+            {product.price != null && <p className="font-medium">가격: {product.price} 원</p>}
+          </div>
+        }
+        extraFields={[
+          { label: '번호', value: currentPage * pageSize + index + 1 },
+          { label: '물품ID', value: productId(product) },
+          { label: '구매처', value: purchasePlaceNames(product) },
+          { label: '판매채널', value: channelCount(product) },
+          { label: '상태', value: statusChip(product.active) },
+          { label: '등록일', value: formatDate(product.createdDate) },
+        ]}
+      />
+    ));
+
   return (
     <div className="space-y-3">
-      {/* Narrow-screen only: let the user switch table (h-scroll) ↔ cards. */}
-      <div className="flex justify-end md:hidden">
-        <ViewModeToggle />
-      </div>
-
-      {/* Table: always on md+. Below md it stays unless the user picks card view.
+      {/* Table: always on md+. Below md the table or the cards, by the list view mode.
           whitespace-nowrap keeps text on one line so columns shrink only to
           content width, then scroll (no vertical character wrapping). */}
-      <div
-        className={`${
-          showCards ? 'hidden md:block' : 'block'
-        } list-table-scroll border border-gray-300 rounded-lg bg-white`}
+      <DataCardSwitch
+        placement="page"
+        renderCards={renderCards}
+        className="list-table-scroll border border-gray-300 rounded-lg bg-white"
+        cardsToolbar={
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 cursor-pointer"
+              checked={allSelected}
+              onChange={(e) => onToggleAll(e.target.checked)}
+            />
+            전체 선택
+          </label>
+        }
       >
         <table className="w-full">
           <thead className="bg-gray-100 border-b border-gray-200">
@@ -201,32 +244,7 @@ export function ProductTable({
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Below md + card mode: one DataCard per row, same tap → detail.
-          🔴 카드 뷰에는 체크박스를 넣지 않는다 — 일괄 조작은 표 화면 전용이다(PLAN D10). */}
-      {showCards && (
-        <div className="md:hidden space-y-3">
-          {products.map((product) => (
-            <DataCard
-              key={product.id}
-              onClick={() => openDetail(product.id)}
-              fields={[
-                { label: '이미지', value: thumbnail(product) },
-                { label: '물품ID', value: productId(product) },
-                { label: '상품명', value: product.productName },
-                { label: '바코드', value: barcode(product) },
-                { label: '브랜드', value: product.brand },
-                { label: '가격', value: formatKrw(product.price) },
-                { label: '구매처', value: purchasePlaceNames(product) },
-                { label: '판매채널', value: channelCount(product) },
-                { label: '상태', value: statusChip(product.active) },
-                { label: '등록일', value: formatDate(product.createdDate) },
-              ]}
-            />
-          ))}
-        </div>
-      )}
+      </DataCardSwitch>
     </div>
   );
 }

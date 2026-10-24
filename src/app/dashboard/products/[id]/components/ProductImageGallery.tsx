@@ -11,6 +11,8 @@ import { CLIP_MIME, clipSourceImageIds, hasClipPayload, type ClipItem } from '@/
 import { newClipId } from '@/infrastructure/stores/clipboardStore';
 import { setSmallDragImage } from '@/infrastructure/utils/dragGhost';
 import { ImageLightbox } from '@/presentation/components/ImageLightbox';
+import { DragNotice } from '@/presentation/components/WideScreenOnly';
+import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 
 /**
  * 물품(상품)의 다중 이미지 갤러리. 단일 `ProductImageSection` 을 대체하며 물품
@@ -420,6 +422,9 @@ export function ProductImageGallery({
     setIsDragOver(false);
   };
 
+  // Below 768px the photos are not dragged into the clipboard; a notice line sits above them (FEATURE_2610_31 D19).
+  const isMobile = useIsMobile();
+
   // ---- 확대 보기 (공용 ImageLightbox) ----
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
 
@@ -558,6 +563,7 @@ export function ProductImageGallery({
           />
         )}
 
+        <DragNotice />
         {isEdit && isLoading ? (
           <div className="flex min-h-24 items-center justify-center">
             <Spinner size={20} label="이미지 불러오는 중..." />
@@ -571,7 +577,7 @@ export function ProductImageGallery({
             {items.map((item, index) => (
               <div
                 key={item.key}
-                draggable={item.imageId != null}
+                draggable={!isMobile && item.imageId != null}
                 onDragStart={(e) => handleCardDragStart(e, item)}
                 onDragEnd={handleCardDragEnd}
                 className="rounded-lg border border-gray-200 p-2"

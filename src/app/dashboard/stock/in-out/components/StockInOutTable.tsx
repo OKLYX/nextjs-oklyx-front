@@ -2,6 +2,7 @@
 
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { StockMovement } from '@/domain/entities/StockEntity';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 import { StockMovementTable } from '../../components/StockMovementTable';
 
 interface StockInOutTableProps {
@@ -36,8 +37,10 @@ export function StockInOutTable({
   onToChange,
   onSearch,
 }: StockInOutTableProps) {
+  const showCards = useShowCards();
   return (
-    <div className="p-6 space-y-3">
+    // Narrow-screen card view: no box padding — the heading sits in the page padding (FEATURE_2610_31 D30).
+    <div className={showCards ? 'space-y-3' : 'p-6 space-y-3'}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h2 className="text-base font-semibold text-gray-900">최근 이력</h2>
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Card } from '@/presentation/components/ui/Card';
 import { Spinner } from '@/presentation/components/Spinner';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ROUTES } from '@/config/routes';
 import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
@@ -36,6 +37,7 @@ export function MasterCompositionContainer({ id }: { id: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const showCards = useShowCards();
 
   useEffect(() => {
     let alive = true;
@@ -64,7 +66,8 @@ export function MasterCompositionContainer({ id }: { id: string }) {
 
   return (
     <PageContainer title="구성상품 변경">
-      <Card>
+      {/* Narrow-screen card view: the box is not drawn so the form's card lists run edge to edge (FEATURE_2610_31 D30). */}
+      <Card bare={showCards}>
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <button
             type="button"

@@ -15,7 +15,7 @@ const TABS: { key: PurchaseTab; label: string }[] = [
 // Toggle buttons switching between the active shopping list and the completed-purchase history.
 export function PurchaseTabs({ activeTab, onChange }: PurchaseTabsProps) {
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 max-md:flex-wrap">
       {TABS.map((tab) => {
         const isActive = activeTab === tab.key;
         return (

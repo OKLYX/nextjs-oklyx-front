@@ -87,7 +87,7 @@ export function PeriodFilter({ from, to, isLoading, onChange, children }: Period
         />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 max-md:flex-wrap">
         {PRESETS.map((preset) => (
           <button
             key={preset.label}

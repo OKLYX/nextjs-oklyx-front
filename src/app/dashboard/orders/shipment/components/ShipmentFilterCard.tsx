@@ -144,13 +144,13 @@ export function ShipmentFilterCard({
           onSearchTermChange={onSearchTermChange}
         />
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between max-md:flex-wrap">
           <div>
             {resultCount > 0 && (
               <p className="text-sm text-gray-600">{resultCount}개의 결과</p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-md:flex-wrap">
             <button
               onClick={onSync}
               disabled={isSyncing}

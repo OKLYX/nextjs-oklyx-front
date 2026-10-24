@@ -6,6 +6,7 @@ import {
   formatMoney,
   formatProfit,
 } from '@/domain/entities/SalesSummary';
+import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 
 /**
  * 채널 하나의 <b>기간 매출 내역</b> — 그 채널에서 무엇이 얼마나 팔렸는지 (FEATURE_2609_34).
@@ -43,7 +44,29 @@ export function ChannelSalesLines({ rows, isLoading, error }: ChannelSalesLinesP
     return <p className="text-xs text-gray-500">이 기간에 이 채널에서 판매된 상품이 없습니다.</p>;
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D30): the app's product line — the name (two lines), then
+  // 「판매 · 매출 · 할인 · 수수료 · 순이익」 in one small line.
+  const renderCards = () =>
+    rows.map((row) => (
+      <DataCard
+        key={`${row.masterProductId ?? 'uncategorized'}-${row.accountId ?? 'all'}`}
+        body={
+          <div>
+            <p className="line-clamp-2 break-words text-[13px] text-gray-900">
+              {row.masterProductName}
+              {row.uncategorized && <span className="text-gray-300"> (상품 미연결)</span>}
+            </p>
+            <p className="text-xs text-gray-500" title={row.costBasisReady ? undefined : PROFIT_PENDING_HINT}>
+              판매 {row.netQty.toLocaleString('ko-KR')} · 매출 {formatMoney(row.grossSales)} · 할인{' '}
+              {formatMoney(row.discount)} · 수수료 {formatMoney(row.estFee)} · 순이익 {formatProfit(row)}
+            </p>
+          </div>
+        }
+      />
+    ));
+
   return (
+    <DataCardSwitch placement="page" renderCards={renderCards}>
     <table className="w-full table-fixed text-xs">
       {/* 🔴 상품 칸은 다른 칸의 약 2배다 — 상품명이 길어서 가로 스크롤을 만들던 자리다. */}
       <colgroup>
@@ -105,5 +128,6 @@ export function ChannelSalesLines({ rows, isLoading, error }: ChannelSalesLinesP
         ))}
       </tbody>
     </table>
+    </DataCardSwitch>
   );
 }

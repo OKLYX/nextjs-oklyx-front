@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { CarrierOption, ReservedShipmentRow } from '@/application/dto/ShippingLabelDTOs';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
@@ -40,6 +41,8 @@ export function ReservedShipmentPanel({ useCase, reloadKey, onChanged }: Reserve
   const [tick, setTick] = useState(0);
   // Lives as long as the card is mounted — reloads and row actions keep the chip (FEATURE_2610_07 / D8).
   const [filter, setFilter] = useState<ReservedFilter>('open');
+
+  const showCards = useShowCards();
 
   useEffect(() => {
     let alive = true;
@@ -84,7 +87,8 @@ export function ReservedShipmentPanel({ useCase, reloadKey, onChanged }: Reserve
   const shownRows = rows.filter((row) => filter === 'all' || isOpen(row) === (filter === 'open'));
 
   return (
-    <Card title="예약 발송">
+    // Narrow-screen card view: the box is not drawn and the reservation cards run edge to edge (FEATURE_2610_31 D30).
+    <Card title="예약 발송" bare={showCards}>
       {isLoading ? (
         <StateBlock variant="loading" message="불러오는 중..." />
       ) : loadError ? (

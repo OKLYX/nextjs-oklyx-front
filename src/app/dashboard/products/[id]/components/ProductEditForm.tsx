@@ -286,7 +286,7 @@ export function ProductEditForm({
       {/* [취소][저장] 은 폼 **오른쪽 위**다 — 상세 화면의 [수정][삭제] 와 같은 자리라 수정 모드를
           오갈 때 버튼이 움직이지 않는다. `ui/Button` 사용(취소=secondary 가 왼쪽).
           ⚠️ 폼 맨 아래로 되돌리지 말 것(2026-09-20). */}
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-2 max-md:flex-wrap">
         {clipNotice && <span className="text-sm text-gray-600">{clipNotice}</span>}
         <Button
           variant="secondary"
@@ -341,7 +341,7 @@ export function ProductEditForm({
             <label htmlFor="barcodeId" className="block text-sm font-medium text-gray-900 mb-1">
               바코드 ID
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-md:flex-wrap">
               <div className="flex-1">
                 <Input
                   id="barcodeId"
@@ -390,7 +390,7 @@ export function ProductEditForm({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="brand" className="block text-sm font-medium text-gray-900 mb-1">
                 브랜드
@@ -430,7 +430,7 @@ export function ProductEditForm({
 
           <div className="border-t border-gray-200 pt-4 space-y-4">
             <h3 className="text-base font-semibold text-gray-900">중량 / 수량</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="netContent" className="block text-sm font-medium text-gray-900 mb-1">
                   내용물 양
@@ -478,7 +478,7 @@ export function ProductEditForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="countQuantity" className="block text-sm font-medium text-gray-900 mb-1">
                   개수
@@ -533,7 +533,7 @@ export function ProductEditForm({
 
           <div className="border-t border-gray-200 pt-4 space-y-4">
             <h3 className="text-base font-semibold text-gray-900">부피</h3>
-            <div className="flex flex-col sm:flex-row gap-6">
+            <div className="flex flex-col sm:flex-row gap-6 max-md:flex-wrap">
               <VolumeDiagram embedded={false} />
               <div className="flex-1 space-y-4">
                 <div>
