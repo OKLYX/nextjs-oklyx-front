@@ -3,6 +3,8 @@
 import { CLAIM_STATUS_LABEL, faultTypeText } from '@/domain/entities/ClaimEntity';
 import type { Claim, ClaimType } from '@/domain/entities/ClaimEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { DataCard } from '@/presentation/components/DataCard';
+import { Button } from '@/presentation/components/ui/Button';
 import { LocalRecordBadge } from './LocalRecordBadge';
 
 interface ClaimTableProps {
@@ -74,11 +76,68 @@ export function ClaimTable({
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D14 · D31 · D37): the app's claim card — bold order number with the
+  // 「주문 미연결」 · 「우리 기록」 · status badges on the right, the product (two lines), 「수량 N · 사유 …」 and
+  // 「접수일 …」; the table's 「귀책」 · 「회수송장」 · 「재발송송장」 (exchange tab only) at the bottom. A tap opens
+  // the claim like a row tap; the 「접수일」 sort sits above the cards.
+  const renderCards = () =>
+    claims.map((claim) => (
+      <DataCard
+        key={claim.id}
+        onClick={() => onRowClick(claim)}
+        title={<span className="line-clamp-1">{claim.externalOrderId}</span>}
+        trailing={
+          <>
+            {!claim.linked && (
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">주문 미연결</span>
+            )}
+            {claim.collectInvoiceSource === 'LOCAL' && (
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800">우리 기록</span>
+            )}
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
+              {CLAIM_STATUS_LABEL[claim.status]}
+            </span>
+          </>
+        }
+        body={
+          <div className="space-y-1.5">
+            <p className="line-clamp-2 text-[13px] text-gray-900">{claim.itemName ?? '-'}</p>
+            <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+              <span>수량 {claim.quantity}</span>
+              <span>사유 {claim.reasonText ?? claim.reasonCode ?? '-'}</span>
+            </p>
+            <p className="text-xs text-gray-500">접수일 {formatDate(claim.receivedAt)}</p>
+          </div>
+        }
+        extraFields={[
+          { label: '귀책', value: faultTypeText(claim.faultType) },
+          { label: '회수송장', value: claim.collectInvoiceNo ?? '-' },
+          ...(claimType === 'EXCHANGE' ? [{ label: '재발송송장', value: claim.reshipInvoiceNo ?? '-' }] : []),
+        ]}
+      />
+    ));
+
   return (
     <TableCard
       isLoading={isLoading}
       isEmpty={!hasSearched || claims.length === 0}
       emptyMessage={hasSearched ? emptyMessage : '조회 결과가 여기에 표시됩니다.'}
+      renderCards={renderCards}
+      cardsToolbar={
+        <div className="flex items-center gap-2 max-md:flex-wrap">
+          <select
+            aria-label="정렬"
+            value="receivedAt"
+            onChange={() => undefined}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          >
+            <option value="receivedAt">접수일</option>
+          </select>
+          <Button type="button" variant="secondary" size="sm" onClick={onToggleSort}>
+            {sortDir === 'asc' ? '▲' : '▼'}
+          </Button>
+        </div>
+      }
     >
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-200">
@@ -138,7 +197,7 @@ export function ClaimTable({
       </table>
 
       {totalPages > 1 && (
-        <div className="px-6 py-4 flex items-center justify-center gap-4 border-t border-gray-200">
+        <div className="px-6 py-4 flex items-center justify-center gap-4 border-t border-gray-200 max-md:flex-wrap">
           <button
             onClick={() => onPageChange(Math.max(0, currentPage - 1))}
             disabled={currentPage === 0}
@@ -146,7 +205,7 @@ export function ClaimTable({
           >
             ← 이전
           </button>
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-gray-600 max-md:min-w-0 max-md:truncate">
             {currentPage + 1} / {totalPages}
           </span>
           <button

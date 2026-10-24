@@ -90,7 +90,7 @@ export function AcknowledgeBar({
 
   return (
     <div className="bg-white rounded-lg shadow px-4 py-3 space-y-2">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 max-md:flex-wrap">
         {/* 선택 건수는 이 바에서만 말한다 — 버튼 글자에 건수를 넣지 않는다.
             버튼마다 같은 수를 반복하면 두 버튼 중 어느 쪽 수인지 되읽게 된다. */}
         <div className="text-sm text-gray-700">

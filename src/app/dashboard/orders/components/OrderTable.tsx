@@ -6,6 +6,9 @@ import { TableCard } from '@/presentation/components/ui/TableCard';
 import { InternalStageBadge } from './InternalStageBadge';
 import { ElevenstReservedBadge } from './ElevenstReservedBadge';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
+import { DataCard } from '@/presentation/components/DataCard';
+import { ZoomableThumb } from '@/presentation/components/ZoomableThumb';
+import { Button } from '@/presentation/components/ui/Button';
 
 interface OrderTableProps {
   orders: OrderItem[];
@@ -90,11 +93,122 @@ export function OrderTable({
     );
   }
 
+  // Narrow-screen cards (FEATURE_2610_31 D13 · D14 · D31 · D34): the app's order card — the row checkbox
+  // (「출고관리」 acknowledgement), the photo (tap = zoom), bold order number with the stage · reserved badges and [송장 수정], 「고객 …」,
+  // the product, 「주문수량 N · 취소 N」 and 「결제일 …」. A tap opens the order like a row tap. 「전체 선택」 and the
+  // sort select with the direction button sit above the cards.
+  const renderCards = () =>
+    orders.map((order) => {
+      const src =
+        order.thumbnailProductId != null
+          ? getProductThumbUrl(order.thumbnailImageUrl, order.thumbnailProductId)
+          : null;
+      return (
+        <DataCard
+          key={order.id}
+          onClick={() => onRowClick(order)}
+          selection={
+            selection
+              ? {
+                  checked: selection.selectedIds.has(order.id),
+                  onChange: () => selection.onToggle(order.id),
+                  label: `${order.externalOrderId} 선택`,
+                  disabled: !selection.isSelectable(order),
+                }
+              : undefined
+          }
+          image={
+            <ZoomableThumb
+              src={src}
+              alt={order.itemName ?? ''}
+              imgClassName="h-14 w-14 rounded-md bg-gray-200 object-cover"
+              placeholder={
+                <div className="flex h-14 w-14 items-center justify-center rounded-md bg-gray-200 text-xs text-gray-500">
+                  없음
+                </div>
+              }
+            />
+          }
+          title={order.externalOrderId}
+          badges={
+            <>
+              <InternalStageBadge stage={order.internalStage} />
+              <ElevenstReservedBadge reservedSale={order.reservedSale} />
+              {onEditInvoice && order.internalStage != null && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditInvoice(order);
+                  }}
+                  className="rounded px-3 py-1 text-xs text-gray-900 hover:bg-gray-100"
+                >
+                  송장 수정
+                </button>
+              )}
+            </>
+          }
+          body={
+            <div className="space-y-1.5">
+              <p className="truncate text-[13px] text-gray-500">고객 {getCustomerName(order)}</p>
+              <p className="text-[13px] text-gray-900">{order.itemName ?? '-'}</p>
+              <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                <span>주문수량 {order.orderCount}</span>
+                <span>취소 {order.cancelCount}</span>
+              </p>
+              <p className="text-xs text-gray-500">결제일 {formatDate(order.paidAt)}</p>
+            </div>
+          }
+        />
+      );
+    });
+
   return (
     <TableCard
       isLoading={isLoading}
       isEmpty={!hasSearched || orders.length === 0}
       emptyMessage={hasSearched ? '조회 결과가 없습니다.' : '조회를 수행해주세요.'}
+      renderCards={renderCards}
+      cardsToolbar={
+        <>
+          {selection && (
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={selection.isPageAllSelected}
+                disabled={!orders.some(selection.isSelectable)}
+                onChange={selection.onTogglePage}
+                className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+              />
+              전체 선택
+            </label>
+          )}
+          <div className="flex items-center gap-2 max-md:flex-wrap">
+            <select
+              aria-label="정렬"
+              value={sortKey ?? ''}
+              onChange={(e) => onSort(e.target.value as keyof OrderItem)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            >
+              {/* The first state is 「정렬 안 함」 and cannot be picked again — the headers cannot turn sorting off
+                  either (FEATURE_2610_31 D31). */}
+              <option value="" disabled>
+                정렬 안 함
+              </option>
+              {COLUMNS.map((col) => (
+                <option key={col.key} value={col.key}>
+                  {col.label}
+                </option>
+              ))}
+            </select>
+            {sortKey != null && (
+              <Button type="button" variant="secondary" size="sm" onClick={() => onSort(sortKey)}>
+                {sortDir === 'asc' ? '▲' : '▼'}
+              </Button>
+            )}
+          </div>
+        </>
+      }
     >
       <table className="w-full">
         <thead className="bg-gray-100 border-b border-gray-200">
@@ -176,7 +290,7 @@ export function OrderTable({
       </table>
 
       {totalPages > 1 && (
-        <div className="px-6 py-4 flex items-center justify-center gap-4 border-t border-gray-200">
+        <div className="px-6 py-4 flex items-center justify-center gap-4 border-t border-gray-200 max-md:flex-wrap">
           <button
             onClick={() => onPageChange(Math.max(0, currentPage - 1))}
             disabled={currentPage === 0}
@@ -184,7 +298,7 @@ export function OrderTable({
           >
             ← 이전
           </button>
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-gray-600 max-md:min-w-0 max-md:truncate">
             {currentPage + 1} / {totalPages}
           </span>
           <button

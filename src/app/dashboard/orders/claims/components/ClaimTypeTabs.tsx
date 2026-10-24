@@ -21,7 +21,7 @@ const TABS: ClaimType[] = ['RETURN', 'EXCHANGE'];
 
 export function ClaimTypeTabs({ value, onChange, disabled }: ClaimTypeTabsProps) {
   return (
-    <div className="flex gap-1 border-b border-gray-200">
+    <div className="flex gap-1 border-b border-gray-200 max-md:flex-wrap">
       {TABS.map((type) => {
         const isActive = value === type;
         return (
