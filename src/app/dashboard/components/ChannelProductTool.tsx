@@ -18,6 +18,8 @@ import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 import { CLIP_MIME } from '@/domain/entities/ClipItem';
 import { newClipId } from '@/infrastructure/stores/clipboardStore';
 import { setSmallDragImage } from '@/infrastructure/utils/dragGhost';
+import { DragNotice } from '@/presentation/components/WideScreenOnly';
+import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 import { MarketImagePreviewModal } from './MarketImagePreviewModal';
 
 /**
@@ -99,6 +101,7 @@ const lookupErrorMessage = (e: unknown): string => {
 export function ChannelProductTool() {
   /** 값을 받을 화면이 마운트돼 있을 때만 값이 있다. 없으면 [채우기] 버튼을 그리지 않는다. */
   const fillTarget = useToolPanelStore((s) => s.fillTarget);
+  const isMobile = useIsMobile();
 
   const channelUseCase = useMemo(
     () => new ChannelProductUseCase(new ChannelProductRepositoryImpl()),
@@ -237,24 +240,30 @@ export function ChannelProductTool() {
     [],
   );
 
-  /** 사진 격자 — 끌면 담기고, 누르면 확대된다. 마켓 URL 은 절대 주소라 프록시를 타지 않는다. */
+  /**
+   * Photo grid — drag to keep a photo, tap to enlarge it. Market URLs are absolute, so they skip the proxy.
+   * Below 768px the photos are not draggable and a notice line sits above the grid (FEATURE_2610_31 D19).
+   */
   const imageGrid = (urls: string[], productName: string, platformProductId: string) => (
-    <div className="grid grid-cols-3 gap-2">
-      {urls.map((url) => (
-        <button
-          key={url}
-          // 🔴 폼 밖이어도 유지 — 어느 화면 위에 떠 있을지 알 수 없다.
-          type="button"
-          draggable
-          onDragStart={(e) => startImageDrag(e, url, productName, platformProductId)}
-          onClick={() => setPreviewUrl(url)}
-          className="aspect-square overflow-hidden rounded border border-gray-200 bg-gray-100 hover:border-blue-400"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="마켓 사진" className="h-full w-full object-contain" />
-        </button>
-      ))}
-    </div>
+    <>
+      <DragNotice />
+      <div className="grid grid-cols-3 gap-2">
+        {urls.map((url) => (
+          <button
+            key={url}
+            // 🔴 폼 밖이어도 유지 — 어느 화면 위에 떠 있을지 알 수 없다.
+            type="button"
+            draggable={!isMobile}
+            onDragStart={(e) => startImageDrag(e, url, productName, platformProductId)}
+            onClick={() => setPreviewUrl(url)}
+            className="aspect-square overflow-hidden rounded border border-gray-200 bg-gray-100 hover:border-blue-400"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="마켓 사진" className="h-full w-full object-contain" />
+          </button>
+        ))}
+      </div>
+    </>
   );
 
   return (
@@ -276,7 +285,7 @@ export function ChannelProductTool() {
           ))}
         </select>
 
-        <div className="flex gap-3 text-xs text-gray-700">
+        <div className="flex gap-3 text-xs text-gray-700 max-md:flex-wrap">
           {(['name', 'id'] as const).map((value) => (
             <label key={value} className="flex cursor-pointer items-center gap-1">
               <input
@@ -293,7 +302,7 @@ export function ChannelProductTool() {
           ))}
         </div>
 
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-2 max-md:flex-wrap">
           <div className="min-w-0 flex-1">
             <Input
               size="sm"

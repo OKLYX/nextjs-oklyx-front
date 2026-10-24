@@ -45,11 +45,16 @@ export interface CardProps {
   padded?: boolean;
   /** 레이아웃 보정용 추가 클래스 */
   className?: string;
+  /**
+   * Narrow-screen card view of a list inside this card (FEATURE_2610_31 D30): no background, corners, shadow or
+   * padding — the title and the other content sit in the page padding, the card list runs edge to edge.
+   */
+  bare?: boolean;
   children: ReactNode;
 }
 
-export function Card({ title, action, padded = true, className, children }: CardProps) {
-  const classes = ['bg-white rounded-lg shadow', padded ? 'p-6' : '', className]
+export function Card({ title, action, padded = true, className, bare = false, children }: CardProps) {
+  const classes = (bare ? [className] : ['bg-white rounded-lg shadow', padded ? 'p-6' : '', className])
     .filter(Boolean)
     .join(' ');
 
@@ -58,10 +63,14 @@ export function Card({ title, action, padded = true, className, children }: Card
       {title && (
         <div
           className={
-            action ? 'flex items-center justify-between gap-4 mb-4' : undefined
+            action ? 'flex items-center justify-between gap-4 mb-4 max-md:flex-wrap' : undefined
           }
         >
-          <h2 className={`text-lg font-semibold text-gray-900 ${action ? '' : 'mb-4'}`}>{title}</h2>
+          <h2
+            className={`text-lg font-semibold text-gray-900 ${action ? 'max-md:min-w-0 max-md:truncate' : 'mb-4'}`}
+          >
+            {title}
+          </h2>
           {action}
         </div>
       )}

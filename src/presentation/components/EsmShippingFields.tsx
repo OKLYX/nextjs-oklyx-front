@@ -146,7 +146,7 @@ export function EsmShippingFields({
     <div className="space-y-5">
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-gray-900">출하지 · 배송비</h3>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {renderChoice(ESM_KEYS.placeNo, outbound, listsLoading, setPlace)}
           {renderChoice(ESM_KEYS.bundlePolicyNo, bundleList, bundlesLoading, (raw) =>
             set(ESM_KEYS.bundlePolicyNo, raw),
@@ -161,7 +161,7 @@ export function EsmShippingFields({
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-gray-900">반품/교환</h3>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {renderChoice(ESM_KEYS.returnAddrNo, returns, listsLoading, (raw) => set(ESM_KEYS.returnAddrNo, raw))}
           {renderChoice(ESM_KEYS.companyNo, companies, listsLoading, (raw) => set(ESM_KEYS.companyNo, raw))}
           <div>

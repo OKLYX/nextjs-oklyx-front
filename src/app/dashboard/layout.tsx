@@ -47,6 +47,8 @@ export default function DashboardLayout({
   const closeSidebar = useNavigationStore((state) => state.closeSidebar);
   // 오른쪽 도구 패널(FEATURE_2609_68). 열려 있으면 넓은 화면에서 본문을 그만큼 밀어낸다.
   const openTool = useToolPanelStore((state) => state.openTool);
+  // Below 768px a collapsed tool bar takes no room on the right (FEATURE_2610_31 D39).
+  const railCollapsed = useToolPanelStore((state) => state.railCollapsed);
 
   // Session restore: validate the session against the server and refresh the
   // access token on dashboard entry (a page reload may have expired the 30-min
@@ -109,7 +111,7 @@ export default function DashboardLayout({
   }, [pathname, isMobile, closeSidebar]);
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex max-md:flex-wrap">
       {/* Mobile-only backdrop behind the open drawer; tap to dismiss. */}
       {isMobile && isSidebarOpen && (
         <div
@@ -148,16 +150,17 @@ export default function DashboardLayout({
       {/* Right column: top bar over the content area, then the page content
           below. Desktop padding tracks the rail — pl-16 collapsed, pl-56 when
           pinned (push). Mobile has no rail, so pl-0 (drawer overlays).
-          오른쪽은 도구 툴바(w-16 = 4rem, **접힌 왼쪽 레일과 같은 폭**)가 늘 자리를 차지하고(pr-16),
-          패널은 lg 이상일 때만 본문을 민다(lg:pr-[32rem] = 패널 28rem + 툴바 4rem). 🔴 패딩을 `main` 이 아니라 이 div 에
-          거는 이유: main 에만 걸면 위의 상단바 행이 패딩을 못 받아 [Logout]·테마 스위치가 레일
-          밑에 깔려 눌리지 않는다. */}
+          On the right the tool bar (w-16 = 4rem, **the same width as the collapsed left rail**) takes its room
+          (pr-16); below 768px a collapsed tool bar takes none (max-md:pr-0 — FEATURE_2610_31 D39). The panel pushes
+          the content only at lg and up (lg:pr-[32rem] = panel 28rem + tool bar 4rem).
+          🔴 The padding sits on this div, not on `main`: on `main` only, the top bar row above would not get it and
+          [Logout] · the theme switch would sit under the tool bar where they cannot be tapped. */}
       <div
         className={`flex flex-1 flex-col min-w-0 transition-[padding] duration-200 pr-16 ${
           isMobile ? 'pl-0' : isSidebarOpen ? 'pl-56' : 'pl-16'
-        } ${openTool ? 'lg:pr-[32rem]' : ''}`}
+        } ${openTool ? 'lg:pr-[32rem]' : ''} ${railCollapsed ? 'max-md:pr-0' : ''}`}
       >
-        <div className="flex items-stretch bg-white">
+        <div className="flex items-stretch bg-white max-md:flex-wrap">
           {/* Sidebar toggle — the only one. Lives at the top bar's far left on
               every screen size: desktop pins/collapses the rail, mobile opens
               and closes the drawer (whose own hamburger is off-screen while

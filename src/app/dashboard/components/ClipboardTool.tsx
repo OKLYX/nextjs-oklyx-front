@@ -5,35 +5,39 @@ import { useClipboardStore } from '@/infrastructure/stores/clipboardStore';
 import { CLIP_MIME, hasClipPayload, type ClipItem } from '@/domain/entities/ClipItem';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { setSmallDragImage } from '@/infrastructure/utils/dragGhost';
+import { DragNotice } from '@/presentation/components/WideScreenOnly';
+import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 import { NavBadge } from './NavBadge';
 
 /**
- * 클립보드 — 오른쪽 툴바의 도구 하나 (FEATURE_2609_62 · 상단바에서 툴바로 옮김).
+ * Clipboard — one tool of the right tool bar (FEATURE_2609_62 · moved from the top bar to the tool bar).
  *
- * **용도**: 물품 사진·값을 담아두고 다른 물품에 옮긴다. 담긴 개수는 툴바 아이콘 위 배지로 본다.
- * **파일**: src/app/dashboard/components/ClipboardTool.tsx
- * **내보내는 것 둘**
- * - `ClipboardRailSlot` — 툴바(`ToolRail`) 아이콘을 감싸는 껍데기. **배지 + 드롭존**을 얹는다.
- * - `ClipboardTool` — 도구 패널(`ToolPanel`) 본문. 담긴 목록·비우기·드롭존.
- * **엮는 곳**: `toolRegistry.tsx` 한 곳뿐이다 — 화면마다 달지 않는다.
- * **숫자**: `useClipboardStore` 의 `items.length` — 이 store 가 담기·붙이기의 단일 창구다.
+ * **Purpose**: keeps product photos and values to move them to another product. The number of kept items shows as
+ *   a badge on the tool bar icon; below 768px it is not shown while the tool bar is collapsed (FEATURE_2610_31 D43).
+ * **File**: src/app/dashboard/components/ClipboardTool.tsx
+ * **Two exports**
+ * - `ClipboardRailSlot` — the shell around the tool bar (`ToolRail`) icon. Adds **the badge + the drop zone**.
+ * - `ClipboardTool` — the tool panel (`ToolPanel`) body. The kept list, clear-all and the drop zone.
+ * **Wired in**: `toolRegistry.tsx` only — screens do not mount it.
+ * **Count**: `useClipboardStore` `items.length` — this store is the one way in for keeping and pasting.
  *
- * **담는 법(둘 다 된다)**
- * - 물품 갤러리 사진을 끌어 **툴바 아이콘 위**에 놓기 (패널이 닫혀 있어도 받는다)
- * - 전역 도구 패널의 **마켓 사진**을 끌어다 놓기 (2609_68 — 우리 행이 아니라 마켓 URL 이다)
- * - 패널을 연 채로 **패널 안**에 놓기
- * - 물품 상세의 [클립보드에 담기] 버튼(값 + 갤러리 전부)
+ * **Ways to keep (all work at 768px and up)**
+ * - Drag a product gallery photo onto **the tool bar icon** (works while the panel is closed)
+ * - Drag a **market photo** from the global tool panel (2609_68 — a market URL, not our row)
+ * - Drop **into the panel** while it is open
+ * - The [클립보드에 담기] button on the product detail (values + the whole gallery)
  *
- * **붙이는 법**: 패널의 행을 끌어 물품 갤러리에 놓는다(`ProductImageGallery`).
- *   붙여도 클립보드에서 사라지지 않는다 — 여러 물품에 붙일 수 있어야 한다.
+ * **Pasting**: drag a panel row onto a product gallery (`ProductImageGallery`).
+ *   Pasting does not remove it from the clipboard — it must be pastable onto several products.
+ * **Below 768px**: rows are not draggable; a notice line sits above the list (FEATURE_2610_31 D19).
  *
- * 🔴 개수를 props 로 받지 않는다 — store 를 직접 읽는다(`AlertBell` 과 같은 규칙).
- * 🔴 `ui/Modal` 을 쓰지 않는다 — 여는 것은 `ToolPanel`(z-40, 사이드바·모달 z-50 아래)이다.
- *   ⚠️ 툴바 안에서 자체 드롭다운(`absolute`)을 띄우지 말 것 — `ToolPanel` 과 오른쪽에서 겹친다.
- * 🔴 썸네일은 `resolveThumbUrl(imageUrl)` 로 렌더한다. 대표 프록시 `getImageUrl` 금지.
- *   ⚠️ **마켓 사진(`market-image`)만 예외** — 이미 절대 주소라 그대로 `<img src>` 에 넣는다.
- * ⚠️ `persist` 복원 ↔ SSR 첫 렌더 mismatch 를 피하려고 **마운트 전에는 배지를 그리지 않는다**.
- * ⚠️ `dragover` 에서는 `getData()` 를 읽을 수 없다 — 받을지 말지는 `dataTransfer.types` 로만 판단한다.
+ * 🔴 The count does not come in props — read the store directly (same rule as `AlertBell`).
+ * 🔴 Do not use `ui/Modal` — `ToolPanel` opens it (z-40, under the sidebar · modal z-50).
+ *   ⚠️ Do not open a dropdown (`absolute`) inside the tool bar — it overlaps `ToolPanel` on the right.
+ * 🔴 Thumbnails render through `resolveThumbUrl(imageUrl)`. The representative proxy `getImageUrl` is not allowed.
+ *   ⚠️ **Market photos (`market-image`) are the only exception** — already absolute, they go straight into `<img src>`.
+ * ⚠️ To avoid a `persist` restore ↔ SSR first render mismatch, **the badge is not drawn before mount**.
+ * ⚠️ `getData()` cannot be read on `dragover` — whether to accept is decided from `dataTransfer.types` only.
  */
 
 /**
@@ -118,6 +122,7 @@ export function ClipboardTool() {
   const remove = useClipboardStore((state) => state.remove);
   const clear = useClipboardStore((state) => state.clear);
   const { isDragOver, dropHandlers } = useClipDropZone();
+  const isMobile = useIsMobile();
 
   const thumbOf = (item: ClipItem): string | null => {
     // 마켓 사진은 절대 주소다 — 프록시를 태우면 404 가 난다.
@@ -142,66 +147,69 @@ export function ClipboardTool() {
   };
 
   return (
-    <div
-      {...dropHandlers}
-      className={`overflow-hidden rounded-lg border ${
-        isDragOver ? 'border-blue-500 ring-2 ring-blue-500' : 'border-gray-200'
-      }`}
-    >
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2">
-        <span className="text-sm font-semibold text-gray-900">담긴 항목 {items.length}개</span>
-        {items.length > 0 && (
-          <button
-            type="button"
-            onClick={clear}
-            className="text-xs font-medium text-gray-500 hover:text-red-600"
-          >
-            모두 비우기
-          </button>
+    <>
+      <DragNotice />
+      <div
+        {...dropHandlers}
+        className={`overflow-hidden rounded-lg border ${
+          isDragOver ? 'border-blue-500 ring-2 ring-blue-500' : 'border-gray-200'
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2">
+          <span className="text-sm font-semibold text-gray-900">담긴 항목 {items.length}개</span>
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={clear}
+              className="text-xs font-medium text-gray-500 hover:text-red-600"
+            >
+              모두 비우기
+            </button>
+          )}
+        </div>
+
+        {items.length === 0 ? (
+          <div className="px-3 py-6 text-center text-sm text-gray-500">
+            여기에 상품 이미지를 끌어다 놓으세요
+          </div>
+        ) : (
+          items.map((item) => {
+            const thumb = thumbOf(item);
+            return (
+              <div
+                key={item.clipId}
+                draggable={!isMobile}
+                onDragStart={(e) => startDragItem(e, item)}
+                className="flex cursor-grab items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0 hover:bg-gray-50 active:cursor-grabbing"
+              >
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-gray-100">
+                  {thumb && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={thumb}
+                      alt=""
+                      draggable={false}
+                      className="h-full w-full object-contain"
+                    />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">{item.productName}</p>
+                  <p className="text-xs text-gray-500">{summaryOf(item)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => remove(item.clipId)}
+                  aria-label="비우기"
+                  className="shrink-0 rounded px-2 py-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-red-600"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })
         )}
       </div>
-
-      {items.length === 0 ? (
-        <div className="px-3 py-6 text-center text-sm text-gray-500">
-          여기에 상품 이미지를 끌어다 놓으세요
-        </div>
-      ) : (
-        items.map((item) => {
-          const thumb = thumbOf(item);
-          return (
-            <div
-              key={item.clipId}
-              draggable
-              onDragStart={(e) => startDragItem(e, item)}
-              className="flex cursor-grab items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0 hover:bg-gray-50 active:cursor-grabbing"
-            >
-              <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-gray-100">
-                {thumb && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={thumb}
-                    alt=""
-                    draggable={false}
-                    className="h-full w-full object-contain"
-                  />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-900">{item.productName}</p>
-                <p className="text-xs text-gray-500">{summaryOf(item)}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => remove(item.clipId)}
-                aria-label="비우기"
-                className="shrink-0 rounded px-2 py-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-red-600"
-              >
-                ✕
-              </button>
-            </div>
-          );
-        })
-      )}
-    </div>
+    </>
   );
 }

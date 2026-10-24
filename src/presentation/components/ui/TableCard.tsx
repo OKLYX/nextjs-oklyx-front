@@ -1,36 +1,40 @@
 /**
- * 목록 표를 담는 흰 표면 + 로딩 / 빈 상태 / 에러 분기를 한 곳에서 소유한다.
+ * The white surface that holds a list table, plus the loading / empty / error branches, in one place.
  *
- * **용도**: 모든 목록 화면의 `<table>` 컨테이너.
- * **파일**: src/presentation/components/ui/TableCard.tsx
+ * **Purpose**: the `<table>` container of list screens. Not every table sits in it — a list that must not scroll
+ *   sideways (`ChannelSaleRecords`) or a table inside a popup or a row draws its own surface.
+ * **File**: src/presentation/components/ui/TableCard.tsx
  *
- * **필수 규칙**
- * - 목록 표는 이 컴포넌트 안에 둔다. `bg-white rounded-lg shadow overflow-hidden` 을
- *   새로 작성하지 않는다. 가로 스크롤 정책(`.list-table-scroll` → `--list-table-min-w`)은
- *   이 컴포넌트가 항상 적용한다.
- * - 로딩 / 빈 상태 / 에러는 화면에서 분기하지 말고 props 로 올린다. 내부에서 `StateBlock`
- *   으로 렌더링되므로 목록 화면끼리 모양이 같아진다.
- * - 우선순위는 `error` → `isLoading` → `isEmpty` → `children` 이다.
- * - 표 헤더 스타일은 이 컴포넌트가 소유하지 **않는다**. `<thead>` 는 각 화면이 그리되
- *   클래스는 `bg-gray-100 border-b border-gray-200` 로 통일한다.
- * - 범용 DataTable 이 아니다. 컬럼 구성은 화면마다 다르므로 `<table>` 은 children 이다.
+ * **Required rules**
+ * - A list table sits inside this component. Do not write `bg-white rounded-lg shadow overflow-hidden` again
+ *   elsewhere. The horizontal-scroll policy (`.list-table-scroll` → `--list-table-min-w`) is applied by this
+ *   component whenever the table is drawn — in the narrow-screen card view (`renderCards`, FEATURE_2610_31 D13)
+ *   the cards take the table's place and the box is not drawn.
+ * - Do not branch on loading / empty / error in the screen — pass them as props. They render through `StateBlock`,
+ *   so the list screens that use this component look the same.
+ * - Priority: `error` → `isLoading` → `isEmpty` → `children` (in card view, the cards in place of the `<table>`).
+ * - This component does **not** own the table header style. Each screen draws its `<thead>`, with the classes
+ *   `bg-gray-100 border-b border-gray-200`.
+ * - Not a generic DataTable. Columns differ per screen, so the `<table>` is a child.
  *
  * **Props**
- * - `isLoading` / `isEmpty`: 상태 플래그. 화면의 기존 분기를 그대로 올린다.
- * - `error?`: 문자열이 있으면 빨간 에러 블록을 대신 렌더링한다.
- * - `loadingMessage?`: 기본 `'불러오는 중...'`
- * - `emptyMessage?`: 기본 `'결과가 없습니다.'` — "아직 검색 안 함"과 "결과 0건"을 구분하는
- *   화면은 호출부에서 다른 문구를 넘긴다.
- * - `className?`: 레이아웃 보정용 추가 클래스. 배경·그림자 재정의 ❌.
- * - 페이지네이션처럼 같은 카드 안에 놓이던 요소는 `<table>` 뒤에 children 으로 나란히 넘긴다.
+ * - `isLoading` / `isEmpty`: state flags. Pass the screen's existing branches as they are.
+ * - `error?`: when a string is given, a red error block is rendered instead.
+ * - `loadingMessage?`: default `'불러오는 중...'`
+ * - `emptyMessage?`: default `'결과가 없습니다.'` — a screen that tells "not searched yet" from "0 results" passes
+ *   another text.
+ * - `className?`: extra layout classes. ❌ No background or shadow override.
+ * - `renderCards?` · `cardsToolbar?`: the narrow-screen cards and the controls above them (see the props below).
+ * - Elements that sat in the same card, like pagination, are passed as children right after the `<table>`.
  *
- * **사용 예제**
+ * **Usage**
  * ```tsx
  * <TableCard
  *   isLoading={isLoading}
  *   isEmpty={rows.length === 0}
  *   error={error}
  *   emptyMessage={hasSearched ? '검색 결과가 없습니다.' : '조건을 입력해 검색하세요.'}
+ *   renderCards={() => rows.map((row) => <DataCard key={row.id} title={row.name} />)}
  * >
  *   <table className="min-w-full divide-y divide-gray-200">
  *     <thead className="bg-gray-100 border-b border-gray-200">…</thead>
@@ -39,10 +43,15 @@
  * </TableCard>
  * ```
  *
- * ⚠️ `overflow-hidden` 만 쓰던 목록도 이제 표 안에서 가로 스크롤된다(의도된 개선).
- * ❌ 표를 이 컴포넌트 밖에 두고 별도 스크롤 래퍼를 만들지 않는다.
+ * ⚠️ Lists that used `overflow-hidden` only now scroll horizontally inside the table (an intended improvement).
+ * ❌ Do not put the table outside this component with a scroll wrapper of its own.
  */
-import type { ReactNode } from 'react';
+'use client';
+
+import { Children, isValidElement, type ReactNode } from 'react';
+import { DataCardList } from '@/presentation/components/DataCard';
+import { ViewModeToggle } from '@/presentation/components/ViewModeToggle';
+import { useShowCards } from '@/presentation/hooks/useShowCards';
 import { StateBlock } from './StateBlock';
 
 export interface TableCardProps {
@@ -58,6 +67,15 @@ export interface TableCardProps {
   emptyMessage?: string;
   /** 레이아웃 보정용 추가 클래스 */
   className?: string;
+  /**
+   * The list's narrow-screen cards (FEATURE_2610_31 D13 · D25) — the `DataCard`s of the rows. When given, a
+   * table/card switch (`ViewModeToggle`) sits above the list below 768px, and in card view the white box (and
+   * `className`) is not drawn and the cards (in a page `DataCardList`) take the place of the `<table>` child — the
+   * other children (pagination etc.) stay where they are. Loading, empty and error blocks keep the box.
+   */
+  renderCards?: () => ReactNode;
+  /** Controls above the cards, left of the switch, in card view only (「전체 선택」 · sort — D13 · D31). */
+  cardsToolbar?: ReactNode;
   /** `<table>` (+ 같은 카드에 놓이는 페이지네이션 등) */
   children: ReactNode;
 }
@@ -69,8 +87,11 @@ export function TableCard({
   loadingMessage = '불러오는 중...',
   emptyMessage = '결과가 없습니다.',
   className,
+  renderCards,
+  cardsToolbar,
   children,
 }: TableCardProps) {
+  const showCards = useShowCards();
   const classes = ['bg-white rounded-lg shadow list-table-scroll', className]
     .filter(Boolean)
     .join(' ');
@@ -99,5 +120,27 @@ export function TableCard({
     );
   }
 
-  return <div className={classes}>{children}</div>;
+  if (renderCards === undefined) return <div className={classes}>{children}</div>;
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-2 md:hidden">
+        {showCards && cardsToolbar}
+        <ViewModeToggle className="ml-auto" />
+      </div>
+      {showCards ? (
+        <div>
+          {Children.map(children, (child) =>
+            isValidElement(child) && child.type === 'table' ? (
+              <DataCardList placement="page">{renderCards()}</DataCardList>
+            ) : (
+              child
+            )
+          )}
+        </div>
+      ) : (
+        <div className={classes}>{children}</div>
+      )}
+    </>
+  );
 }

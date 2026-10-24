@@ -125,8 +125,8 @@ function ChannelPreviewInner({ data, onClose }: { data: ChannelPreviewData; onCl
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-gray-200 px-4 pt-3">
-        <div className="flex items-end gap-1">
+      <div className="flex items-center justify-between border-b border-gray-200 px-4 pt-3 max-md:flex-wrap">
+        <div className="flex items-end gap-1 max-md:flex-wrap">
           <button type="button" onClick={() => setTab('image')} className={tabClass(tab === 'image')}>
             이미지
           </button>

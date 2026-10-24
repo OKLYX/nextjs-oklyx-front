@@ -185,6 +185,18 @@ body {
   white-space: nowrap;
 }
 
+/* ---- Narrow-screen input text size (single source, FEATURE_2610_31 D16) ----
+   iPhone Safari zooms the page when an input under 16px gets focus. Below 768px every input, select and
+   textarea uses 16px — here only, not per screen. Plain CSS outside a layer, so it wins over `text-sm` · `text-xs`.
+   ❌ Do not stop zooming with `maximum-scale=1` / `user-scalable=no` — that also blocks pinch zoom. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* Native <input type="color"> shows the swatch inset by browser padding/border.
    .color-swatch-fill removes that so the color fills the whole control area. */
 .color-swatch-fill { padding: 0; }

@@ -3,32 +3,38 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { CircleCheck, AlertCircle } from 'lucide-react';
 import { TOAST_DURATION_MS, useToastStore, type ToastItem } from '@/infrastructure/stores/toastStore';
+import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 
 /**
- * 웹 공용 잠깐 알림(토스트)을 그리는 **유일한** 자리 (FEATURE_2609_77, UX D26·D33).
+ * The **only** place that draws the web's short notices (toasts) (FEATURE_2609_77, UX D26 · D33).
  * File: src/presentation/components/ToastViewport.tsx
  *
- * **필수 규칙**
- * - `dashboard/layout.tsx` 에서 **한 번만** 마운트한다. 화면마다 두지 않는다.
- * - 알림을 띄우는 쪽은 `toast.success` / `toast.error`(`toastStore.ts`)만 부른다.
+ * **Required rules**
+ * - Mounted **once**, in `dashboard/layout.tsx`. Screens do not mount it.
+ * - Callers only call `toast.success` / `toast.error` (`toastStore.ts`).
  *
- * **동작**
- * - 자리: 화면 오른쪽 위(상단바 아래 · 오른쪽 도구 툴바 왼쪽). 새 알림이 아래에 쌓인다.
- * - 시간: 성공 3초 · 실패 6초(`TOAST_DURATION_MS`). 마우스를 올리거나 손가락을 대고 있으면 멈추고,
- *   떼면 **남은 시간**만큼 더 떠 있다.
- * - 층: `z-[70]` — 열린 `ui/Modal`(z-50/z-[60]) 위에서도 보인다. Radix 가 모달이 열리면 body 의
- *   pointer-events 를 끄므로 알림 카드에 `pointer-events-auto` 를 준다.
+ * **Behaviour**
+ * - Place: top right of the screen (under the top bar · left of the right tool bar). New notices stack below.
+ *   Below 768px, while the tool bar is collapsed: 1rem from the right edge, at most `100vw − 2rem` wide
+ *   (FEATURE_2610_31 D39).
+ * - Time: success 3s · failure 6s (`TOAST_DURATION_MS`). A mouse over it or a finger on it pauses the timer;
+ *   on leave it stays for the **remaining time**.
+ * - Layer: `z-[70]` — visible above an open `ui/Modal` (z-50/z-[60]). Radix turns off the body's pointer-events
+ *   while a modal is open, so the notice card gets `pointer-events-auto`.
  *
- * ⚠️ 닫기(✕) 버튼은 두지 않는다 — 잠깐 떴다 사라지는 알림이다(D26).
- * ❌ `fixed inset-0` · `z-50` · `z-[60]` 금지(`npm run lint:ui`).
+ * ⚠️ No close (✕) button — it is a notice that shows briefly and goes away (D26).
+ * ❌ No `fixed inset-0` · `z-50` · `z-[60]` (`npm run lint:ui`).
  */
 export function ToastViewport() {
   const toasts = useToastStore((s) => s.toasts);
+  const railCollapsed = useToolPanelStore((s) => s.railCollapsed);
   if (toasts.length === 0) return null;
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed right-20 top-16 z-[70] flex w-80 max-w-[calc(100vw-6rem)] flex-col gap-2"
+      className={`pointer-events-none fixed right-20 top-16 z-[70] flex w-80 max-w-[calc(100vw-6rem)] flex-col gap-2 ${
+        railCollapsed ? 'max-md:right-4 max-md:max-w-[calc(100vw-2rem)]' : ''
+      }`}
     >
       {toasts.map((item) => (
         <ToastCard key={item.id} item={item} />

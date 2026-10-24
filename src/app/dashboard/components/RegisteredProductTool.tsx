@@ -12,6 +12,8 @@ import { formatKrw } from '@/infrastructure/utils/money';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { setSmallDragImage } from '@/infrastructure/utils/dragGhost';
+import { DragNotice } from '@/presentation/components/WideScreenOnly';
+import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 import { newClipId } from '@/infrastructure/stores/clipboardStore';
 import { CLIP_MIME, type ClipItem } from '@/domain/entities/ClipItem';
 import { purchasePlaceNames, type Product } from '@/domain/entities/Product';
@@ -109,6 +111,7 @@ export function RegisteredProductTool() {
   const [imagesState, setImagesState] = useState<'loading' | 'error' | 'ready'>('loading');
   /** Index of the photo in the lightbox. `null` = closed. */
   const [zoom, setZoom] = useState<number | null>(null);
+  const isMobile = useIsMobile();
 
   /** Result row buttons by product id — the opened row is scrolled back into view after [뒤로]. */
   const rowRefs = useRef(new Map<number, HTMLButtonElement>());
@@ -259,26 +262,30 @@ export function RegisteredProductTool() {
           ) : images.length === 0 ? (
             <p className="text-xs text-gray-500">사진이 없습니다.</p>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {images.map((image, index) => (
-                <button
-                  key={image.id}
-                  type="button"
-                  draggable
-                  onDragStart={(e) => startImageDrag(e, selected, image)}
-                  onClick={() => setZoom(index)}
-                  className="aspect-square overflow-hidden rounded border border-gray-200 bg-gray-100 hover:border-blue-400"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={resolveThumbUrl(image.imageUrl)}
-                    alt="상품 사진"
-                    draggable={false}
-                    className="h-full w-full object-contain"
-                  />
-                </button>
-              ))}
-            </div>
+            <>
+              {/* Below 768px the photos are not draggable (FEATURE_2610_31 D19). */}
+              <DragNotice />
+              <div className="grid grid-cols-3 gap-2">
+                {images.map((image, index) => (
+                  <button
+                    key={image.id}
+                    type="button"
+                    draggable={!isMobile}
+                    onDragStart={(e) => startImageDrag(e, selected, image)}
+                    onClick={() => setZoom(index)}
+                    className="aspect-square overflow-hidden rounded border border-gray-200 bg-gray-100 hover:border-blue-400"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={resolveThumbUrl(image.imageUrl)}
+                      alt="상품 사진"
+                      draggable={false}
+                      className="h-full w-full object-contain"
+                    />
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
@@ -294,7 +301,7 @@ export function RegisteredProductTool() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2 max-md:flex-wrap">
         <div className="min-w-0 flex-1">
           <Input
             size="sm"
