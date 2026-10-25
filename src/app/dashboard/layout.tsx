@@ -192,7 +192,9 @@ export default function DashboardLayout({
           {pathname === ROUTES.DASHBOARD && (
             <Link href={ROUTES.DASHBOARD} className="md:hidden flex shrink-0 items-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/oclyx_letter_logo.png" alt="OCLYX" className="h-8 w-auto" />
+              <img src="/oclyx_letter_logo.png" alt="OCLYX" className="logo-on-light h-8 w-auto" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/oclyx_letter_logo_dark.png" alt="OCLYX" className="logo-on-dark h-8 w-auto" />
             </Link>
           )}
           <div className="flex-1 min-w-0">
