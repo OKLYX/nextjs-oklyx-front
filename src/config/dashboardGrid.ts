@@ -36,18 +36,18 @@ export const WEB_GRID = {
 } as const;
 
 /**
- * Dashboard grid below 768px (FEATURE_2610_31 D17) — the mobile app's grid (`MobileGrid` in
+ * Dashboard grid below 768px (FEATURE_2610_31 D17) — the mobile app's columns (`MobileGrid` in
  * `lib/features/dashboard/presentation/utils/dashboard_grid_spec.dart`): 2 columns, a card one row high or, when
- * its spec is `narrowTall`, `tallRowHeight` high.
- * ⚠️ Same numbers as the app — change both together.
+ * its spec is `narrowTall`, two rows high.
+ * Rows are the web rows (2026-10-25), so a card keeps its wide-screen height ratio; the app keeps its own heights.
  */
 export const NARROW_GRID = {
   /** Columns across. */
   cols: 2,
-  /** Height of the one row a card takes, in px. */
-  rowHeight: 104,
-  /** Height of a tall card's row in px — 1.5 × `rowHeight` (2026-10-24). */
-  tallRowHeight: 156,
+  /** Height of one row in px — the web row. */
+  rowHeight: WEB_GRID.rowHeight,
+  /** Height of a tall card in px — two web rows and the gap between them. */
+  tallHeight: 2 * WEB_GRID.rowHeight + WEB_GRID.gap,
   /** Space between cells in px, both directions. */
   gap: 12,
   /** Card widths in cells. */
@@ -68,13 +68,8 @@ export interface DashboardCardSpec {
   /** Smallest width / width of a card without a mobile place, in `NARROW_GRID` cells — the app's `minWidth` · `initialWidth` (FEATURE_2610_31 D17). */
   narrowMinW: number;
   narrowInitW: number;
-  /** true = drawn `NARROW_GRID.tallRowHeight` high below 768px; only full-width cards, so a row never mixes heights. */
+  /** true = drawn `NARROW_GRID.tallHeight` high below 768px; only full-width cards, so a row never mixes heights. */
   narrowTall?: boolean;
-  /**
-   * Height in px below 768px when the card needs more than `tallRowHeight` — wins over `narrowTall`. Web only: the
-   * app's card keeps its own height.
-   */
-  narrowHeightPx?: number;
   /** Screen a tap opens (D21). */
   href: string;
   /** Periods the card offers, in selector order; empty = no period (D22 · D23). */
@@ -107,7 +102,7 @@ export const DASHBOARD_CARD_SPECS: Record<DashboardCardType, DashboardCardSpec> 
   PURCHASE_LIST: { title: '구매목록 남은 품목', adminOnly: true, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.PURCHASE_LIST, periods: [], defaultPeriod: null },
   RESERVED_SHIPMENTS: { title: '예약 발송', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, narrowMinW: 2, narrowInitW: 2, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
   DAILY_SALES_CHART: { title: '날짜별 매출 · 주문 수', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_SUMMARY, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7', narrowTall: true },
-  CHANNEL_SALES_CHART: { title: '채널별 매출', adminOnly: true, minW: 4, minH: 2, initW: 4, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_BY_CHANNEL, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7', narrowHeightPx: 2 * WEB_GRID.rowHeight + WEB_GRID.gap },
+  CHANNEL_SALES_CHART: { title: '채널별 매출', adminOnly: true, minW: 4, minH: 2, initW: 4, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_BY_CHANNEL, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7', narrowTall: true },
 };
 
 /** Picker and selector labels of the periods (D22 · D23). */
@@ -131,9 +126,7 @@ export function narrowAllowedWidths(type: DashboardCardType): number[] {
 
 /** Height in px the card is drawn at below 768px. */
 export function narrowHeight(type: DashboardCardType): number {
-  const spec = DASHBOARD_CARD_SPECS[type];
-  if (spec.narrowHeightPx !== undefined) return spec.narrowHeightPx;
-  return spec.narrowTall ? NARROW_GRID.tallRowHeight : NARROW_GRID.rowHeight;
+  return DASHBOARD_CARD_SPECS[type].narrowTall ? NARROW_GRID.tallHeight : NARROW_GRID.rowHeight;
 }
 
 /** Heights the card may take: the D7 heights at or above its minimum. */
