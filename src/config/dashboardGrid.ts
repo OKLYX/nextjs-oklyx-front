@@ -129,26 +129,6 @@ export function narrowHeight(type: DashboardCardType): number {
   return DASHBOARD_CARD_SPECS[type].narrowTall ? NARROW_GRID.tallRowHeight : NARROW_GRID.rowHeight;
 }
 
-/**
- * Channel rows the 「채널별 매출」 card shows before it folds the rest into one 「외 K개」 line (DASHBOARD_CARDS D41 ·
- * D44) — the most 22px rows plus the 16px fold line that fit the chart area of each size.
- * ⚠️ The app's `MobileGrid.channelChartRows` is the `narrow` value — change both together.
- */
-export const CHANNEL_CHART_ROWS = {
-  /** Below 768px (chart area 98px). */
-  narrow: 3,
-  /** 768px and up, one row high (chart area 62px). */
-  wideShort: 2,
-  /** 768px and up, two rows high (chart area 198px). */
-  wideTall: 8,
-} as const;
-
-/** Channel rows of the 「채널별 매출」 card at a size; `h` = the card's rows on the wide grid. */
-export function channelChartRows(narrow: boolean, h: number): number {
-  if (narrow) return CHANNEL_CHART_ROWS.narrow;
-  return h === 1 ? CHANNEL_CHART_ROWS.wideShort : CHANNEL_CHART_ROWS.wideTall;
-}
-
 /** Heights the card may take: the D7 heights at or above its minimum. */
 export function allowedHeights(type: DashboardCardType): number[] {
   return WEB_GRID.heights.filter((h) => h >= DASHBOARD_CARD_SPECS[type].minH);

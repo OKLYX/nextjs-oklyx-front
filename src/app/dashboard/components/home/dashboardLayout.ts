@@ -283,3 +283,36 @@ export function periodRange(period: DashboardPeriod): { from: string; to: string
       return lastMonthRange();
   }
 }
+
+/**
+ * The period right before `period`, of the same length (the 「채널별 매출」 card's comparison base). 「이번 달」 compares
+ * with the same days of last month (1st ~ today's day, cut at last month's end) — not the whole month.
+ */
+export function previousPeriodRange(period: DashboardPeriod): { from: string; to: string } {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  const d = today.getDate();
+  const range = (from: Date, to: Date) => ({ from: toDateInput(from), to: toDateInput(to) });
+  switch (period) {
+    case 'TODAY':
+      return range(new Date(y, m, d - 1), new Date(y, m, d - 1));
+    case 'DAYS_7':
+      return range(new Date(y, m, d - 13), new Date(y, m, d - 7));
+    case 'DAYS_30':
+      return range(new Date(y, m, d - 59), new Date(y, m, d - 30));
+    case 'THIS_MONTH':
+      return range(new Date(y, m - 1, 1), new Date(y, m - 1, Math.min(d, new Date(y, m, 0).getDate())));
+    case 'LAST_MONTH':
+      return range(new Date(y, m - 2, 1), new Date(y, m - 1, 0));
+  }
+}
+
+/** Label next to the change against `previousPeriodRange`. */
+export const PREVIOUS_PERIOD_LABELS: Record<DashboardPeriod, string> = {
+  TODAY: '어제 대비',
+  DAYS_7: '직전 7일 대비',
+  DAYS_30: '직전 30일 대비',
+  THIS_MONTH: '지난달 같은 기간 대비',
+  LAST_MONTH: '전월 대비',
+};
