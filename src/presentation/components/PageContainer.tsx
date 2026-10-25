@@ -37,7 +37,8 @@ export const CONTENT_WIDTH = 'max-w-7xl';
  * - `title?`: 페이지 제목. 넘기면 `<h1 className="text-2xl font-bold text-gray-900 truncate">`를
  *   렌더링한다. 없으면 헤더 영역 자체를 렌더링하지 않는다(제목 없는 페이지 허용).
  * - `action?`: 제목 우측 영역(버튼, 건수 표시 등). 있으면 제목 줄이
- *   `flex items-center justify-between`으로 배치된다.
+ *   `flex items-center justify-between`으로 배치된다. `title` 없이 `action`만 넘기면
+ *   액션만 오른쪽 끝에 붙는다(대시보드 홈 — 제목 없음, [편집] 버튼만).
  *
  * @example
  * // 기본 (왼쪽 정렬, max-w-7xl, 세로 간격 space-y-6)
@@ -88,6 +89,7 @@ export function PageContainer({ children, title, action }: PageContainerProps) {
             {action}
           </div>
         )}
+        {!title && action && <div className="flex justify-end">{action}</div>}
         {children}
       </div>
     </div>

@@ -230,7 +230,7 @@ export function DashboardHome() {
     );
 
   return (
-    <PageContainer title="Welcome to OCLYX" action={action}>
+    <PageContainer action={action}>
       <div ref={containerRef}>
         {loadState === 'loading' && <StateBlock variant="loading" message="불러오는 중..." />}
         {loadState === 'error' && (
