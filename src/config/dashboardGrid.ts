@@ -70,6 +70,11 @@ export interface DashboardCardSpec {
   narrowInitW: number;
   /** true = drawn `NARROW_GRID.tallRowHeight` high below 768px; only full-width cards, so a row never mixes heights. */
   narrowTall?: boolean;
+  /**
+   * Height in px below 768px when the card needs more than `tallRowHeight` — wins over `narrowTall`. Web only: the
+   * app's card keeps its own height.
+   */
+  narrowHeightPx?: number;
   /** Screen a tap opens (D21). */
   href: string;
   /** Periods the card offers, in selector order; empty = no period (D22 · D23). */
@@ -102,7 +107,7 @@ export const DASHBOARD_CARD_SPECS: Record<DashboardCardType, DashboardCardSpec> 
   PURCHASE_LIST: { title: '구매목록 남은 품목', adminOnly: true, minW: 1, minH: 1, initW: 1, initH: 1, narrowMinW: 1, narrowInitW: 1, href: ROUTES.PURCHASE_LIST, periods: [], defaultPeriod: null },
   RESERVED_SHIPMENTS: { title: '예약 발송', adminOnly: true, minW: 2, minH: 1, initW: 2, initH: 1, narrowMinW: 2, narrowInitW: 2, href: ROUTES.ORDERS_SHIPMENT, periods: [], defaultPeriod: null },
   DAILY_SALES_CHART: { title: '날짜별 매출 · 주문 수', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_SUMMARY, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7', narrowTall: true },
-  CHANNEL_SALES_CHART: { title: '채널별 매출', adminOnly: true, minW: 4, minH: 1, initW: 4, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_BY_CHANNEL, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7', narrowTall: true },
+  CHANNEL_SALES_CHART: { title: '채널별 매출', adminOnly: true, minW: 4, minH: 2, initW: 4, initH: 2, narrowMinW: 2, narrowInitW: 2, href: ROUTES.SALES_BY_CHANNEL, periods: ['DAYS_7', 'THIS_MONTH', 'LAST_MONTH'], defaultPeriod: 'DAYS_7', narrowHeightPx: 2 * WEB_GRID.rowHeight + WEB_GRID.gap },
 };
 
 /** Picker and selector labels of the periods (D22 · D23). */
@@ -126,7 +131,9 @@ export function narrowAllowedWidths(type: DashboardCardType): number[] {
 
 /** Height in px the card is drawn at below 768px. */
 export function narrowHeight(type: DashboardCardType): number {
-  return DASHBOARD_CARD_SPECS[type].narrowTall ? NARROW_GRID.tallRowHeight : NARROW_GRID.rowHeight;
+  const spec = DASHBOARD_CARD_SPECS[type];
+  if (spec.narrowHeightPx !== undefined) return spec.narrowHeightPx;
+  return spec.narrowTall ? NARROW_GRID.tallRowHeight : NARROW_GRID.rowHeight;
 }
 
 /** Heights the card may take: the D7 heights at or above its minimum. */
