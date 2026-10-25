@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { TopBar } from './components/TopBar';
 import { Navbar } from './components/Navbar';
@@ -186,6 +187,14 @@ export default function DashboardLayout({
               <line x1="9" y1="3" x2="9" y2="21" />
             </svg>
           </button>
+          {/* Letter logo on the home screen at narrow widths only — mirrors the mobile app's
+              dashboard AppBar. Wide screens already show the logo in the rail header. */}
+          {pathname === ROUTES.DASHBOARD && (
+            <Link href={ROUTES.DASHBOARD} className="md:hidden flex shrink-0 items-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/oclyx_letter_logo.png" alt="OCLYX" className="h-8 w-auto" />
+            </Link>
+          )}
           <div className="flex-1 min-w-0">
             <TopBar />
           </div>
