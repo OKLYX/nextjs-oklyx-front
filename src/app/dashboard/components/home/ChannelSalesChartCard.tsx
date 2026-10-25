@@ -41,8 +41,6 @@ const spec = DASHBOARD_CARD_SPECS.CHANNEL_SALES_CHART;
 /** Line shape of the list — fixed, the number of lines comes from the measured list height. */
 const LINE_HEIGHT_PX = 22;
 const NAME_WIDTH_PX = 120;
-/** Below this body height the share bar and its legend are dropped so channel lines still fit (phone · 1-row card). */
-const COMPACT_BELOW_HEIGHT_PX = 150;
 /** Below this body width the per-line bar is dropped — names and numbers keep the room. */
 const BAR_FROM_WIDTH_PX = 440;
 /** Below this body width the change column is dropped. */
@@ -284,22 +282,11 @@ function ChannelSalesView({
     return <p className="flex h-full items-center justify-center text-xs text-gray-500">이 기간 매출이 없습니다.</p>;
   }
 
-  const compact = body.height > 0 && body.height < COMPACT_BELOW_HEIGHT_PX;
   const fit: Fit = { bar: body.width >= BAR_FROM_WIDTH_PX, change: body.width >= CHANGE_FROM_WIDTH_PX };
-  // A short card in market mode lists only the market lines — one line per market says more than a header plus one
-  // account. A market header that fits without its accounts still shows the market total; cut accounts fold below.
-  const marketsOnly = compact && mode === 'MARKET';
-  const candidates = marketsOnly ? view.lines.filter((line) => line.kind === 'market') : view.lines;
-  const shown = candidates.slice(0, Math.floor(list.height / LINE_HEIGHT_PX));
+  // A market header that fits without its accounts still shows the market total; the cut accounts fold below.
+  const shown = view.lines.slice(0, Math.floor(list.height / LINE_HEIGHT_PX));
   const shownAccounts = new Set(shown.flatMap((line) => (line.kind === 'account' ? [line.row.accountId] : [])));
-  const shownMarkets = new Set(shown.flatMap((line) => (line.kind === 'market' ? [line.platform] : [])));
-  const hidden = view.lines.flatMap((line) =>
-    line.kind === 'account' &&
-    !shownAccounts.has(line.row.accountId) &&
-    !(marketsOnly && shownMarkets.has(line.row.platform))
-      ? [line.row]
-      : []
-  );
+  const hidden = view.lines.flatMap((line) => (line.kind === 'account' && !shownAccounts.has(line.row.accountId) ? [line.row] : []));
   const totalPct = view.previousTotal === null ? null : changePct(view.total, view.previousTotal);
   const legend = view.segments.slice(0, 3);
   const footer = [
@@ -311,7 +298,7 @@ function ChannelSalesView({
   return (
     <div ref={bodyRef} className="flex h-full flex-col overflow-hidden">
       <div className="flex min-w-0 shrink-0 items-baseline gap-2 overflow-hidden">
-        <span className={`whitespace-nowrap font-semibold tabular-nums text-gray-900 ${compact ? 'text-base' : 'text-xl'}`}>{formatMoney(view.total)}원</span>
+        <span className={`whitespace-nowrap font-semibold tabular-nums text-gray-900 text-xl`}>{formatMoney(view.total)}원</span>
         {totalPct !== null && (
           <span className="flex min-w-0 items-baseline gap-1 text-xs">
             <span className="font-medium tabular-nums">
@@ -323,7 +310,7 @@ function ChannelSalesView({
         {view.previousTotal === 0 && view.total > 0 && <span className="shrink-0 text-xs text-gray-500">직전 기간 매출 없음</span>}
       </div>
 
-      {!compact && view.segments.length > 0 && (
+      {view.segments.length > 0 && (
         <>
           <div className="mt-1.5 flex h-2 shrink-0 gap-0.5 overflow-hidden rounded-full bg-gray-100">
             {view.segments.map((segment) => (
@@ -344,7 +331,7 @@ function ChannelSalesView({
 
       <div
         ref={listRef}
-        className={`min-h-0 flex-1 overflow-hidden ${compact ? '' : 'mt-1.5 border-t border-gray-200 pt-1'}`}
+        className="mt-1.5 min-h-0 flex-1 overflow-hidden border-t border-gray-200 pt-1"
       >
         {shown.map((line) =>
           line.kind === 'market' ? (
@@ -363,7 +350,7 @@ function ChannelSalesView({
 
       {footer.length > 0 && (
         <p
-          className={`shrink-0 truncate text-xs text-gray-500 ${compact ? '' : 'border-t border-gray-200 pt-1'}`}
+          className="shrink-0 truncate border-t border-gray-200 pt-1 text-xs text-gray-500"
           title={footer.join(' · ')}
         >
           {footer.join(' · ')}
