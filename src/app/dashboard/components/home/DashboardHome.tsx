@@ -184,7 +184,6 @@ export function DashboardHome() {
             period={card.period ?? 'DAYS_7'}
             onPeriodChange={onPeriodChange}
             sellers={sellers}
-            narrow={narrow}
             {...common}
           />
         );
