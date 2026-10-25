@@ -21,8 +21,6 @@ interface ChannelSalesChartCardProps {
   onPeriodChange: (period: DashboardPeriod) => void;
   /** Seller list of the dashboard (FEATURE_2610_30 D37). */
   sellers: Seller[];
-  /** Below 768px — the name column narrows and the change column is hidden. */
-  narrow: boolean;
   editing: boolean;
   onRemove: () => void;
 }
@@ -43,7 +41,18 @@ const spec = DASHBOARD_CARD_SPECS.CHANNEL_SALES_CHART;
 /** Line shape of the list — fixed, the number of lines comes from the measured list height. */
 const LINE_HEIGHT_PX = 22;
 const NAME_WIDTH_PX = 120;
-const NARROW_NAME_WIDTH_PX = 88;
+/** Below this body height the share bar and its legend are dropped so channel lines still fit (phone · 1-row card). */
+const COMPACT_BELOW_HEIGHT_PX = 150;
+/** Below this body width the per-line bar is dropped — names and numbers keep the room. */
+const BAR_FROM_WIDTH_PX = 440;
+/** Below this body width the change column is dropped. */
+const CHANGE_FROM_WIDTH_PX = 300;
+
+/** Which optional parts fit the measured body. */
+interface Fit {
+  bar: boolean;
+  change: boolean;
+}
 
 /** Colours of the share bar, in sales order (brand utilities first — dark mode remaps them). */
 const GROUP_COLORS = ['bg-brand', 'bg-brand-teal', 'bg-brand-green', 'bg-brand-slate', 'bg-violet-400', 'bg-pink-400'];
@@ -147,11 +156,6 @@ function buildView(data: ChannelSalesData, mode: GroupMode, sellerId: number | n
   return { total, previousTotal, previousByAccount, lines, segments, idle };
 }
 
-/** The first `limit` lines; a market header whose accounts are all cut is dropped with them. */
-function visibleLines(lines: Line[], limit: number): Line[] {
-  const shown = lines.slice(0, Math.max(limit, 0));
-  return shown.length > 0 && shown[shown.length - 1].kind === 'market' ? shown.slice(0, -1) : shown;
-}
 
 /** Segmented 「마켓 | 계정」 switch in the title row. A tap on it does not open the card's screen. */
 function GroupModeSwitch({ value, onChange }: { value: GroupMode; onChange: (mode: GroupMode) => void }) {
@@ -179,12 +183,12 @@ function GroupModeSwitch({ value, onChange }: { value: GroupMode; onChange: (mod
 }
 
 /** Right-hand columns shared by both line kinds so the amounts line up. */
-function ValueColumns({ sales, total, pct, narrow, strong }: { sales: number; total: number; pct: number | null; narrow: boolean; strong?: boolean }) {
+function ValueColumns({ sales, total, pct, fit, strong }: { sales: number; total: number; pct: number | null; fit: Fit; strong?: boolean }) {
   return (
     <>
       <span className={`shrink-0 tabular-nums ${strong ? 'font-semibold text-gray-900' : 'text-gray-900'}`}>{formatMoney(sales)}원</span>
       <span className="w-12 shrink-0 text-right tabular-nums text-gray-500">{formatShare(sales, total)}</span>
-      {!narrow && (
+      {fit.change && (
         <span className="w-11 shrink-0 text-right tabular-nums">
           <ChangeText pct={pct} />
         </span>
@@ -193,7 +197,7 @@ function ValueColumns({ sales, total, pct, narrow, strong }: { sales: number; to
   );
 }
 
-function MarketRow({ line, total, narrow }: { line: MarketLine; total: number; narrow: boolean }) {
+function MarketRow({ line, total, fit }: { line: MarketLine; total: number; fit: Fit }) {
   const label = platformLabel(line.platform);
   return (
     <div className="flex items-center gap-1.5 text-xs" style={{ height: LINE_HEIGHT_PX }}>
@@ -204,7 +208,7 @@ function MarketRow({ line, total, narrow }: { line: MarketLine; total: number; n
         <span className="truncate font-medium text-gray-900">{label}</span>
         <span className="shrink-0 text-gray-500">계정 {line.accountCount}개</span>
       </div>
-      <ValueColumns sales={line.sales} total={total} pct={changePct(line.sales, line.previous)} narrow={narrow} strong />
+      <ValueColumns sales={line.sales} total={total} pct={changePct(line.sales, line.previous)} fit={fit} strong />
     </div>
   );
 }
@@ -213,12 +217,12 @@ function AccountRow({
   line,
   total,
   previous,
-  narrow,
+  fit,
 }: {
   line: AccountLine;
   total: number;
   previous: number | undefined;
-  narrow: boolean;
+  fit: Fit;
 }) {
   const { row } = line;
   const name = line.indent ? row.accountAlias?.trim() || `채널 #${row.accountId}` : channelLabel(row);
@@ -228,33 +232,37 @@ function AccountRow({
       <div className={`flex min-w-0 flex-1 items-center gap-1.5 ${line.indent ? 'pl-5' : ''}`}>
         <span className={`h-2 w-2 shrink-0 rounded-sm ${line.color}`} style={{ opacity: line.opacity }} />
         <span
-          className="shrink-0 truncate text-gray-700"
-          style={{ width: narrow ? NARROW_NAME_WIDTH_PX : NAME_WIDTH_PX }}
+          className={`truncate text-gray-700 ${fit.bar ? 'shrink-0' : 'min-w-0 flex-1'}`}
+          style={fit.bar ? { width: NAME_WIDTH_PX } : undefined}
           title={channelLabel(row)}
         >
           {name}
         </span>
-        <div className="h-1.5 min-w-0 flex-1 rounded-full bg-gray-100">
-          <div className={`h-full rounded-full ${line.color}`} style={{ width: `${ratio * 100}%`, opacity: line.opacity }} />
-        </div>
+        {fit.bar && (
+          <div className="h-1.5 min-w-0 flex-1 rounded-full bg-gray-100">
+            <div className={`h-full rounded-full ${line.color}`} style={{ width: `${ratio * 100}%`, opacity: line.opacity }} />
+          </div>
+        )}
       </div>
-      <ValueColumns sales={row.grossSales} total={total} pct={changePct(row.grossSales, previous)} narrow={narrow} />
+      <ValueColumns sales={row.grossSales} total={total} pct={changePct(row.grossSales, previous)} fit={fit} />
     </div>
   );
 }
 
-/** Number of list lines that fit the element's height, re-measured when the card is resized. */
-function useFittingLines() {
+/** Content size of the element, re-measured when the card is resized (0 × 0 before the first measure). */
+function useElementSize() {
   const ref = useRef<HTMLDivElement>(null);
-  const [lines, setLines] = useState(0);
+  const [size, setSize] = useState({ width: 0, height: 0 });
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setLines(Math.floor(entry.contentRect.height / LINE_HEIGHT_PX)));
+    const observer = new ResizeObserver(([entry]) =>
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+    );
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  return { ref, lines };
+  return [ref, size] as const;
 }
 
 function ChannelSalesView({
@@ -262,24 +270,36 @@ function ChannelSalesView({
   mode,
   sellerId,
   period,
-  narrow,
 }: {
   data: ChannelSalesData;
   mode: GroupMode;
   sellerId: number | null;
   period: DashboardPeriod;
-  narrow: boolean;
 }) {
   const view = useMemo(() => buildView(data, mode, sellerId), [data, mode, sellerId]);
-  const { ref, lines: fitting } = useFittingLines();
+  const [bodyRef, body] = useElementSize();
+  const [listRef, list] = useElementSize();
 
   if (view.lines.length === 0 && view.idle.length === 0) {
     return <p className="flex h-full items-center justify-center text-xs text-gray-500">이 기간 매출이 없습니다.</p>;
   }
 
-  const shown = visibleLines(view.lines, fitting);
+  const compact = body.height > 0 && body.height < COMPACT_BELOW_HEIGHT_PX;
+  const fit: Fit = { bar: body.width >= BAR_FROM_WIDTH_PX, change: body.width >= CHANGE_FROM_WIDTH_PX };
+  // A short card in market mode lists only the market lines — one line per market says more than a header plus one
+  // account. A market header that fits without its accounts still shows the market total; cut accounts fold below.
+  const marketsOnly = compact && mode === 'MARKET';
+  const candidates = marketsOnly ? view.lines.filter((line) => line.kind === 'market') : view.lines;
+  const shown = candidates.slice(0, Math.floor(list.height / LINE_HEIGHT_PX));
   const shownAccounts = new Set(shown.flatMap((line) => (line.kind === 'account' ? [line.row.accountId] : [])));
-  const hidden = view.lines.flatMap((line) => (line.kind === 'account' && !shownAccounts.has(line.row.accountId) ? [line.row] : []));
+  const shownMarkets = new Set(shown.flatMap((line) => (line.kind === 'market' ? [line.platform] : [])));
+  const hidden = view.lines.flatMap((line) =>
+    line.kind === 'account' &&
+    !shownAccounts.has(line.row.accountId) &&
+    !(marketsOnly && shownMarkets.has(line.row.platform))
+      ? [line.row]
+      : []
+  );
   const totalPct = view.previousTotal === null ? null : changePct(view.total, view.previousTotal);
   const legend = view.segments.slice(0, 3);
   const footer = [
@@ -289,21 +309,21 @@ function ChannelSalesView({
   ].filter(Boolean) as string[];
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex shrink-0 items-baseline gap-2">
-        <span className="whitespace-nowrap text-xl font-semibold tabular-nums text-gray-900">{formatMoney(view.total)}원</span>
+    <div ref={bodyRef} className="flex h-full flex-col overflow-hidden">
+      <div className="flex min-w-0 shrink-0 items-baseline gap-2 overflow-hidden">
+        <span className={`whitespace-nowrap font-semibold tabular-nums text-gray-900 ${compact ? 'text-base' : 'text-xl'}`}>{formatMoney(view.total)}원</span>
         {totalPct !== null && (
-          <span className="flex shrink-0 items-baseline gap-1 text-xs">
+          <span className="flex min-w-0 items-baseline gap-1 text-xs">
             <span className="font-medium tabular-nums">
               <ChangeText pct={totalPct} digits={1} />
             </span>
-            <span className="text-gray-500">{PREVIOUS_PERIOD_LABELS[period]}</span>
+            <span className="truncate text-gray-500">{PREVIOUS_PERIOD_LABELS[period]}</span>
           </span>
         )}
         {view.previousTotal === 0 && view.total > 0 && <span className="shrink-0 text-xs text-gray-500">직전 기간 매출 없음</span>}
       </div>
 
-      {view.segments.length > 0 && (
+      {!compact && view.segments.length > 0 && (
         <>
           <div className="mt-1.5 flex h-2 shrink-0 gap-0.5 overflow-hidden rounded-full bg-gray-100">
             {view.segments.map((segment) => (
@@ -322,24 +342,30 @@ function ChannelSalesView({
         </>
       )}
 
-      <div ref={ref} className="mt-1.5 min-h-0 flex-1 overflow-hidden border-t border-gray-200 pt-1">
+      <div
+        ref={listRef}
+        className={`min-h-0 flex-1 overflow-hidden ${compact ? '' : 'mt-1.5 border-t border-gray-200 pt-1'}`}
+      >
         {shown.map((line) =>
           line.kind === 'market' ? (
-            <MarketRow key={`m-${line.platform}`} line={line} total={view.total} narrow={narrow} />
+            <MarketRow key={`m-${line.platform}`} line={line} total={view.total} fit={fit} />
           ) : (
             <AccountRow
               key={line.row.accountId}
               line={line}
               total={view.total}
               previous={view.previousByAccount.get(line.row.accountId)}
-              narrow={narrow}
+              fit={fit}
             />
           )
         )}
       </div>
 
       {footer.length > 0 && (
-        <p className="shrink-0 truncate border-t border-gray-200 pt-1 text-xs text-gray-500" title={footer.join(' · ')}>
+        <p
+          className={`shrink-0 truncate text-xs text-gray-500 ${compact ? '' : 'border-t border-gray-200 pt-1'}`}
+          title={footer.join(' · ')}
+        >
           {footer.join(' · ')}
         </p>
       )}
@@ -359,7 +385,7 @@ function ChannelSalesView({
  * The seller selector (FEATURE_2610_30 D35 · D36 · D37) narrows everything to that seller's channels; it starts at
  * 「전체」, is not saved, and stays when the period changes. The 「마켓 | 계정」 switch is not saved either.
  */
-export function ChannelSalesChartCard({ period, onPeriodChange, sellers, narrow, editing, onRemove }: ChannelSalesChartCardProps) {
+export function ChannelSalesChartCard({ period, onPeriodChange, sellers, editing, onRemove }: ChannelSalesChartCardProps) {
   const salesUseCase = useMemo(() => new SalesStatsUseCase(new SalesStatsRepositoryImpl()), []);
   const accountUseCase = useMemo(() => new MarketplaceAccountUseCase(new MarketplaceAccountRepositoryImpl()), []);
   const [sellerId, setSellerId] = useState<number | null>(null);
@@ -390,7 +416,7 @@ export function ChannelSalesChartCard({ period, onPeriodChange, sellers, narrow,
       }
     >
       <CardBody data={data}>
-        {(value) => <ChannelSalesView data={value} mode={mode} sellerId={sellerId} period={period} narrow={narrow} />}
+        {(value) => <ChannelSalesView data={value} mode={mode} sellerId={sellerId} period={period} />}
       </CardBody>
     </DashboardCardFrame>
   );
