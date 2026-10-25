@@ -49,7 +49,9 @@ export function LoginForm() {
     <div className="w-full max-w-md px-4">
       <div className="mb-24 flex justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/oclyx_letter_logo.png" alt="OCLYX Logo" className="w-full max-w-[400px] h-auto" />
+        <img src="/oclyx_letter_logo.png" alt="OCLYX Logo" className="logo-on-light w-full max-w-[400px] h-auto" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/oclyx_letter_logo_dark.png" alt="OCLYX Logo" className="logo-on-dark w-full max-w-[400px] h-auto" />
       </div>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>

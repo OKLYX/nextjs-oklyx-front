@@ -75,6 +75,12 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+/* ---- Brand letter logo: light/dark variants ----
+   Render both images (`logo-on-light` + `logo-on-dark`); the theme picks one. */
+.logo-on-dark { display: none; }
+.dark .logo-on-light { display: none; }
+.dark .logo-on-dark { display: block; }
+
 /* ---- Surfaces (backgrounds) ---- */
 .dark .bg-white { background-color: #363636; }
 .dark .bg-gray-50 { background-color: #303030; }
