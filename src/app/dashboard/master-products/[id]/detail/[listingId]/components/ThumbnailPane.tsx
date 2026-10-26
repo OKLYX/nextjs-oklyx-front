@@ -8,10 +8,20 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { ThumbnailTemplateUseCase } from '@/application/usecases/ThumbnailTemplateUseCase';
 import { ThumbnailTemplateRepositoryImpl } from '@/infrastructure/repositories/ThumbnailTemplateRepositoryImpl';
+import { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
+import { DetailContentRepositoryImpl } from '@/infrastructure/repositories/DetailContentRepositoryImpl';
+import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import type { MasterPoolImage } from '@/domain/entities/DetailTemplateEntity';
+import type { ThumbnailPhotoStageView } from '@/domain/entities/ThumbnailPhotoEntity';
 import { BUILTIN_FIELD_KEYS, type TemplateField } from '@/domain/entities/ThumbnailEntity';
 import type { GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
 import type { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import type { OnGenerated } from './DetailEditorTabs';
+import { MasterImagePickerModal } from '../../../../components/MasterImagePickerModal';
+import {
+  THUMBNAIL_PHOTO_COLLAGE_NOTICE,
+  THUMBNAIL_PHOTO_SOURCE_LABEL,
+} from '../../../../components/thumbnailPhotoLabels';
 
 const isReserved = (key: string) => (BUILTIN_FIELD_KEYS as readonly string[]).includes(key);
 
@@ -30,7 +40,7 @@ interface ThumbnailPaneProps {
 
 /**
  * Tab 4 — channel cell thumbnail management (view / regenerate / upload override / clear override / open the
- * collage editor).
+ * collage editor / choose the thumbnail photo).
  * File: src/app/dashboard/master-products/[id]/detail/[listingId]/components/ThumbnailPane.tsx
  *
  * The badge and override state are always derived from `generated.thumbnailSource` (separate from the detail's
@@ -39,6 +49,8 @@ interface ThumbnailPaneProps {
  * reserved key uses the registered product value, an empty custom key the template default. In the override state
  * only the thumbnail is kept (field values and detail are refreshed).
  * [콜라주 편집] (2+ components, FEATURE_2610_21 D40 listing-tab entry) opens the collage editor at this listing's stage.
+ * 「썸네일 사진」 (FEATURE_2610_32 D13 (다) · D14 · D32) shows which stage photo this listing's single-photo thumbnail
+ * uses, with [썸네일 사진 고르기] (one photo of the master pool) and, for its own choice, [지우기].
  */
 export function ThumbnailPane({
   masterId,
@@ -68,7 +80,62 @@ export function ThumbnailPane({
   const [fieldsLoading, setFieldsLoading] = useState(true);
   const [values, setValues] = useState<Record<string, string>>(generated.fieldValues ?? {});
 
-  const busy = isRegenerating || isUploading || isClearing;
+  // ---- Thumbnail photo of this listing's stage (FEATURE_2610_32 D13 (다)) ----
+  const detailUseCase = useMemo(
+    () => new DetailContentUseCase(new DetailContentRepositoryImpl()),
+    [],
+  );
+  const [photoStage, setPhotoStage] = useState<ThumbnailPhotoStageView | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const [photoPool, setPhotoPool] = useState<MasterPoolImage[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const stages = await detailUseCase.listThumbnailPhotoStages(masterId);
+        if (alive) {
+          setPhotoStage(stages.find((s) => s.stage === 'LISTING' && s.listingId === listingId) ?? null);
+        }
+      } catch (e: unknown) {
+        if (alive) setPhotoError(extractErrorMessage(e, '썸네일 사진 상태를 불러오지 못했습니다.'));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [detailUseCase, masterId, listingId]);
+
+  const openPhotoPicker = async () => {
+    setPhotoError('');
+    try {
+      const list = await detailUseCase.listPoolImages(masterId);
+      setPhotoPool([...list].sort((a, b) => a.sortOrder - b.sortOrder));
+    } catch (e: unknown) {
+      setPhotoError(extractErrorMessage(e, '이미지 풀을 불러오지 못했습니다.'));
+    }
+  };
+
+  const savePhoto = async (imageId: number | null) => {
+    setPhotoBusy(true);
+    setPhotoError('');
+    try {
+      const stages = await detailUseCase.setThumbnailPhoto(masterId, {
+        stage: 'LISTING',
+        sellerId: null,
+        listingId,
+        imageId,
+      });
+      setPhotoStage(stages.find((s) => s.stage === 'LISTING' && s.listingId === listingId) ?? null);
+    } catch (e: unknown) {
+      setPhotoError(extractErrorMessage(e, '썸네일 사진을 바꾸지 못했습니다.'));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const busy = isRegenerating || isUploading || isClearing || photoBusy;
   const isOverridden = generated.thumbnailSource === 'MANUAL_OVERRIDE';
 
   // Reserved keys (brandName/productName) are always editable, even if the template
@@ -188,6 +255,39 @@ export function ThumbnailPane({
       </div>
 
       <div className="space-y-2 border-t border-gray-100 pt-3">
+        <p className="text-xs font-medium text-gray-600">썸네일 사진</p>
+        {photoError && (
+          <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{photoError}</p>
+        )}
+        {photoStage && (
+          <div className="flex flex-wrap items-center gap-3">
+            {photoStage.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={photoStage.imageUrl}
+                alt="썸네일 사진"
+                className="h-16 w-16 rounded border border-gray-200 bg-gray-100 object-contain"
+              />
+            )}
+            <div>
+              <p className="text-xs text-gray-600">{THUMBNAIL_PHOTO_SOURCE_LABEL[photoStage.source]}</p>
+              {photoStage.collageUsed && (
+                <p className="text-[11px] text-amber-700">{THUMBNAIL_PHOTO_COLLAGE_NOTICE}</p>
+              )}
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => void openPhotoPicker()} disabled={busy}>
+              썸네일 사진 고르기
+            </Button>
+            {photoStage.source === 'OWN' && (
+              <Button variant="secondary" size="sm" onClick={() => void savePhoto(null)} disabled={busy}>
+                지우기
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t border-gray-100 pt-3">
         <p className="text-xs font-medium text-gray-600">필드값 (재생성 시 적용)</p>
         {fieldsLoading ? (
           <div className="flex min-h-10 items-center">
@@ -257,6 +357,22 @@ export function ThumbnailPane({
           </Button>
         )}
       </div>
+
+      {photoPool && photoStage && (
+        <MasterImagePickerModal
+          fieldLabel="썸네일 사진"
+          single
+          images={photoPool.map((img) => ({ token: img.id, url: img.imageUrl }))}
+          initialSelected={
+            photoStage.source === 'OWN' && photoStage.imageId != null ? [photoStage.imageId] : []
+          }
+          onConfirm={(tokens) => {
+            setPhotoPool(null);
+            void savePhoto(tokens[0] ?? null);
+          }}
+          onClose={() => setPhotoPool(null)}
+        />
+      )}
     </div>
   );
 }

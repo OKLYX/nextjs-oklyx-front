@@ -4,18 +4,18 @@ import { useState } from 'react';
 import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
- * 이미지 풀에서 한 필드(상세 zone 또는 대표사진)에 매핑할 이미지를 고르는 팝업.
+ * Popup that picks pool images — for one field (a detail zone, the cover photo or the thumbnail photo) or one
+ * thumbnail photo stage (the 「단계별 썸네일 사진」 block and the listing 「썸네일」 tab, FEATURE_2610_32 D13).
  * File: src/app/dashboard/master-products/components/MasterImagePickerModal.tsx
  *
- * Hand-rolled `fixed inset-0` modal (shadcn 미도입, AssetPickerModal 스타일).
- * 풀 이미지 그리드에서 다중 체크(zone 필드) 또는 단일 라디오(대표사진 필드) 선택 후
- * 확인하면 그 필드의 매핑 토큰 배열을 반환한다.
+ * Built on `ui/Modal`. From the pool image grid the user checks several images (zone field) or one image
+ * (`single` — cover photo, thumbnail photo, a stage) and confirms; the selected token array is returned.
  *
- * ⚠️ `token` = 이미지 식별자(수정 모드 = 이미지 id, 생성 모드 = 파일 인덱스).
- * ⚠️ url 은 이미 완성 URL(수정) 또는 objectURL(생성) → <img src> 직접 사용.
- * ⚠️ `single=true`(대표사진)면 마지막 선택 1개만 유지.
+ * ⚠️ `token` = image identifier (edit mode = image id, create mode = file index).
+ * ⚠️ url is already a complete URL (edit) or an objectURL (create) → use it in <img src> directly.
+ * ⚠️ `single=true` keeps only the last pick; confirming with nothing picked returns `[]`.
  *
- * 사용 예제:
+ * Usage:
  *   {pickerField && (
  *     <MasterImagePickerModal
  *       key={pickerField.key}                // remount per field → fresh selection

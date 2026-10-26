@@ -7,6 +7,10 @@ import type {
   DetailTemplateRequest,
   MasterPoolImage,
 } from '@/domain/entities/DetailTemplateEntity';
+import type {
+  ThumbnailPhotoRequest,
+  ThumbnailPhotoStageView,
+} from '@/domain/entities/ThumbnailPhotoEntity';
 
 const templatesBase = '/api/admin/detail-templates';
 const masterBase = '/api/admin/master-products';
@@ -78,6 +82,19 @@ export class DetailContentRepositoryImpl implements DetailContentRepository {
     const response = await axiosInstance.post(`${masterBase}/${masterId}/images/import`, {
       productImageIds,
     });
+    return response.data.data;
+  }
+
+  async listThumbnailPhotoStages(masterId: number): Promise<ThumbnailPhotoStageView[]> {
+    const response = await axiosInstance.get(`${masterBase}/${masterId}/thumbnail-photo`);
+    return response.data.data;
+  }
+
+  async setThumbnailPhoto(
+    masterId: number,
+    request: ThumbnailPhotoRequest,
+  ): Promise<ThumbnailPhotoStageView[]> {
+    const response = await axiosInstance.put(`${masterBase}/${masterId}/thumbnail-photo`, request);
     return response.data.data;
   }
 }
