@@ -4,6 +4,10 @@ import type {
   DetailTemplateRequest,
   MasterPoolImage,
 } from '@/domain/entities/DetailTemplateEntity';
+import type {
+  ThumbnailPhotoRequest,
+  ThumbnailPhotoStageView,
+} from '@/domain/entities/ThumbnailPhotoEntity';
 
 export class DetailContentUseCase {
   constructor(private repository: DetailContentRepository) {}
@@ -50,5 +54,16 @@ export class DetailContentUseCase {
 
   importProductImages(masterId: number, productImageIds: number[]): Promise<MasterPoolImage[]> {
     return this.repository.importProductImages(masterId, productImageIds);
+  }
+
+  listThumbnailPhotoStages(masterId: number): Promise<ThumbnailPhotoStageView[]> {
+    return this.repository.listThumbnailPhotoStages(masterId);
+  }
+
+  setThumbnailPhoto(
+    masterId: number,
+    request: ThumbnailPhotoRequest,
+  ): Promise<ThumbnailPhotoStageView[]> {
+    return this.repository.setThumbnailPhoto(masterId, request);
   }
 }
