@@ -6,12 +6,16 @@
 /** Collage shape (D30): ① ROW · ② COLUMN · ③ LEFT_BIG · ④ TOP_BIG · ⑤ TWO_ROWS. */
 export type CollageShape = 'ROW' | 'COLUMN' | 'LEFT_BIG' | 'TOP_BIG' | 'TWO_ROWS';
 
-/** One cell (D47): `zoom` 1 = covers the cell, `cx`·`cy` = photo point (0..1) at the cell centre. */
+/**
+ * One cell (D47): `zoom` 1 = covers the cell, `cx`·`cy` = photo point (0..1) at the cell centre,
+ * `productImageId` = the chosen photo of that product's gallery, null = its cover photo (FEATURE_2610_32 D16).
+ */
 export interface CollageCell {
   productId: number;
   zoom: number;
   cx: number;
   cy: number;
+  productImageId: number | null;
 }
 
 /** One collage (D47) — every value is a ratio, so it draws at any template size. */
@@ -35,11 +39,19 @@ export type CollageStage = 'MASTER' | 'SELLER' | 'LISTING';
 /** Which stored stage a stage currently uses (D41). */
 export type CollageSource = 'OWN' | 'SELLER' | 'MASTER' | 'NONE';
 
+/** One gallery photo of a component (FEATURE_2610_32 D20) — `imageUrl` is a stored value like the cover. */
+export interface CollageProductImage {
+  productImageId: number;
+  imageUrl: string;
+}
+
 export interface CollageProductView {
   productId: number;
   productName: string;
   /** Cover photo; null = no photo (D18). */
   imageUrl: string | null;
+  /** The product's gallery in gallery order — the photos a cell may choose (FEATURE_2610_32 D20). */
+  images: CollageProductImage[];
 }
 
 export interface CollageStageView {
