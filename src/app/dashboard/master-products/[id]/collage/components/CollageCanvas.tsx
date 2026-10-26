@@ -4,6 +4,7 @@ import { useRef, useState, type PointerEvent } from 'react';
 import type { CollageLayout, CollageProductView } from '@/domain/entities/CollageEntity';
 import {
   boundaries,
+  cellPhotoUrl,
   cellRects,
   clamp,
   moveBoundary,
@@ -24,9 +25,9 @@ interface CollageCanvasProps {
   /** Display size in pixels (the collage's aspect ratio). */
   width: number;
   height: number;
-  /** Natural photo sizes by product id (reported through `onPhotoSize`). */
-  photoSizes: Record<number, PhotoSize>;
-  onPhotoSize: (productId: number, size: PhotoSize) => void;
+  /** Natural photo sizes by photo URL (stored value, reported through `onPhotoSize`, FEATURE_2610_32 D15). */
+  photoSizes: Record<string, PhotoSize>;
+  onPhotoSize: (url: string, size: PhotoSize) => void;
   /** true = shown dimmed for an inherited collage — no pointer handling. */
   readOnly?: boolean;
   selected?: number | null;
@@ -90,7 +91,8 @@ export function CollageCanvas({
     e.currentTarget.setPointerCapture(e.pointerId);
     onSelect?.(index);
     const cell = layout.cells[index];
-    const size = photoSizes[cell.productId];
+    const url = cellPhotoUrl(cell, productById.get(cell.productId));
+    const size = url ? photoSizes[url] : undefined;
     const r = rects[index];
     const box = size ? photoBox(cell, r.w, r.h, size.w, size.h) : null;
     dragRef.current = {
@@ -146,7 +148,8 @@ export function CollageCanvas({
         const cell = layout.cells[i];
         if (!cell) return null;
         const product = productById.get(cell.productId);
-        const size = photoSizes[cell.productId];
+        const url = cellPhotoUrl(cell, product);
+        const size = url ? photoSizes[url] : undefined;
         const box = size ? photoBox(cell, r.w, r.h, size.w, size.h) : null;
         return (
           <div
@@ -160,14 +163,14 @@ export function CollageCanvas({
             onPointerUp={end}
             onPointerCancel={end}
           >
-            {product?.imageUrl ? (
+            {url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={resolveThumbUrl(product.imageUrl)}
-                alt={product.productName}
+                src={resolveThumbUrl(url)}
+                alt={product?.productName ?? ''}
                 draggable={false}
                 onLoad={(e) =>
-                  onPhotoSize(cell.productId, { w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+                  onPhotoSize(url, { w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
                 }
                 className="pointer-events-none absolute max-w-none"
                 style={box ? { left: box.x, top: box.y, width: box.w, height: box.h } : { opacity: 0 }}

@@ -1,4 +1,9 @@
-import type { CollageCell, CollageLayout, CollageShape } from '@/domain/entities/CollageEntity';
+import type {
+  CollageCell,
+  CollageLayout,
+  CollageProductView,
+  CollageShape,
+} from '@/domain/entities/CollageEntity';
 
 /**
  * Thumbnail collage rules and geometry (FEATURE_2610_21) — pure functions for the editor screen.
@@ -73,9 +78,9 @@ export function initialMain(shape: CollageShape): number | null {
   return shape === 'ROW' || shape === 'COLUMN' ? null : 0.5;
 }
 
-/** A cell at its initial zoom and position (D33). */
+/** A cell at its initial zoom and position (D33), on the cover photo (FEATURE_2610_32 D16). */
 export function initialCell(productId: number): CollageCell {
-  return { productId, zoom: 1, cx: 0.5, cy: 0.5 };
+  return { productId, zoom: 1, cx: 0.5, cy: 0.5, productImageId: null };
 }
 
 /** The first collage of a stage (D32): ROW, equal cells, gap 0, white gap, template on, ids in the given order. */
@@ -91,15 +96,43 @@ export function initialLayout(productIds: number[]): CollageLayout {
   };
 }
 
-/** Shape change (D34): ratios and every cell's zoom/position back to initial, cell order kept. */
+/**
+ * Shape change (D34): ratios and every cell's zoom/position back to initial, cell order kept; each cell keeps its
+ * chosen photo (FEATURE_2610_32 D33).
+ */
 export function reshape(layout: CollageLayout, shape: CollageShape): CollageLayout {
   return {
     ...layout,
     shape,
     main: initialMain(shape),
     lines: initialLines(shape, layout.cells.length),
-    cells: layout.cells.map((c) => initialCell(c.productId)),
+    cells: layout.cells.map((c) => ({ ...initialCell(c.productId), productImageId: c.productImageId })),
   };
+}
+
+/**
+ * Photo URL (stored value) of one cell (FEATURE_2610_32 D15 · D17): the chosen photo while it is still in that
+ * product's gallery, otherwise the cover photo; null = no photo (D18).
+ */
+export function cellPhotoUrl(cell: CollageCell, product: CollageProductView | undefined): string | null {
+  if (!product) return null;
+  const chosen =
+    cell.productImageId == null
+      ? undefined
+      : product.images.find((i) => i.productImageId === cell.productImageId);
+  return chosen?.imageUrl ?? product.imageUrl;
+}
+
+/** Photo change of one cell (FEATURE_2610_32 D18): the new photo at zoom 1 · centre. null = the cover photo. */
+export function withCellPhoto(
+  layout: CollageLayout,
+  index: number,
+  productImageId: number | null,
+): CollageLayout {
+  const cells = layout.cells.map((c, i) =>
+    i === index ? { ...initialCell(c.productId), productImageId } : c,
+  );
+  return { ...layout, cells };
 }
 
 /** Swap two cells (D27) — the whole entry moves with its photo (zoom and position included). */
