@@ -20,12 +20,15 @@ import type {
 } from '@/domain/entities/CollageEntity';
 import {
   MAX_ZOOM,
+  cellPhotoUrl,
   collageSize,
   cellRects,
   initialLayout,
   minZoom,
   reshape,
+  withCellPhoto,
 } from '@/domain/collage/collageGeometry';
+import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { CollageCanvas, type PhotoSize } from './CollageCanvas';
 import { CollageShapePicker } from './CollageShapePicker';
 import { sourceLabel, stageLabel, targetLabel } from './collageLabels';
@@ -78,7 +81,7 @@ export function CollageEditorContainer({ id, stage, sellerId, listingId }: Colla
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [targetIndex, setTargetIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
-  const [photoSizes, setPhotoSizes] = useState<Record<number, PhotoSize>>({});
+  const [photoSizes, setPhotoSizes] = useState<Record<string, PhotoSize>>({});
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -116,8 +119,8 @@ export function CollageEditorContainer({ id, stage, sellerId, listingId }: Colla
   const displayW = size ? Math.round(size.width * scale) : 0;
   const displayH = size ? Math.round(size.height * scale) : 0;
 
-  const reportPhotoSize = (productId: number, s: PhotoSize) =>
-    setPhotoSizes((prev) => (prev[productId] ? prev : { ...prev, [productId]: s }));
+  const reportPhotoSize = (url: string, s: PhotoSize) =>
+    setPhotoSizes((prev) => (prev[url] ? prev : { ...prev, [url]: s }));
 
   const applyResponse = (res: CollageStageResponse) => {
     setData(res);
@@ -188,10 +191,23 @@ export function CollageEditorContainer({ id, stage, sellerId, listingId }: Colla
 
   const selectedCell = draft && selected !== null ? draft.cells[selected] : null;
   const selectedRect = draft && selected !== null ? cellRects(draft, displayW, displayH)[selected] : null;
-  const selectedPhoto = selectedCell ? photoSizes[selectedCell.productId] : undefined;
   const selectedProduct = selectedCell ? data?.products.find((p) => p.productId === selectedCell.productId) : undefined;
+  const selectedUrl = selectedCell ? cellPhotoUrl(selectedCell, selectedProduct) : null;
+  const selectedPhoto = selectedUrl ? photoSizes[selectedUrl] : undefined;
+  // The highlighted photo of the strip: the chosen one while it is still in the gallery, otherwise the cover (D17).
+  const selectedImageId =
+    selectedCell?.productImageId != null &&
+    selectedProduct?.images.some((i) => i.productImageId === selectedCell.productImageId)
+      ? selectedCell.productImageId
+      : null;
   const zoomMin =
     selectedRect && selectedPhoto ? minZoom(selectedRect.w, selectedRect.h, selectedPhoto.w, selectedPhoto.h) : 1;
+
+  // FEATURE_2610_32 D18 · D20: choosing a photo for the selected cell resets its zoom/position.
+  const pickPhoto = (productImageId: number | null) => {
+    if (!draft || selected === null) return;
+    setDraft(withCellPhoto(draft, selected, productImageId));
+  };
 
   const setZoom = (zoom: number) => {
     if (!draft || selected === null) return;
@@ -310,6 +326,41 @@ export function CollageEditorContainer({ id, stage, sellerId, listingId }: Colla
                         />
                         <span className="w-12 text-right">{Math.round(selectedCell.zoom * 100)}%</span>
                       </label>
+                    )}
+                    {selectedCell && selectedProduct && (
+                      <div className="max-w-[480px] space-y-1">
+                        <p className="text-sm text-gray-700">사진 · {selectedProduct.productName}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => pickPhoto(null)}
+                            disabled={busy !== null}
+                            className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded border-2 bg-gray-100 text-[11px] text-gray-600 ${
+                              selectedImageId === null ? 'border-blue-500' : 'border-gray-200'
+                            }`}
+                          >
+                            대표사진(기본)
+                          </button>
+                          {selectedProduct.images.map((img) => (
+                            <button
+                              key={img.productImageId}
+                              type="button"
+                              onClick={() => pickPhoto(img.productImageId)}
+                              disabled={busy !== null}
+                              className={`h-16 w-16 overflow-hidden rounded border-2 bg-gray-100 ${
+                                selectedImageId === img.productImageId ? 'border-blue-500' : 'border-gray-200'
+                              }`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={resolveThumbUrl(img.imageUrl)}
+                                alt={selectedProduct.productName}
+                                className="h-full w-full object-contain"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
 
