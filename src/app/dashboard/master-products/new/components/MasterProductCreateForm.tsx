@@ -702,8 +702,8 @@ export function MasterProductCreateForm({
     [],
   );
 
-  // Image fields = cover photo (always first) + the union of detail imageZones across ALL templates
-  // (a master's mapped image is reusable by whichever template a channel ends up resolving to).
+  // Image fields = cover photo (always first) + one group per thumbnail template + the whole detail image group
+  // catalog (FEATURE_2610_33 D14) — the union every template a channel resolves to can use.
   const [imageFields, setImageFields] = useState<ImageField[]>([]);
   // Filter-only grouping (cover photo + per template); the render order is always `imageFields`.
   const [imageFieldFilters, setImageFieldFilters] = useState<ImageFieldFilter[]>([]);
@@ -1067,12 +1067,16 @@ export function MasterProductCreateForm({
     [selectedIds, products],
   );
 
-  // Image fields = cover photo + the shared detail image group catalog. 도출 규칙은 상세
-  // 페이지와 공유하는 헬퍼(deriveMasterImageFields)가 소유한다.
+  // Image fields = cover photo + one group per thumbnail template + the shared detail image group catalog.
+  // The derivation rules belong to the helper shared with the detail page (deriveMasterImageFields).
   useEffect(() => {
     let alive = true;
     (async () => {
-      const derived = await deriveMasterImageFields(detailUseCase, groupUseCase);
+      const derived = await deriveMasterImageFields(
+        detailUseCase,
+        groupUseCase,
+        thumbnailTemplateUseCase,
+      );
       if (!alive) return;
       setImageFields(derived.fields);
       setImageFieldFilters(derived.fieldFilters);
@@ -1081,7 +1085,7 @@ export function MasterProductCreateForm({
     return () => {
       alive = false;
     };
-  }, [detailUseCase, groupUseCase]);
+  }, [detailUseCase, groupUseCase, thumbnailTemplateUseCase]);
 
   const handleSubmit = async () => {
     setError('');

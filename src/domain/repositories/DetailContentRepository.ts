@@ -3,12 +3,8 @@ import type {
   DetailTemplateRequest,
   MasterPoolImage,
 } from '@/domain/entities/DetailTemplateEntity';
-import type {
-  ThumbnailPhotoRequest,
-  ThumbnailPhotoStageView,
-} from '@/domain/entities/ThumbnailPhotoEntity';
 
-// Detail templates (CRUD) + master image pool + field mapping + thumbnail photo stages (masterId-scoped).
+// Detail templates (CRUD) + master image pool + field mapping (masterId-scoped).
 // Listing-scoped detail actions (preview/override/clear) live on
 // ListingRegistrationRepository, not here.
 export interface DetailContentRepository {
@@ -26,10 +22,4 @@ export interface DetailContentRepository {
   setSourceImage(masterId: number, imageId: number | null): Promise<MasterPoolImage | void>;
   // Import product gallery image slots into the pool as live-linked reference entries (backend 40).
   importProductImages(masterId: number, productImageIds: number[]): Promise<MasterPoolImage[]>;
-  // Thumbnail photo per stage (FEATURE_2610_32 D23 · D31) — both return every stage row.
-  listThumbnailPhotoStages(masterId: number): Promise<ThumbnailPhotoStageView[]>;
-  setThumbnailPhoto(
-    masterId: number,
-    request: ThumbnailPhotoRequest,
-  ): Promise<ThumbnailPhotoStageView[]>;
 }

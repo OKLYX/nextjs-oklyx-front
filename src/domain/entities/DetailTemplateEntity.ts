@@ -61,20 +61,20 @@ export interface DetailTemplateSelectRequest {
 export const SOURCE_ZONE = '__source__';
 
 // A master pool image with its field-mapping state (backend 37).
-// One pool image is reusable across many detail zones + the cover photo (M:N).
+// One pool image is reusable across many detail zones + thumbnail template
+// groups + the cover photo (M:N).
 // ⚠️ `imageUrl` is an already-complete URL → use directly in <img src>, never
 // resolveThumbUrl (double-wrapping breaks the path). Same rule everywhere.
-// `assignedZones` = the detail zones this image is mapped to (excludes the
-// cover-photo key); `isSource` = true if it is the master's cover photo;
-// `usedForThumbnail` = true if any thumbnail photo stage (master · seller ·
-// listing) chose it (FEATURE_2610_32 D11).
+// `assignedZones` = the detail zones and thumbnail template groups
+// (`ThumbnailTemplate.imageGroupKey`, FEATURE_2610_33 D9) this image is mapped
+// to (excludes the cover-photo key); `isSource` = true if it is the master's
+// cover photo.
 export interface MasterPoolImage {
   id: number;
   imageUrl: string;
   sortOrder: number;
   assignedZones: string[];
   isSource: boolean;
-  usedForThumbnail: boolean;
   // Linked product image slot id when this is a reference entry (backend 40);
   // null for an edited (master-owned) entry.
   productImageId?: number | null;

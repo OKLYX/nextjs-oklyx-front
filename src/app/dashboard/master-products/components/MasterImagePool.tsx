@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { SOURCE_ZONE, type MasterPoolImage } from '@/domain/entities/DetailTemplateEntity';
-import { THUMBNAIL_PHOTO_FIELD } from '@/domain/entities/ThumbnailPhotoEntity';
 import type { ProductImage } from '@/domain/entities/ProductImage';
 import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import type { ProductImageUseCase } from '@/application/usecases/ProductImageUseCase';
@@ -23,44 +22,48 @@ const DETAIL_ALL = '__detail_all__';
 const PRODUCT_OFFSET = 1_000_000_000;
 
 /**
- * Shared UI of the master image pool + field mapping (detail zones + cover photo + thumbnail photo).
+ * Shared UI for the master image pool + field (detail zone · cover photo · thumbnail template group) mapping.
  * File: src/app/dashboard/master-products/components/MasterImagePool.tsx
  *
  * **Layout**:
- *   - Left bottom 「사용 중인 이미지」: every image in use — mapped to any field, or chosen by a seller/listing
- *     thumbnail photo stage (FEATURE_2610_32 D34) — in one flat management view (drag to reuse it in another field,
- *     remove with the ✕ on the right).
- *   - Left top, two source tabs: [제품 이미지] (component galleries shown directly) / [마스터 이미지 풀] (uploads).
- *   - Right: field drop zones (cover photo + thumbnail photo + detail zones) = mapping management.
+ *   - Top left, two source tabs: [제품 이미지] (component product galleries shown directly) /
+ *     [마스터 이미지 풀] (uploads).
+ *   - Bottom left 「사용 중인 이미지」: every image mapped to any field, gathered flat regardless of field — a
+ *     single management view (drag to reuse it in another field, remove with the ✕ on the right).
+ *   - Right: field drop zones (cover photo + thumbnail template groups + detail zones) = mapping management.
  *
  * **Product images = option A (view directly + auto-reference on use)**:
- *   The [제품 이미지] tab shows the component galleries as they are. Dragging one onto a field on the right creates
- *   a reference entry in the master pool at that moment (backend 40 import, zero copy, live) and maps it.
- *   A reference released from every field and not used by any thumbnail photo stage (orphan) is deleted
- *   automatically (sweep), so unused references do not pile up in the pool.
- *   → No "import modal" or "reference cannot be removed" concept (references stay an internal detail).
+ *   The [제품 이미지] tab shows the component product galleries as they are. Dragging one of those images onto a
+ *   field on the right auto-creates a reference entry in the master pool at that moment (backend 40 import,
+ *   zero copies · live) and maps it. When a reference is released from every field (orphan) it is deleted
+ *   automatically (sweep), so unused references never pile up in the pool.
+ *   → No "import modal" and no "reference cannot be removed" concept (references stay a hidden detail).
  *
  * **Required rules**:
- *   - Do not build a direct-upload <input> per field (upload = pool only).
- *   - Pool image `imageUrl` is a complete URL → <img src> directly (no resolveThumbUrl).
- *     ⚠️ `ProductImage.imageUrl` of the [제품 이미지] tab is a stored value → use `resolveThumbUrl` (as the gallery).
- *   - Cover photo key = `SOURCE_ZONE` (single). Thumbnail photo key = `THUMBNAIL_PHOTO_FIELD` (single, the master
- *     stage of the thumbnail-photo API — never a zone mapping). Zone fields = multiple.
+ *   - Never build a direct per-field upload <input> (upload = pool only).
+ *   - Pool image `imageUrl` is a complete URL → use it in <img src> directly (no resolveThumbUrl).
+ *     ⚠️ `ProductImage.imageUrl` in the [제품 이미지] tab is a stored value → use `resolveThumbUrl` (same as
+ *     the gallery).
+ *   - A field with `single` (cover photo `SOURCE_ZONE` · thumbnail template groups) holds one image; every other
+ *     field holds many. The cover photo alone is saved through `setSourceImage`.
  *   - `fields` is derived and injected by the parent. Rendering is **always flat** (`fields` order as is).
- *     Given `fieldFilters`, the top filter bar (전체 / 썸네일 템플릿 / 상세 템플릿) is drawn — not for grouping.
+ *     Passing `fieldFilters` draws the filter bar on top (「전체」 / 「썸네일 템플릿」 / 「상세 템플릿」) — it is not for
+ *     grouped rendering.
  *
  * **Modes**:
- *   - Edit (`masterId != null`): mappings/references reach the server at once.
- *   - Create (`masterId == null`): buffer only, no server call (product photos are buffered as reference tokens
- *     and applied on save).
- *     ⚠️ The [제품 이미지] tab **shows in create mode too** — the only condition is whether both `productImageUseCase`
- *     and `sourceProducts` are given (`canUseProducts`). Missing either one drops the whole photo list.
+ *   - Edit (`masterId != null`): mappings/references reach the server immediately.
+ *   - Create (`masterId == null`): buffer only, no server calls (product photos go into the buffer as reference
+ *     tokens and are applied on save).
+ *     ⚠️ The [제품 이미지] tab **shows in create mode too** — its only condition is whether both
+ *     `productImageUseCase` and `sourceProducts` are given (`canUseProducts`). Missing either one drops the
+ *     whole photo list.
  */
-export type ImageField = { key: string; label: string };
+// `single` = the field holds one image (cover photo · thumbnail template group, FEATURE_2610_33 D23); absent = false.
+export type ImageField = { key: string; label: string; single?: boolean };
 
 // 필터 전용. 렌더 순서는 언제나 `fields` 가 결정한다 — 이 타입으로 묶어 그리지 말 것.
 export type ImageFieldFilter = {
-  label: string; // Shown in the select (template name / '대표사진' / '썸네일 사진')
+  label: string; // 셀렉트에 표시(템플릿 이름 / '대표사진')
   keys: string[]; // 이 필터가 통과시키는 field.key 집합
   kind: 'cover' | 'detail'; // 어느 셀렉트에 들어갈지
 };
@@ -76,8 +79,7 @@ export type MasterImageBuffer = {
 // `isReference` = the entry live-links a product gallery image (backend 40). References are
 // created/removed automatically by the "제품 이미지" tab flow, so the "마스터 이미지 풀" tab
 // (removable) only ever contains master-owned entries.
-// `usedForThumbnail` = chosen by any thumbnail photo stage (edit only; create = false, FEATURE_2610_32 D34).
-type PoolEntry = { token: number; url: string; isReference: boolean; usedForThumbnail: boolean };
+type PoolEntry = { token: number; url: string; isReference: boolean };
 
 type ProductSection = { productId: number; name: string; images: ProductImage[] };
 
@@ -89,12 +91,8 @@ interface MasterImagePoolProps {
   // Create mode only: parent holds the buffer as the single source of truth.
   buffer?: MasterImageBuffer;
   onBufferChange?: (next: MasterImageBuffer) => void;
-  // Edit mode: notify the parent a mapping changed (detail editor tab2 → zoneDirty · master 「이미지」 tab →
-  // the 「단계별 썸네일 사진」 block reloads, FEATURE_2610_32 D34).
+  // Edit mode: notify the parent a mapping changed (detail editor tab2 → zoneDirty).
   onDirty?: () => void;
-  // Edit mode: a change of this value reloads the pool and the thumbnail photo stages (the master 「이미지」 tab
-  // bumps it after the 「단계별 썸네일 사진」 block changes a stage, FEATURE_2610_32 D34).
-  reloadKey?: number;
   // Optional (backend 40): enable the "제품 이미지" source tab (direct view + auto-reference on map)
   // when both are given and masterId != null (edit mode). Omit → tab hidden (create mode / no BOM).
   productImageUseCase?: ProductImageUseCase;
@@ -109,21 +107,16 @@ export function MasterImagePool({
   buffer,
   onBufferChange,
   onDirty,
-  reloadKey,
   productImageUseCase,
   sourceProducts,
 }: MasterImagePoolProps) {
   const isEdit = masterId != null;
-  // The 「썸네일 사진」 card is present only when the parent's field list has it (StructuredDataPane does not).
-  const hasThumbnailField = fields.some((f) => f.key === THUMBNAIL_PHOTO_FIELD);
   // Product images are directly viewable/usable whenever a BOM is available (edit = auto-import on
   // map; create = buffered as product refs, imported + mapped on submit).
   const canUseProducts = productImageUseCase != null && (sourceProducts?.length ?? 0) > 0;
 
   // ---- Edit-mode server state ----
   const [pool, setPool] = useState<MasterPoolImage[]>([]);
-  // Master-stage thumbnail photo (pool image id) — the 「썸네일 사진」 card in edit mode (FEATURE_2610_32 D13).
-  const [masterThumbnailId, setMasterThumbnailId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(isEdit);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -142,20 +135,11 @@ export function MasterImagePool({
   const [productSections, setProductSections] = useState<ProductSection[]>([]);
   const [productLoading, setProductLoading] = useState(false);
 
-  // The MASTER row's own choice; any other source = the card is empty.
-  const loadMasterThumbnail = useCallback(async () => {
-    if (masterId == null || !hasThumbnailField) return null;
-    const stages = await detailUseCase.listThumbnailPhotoStages(masterId);
-    const row = stages.find((s) => s.stage === 'MASTER');
-    return row?.source === 'OWN' ? row.imageId : null;
-  }, [detailUseCase, masterId, hasThumbnailField]);
-
   const reload = useCallback(async () => {
     if (masterId == null) return;
     const list = await detailUseCase.listPoolImages(masterId);
     setPool([...list].sort((a, b) => a.sortOrder - b.sortOrder));
-    setMasterThumbnailId(await loadMasterThumbnail());
-  }, [detailUseCase, masterId, loadMasterThumbnail]);
+  }, [detailUseCase, masterId]);
 
   useEffect(() => {
     if (masterId == null) return;
@@ -165,11 +149,7 @@ export function MasterImagePool({
       setError('');
       try {
         const list = await detailUseCase.listPoolImages(masterId);
-        const thumbnailId = await loadMasterThumbnail();
-        if (alive) {
-          setPool([...list].sort((a, b) => a.sortOrder - b.sortOrder));
-          setMasterThumbnailId(thumbnailId);
-        }
+        if (alive) setPool([...list].sort((a, b) => a.sortOrder - b.sortOrder));
       } catch {
         if (alive) setError('이미지 풀을 불러오지 못했습니다.');
       } finally {
@@ -179,28 +159,7 @@ export function MasterImagePool({
     return () => {
       alive = false;
     };
-  }, [detailUseCase, masterId, loadMasterThumbnail]);
-
-  // Reload on the parent's signal; 0 / undefined = the first render, already loaded above.
-  useEffect(() => {
-    if (!reloadKey || masterId == null) return;
-    let alive = true;
-    (async () => {
-      try {
-        const list = await detailUseCase.listPoolImages(masterId);
-        const thumbnailId = await loadMasterThumbnail();
-        if (alive) {
-          setPool([...list].sort((a, b) => a.sortOrder - b.sortOrder));
-          setMasterThumbnailId(thumbnailId);
-        }
-      } catch {
-        if (alive) setError('이미지 풀을 불러오지 못했습니다.');
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [reloadKey, detailUseCase, masterId, loadMasterThumbnail]);
+  }, [detailUseCase, masterId]);
 
   // ---- Load the BOM products' galleries for the "제품 이미지" tab (both create and edit) ----
   useEffect(() => {
@@ -255,20 +214,13 @@ export function MasterImagePool({
         token: img.id,
         url: img.imageUrl,
         isReference: img.productImageId != null,
-        usedForThumbnail: img.usedForThumbnail,
       }));
     // Create mode: file-buffer previews (index tokens) + mapped product refs (offset tokens).
-    const fileEntries = previews.map((url, index) => ({
-      token: index,
-      url,
-      isReference: false,
-      usedForThumbnail: false,
-    }));
+    const fileEntries = previews.map((url, index) => ({ token: index, url, isReference: false }));
     const productEntries = mappedProductIds.map((id) => ({
       token: PRODUCT_OFFSET + id,
       url: resolveThumbUrl(productUrlById.get(id) ?? ''),
       isReference: true,
-      usedForThumbnail: false,
     }));
     return [...fileEntries, ...productEntries];
   }, [isEdit, pool, previews, mappedProductIds, productUrlById]);
@@ -295,10 +247,15 @@ export function MasterImagePool({
         return [...fileToks, ...prodToks];
       }
       if (fieldKey === SOURCE_ZONE) return pool.filter((i) => i.isSource).map((i) => i.id);
-      if (fieldKey === THUMBNAIL_PHOTO_FIELD) return masterThumbnailId == null ? [] : [masterThumbnailId];
       return pool.filter((i) => i.assignedZones.includes(fieldKey)).map((i) => i.id);
     },
-    [isEdit, buffer, pool, masterThumbnailId],
+    [isEdit, buffer, pool],
+  );
+
+  // Whether a field key holds one image (FEATURE_2610_33 D23) — looked up in `fields`, false if absent.
+  const isSingleField = useCallback(
+    (fieldKey: string): boolean => fields.find((f) => f.key === fieldKey)?.single === true,
+    [fields],
   );
 
   // Field labels this token is used in (badges).
@@ -314,24 +271,13 @@ export function MasterImagePool({
     [fields, fieldTokens],
   );
 
-  // In use = mapped to a field, or chosen by any thumbnail photo stage (FEATURE_2610_32 D34).
-  const inUseToken = useCallback(
-    (entry: PoolEntry): boolean => entry.usedForThumbnail || badgesForToken(entry.token).length > 0,
-    [badgesForToken],
-  );
-
-  // ---- Auto-cleanup: delete product references no longer mapped anywhere and not chosen as a thumbnail photo
-  //      by any stage (keeps the pool clean, FEATURE_2610_32 D11) ----
+  // ---- Auto-cleanup: delete product references no longer mapped anywhere (keeps the pool clean) ----
   const sweepOrphanReferences = useCallback(async () => {
     if (!isEdit || masterId == null) return;
     try {
       const fresh = await detailUseCase.listPoolImages(masterId);
       const orphans = fresh.filter(
-        (i) =>
-          i.productImageId != null &&
-          !i.isSource &&
-          !i.usedForThumbnail &&
-          i.assignedZones.length === 0,
+        (i) => i.productImageId != null && !i.isSource && i.assignedZones.length === 0,
       );
       if (orphans.length === 0) return;
       for (const o of orphans) await detailUseCase.deletePoolImage(masterId, o.id);
@@ -341,24 +287,11 @@ export function MasterImagePool({
     }
   }, [isEdit, masterId, detailUseCase, reload]);
 
-  // The 「썸네일 사진」 card writes the MASTER stage of the thumbnail-photo API (FEATURE_2610_32 D13 · D23).
-  const setMasterThumbnail = useCallback(
-    async (id: number, imageId: number | null) => {
-      await detailUseCase.setThumbnailPhoto(id, {
-        stage: 'MASTER',
-        sellerId: null,
-        listingId: null,
-        imageId,
-      });
-    },
-    [detailUseCase],
-  );
-
   // ---- Commit a field's mapping (edit → server, create → buffer) ----
   const commit = useCallback(
     async (fieldKey: string, tokens: number[]) => {
-      const isSingle = fieldKey === SOURCE_ZONE || fieldKey === THUMBNAIL_PHOTO_FIELD;
-      const capped = isSingle ? tokens.slice(0, 1) : tokens;
+      const isSource = fieldKey === SOURCE_ZONE;
+      const capped = isSingleField(fieldKey) ? tokens.slice(0, 1) : tokens;
       if (!isEdit) {
         // Split the unified tokens back into file indices and product image ids.
         const fileToks = capped.filter((t) => t < PRODUCT_OFFSET);
@@ -374,8 +307,7 @@ export function MasterImagePool({
       setError('');
       setBusy(true);
       try {
-        if (fieldKey === SOURCE_ZONE) await detailUseCase.setSourceImage(masterId, capped[0] ?? null);
-        else if (fieldKey === THUMBNAIL_PHOTO_FIELD) await setMasterThumbnail(masterId, capped[0] ?? null);
+        if (isSource) await detailUseCase.setSourceImage(masterId, capped[0] ?? null);
         else await detailUseCase.setZoneImages(masterId, fieldKey, capped);
         await reload();
         await sweepOrphanReferences();
@@ -395,12 +327,12 @@ export function MasterImagePool({
       onBufferChange,
       buffer,
       sweepOrphanReferences,
-      setMasterThumbnail,
+      isSingleField,
     ],
   );
 
   const addToField = (fieldKey: string, token: number) => {
-    if (fieldKey === SOURCE_ZONE || fieldKey === THUMBNAIL_PHOTO_FIELD) {
+    if (isSingleField(fieldKey)) {
       void commit(fieldKey, [token]);
       return;
     }
@@ -435,8 +367,8 @@ export function MasterImagePool({
       // Map using the fresh pool (avoid stale fieldTokens after import).
       if (fieldKey === SOURCE_ZONE) {
         await detailUseCase.setSourceImage(masterId, ref.id);
-      } else if (fieldKey === THUMBNAIL_PHOTO_FIELD) {
-        await setMasterThumbnail(masterId, ref.id);
+      } else if (isSingleField(fieldKey)) {
+        await detailUseCase.setZoneImages(masterId, fieldKey, [ref.id]);
       } else {
         const currentZoneIds = freshPool
           .filter((i) => i.assignedZones.includes(fieldKey))
@@ -447,7 +379,8 @@ export function MasterImagePool({
         await detailUseCase.setZoneImages(masterId, fieldKey, nextIds);
       }
       await reload();
-      // Replacing the cover or thumbnail photo can orphan a previous product reference → sweep.
+      // Replacing a single field's image (cover photo · thumbnail template group) can orphan a previous product
+      // reference → sweep.
       await sweepOrphanReferences();
       onDirty?.();
     } catch {
@@ -560,18 +493,21 @@ export function MasterImagePool({
   // ---- [이미지 관리] popup (multi-select delete of master-owned images) ----
   const [manageOpen, setManageOpen] = useState(false);
 
-  const activeEntries = entries.filter((e) => inUseToken(e));
+  const activeEntries = entries.filter((e) => badgesForToken(e.token).length > 0);
   const masterEntries = entries.filter((e) => !e.isReference);
 
   // Right-column filter: 전체 chip + 썸네일 템플릿 select (cover) + 상세 템플릿 select (detail).
   // ⚠️ 필터는 어느 카드를 "보일지"만 정한다 — 렌더 순서/그룹핑은 언제나 `fields` 가 소유한다.
   const keysOf = (filters: ImageFieldFilter[]) => new Set(filters.flatMap((f) => f.keys));
+  // A filter's select value = its index in `fieldFilters`, so a thumbnail and a detail template with the same
+  // name stay two separate choices (FEATURE_2610_33 D14: picking one shows that group card only).
+  const filterValue = (f: ImageFieldFilter) => String((fieldFilters ?? []).indexOf(f));
   const coverFilters = (fieldFilters ?? []).filter((f) => f.kind === 'cover');
   const detailFilters = (fieldFilters ?? []).filter((f) => f.kind === 'detail');
   const coverCurrent =
-    activeGroup === COVER_ALL || coverFilters.some((f) => f.label === activeGroup);
+    activeGroup === COVER_ALL || coverFilters.some((f) => filterValue(f) === activeGroup);
   const detailCurrent =
-    activeGroup === DETAIL_ALL || detailFilters.some((f) => f.label === activeGroup);
+    activeGroup === DETAIL_ALL || detailFilters.some((f) => filterValue(f) === activeGroup);
   const visibleKeys: Set<string> | null =
     activeGroup == null
       ? null // 전체
@@ -579,7 +515,7 @@ export function MasterImagePool({
         ? keysOf(coverFilters)
         : activeGroup === DETAIL_ALL
           ? keysOf(detailFilters)
-          : keysOf((fieldFilters ?? []).filter((f) => f.label === activeGroup));
+          : keysOf((fieldFilters ?? []).filter((f) => filterValue(f) === activeGroup));
   const visibleFields = visibleKeys == null ? fields : fields.filter((f) => visibleKeys.has(f.key));
   // 필터바가 있는 화면(마스터 생성/상세)만 카드 목록을 자체 스크롤 영역에 담는다.
   // `StructuredDataPane` 은 필터 없이 부모 흐름에 그대로 얹혀야 해서 wrapper 를 투명하게(`contents`) 둔다.
@@ -613,7 +549,6 @@ export function MasterImagePool({
   // One field drop-zone card.
   const renderFieldCard = (field: ImageField) => {
     const tokens = fieldTokens(field.key);
-    const isSingle = field.key === SOURCE_ZONE || field.key === THUMBNAIL_PHOTO_FIELD;
     const highlighted = field.key === highlightedField;
     return (
       <div
@@ -638,7 +573,7 @@ export function MasterImagePool({
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-medium text-gray-600">
             {field.label}
-            {isSingle && <span className="ml-1 text-gray-400">(단일)</span>}
+            {field.single === true && <span className="ml-1 text-gray-400">(단일)</span>}
           </span>
           <button
             type="button"
@@ -689,20 +624,16 @@ export function MasterImagePool({
   };
 
   // One pool thumbnail card. Deletion lives in the [이미지 관리] popup, not per-card.
-  //  - `badge='fields'` (default): field-location chips plus the 「단계별 썸네일 사진」 tag for a photo chosen only
-  //    by a seller/listing stage (Active Image = the "where is it used" management view, FEATURE_2610_32 D34).
-  //  - `badge='inUse'`: single "사용중" badge only, like a product image card (마스터 이미지 풀 tab).
-  //  - `siblings`/`index`: the photos of the same list to page through with ◀▶ in the zoom view (the caller
-  //    passes them).
+  //  - `badge='fields'` (default): field-location chips (Active Image = 어디에 쓰이는지 관리 뷰).
+  //  - `badge='inUse'`: single "사용중" badge only, like a product image card (마스터 이미지 풀 탭).
+  //  - `siblings`/`index`: 확대 보기에서 ◀▶ 로 넘길 같은 목록의 사진들(호출부가 넘긴다).
   const renderPoolCard = (
     entry: PoolEntry,
     opts?: { badge?: 'fields' | 'inUse'; siblings?: string[]; index?: number },
   ) => {
     const badgeMode = opts?.badge ?? 'fields';
     const badges = badgesForToken(entry.token);
-    const inUse = inUseToken(entry);
-    // Chosen only by a seller/listing stage (no field card to point at) → a plain 「단계별 썸네일 사진」 tag (D34).
-    const stageOnly = entry.usedForThumbnail && entry.token !== masterThumbnailId;
+    const inUse = badges.length > 0;
     return (
       <div
         key={entry.token}
@@ -724,7 +655,7 @@ export function MasterImagePool({
             </span>
           )}
         </div>
-        {badgeMode === 'fields' && (badges.length > 0 || stageOnly) && (
+        {badgeMode === 'fields' && badges.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
             {fieldsForToken(entry.token).map((f) => (
               <button
@@ -740,11 +671,6 @@ export function MasterImagePool({
                 {f.label}
               </button>
             ))}
-            {stageOnly && (
-              <span className="min-w-0 max-w-full truncate rounded bg-blue-100 px-1 py-0.5 text-[10px] text-blue-700">
-                단계별 썸네일 사진
-              </span>
-            )}
           </div>
         )}
       </div>
@@ -755,7 +681,7 @@ export function MasterImagePool({
   const renderProductImageCard = (pi: ProductImage, siblings?: string[], index?: number) => {
     const ref = isEdit ? refByProductImageId.get(pi.id) : undefined;
     const inUse = isEdit
-      ? ref != null && (ref.isSource || ref.usedForThumbnail || ref.assignedZones.length > 0)
+      ? ref != null && (ref.isSource || ref.assignedZones.length > 0)
       : mappedProductIds.includes(pi.id);
     // Edit reuses an existing reference's pool id when present; otherwise (and always in create) the
     // `pi:` token routes through the drop handler (importThenMap / buffer).
@@ -955,7 +881,7 @@ export function MasterImagePool({
                   </option>
                   <option value={COVER_ALL}>썸네일 템플릿 전체</option>
                   {coverFilters.map((f) => (
-                    <option key={f.label} value={f.label}>
+                    <option key={filterValue(f)} value={filterValue(f)}>
                       {f.label}
                     </option>
                   ))}
@@ -976,7 +902,7 @@ export function MasterImagePool({
                   </option>
                   <option value={DETAIL_ALL}>상세 템플릿 전체</option>
                   {detailFilters.map((f) => (
-                    <option key={f.label} value={f.label}>
+                    <option key={filterValue(f)} value={filterValue(f)}>
                       {f.label}
                     </option>
                   ))}
@@ -996,7 +922,7 @@ export function MasterImagePool({
         <MasterImagePickerModal
           key={pickerField.key}
           fieldLabel={pickerField.label}
-          single={pickerField.key === SOURCE_ZONE || pickerField.key === THUMBNAIL_PHOTO_FIELD}
+          single={pickerField.single === true}
           images={pickerImages}
           initialSelected={fieldTokens(pickerField.key)}
           onConfirm={(tokens) => {
@@ -1012,7 +938,7 @@ export function MasterImagePool({
           images={masterEntries.map((e) => ({
             token: e.token,
             url: e.url,
-            inUse: inUseToken(e),
+            inUse: badgesForToken(e.token).length > 0,
           }))}
           onDelete={handleDeletePoolImages}
           onClose={() => setManageOpen(false)}
