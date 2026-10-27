@@ -70,6 +70,7 @@ export interface ThumbnailTemplate {
   elements: TemplateElement[];
   active: boolean;
   isDefault: boolean; // tenant default template (only one per tenant)
+  imageGroupKey: string; // this template's image group zone id, built by the server (FEATURE_2610_33 D9)
 }
 
 // Font type moved to FontEntity.ts (fonts are a tenant-wide asset, not thumbnail-only).
