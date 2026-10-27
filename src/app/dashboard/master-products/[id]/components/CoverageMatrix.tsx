@@ -90,7 +90,6 @@ import { CategoryMetaPanel } from './CategoryMetaPanel';
 import { MasterBasicInfoPanel } from './MasterBasicInfoPanel';
 import { MasterFieldValuesPanel } from './MasterFieldValuesPanel';
 import { CollageStagesPanel } from './CollageStagesPanel';
-import { ThumbnailPhotoStagesPanel } from './ThumbnailPhotoStagesPanel';
 import { isCollageMaster } from '@/domain/collage/collageGeometry';
 import { MasterNoticeTextPanel } from './MasterNoticeTextPanel';
 import { NOTICE_TEXT_KEYS } from '@/domain/entities/ElevenstNoticeText';
@@ -200,10 +199,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.role === 'ADMIN';
   const masterId = Number(id);
-  // Bumped when the image pool or the 「단계별 썸네일 사진」 block changes a mapping, so the other reloads its
-  // 「사용중」 / stage state (FEATURE_2610_32 D34).
-  const [thumbnailPhotoVersion, setThumbnailPhotoVersion] = useState(0);
-  const bumpThumbnailPhotoVersion = useCallback(() => setThumbnailPhotoVersion((v) => v + 1), []);
 
   const masterUseCase = useMemo(
     () => new MasterProductUseCase(new MasterProductRepositoryImpl()),
@@ -223,9 +218,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     () => new MarketplaceAccountUseCase(new MarketplaceAccountRepositoryImpl()),
     [],
   );
-  // Carrier/box candidates + template fields for the inline detail panels (83A), and the thumbnail template list of
-  // the 「판매채널 수정」 modal (FEATURE_2610_16 / D29) — parent-owned and injected, so a panel never re-fetches what
-  // this container already holds.
+  // Carrier/box candidates + template fields for the inline detail panels (83A), the thumbnail template list of
+  // the 「판매채널 수정」 modal (FEATURE_2610_16 / D29) and the thumbnail template groups of the [이미지] section's
+  // fields (FEATURE_2610_33 D14) — parent-owned and injected, so a panel never re-fetches what this container
+  // already holds.
   const carrierRateUseCase = useMemo(
     () => new CarrierRateUseCase(new CarrierRateRepositoryImpl()),
     [],
@@ -303,7 +299,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // 옵션 고시 노출·검증 범위 = 마스터가 저장/선택한 실효 품목군(submitNoticeGroup 단일 해석).
   const [masterNoticeGroup, setMasterNoticeGroup] = useState<string | null>(null);
   const [metaBaseError, setMetaBaseError] = useState('');
-  // MasterImagePool field derivation (대표사진 + 이미지 그룹 카탈로그).
+  // MasterImagePool field derivation (cover photo + thumbnail template groups + detail image group catalog).
   const [imageFields, setImageFields] = useState<ImageField[]>([]);
   const [imageFieldFilters, setImageFieldFilters] = useState<ImageFieldFilter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -808,11 +804,16 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     };
   }, [categoryId, categoryName, categoryUseCase]);
 
-  // 이미지 필드(대표사진 + 이미지 그룹 카탈로그). 생성 모달과 같은 도출 헬퍼를 쓴다.
+  // Image fields (cover photo + one group per thumbnail template + the image group catalog). Same derivation
+  // helper as the create form.
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const { fields, fieldFilters } = await deriveMasterImageFields(detailUseCase, groupUseCase);
+      const { fields, fieldFilters } = await deriveMasterImageFields(
+        detailUseCase,
+        groupUseCase,
+        templateUseCase,
+      );
       if (!alive) return;
       setImageFields(fields);
       setImageFieldFilters(fieldFilters);
@@ -820,7 +821,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     return () => {
       alive = false;
     };
-  }, [detailUseCase, groupUseCase]);
+  }, [detailUseCase, groupUseCase, templateUseCase]);
 
   const unregisteredRows = useMemo(
     () => matrix?.rows.filter((r) => !r.registered) ?? [],
@@ -1767,21 +1768,10 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             detailUseCase={detailUseCase}
                             fields={imageFields}
                             fieldFilters={imageFieldFilters}
-                            onDirty={bumpThumbnailPhotoVersion}
-                            reloadKey={thumbnailPhotoVersion}
                             productImageUseCase={productImageUseCase}
                             sourceProducts={sourceProducts}
                           />
                         </div>
-                        {isAdmin && (
-                          <StackedBlock title="단계별 썸네일 사진">
-                            <ThumbnailPhotoStagesPanel
-                              masterId={masterId}
-                              reloadKey={thumbnailPhotoVersion}
-                              onChanged={bumpThumbnailPhotoVersion}
-                            />
-                          </StackedBlock>
-                        )}
                         <StackedBlock title="템플릿 필드값">
                           <MasterFieldValuesPanel
                             master={master}

@@ -1,5 +1,4 @@
 import { SOURCE_ZONE } from '@/domain/entities/DetailTemplateEntity';
-import { THUMBNAIL_PHOTO_FIELD } from '@/domain/entities/ThumbnailPhotoEntity';
 import type { DetailContentUseCase } from '@/application/usecases/DetailContentUseCase';
 import type { MasterImageBuffer } from './MasterImagePool';
 
@@ -63,14 +62,6 @@ export async function commitMasterImageBuffer(
     const ids = [...fileIds, ...productPoolIds];
     if (fieldKey === SOURCE_ZONE) {
       await detailUseCase.setSourceImage(masterId, ids[0] ?? null);
-    } else if (fieldKey === THUMBNAIL_PHOTO_FIELD) {
-      // FEATURE_2610_32 D13: the master stage of the thumbnail photo, one photo.
-      await detailUseCase.setThumbnailPhoto(masterId, {
-        stage: 'MASTER',
-        sellerId: null,
-        listingId: null,
-        imageId: ids[0] ?? null,
-      });
     } else {
       await detailUseCase.setZoneImages(masterId, fieldKey, ids);
     }

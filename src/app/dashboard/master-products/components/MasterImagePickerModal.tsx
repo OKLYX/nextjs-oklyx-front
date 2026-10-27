@@ -4,23 +4,22 @@ import { useState } from 'react';
 import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
- * Popup that picks pool images — for one field (a detail zone, the cover photo or the thumbnail photo) or one
- * thumbnail photo stage (the 「단계별 썸네일 사진」 block and the listing 「썸네일」 tab, FEATURE_2610_32 D13).
+ * Popup that picks the pool images to map to one field (detail zone · cover photo · thumbnail template group).
  * File: src/app/dashboard/master-products/components/MasterImagePickerModal.tsx
  *
- * Built on `ui/Modal`. From the pool image grid the user checks several images (zone field) or one image
- * (`single` — cover photo, thumbnail photo, a stage) and confirms; the selected token array is returned.
+ * Built on `ui/Modal`. In the pool image grid you tick many (multi-image field) or one (a `single` field —
+ * cover photo · thumbnail template group), and confirming returns that field's mapping token array.
  *
  * ⚠️ `token` = image identifier (edit mode = image id, create mode = file index).
  * ⚠️ url is already a complete URL (edit) or an objectURL (create) → use it in <img src> directly.
- * ⚠️ `single=true` keeps only the last pick; confirming with nothing picked returns `[]`.
+ * ⚠️ With `single=true` only the last pick is kept.
  *
- * Usage:
+ * Usage example:
  *   {pickerField && (
  *     <MasterImagePickerModal
  *       key={pickerField.key}                // remount per field → fresh selection
  *       fieldLabel={pickerField.label}
- *       single={pickerField.key === SOURCE_ZONE}
+ *       single={pickerField.single === true}
  *       images={poolEntries}
  *       initialSelected={mappedTokens}
  *       onConfirm={(tokens) => commitMapping(pickerField.key, tokens)}
