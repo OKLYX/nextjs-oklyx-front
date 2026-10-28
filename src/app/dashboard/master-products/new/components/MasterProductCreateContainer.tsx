@@ -39,10 +39,10 @@ type MarketLoad =
   | { status: 'ready'; market: MarketSource };
 
 /**
- * 「판매 상품 관리 마스터」 = 판매상품 마스터 **새로 만들기** 페이지 진입점 (2609_78 / UX D41·D46·D61).
+ * 「판매상품 마스터 등록」 = 판매상품 마스터 **새로 만들기** 페이지 진입점 (2609_78 / UX D41·D46·D61).
  * File: src/app/dashboard/master-products/new/components/MasterProductCreateContainer.tsx
  *
- * 진입점 3곳: 좌측 네비 `판매상품 > 판매 상품 관리 마스터` · 물품 등록 완료 창 [이 물품으로 마스터 만들기] ·
+ * 진입점 3곳: 좌측 네비 `판매상품 > 판매상품 마스터 등록` · 물품 등록 완료 창 [이 물품으로 마스터 만들기] ·
  * 마스터 바구니 [마스터 만들기]. 뒤의 둘은 `?productIds=1,2,3` 으로 구성상품을 골라 둔 채 들어온다.
  * ⚠️ 목록(`MasterProductList`)에 [마스터 추가] 버튼을 다시 넣지 말 것.
  *
@@ -163,7 +163,7 @@ export function MasterProductCreateContainer() {
 
   return (
     <PageContainer
-      title="판매 상품 관리 마스터"
+      title="판매상품 마스터 등록"
       action={
         <Button
           size="sm"

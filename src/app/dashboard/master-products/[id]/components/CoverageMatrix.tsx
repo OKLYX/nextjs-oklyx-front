@@ -366,7 +366,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const searchParams = useSearchParams();
   const createNotice = searchParams.get('notice');
   const shownBanner = banner ?? (createNotice ? { text: createNotice, tone: 'amber' as const } : null);
-  // 2609_78/D50·D52 🔁·D69: [상품 관계 한눈에 보기] — 기본은 닫힘(= 지금 화면 그대로). 판매 상품 관리 마스터에서 방금
+  // 2609_78/D50·D52 🔁·D69: [상품 관계 한눈에 보기] — 기본은 닫힘(= 지금 화면 그대로). 판매상품 마스터 등록에서 방금
   // 만들고 넘어온 경우(`?overview=1`)만 **처음 한 번** 열린 채로 시작한다. 그 뒤 켜고 끄는 것은 이 화면 상태다.
   // ⚠️ URL 은 다시 쓰지 않는다(그 주소로 새로고침하면 다시 열린 채로 시작한다 — 수용).
   const [overviewOpen, setOverviewOpen] = useState(() => searchParams.get('overview') === '1');
