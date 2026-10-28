@@ -136,6 +136,8 @@ interface ListingRowProps {
   hasMasterCategory: boolean;
   /** [카테고리 선택하기] on a blocked unsent row — the parent opens that platform's picker (D21 ②). */
   onPickPlatformCategory: (platform: LookupPlatform) => void;
+  /** FEATURE_2610_36 / D12 · D14: this listing's option picker allows one option only — handed to `CellActions`. */
+  oneOption: boolean;
 }
 
 /**
@@ -171,6 +173,7 @@ export function ListingRow({
   onCellRemoved,
   hasMasterCategory,
   onPickPlatformCategory,
+  oneOption,
 }: ListingRowProps) {
   const [expanded, setExpanded] = useState(false);
   const status = cellStatus(cell);
@@ -346,6 +349,7 @@ export function ListingRow({
             onPickCategory={() => {
               if (lookupPlatform != null) onPickPlatformCategory(lookupPlatform);
             }}
+            oneOption={oneOption}
           />
         )}
       </div>
