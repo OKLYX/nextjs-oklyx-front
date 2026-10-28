@@ -717,14 +717,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     window.history.replaceState(null, '', `#master-option-${masterOptionId}`);
   }, []);
 
-  // Mixed composition = 2+ component kinds (backend 63 mirror, the same rule as the create form's `isBundle` in
-  // `MasterProductCreateForm.tsx`). Read by the category meta panel, the option editor's hideCategoryAttrs and the
-  // option picker (FEATURE_2610_36 / D14).
+  // Mixed composition = 2+ component kinds (backend 63 mirror). Read by the option picker (FEATURE_2610_36 / D14);
+  // the Coupang attribute fields no longer hide on it (FEATURE_2610_37 / D17).
   const isBundle = (master?.components.length ?? 0) >= 2;
-  // 표시/필수 = 선택 플랫폼 요구 union. 오늘 쿠팡 단일이라 항상 true.
-  // TODO: 플랫폼 선택 모델 도입 시 실제 선택값으로 교체 (out of scope) — 네이버 추가 시 union 확장.
-  const coupangSelected = true;
-  const hideCategoryAttrs = coupangSelected && isBundle;
   const categoryId = category?.categoryId ?? null;
 
   // 옵션 택배/상자 select 의 "마스터 기본값" 기준. ⚠️ 비우면 normalizeOptionPayload 의 "마스터 기본값과
@@ -1707,7 +1702,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             key={platformCategoriesVersion}
                             masterId={masterId}
                             categoryCode={category ? String(category.categoryId) : null}
-                            isBundle={isBundle}
                             onSaved={() => setMetaVersion((v) => v + 1)}
                             elevenstActive={activeLookupPlatforms.includes('ELEVENST')}
                             esmActive={activeLookupPlatforms.includes('ESM')}
@@ -1750,7 +1744,6 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             masterAttrValues={masterAttrValues}
                             masterNoticeValues={masterNoticeValues}
                             masterNoticeGroup={masterNoticeGroup}
-                            hideCategoryAttrs={hideCategoryAttrs}
                             onChanged={load}
                             focusOption={focusOption}
                           />

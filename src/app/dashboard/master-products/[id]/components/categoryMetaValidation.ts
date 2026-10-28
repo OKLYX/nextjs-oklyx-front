@@ -124,16 +124,17 @@ export function optionNoticesToSubmit(
 }
 
 /**
- * True when a SCHEMA-required OPTION-OWNED field is still missing for this option — 속성(개당
- * 용량/중량·수량) **과 상품정보제공고시** 둘 다. 필수 여부는 오직 카테고리 스키마의 `required`
- * 플래그(쿠팡 메타)만 따른다 — 프론트가 이름으로 강제하지 않는다.
+ * True when a SCHEMA-required OPTION-OWNED field is still missing for this option — the attributes (per-unit
+ * volume/weight · quantity) **and the product notices** both. Whether a field is required follows the `required`
+ * flag of the category schema (Coupang meta) — the screen does not force a field by its name.
  *
- * 고시 판정은 백엔드 96(CoupangListingAdapter.validateRegistrable)과 **같은 규칙**이다:
- * 선택된 품목군(noticeGroup)의 옵션-소유 required 고시를 `merge(마스터, 옵션)` 기준으로 검사한다
- * (옵션 값이 비면 마스터 값 상속 = 충족). 규칙이 어긋나면 서버가 통과시킬 것을 화면이 막는다.
+ * The notice check is the **same rule** as backend 96 (CoupangListingAdapter.validateRegistrable): the option-owned
+ * required notices of the selected group (noticeGroup) are checked on `merge(master, option)` (a blank option value
+ * inherits the master value = satisfied). If the rules diverged, the screen would block what the server lets through.
  *
- * ⚠️ 혼합구성(hideCategoryAttrs)은 **속성만** 스킵한다 — 그 경우에도 고시는 마켓에 전송되므로
- * 고시 검증은 계속한다(96: "AB only skips the ATTRIBUTE half").
+ * ⚠️ hideCategoryAttrs skips the **attributes** — the notices are still sent to the market, so they are still
+ * checked. A mixed composition no longer sets it (FEATURE_2610_37 / D17 · D20): its attributes are checked like a
+ * single composition's.
  *
  * Weight/volume pairs are one-of (either required side satisfied).
  */

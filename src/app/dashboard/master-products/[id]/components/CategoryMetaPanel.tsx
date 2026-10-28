@@ -31,8 +31,6 @@ interface CategoryMetaPanelProps {
   masterId: number;
   categoryCode: string | null; // assigned standard category id (null = unset); a change re-fetches
   platform?: string; // default 'COUPANG' (the only platform with a category attribute schema — FEATURE_2610_13 / D93)
-  // 구성품 종수 ≥ 2 (백엔드 63 미러, 중립 도메인 사실). 부모=마스터 상세 로더가 계산해 주입.
-  isBundle?: boolean;
   onSaved?: () => void;
   /** FEATURE_2610_13 / D98 · D109: a switched-on 11st channel exists → 「통합」 · 「쿠팡」 · 「11번가」 tabs. */
   elevenstActive?: boolean;
@@ -60,7 +58,6 @@ export function CategoryMetaPanel({
   masterId,
   categoryCode,
   platform = 'COUPANG',
-  isBundle = false,
   onSaved,
   elevenstActive = false,
   esmActive = false,
@@ -68,12 +65,6 @@ export function CategoryMetaPanel({
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   // COUPANG owns the persisted per-master values; other platforms are schema-only (read-only).
   const readOnly = platform !== 'COUPANG';
-
-  // 표시/필수 = 선택 플랫폼 요구 union. 오늘 쿠팡 단일이라 상세는 항상 coupangSelected=true.
-  // hideCategoryAttrs = "선택된 채널 중 이 필드(카테고리 속성)를 요구하는 채널이 없다".
-  // TODO: 플랫폼 선택 모델 도입 시 실제 선택값으로 교체 (out of scope) — 네이버 추가 시 union 확장.
-  const coupangSelected = true;
-  const hideCategoryAttrs = coupangSelected && isBundle;
 
   const [attributes, setAttributes] = useState<CategoryAttribute[]>([]);
   const [notices, setNotices] = useState<CategoryNotice[]>([]); // backend-driven notice schema
@@ -159,7 +150,7 @@ export function CategoryMetaPanel({
     attrValues,
     notices,
     noticeValues,
-    hideCategoryAttrs,
+    false,
     noticeGroup,
   );
 
@@ -228,7 +219,6 @@ export function CategoryMetaPanel({
         disabled={readOnly || isSaving}
         onlyRequired={onlyRequired}
         onOnlyRequiredChange={setOnlyRequired}
-        hideCategoryAttrs={hideCategoryAttrs}
         noticeGroup={noticeGroup}
         onNoticeGroupChange={handleNoticeGroupChange}
         elevenstPreview={elevenstActive && !readOnly ? elevenstPreview : undefined}

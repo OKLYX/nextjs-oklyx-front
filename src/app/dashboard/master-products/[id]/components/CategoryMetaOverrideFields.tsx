@@ -39,6 +39,9 @@ interface CategoryMetaOverrideFieldsProps {
   // 선택 채널이 옵션-소유 속성을 요구하지 않으면(hideCategoryAttrs) 속성 그리드 전체 숨김 + 안내만
   // (값은 보존). 고시(옵션-소유) 렌더는 유지.
   hideCategoryAttrs?: boolean;
+  // FEATURE_2610_37 / D23: two or more component kinds — the measure notice stays an input field (not read-only);
+  // the composed text fills it only while it is blank.
+  manualMeasureNotice?: boolean;
   // 선택된 품목군(실효). 이 그룹의 고시만 노출·검증 대상(96 ⑨/⑩ 과 같은 규칙)
   noticeGroup?: string | null;
 }
@@ -93,6 +96,7 @@ export function CategoryMetaOverrideFields({
   onMeasureUnit,
   disabled = false,
   hideCategoryAttrs = false,
+  manualMeasureNotice = false,
   noticeGroup = null,
 }: CategoryMetaOverrideFieldsProps) {
   // Display-only unit pick per pair; the actual value lives in the parent's attrValues.
@@ -137,10 +141,11 @@ export function CategoryMetaOverrideFields({
     : [];
 
   const hasNoticeFields = visibleNoticeFields.length > 0;
-  // 계량 고시(`포장단위별 …용량(중량),수량`)는 **개당 계량값 + 수량으로 만든 파생 문자열**이라
-  // 손으로 고치지 않는다(읽기 전용). 판정 기준은 자동채움과 **같은 함수**(hasMeasureAttr) —
-  // 조합 소스가 없는 카테고리·혼합구성(AB)에서는 조합이 불가하므로 그대로 입력 필드로 둔다.
-  const autoMeasureNotice = !hideCategoryAttrs && hasMeasureAttr(attributes);
+  // The measure notice (`포장단위별 …용량(중량),수량`) is a string **derived from the per-unit measure + quantity**,
+  // so it is not edited by hand (read-only). Judged by the **same function** as the auto-fill (hasMeasureAttr) — a
+  // category without a composing source, hidden attributes and two or more component kinds (FEATURE_2610_37 / D23)
+  // cannot compose it, so it stays an input field.
+  const autoMeasureNotice = !hideCategoryAttrs && !manualMeasureNotice && hasMeasureAttr(attributes);
   const hasAnyOption = pairs.length > 0 || singles.length > 0 || noticeFields.length > 0;
   // Is there anything hidden behind 상세입력? (optional attrs or any notice fields)
   const hasOptional =
@@ -359,7 +364,7 @@ export function CategoryMetaOverrideFields({
     // `@container`: columns follow this block's own width, not the viewport — the relation panel or the
     // half-width option editor narrow it while the viewport stays wide.
     <div className="@container space-y-4">
-      {/* 선택 채널이 속성을 요구하지 않으면(혼합구성) 속성 그리드 대신 안내만(값은 보존). */}
+      {/* No selected channel needs the attributes (hideCategoryAttrs) → a notice instead of the grid (values kept). */}
       {hideCategoryAttrs && (
         <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-500">
           혼합구성(여러 상품) 상품은 쿠팡에 수량/용량/중량 등 속성을 보내지 않습니다(옵션명으로 표현).
