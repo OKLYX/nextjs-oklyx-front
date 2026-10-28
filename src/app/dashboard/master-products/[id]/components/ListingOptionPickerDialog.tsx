@@ -10,6 +10,7 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import type { GeneratedProductResponse } from '@/domain/entities/ListingRegistrationEntity';
+import type { MatrixCell } from '@/domain/entities/MasterProductEntity';
 import { MARKET_OPTION_LOCK_REASON, formatSitePrices } from './ListingDetailPanel';
 
 /** Why a listing cannot be uploaded while its shipping settings are incomplete (77). The [마켓에 올리기] button and this window share it. */
@@ -20,12 +21,32 @@ export const UPLOAD_SUCCESS_MESSAGE =
 
 const UNSAVED_NAME_MESSAGE = '노출상품명을 바꿨습니다. 옆의 [저장]을 먼저 눌러 주세요.';
 
+/** FEATURE_2610_36 / D12: the line at the top of a one-option window. */
+export const COUPANG_ONE_OPTION_NOTICE = '쿠팡은 혼합 구성 상품에 옵션 1개만 올릴 수 있습니다.';
+
+/**
+ * FEATURE_2610_36 / D14: whether this listing's window allows one option only — the same rule the server sends by.
+ * A Coupang listing not on the market yet follows the master's composition (`isBundle`); one on the market follows its
+ * stored bundle type, and the master's composition while that type is not known.
+ */
+export function isCoupangOneOption(
+  platform: string,
+  cell: Pick<MatrixCell, 'platformProductId' | 'marketBundleType'> | null,
+  isBundle: boolean,
+): boolean {
+  if (platform !== 'COUPANG') return false;
+  if (!cell?.platformProductId || cell.marketBundleType == null) return isBundle;
+  return cell.marketBundleType === 'AB';
+}
+
 interface ListingOptionPickerDialogProps {
   /** upload = the first upload (the [마켓에 올리기] confirm) · select = after the upload ([⋯ > 올릴 옵션 고르기]). */
   mode: 'upload' | 'select';
   listingId: number;
   /** 제목 꼬리표(`판매자 · 플랫폼[ · 상품ID]`). */
   channelLabel: string;
+  /** FEATURE_2610_36 / D12 · D14: one option only (a Coupang mixed composition) — pass `isCoupangOneOption(...)`. */
+  oneOption: boolean;
   /** Upload mode only: initial value of the display-name field (the listing's current name). */
   displayName?: string;
   /**
@@ -56,12 +77,15 @@ interface ListingOptionPickerDialogProps {
  * ⚠️ Options, prices and market locks are read once with `getGenerated` on open (the same path in both modes).
  * ⚠️ An option on the market (`onMarket && active`) cannot be switched off — locked checkbox + 🔒 (87).
  * ⚠️ At least one option must be picked (the backend also answers 400).
+ * ⚠️ `oneOption` (FEATURE_2610_36 / D12 · D13): a notice line on top; picking an option replaces the pick; with two or
+ *    more active options nothing but the 🔒 ones is picked on open; while a 🔒 option exists no other can be picked.
  * ❌ Prices are not edited in this window — [⋯ > 가격 설정] does that.
  */
 export function ListingOptionPickerDialog({
   mode,
   listingId,
   channelLabel,
+  oneOption,
   displayName = '',
   onClose,
   onDone,
@@ -91,9 +115,11 @@ export function ListingOptionPickerDialog({
         const res = await useCase.getGenerated(listingId);
         if (!alive) return;
         setGen(res);
-        setSelected(
-          new Set(res.optionPrices.filter((p) => p.active !== false).map((p) => p.optionId)),
-        );
+        const active = res.optionPrices.filter((p) => p.active !== false);
+        // FEATURE_2610_36 / D13: one option only + two or more active → only the 🔒 (on-market) ones stay picked.
+        const initial =
+          oneOption && active.length >= 2 ? active.filter((p) => p.onMarket === true) : active;
+        setSelected(new Set(initial.map((p) => p.optionId)));
       } catch (e: unknown) {
         if (alive) setLoadError(extractErrorMessage(e, '옵션을 불러오지 못했습니다.'));
       }
@@ -101,7 +127,7 @@ export function ListingOptionPickerDialog({
     return () => {
       alive = false;
     };
-  }, [useCase, listingId]);
+  }, [useCase, listingId, oneOption]);
 
   const prices = gen?.optionPrices ?? [];
   const currentActive = prices.filter((p) => p.active !== false).map((p) => p.optionId);
@@ -109,6 +135,8 @@ export function ListingOptionPickerDialog({
     selected.size !== currentActive.length || currentActive.some((id) => !selected.has(id));
   const shippingBlocked = mode === 'upload' && gen?.shippingReady === false;
   const hasLocked = prices.some((p) => p.onMarket === true && p.active !== false);
+  // FEATURE_2610_36 / D12: a 🔒 option is the one option — no other can be picked.
+  const pickBlocked = oneOption && hasLocked;
   // Registration sends the SAVED name, so an unsaved edit would silently not reach the market —
   // handleConfirm refuses it with an alert at the field instead of disabling [올리기].
   const nameUnsaved = mode === 'upload' && !!trimmedName && trimmedName !== savedName;
@@ -117,6 +145,8 @@ export function ListingOptionPickerDialog({
 
   const toggle = (optionId: number) => {
     setSelected((prev) => {
+      // FEATURE_2610_36 / D12: one option only — picking another replaces the pick.
+      if (oneOption && !prev.has(optionId)) return new Set([optionId]);
       const next = new Set(prev);
       if (next.has(optionId)) next.delete(optionId);
       else next.add(optionId);
@@ -210,6 +240,9 @@ export function ListingOptionPickerDialog({
       }
     >
       <div className="space-y-3 text-sm text-gray-700">
+        {oneOption && (
+          <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-700">{COUPANG_ONE_OPTION_NOTICE}</p>
+        )}
         <p>
           {mode === 'upload'
             ? '고른 옵션으로 마켓에 상품을 올립니다. 올린 뒤 승인 결과는 ⋯ 메뉴의 [승인 새로고침]으로 확인합니다.'
@@ -271,7 +304,7 @@ export function ListingOptionPickerDialog({
                       checked,
                       onChange: () => toggle(p.optionId),
                       label: `${p.optionName ?? `옵션 #${p.optionId}`} 선택`,
-                      disabled: busy || locked,
+                      disabled: busy || locked || pickBlocked,
                     }}
                     trailing={
                       locked ? (
@@ -314,7 +347,7 @@ export function ListingOptionPickerDialog({
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={busy || locked}
+                          disabled={busy || locked || pickBlocked}
                           onChange={() => toggle(p.optionId)}
                         />
                         {locked && <span className="text-[10px] text-gray-400">🔒</span>}

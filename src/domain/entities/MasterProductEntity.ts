@@ -264,6 +264,9 @@ export interface MatrixCell {
   // true = 로컬에서 바뀐 값이 아직 마켓에 가지 않았다([수정 요청] 필요). 백엔드 `ProductListing.needsMarketSync`.
   // ⚠️ optional — 구버전 응답(필드 없음)에서는 undefined 다. 판정은 `=== true` 엄격 비교.
   needsMarketSync?: boolean;
+  // FEATURE_2610_36 / D14: the Coupang bundle type this listing has on the market (`ProductListing.marketBundleType`);
+  // null = not known yet. ⚠️ optional — an older response has no field.
+  marketBundleType?: 'SINGLE' | 'AB' | null;
 }
 
 export interface MatrixRow {
