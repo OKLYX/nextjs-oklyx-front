@@ -182,6 +182,8 @@ export interface MasterPlatformCategory {
   platform: string;
   platformCategoryId: string;
   platformCategoryName?: string | null;
+  /** FEATURE_2610_34 / D20: new Coupang registrations of this category leave 총 수량 out (not shown on the web). */
+  grandTotalOmitted?: boolean;
 }
 
 export interface MasterPlatformCategoryRequest {

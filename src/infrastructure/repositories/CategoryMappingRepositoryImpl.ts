@@ -29,4 +29,10 @@ export class CategoryMappingRepositoryImpl implements CategoryMappingRepository 
       `/api/admin/category-mappings/categories/${categoryId}/mappings/${platform}`
     );
   }
+
+  async clearGrandTotalOmitted(code: string): Promise<void> {
+    await axiosInstance.delete(
+      `/api/admin/category-mappings/coupang-categories/${code}/grand-total-omitted`
+    );
+  }
 }
