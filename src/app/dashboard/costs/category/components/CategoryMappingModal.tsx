@@ -9,6 +9,7 @@ import type { CategoryLookupUseCase } from '@/application/usecases/CategoryLooku
 import type { Category } from '@/domain/entities/CategoryEntity';
 import type { CategoryMapping } from '@/domain/entities/CategoryMappingEntity';
 import { Modal } from '@/presentation/components/ui/Modal';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { platformName } from '@/config/platforms';
 
 /**
@@ -17,6 +18,9 @@ import { platformName } from '@/config/platforms';
  * Built on `ui/Modal`. Per mall, the current mapping (code/path) or 「미매핑」 +
  * a [조회 매핑] button → `CategoryLookupPickerModal` (that platform) → pick → `upsertMapping`.
  * Delete = `deleteMapping`. The useCases are **the parent's instances**.
+ *
+ * Coupang row: 「총 수량 안 보냄」 + [기억 지우기] when that Coupang category remembers to leave 총 수량 out
+ * (FEATURE_2610_34 / D7 · D19 — confirmed through `ConfirmDialog` first).
  *
  * ⚠️ Lookup platforms = Coupang, 11st and ESM (11st browses the imported 11st list — FEATURE_2610_10 / D21 ③ · ESM
  *    the imported ESM list — FEATURE_2610_26 / D11 · D12).
@@ -52,6 +56,8 @@ export function CategoryMappingModal({
   const [error, setError] = useState('');
   const [busyPlatform, setBusyPlatform] = useState<string | null>(null);
   const [pickerPlatform, setPickerPlatform] = useState<'COUPANG' | 'NAVER' | 'ELEVENST' | 'ESM' | null>(null);
+  // FEATURE_2610_34 / D19: the Coupang code whose memory the confirm dialog is about to clear.
+  const [clearCode, setClearCode] = useState<string | null>(null);
 
   if (!open) return null;
 
@@ -93,6 +99,22 @@ export function CategoryMappingModal({
     }
   };
 
+  const handleClearGrandTotal = async () => {
+    if (clearCode === null) return;
+    setError('');
+    setBusyPlatform('COUPANG');
+    try {
+      await mappingUseCase.clearGrandTotalOmitted(clearCode);
+      setClearCode(null);
+      onChanged();
+    } catch (e) {
+      setClearCode(null);
+      setError(extractErrorMessage(e, '기억을 지우지 못했습니다.'));
+    } finally {
+      setBusyPlatform(null);
+    }
+  };
+
   return (
     <>
       <Modal
@@ -112,6 +134,7 @@ export function CategoryMappingModal({
           {LOOKUP_PLATFORMS.map(({ platform, label }) => {
             const mapping = mappingOf(platform);
             const busy = busyPlatform === platform;
+            const grandTotalOmitted = platform === 'COUPANG' && mapping?.grandTotalOmitted === true;
             return (
               <div
                 key={platform}
@@ -127,6 +150,7 @@ export function CategoryMappingModal({
                   ) : (
                     <p className="text-xs text-gray-400">미매핑</p>
                   )}
+                  {grandTotalOmitted && <p className="text-xs text-amber-800">총 수량 안 보냄</p>}
                 </div>
                 <div className="flex items-center gap-2 whitespace-nowrap max-md:flex-wrap">
                   {busy && <Spinner size={16} />}
@@ -137,6 +161,15 @@ export function CategoryMappingModal({
                   >
                     {mapping ? '재조회' : '조회 매핑'}
                   </button>
+                  {grandTotalOmitted && mapping && (
+                    <button
+                      onClick={() => setClearCode(mapping.platformCategoryId)}
+                      disabled={busy}
+                      className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-100 disabled:opacity-50"
+                    >
+                      기억 지우기
+                    </button>
+                  )}
                   {mapping && (
                     <button
                       onClick={() => void handleDelete(platform)}
@@ -165,6 +198,17 @@ export function CategoryMappingModal({
           </button>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={clearCode !== null}
+        title="기억 지우기"
+        message="지우면 다음 등록 때 총 수량을 다시 넣어 보냅니다. 지울까요?"
+        confirmText="지우기"
+        onConfirm={() => void handleClearGrandTotal()}
+        onCancel={() => setClearCode(null)}
+        isLoading={busyPlatform === 'COUPANG'}
+        nested
+      />
 
       {pickerPlatform && (
         <CategoryLookupPickerModal

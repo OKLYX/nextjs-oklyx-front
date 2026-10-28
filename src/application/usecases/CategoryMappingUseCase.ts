@@ -21,4 +21,8 @@ export class CategoryMappingUseCase {
   async deleteMapping(categoryId: number, platform: string): Promise<void> {
     return this.repository.deleteMapping(categoryId, platform);
   }
+
+  async clearGrandTotalOmitted(code: string): Promise<void> {
+    return this.repository.clearGrandTotalOmitted(code);
+  }
 }

@@ -149,8 +149,13 @@ export function ListingOptionPickerDialog({
         needsResync = res.needsResync === true;
       }
       if (mode === 'upload') {
-        await useCase.register(listingId);
-        toast.success(UPLOAD_SUCCESS_MESSAGE);
+        const registered = await useCase.register(listingId);
+        // FEATURE_2610_34 / D9 · D13: the server's 총 수량 line follows the success text.
+        toast.success(
+          registered.grandTotalNotice
+            ? `${UPLOAD_SUCCESS_MESSAGE} ${registered.grandTotalNotice}`
+            : UPLOAD_SUCCESS_MESSAGE,
+        );
       } else {
         toast.success(
           needsResync
