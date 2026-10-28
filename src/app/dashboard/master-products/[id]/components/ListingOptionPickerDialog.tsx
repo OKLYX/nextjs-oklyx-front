@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
 import { Spinner } from '@/presentation/components/Spinner';
@@ -17,6 +17,8 @@ export const SHIPPING_BLOCKED_REASON = '배송 설정 미완료 — 마스터/�
 
 export const UPLOAD_SUCCESS_MESSAGE =
   '마켓에 올렸습니다. 승인 결과는 ⋯ 메뉴의 [승인 새로고침]으로 확인하세요.';
+
+const UNSAVED_NAME_MESSAGE = '노출상품명을 바꿨습니다. 옆의 [저장]을 먼저 눌러 주세요.';
 
 interface ListingOptionPickerDialogProps {
   /** upload = the first upload (the [마켓에 올리기] confirm) · select = after the upload ([⋯ > 올릴 옵션 고르기]). */
@@ -47,8 +49,9 @@ interface ListingOptionPickerDialogProps {
  *   🔴 This window IS the confirmation for the market push (D29) — nothing is sent to the market before [올리기].
  * - select: [저장] → saves the active options only (no market call). An uploaded listing then needs [수정 요청].
  * - Upload mode display-name field: [저장] uses the same `updateDisplayName` path as
- *   `ListingDetailPanel` (empty value is not saved). While [저장] is enabled (unsaved edit) or
- *   saving, [올리기] is disabled; the saved name is what registration sends as `displayProductName`.
+ *   `ListingDetailPanel` (empty value is not saved). [올리기] stays enabled; pressing it with an
+ *   unsaved edit is refused with an alert under the field (focus moves there) — the saved name is
+ *   what registration sends as `displayProductName`. While the name is saving, [올리기] is disabled.
  *
  * ⚠️ Options, prices and market locks are read once with `getGenerated` on open (the same path in both modes).
  * ⚠️ An option on the market (`onMarket && active`) cannot be switched off — locked checkbox + 🔒 (87).
@@ -78,6 +81,7 @@ export function ListingOptionPickerDialog({
   const [savedName, setSavedName] = useState(displayName);
   const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState('');
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const trimmedName = nameDraft.trim();
 
   useEffect(() => {
@@ -105,11 +109,11 @@ export function ListingOptionPickerDialog({
     selected.size !== currentActive.length || currentActive.some((id) => !selected.has(id));
   const shippingBlocked = mode === 'upload' && gen?.shippingReady === false;
   const hasLocked = prices.some((p) => p.onMarket === true && p.active !== false);
-  // Upload is blocked while the display-name [저장] is enabled (unsaved edit) or saving —
-  // registration sends the SAVED name, so an unsaved edit would silently not reach the market.
+  // Registration sends the SAVED name, so an unsaved edit would silently not reach the market —
+  // handleConfirm refuses it with an alert at the field instead of disabling [올리기].
   const nameUnsaved = mode === 'upload' && !!trimmedName && trimmedName !== savedName;
   const canConfirm =
-    gen !== null && !busy && selected.size > 0 && !shippingBlocked && !nameUnsaved && !savingName;
+    gen !== null && !busy && selected.size > 0 && !shippingBlocked && !savingName;
 
   const toggle = (optionId: number) => {
     setSelected((prev) => {
@@ -137,6 +141,11 @@ export function ListingOptionPickerDialog({
 
   const handleConfirm = async () => {
     if (!canConfirm) return;
+    if (nameUnsaved) {
+      setNameError(UNSAVED_NAME_MESSAGE);
+      nameInputRef.current?.focus();
+      return;
+    }
     if (mode === 'select' && !changed) {
       onClose();
       return;
@@ -192,7 +201,6 @@ export function ListingOptionPickerDialog({
           <Button
             onClick={handleConfirm}
             disabled={!canConfirm}
-            title={nameUnsaved ? '노출상품명을 먼저 저장하세요.' : undefined}
             isLoading={busy}
             loadingText={mode === 'upload' ? '올리는 중...' : '저장 중...'}
           >
@@ -213,10 +221,15 @@ export function ListingOptionPickerDialog({
             <input
               type="text"
               value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
+              ref={nameInputRef}
+              onChange={(e) => {
+                setNameDraft(e.target.value);
+                if (nameError) setNameError('');
+              }}
               disabled={savingName || busy}
               aria-label="노출상품명"
-              className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+              aria-invalid={!!nameError}
+              className={`min-w-0 flex-1 rounded border px-2 py-1 text-sm ${nameError ? 'border-red-500' : 'border-gray-300'}`}
             />
             <button
               type="button"
@@ -226,7 +239,11 @@ export function ListingOptionPickerDialog({
             >
               {savingName ? <Spinner size={12} label="저장 중" /> : '저장'}
             </button>
-            {nameError && <span className="basis-full text-xs text-red-600">{nameError}</span>}
+            {nameError && (
+              <span role="alert" className="basis-full text-xs text-red-600">
+                {nameError}
+              </span>
+            )}
           </div>
         )}
         {gen === null ? (
