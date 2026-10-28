@@ -109,6 +109,8 @@ export interface ListingRegisterResponse {
   productListingId: number;
   status: ListingStatus;
   platformProductId: string | null;
+  /** FEATURE_2610_34 / D9 · D18: one line for the upload success notice; null unless sent without 총 수량. */
+  grandTotalNotice?: string | null;
 }
 
 // Approval refresh (fetch-status)

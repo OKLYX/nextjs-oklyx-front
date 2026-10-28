@@ -8,6 +8,8 @@ export interface CategoryMapping {
   platform: string;
   platformCategoryId: string;
   platformCategoryName?: string | null;
+  /** FEATURE_2610_34 / D7: new Coupang registrations of this category leave 총 수량 out. */
+  grandTotalOmitted?: boolean;
 }
 
 export interface CategoryMappingUpsertRequest {
