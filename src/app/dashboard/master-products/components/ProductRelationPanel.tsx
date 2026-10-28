@@ -23,7 +23,7 @@ const SEARCH_SIZE = 20;
 type PanelView = { kind: 'list' } | { kind: 'detail'; product: Product } | { kind: 'register' };
 
 interface ProductRelationPanelProps {
-  /** `create` = 새로 만들기(판매 상품 관리 마스터) · `view` = 마스터 상세. */
+  /** `create` = 새로 만들기(판매상품 마스터 등록) · `view` = 마스터 상세. */
   mode: 'create' | 'view';
   /** 이 마스터의 구성상품 id(순서 = 표시 순서). `null` = 아직 불러오는 중(상세에서 마스터 로드 전). */
   componentIds: number[] | null;
@@ -50,7 +50,7 @@ interface ProductRelationPanelProps {
  * view = [구성 변경](기존 「구성상품 변경」 페이지로 — 2609_64 D9 유지). view 는 보기만 한다(UX D63).
  *
  * **필수 사용 규칙**:
- * - 판매 상품 관리 마스터(`MasterProductCreateForm`)와 마스터 상세(`CoverageMatrix`) 두 곳에서만 쓴다.
+ * - 판매상품 마스터 등록(`MasterProductCreateForm`)와 마스터 상세(`CoverageMatrix`) 두 곳에서만 쓴다.
  * - 구성상품을 **실제로 바꾸는 일은 부모가** 한다(create = `onAddComponent`). 패널은 부모 상태를 모른다.
  * - 물품 값(이름·규격·사진)은 여기서 고치지 않는다 — 물품 하나가 여러 마스터에 쓰여 다른 마스터에 번진다.
  *
