@@ -37,10 +37,10 @@ export function withUnit(value: string, unit: string): string {
   return /^[0-9]+(\.[0-9]+)?$/.test(v) ? `${v}${u}` : v;
 }
 
-// 도출 조건 3개(AND)를 만족하는 단일 구성상품을 돌려준다. 아니면 null.
-// - components 가 정확히 1종 (2종 이상 = 어느 물품 기준인지 모호 · 쿠팡 AB 는 속성 자체를 안 보낸다)
-// - netContent 가 비어있지 않음
-// - netContentUnit 이 MARKET_UNIT 에 있음 (단위 없으면 중량/용량 축 판정 자체가 불가)
+// Returns the single component that meets all three derivation conditions (AND), else null.
+// - exactly one component kind (with two or more it is unclear which product the value comes from)
+// - netContent is not blank
+// - netContentUnit is in MARKET_UNIT (without a unit the weight/volume axis cannot be told at all)
 function soleMeasuredComponent(components: MasterComponent[]): MasterComponent | null {
   if (components.length !== 1) return null;
   const c = components[0];
