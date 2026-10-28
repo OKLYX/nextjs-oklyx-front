@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Button } from '@/presentation/components/ui/Button';
+import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Spinner } from '@/presentation/components/Spinner';
 import { ROUTES } from '@/config/routes';
 import { toast } from '@/infrastructure/stores/toastStore';
@@ -39,20 +40,25 @@ type MarketLoad =
   | { status: 'ready'; market: MarketSource };
 
 /**
- * 「판매상품 마스터 등록」 = 판매상품 마스터 **새로 만들기** 페이지 진입점 (2609_78 / UX D41·D46·D61).
+ * 「판매상품 마스터 등록」 = the page that **creates** a new sales-product master (2609_78 / UX D41·D46·D61).
  * File: src/app/dashboard/master-products/new/components/MasterProductCreateContainer.tsx
  *
- * 진입점 3곳: 좌측 네비 `판매상품 > 판매상품 마스터 등록` · 물품 등록 완료 창 [이 물품으로 마스터 만들기] ·
- * 마스터 바구니 [마스터 만들기]. 뒤의 둘은 `?productIds=1,2,3` 으로 구성상품을 골라 둔 채 들어온다.
- * ⚠️ 목록(`MasterProductList`)에 [마스터 추가] 버튼을 다시 넣지 말 것.
+ * Three entries: left nav 「판매상품」 > 「판매상품 마스터 등록」 · product-registered dialog [이 물품으로 마스터 만들기] ·
+ * master basket [마스터 만들기]. The last two arrive with components preselected via `?productIds=1,2,3`.
+ * ⚠️ Do not add a [마스터 추가] button back to the list (`MasterProductList`).
  *
- * ⚠️ 완료 화면이 없다(2609_78 / UX S3): 저장하면 「마스터를 만들었습니다」 알림과 함께 **그 마스터 상세로
- * 바로 간다** — `?overview=1` 로 [상품 관계 한눈에 보기]가 열린 채로(UX D69). 후속 저장 일부 실패는
- * 지금처럼 `?notice=` 배너로 넘긴다. 연달아 만들 때는 메뉴에서 다시 연다.
+ * ⚠️ There is no completion screen (2609_78 / UX S3): saving shows the 「마스터를 만들었습니다」 toast and goes
+ * **straight to that master's detail** with [상품 관계 한눈에 보기] open (`?overview=1`, UX D69). A partial
+ * follow-up save failure is still handed over via the `?notice=` banner. To create another, reopen it from the menu.
  *
- * 2609_79 / UX D70·D71·D77: 진입점 4번째 = 「마켓 상품으로 시작」 [새 마스터로]. 주소에
- * `?sellerId=&platform=&platformProductId=` 가 모두 있으면 마켓 상품을 한 번 조회해 폼을 채우고(사진 제외),
- * 저장 뒤 그 상품을 판매상품으로 붙인다. 조회가 끝나기 전에는 폼을 그리지 않는다(초기값이 조회 결과다).
+ * 2609_79 / UX D70·D71·D77: the fourth entry = [새 마스터로] on the 「마켓 상품으로 등록」 page. When the URL has
+ * all of `?sellerId=&platform=&platformProductId=`, the market product is looked up once to fill the form
+ * (photos excluded), and after saving that product is attached as a listing. The form is not drawn until the
+ * lookup ends (its initial value is the lookup result).
+ *
+ * FEATURE_2610_35 / D3·D6·D17: the 「마켓 상품으로 등록」 page has no menu item — it is entered from this page's
+ * title-row [마켓 상품으로 등록] button. The button is disabled in market mode (loading · error · ready) and asks
+ * before leaving when the form has input (name or picked components).
  */
 export function MasterProductCreateContainer() {
   const router = useRouter();
@@ -137,6 +143,10 @@ export function MasterProductCreateContainer() {
   const categoryUseCase = useMemo(() => new CategoryUseCase(new CategoryRepositoryImpl()), []);
   // 2609_78/D50·D52: [상품 관계 한눈에 보기] — 기본은 가운데(폼)만, 누르면 왼쪽 물품 패널이 열린다.
   const [overviewOpen, setOverviewOpen] = useState(false);
+  // FEATURE_2610_35 / D14: whether the form has input (name or picked components) — reported by the form.
+  const [formHasInput, setFormHasInput] = useState(false);
+  // FEATURE_2610_35 / D8: the leave confirm of [마켓 상품으로 등록].
+  const [marketConfirmOpen, setMarketConfirmOpen] = useState(false);
 
   const handleCreated = useCallback(
     (masterId: number) => {
@@ -161,18 +171,42 @@ export function MasterProductCreateContainer() {
     router.push(ROUTES.MASTER_PRODUCTS);
   }, [router]);
 
+  const goToMarketEntry = useCallback(() => {
+    router.push(ROUTES.MASTER_PRODUCT_NEW_FROM_CHANNEL);
+  }, [router]);
+
+  // FEATURE_2610_35 / D17: no input = go now · input = confirm first (the button is disabled in market mode).
+  const handleMarketEntry = useCallback(() => {
+    if (formHasInput) {
+      setMarketConfirmOpen(true);
+      return;
+    }
+    goToMarketEntry();
+  }, [formHasInput, goToMarketEntry]);
+
   return (
     <PageContainer
       title="판매상품 마스터 등록"
       action={
-        <Button
-          size="sm"
-          variant={overviewOpen ? 'primary' : 'secondary'}
-          aria-pressed={overviewOpen}
-          onClick={() => setOverviewOpen((open) => !open)}
-        >
-          상품 관계 한눈에 보기
-        </Button>
+        <div className="flex items-center gap-2 max-md:flex-wrap">
+          <Button
+            size="sm"
+            variant={overviewOpen ? 'primary' : 'secondary'}
+            aria-pressed={overviewOpen}
+            onClick={() => setOverviewOpen((open) => !open)}
+          >
+            상품 관계 한눈에 보기
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={isMarketMode}
+            title={isMarketMode ? '이미 마켓 상품을 불러온 상태입니다' : undefined}
+            onClick={handleMarketEntry}
+          >
+            마켓 상품으로 등록
+          </Button>
+        </div>
       }
     >
       {load.status === 'loading' && (
@@ -187,7 +221,7 @@ export function MasterProductCreateContainer() {
             href={ROUTES.MASTER_PRODUCT_NEW_FROM_CHANNEL}
             className="mt-1 inline-block font-medium text-blue-600 hover:underline"
           >
-            마켓 상품으로 시작으로 돌아가기
+            다시 조회하기
           </Link>
         </div>
       )}
@@ -210,8 +244,19 @@ export function MasterProductCreateContainer() {
           onCreated={handleCreated}
           onCreatedWithWarning={handleCreatedWithWarning}
           onCancel={handleCancel}
+          onDirtyChange={setFormHasInput}
         />
       )}
+      <ConfirmDialog
+        isOpen={marketConfirmOpen}
+        title="마켓 상품으로 등록"
+        message="작성 중인 내용이 저장되지 않고 사라집니다. 마켓 상품으로 등록 화면으로 이동하시겠습니까?"
+        confirmText="이동"
+        cancelText="계속 작성"
+        isDangerous
+        onConfirm={goToMarketEntry}
+        onCancel={() => setMarketConfirmOpen(false)}
+      />
     </PageContainer>
   );
 }

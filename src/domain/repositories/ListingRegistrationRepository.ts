@@ -137,7 +137,7 @@ export interface ListingRegistrationRepository {
    * (실제 반영은 다음 [수정 요청]). `useMasterCategory=false` 는 백엔드가 400 으로 막는다.
    */
   setCategorySource(listingId: number, useMasterCategory: boolean): Promise<void>;
-  /** 2609_45 → 2609_79: 「마켓 상품으로 시작」 미리보기 — 쓰기 없음(masterId 가 아직 없다). */
+  /** 2609_45 → 2609_79: 「마켓 상품으로 등록」 preview — no writes (there is no masterId yet). */
   masterFromChannelPreview(body: MasterFromChannelPreviewRequest): Promise<MasterFromChannelPreview>;
   /** FEATURE_2610_27 / D1 · D10: every option's margin of one listing. No market call, nothing stored. */
   getListingMargins(listingId: number): Promise<ListingMarginResponse>;

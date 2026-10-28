@@ -100,21 +100,22 @@ const lookupErrorMessage = (e: unknown): string => {
 };
 
 /**
- * 「마켓 상품으로 시작」 (FEATURE_2609_45 → 2609_79 / UX D64·D72~D75·D79).
+ * 「마켓 상품으로 등록」 (FEATURE_2609_45 → 2609_79 / UX D64·D72~D75·D79).
  * File: src/app/dashboard/master-products/new-from-channel/components/MasterFromChannelForm.tsx
  *
- * 순서: 판매자·판매채널·상품 ID → [조회] → 상품 정보 → 이 상품에 든 물품 고르기(상품명으로 후보 · 직접 검색)
- * → 고른 물품이 하나라도 들어간 마스터 전부(물품 조합과 함께) → [이 마스터에 붙이기] / [새 마스터로].
- * [기존 마스터에 붙이기] 는 마스터 이름 검색을 연다(UX D75).
+ * Order: seller · sales channel · product ID → [조회] → product info → pick the products inside it (candidates
+ * from the product name · direct search) → every master containing at least one picked product (with its product
+ * set) → [이 마스터에 붙이기] / [새 마스터로]. [기존 마스터에 붙이기] opens a master name search (UX D75).
  *
- * - 이미 어떤 마스터에 붙은 상품이면 「이미 ○○ 마스터에 연결돼 있습니다」 + [그 마스터로 가기] 만 보인다(UX D81) —
- *   물품 후보 · 겹치는 마스터 · 붙이기 · [새 마스터로] 는 **마스터에 매핑되지 않은 상품일 때만** 나온다.
- * - [이 마스터에 붙이기] = 마스터 상세의 「마켓 상품 추가하기」 와 **같은 창**(`ImportCoupangProductModal`, UX D42·D78).
- *   붙이면 알림 「붙였습니다.」 + 그 마스터 상세로 간다(UX D75).
- * - [새 마스터로] = 3단 페이지(`/dashboard/master-products/new`)로 간다 — 판매자·판매채널·상품 ID + 고른 물품을
- *   주소에 싣는다. 3단 페이지가 다시 조회해 채우고, 저장 뒤 판매상품을 붙인다(UX D70·D77).
- * - ❌ 이 화면은 저장하지 않는다. 마스터·판매상품을 만드는 처리는 3단 페이지와 공유 창에만 있다.
- * - ⚠️ 미리보기 응답을 캐시하지 않는다(가격·재고는 변한다). 페이지를 떠나면 버린다.
+ * - A product already attached to a master shows only 「이미 ○○ 마스터에 연결돼 있습니다」 + [그 마스터로 가기] (UX D81) —
+ *   product candidates · overlapping masters · attach · [새 마스터로] appear **only for a product not mapped to a master**.
+ * - [이 마스터에 붙이기] = the **same dialog** as 「마켓 상품 추가하기」 on the master detail (`ImportCoupangProductModal`,
+ *   UX D42·D78). Attaching shows the 「붙였습니다.」 toast and goes to that master's detail (UX D75).
+ * - [새 마스터로] = goes to the 3-pane page (`/dashboard/master-products/new`) with seller · sales channel · product
+ *   ID + the picked products in the URL. The 3-pane page looks it up again to fill in, and attaches the listing
+ *   after saving (UX D70·D77).
+ * - ❌ This screen saves nothing. Creating masters · listings lives only in the 3-pane page and the shared dialog.
+ * - ⚠️ The preview response is not cached (price · stock change). It is dropped when leaving the page.
  */
 export function MasterFromChannelForm() {
   const router = useRouter();
@@ -460,7 +461,7 @@ export function MasterFromChannelForm() {
   };
 
   return (
-    <PageContainer title="마켓 상품으로 시작">
+    <PageContainer title="마켓 상품으로 등록">
       <Card className="space-y-4">
         {/* ① 판매자 · 판매채널 — 두 칸(UX D72) */}
         <div className="grid gap-3 sm:grid-cols-2">

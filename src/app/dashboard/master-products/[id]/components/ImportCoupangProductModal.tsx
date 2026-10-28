@@ -117,18 +117,21 @@ const isPositiveInt = (raw: string) => {
 };
 
 /**
- * 「마켓 상품 추가하기」 창 (2609_22 → 2609_79 / UX D42·D78) — 이미 마켓에 있는 상품을 **기존 마스터**에 붙이는
- * 공유 창. 여는 곳 셋: 마스터 상세 판매채널 줄 [마켓 상품 추가하기] · [미연결 판매상품 연결] ·
- * 「마켓 상품으로 시작」 [이 마스터에 붙이기]. ❌ 여는 곳마다 창을 따로 만들지 말 것.
+ * 「마켓 상품 추가하기」 dialog (2609_22 → 2609_79 / UX D42·D78) — the shared dialog that attaches a product
+ * already on the market to an **existing master**. Three openers: master detail sales-channel row
+ * [마켓 상품 추가하기] · [미연결 판매상품 연결] · [이 마스터에 붙이기] on the 「마켓 상품으로 등록」 page.
+ * ❌ Do not build a separate dialog per opener.
  * File: src/app/dashboard/master-products/[id]/components/ImportCoupangProductModal.tsx
  *
- * 이미 쿠팡에 올라가 있는 상품을 이 마스터의 채널 셀로 편입한다. 2단계 — ① 상품 ID 로 조회
- * ② 옵션마다 마스터 옵션을 고르거나 구성 수량을 채워 [가져오기](2609_74 — 둘은 항상 일치한다).
- * - 판매자·플랫폼은 매트릭스 행에서 받아 고정 표시한다(모달에 선택 UI 없음).
- * - 단계는 `preview` 유무로만 갈린다(별도 step state 금지 — 조회 실패 후 되돌아갈 자리가 하나여야 한다).
- * - ⚠️ 판매가·재고 입력칸을 만들지 않는다. 서버가 커밋 시점에 쿠팡을 재조회해 확정한다.
- * - ⚠️ 미리보기 응답을 캐시하지 않는다(가격·재고는 변한다). 모달을 닫으면 버린다.
- * - `categoryWarning` 은 가공하지 않고 그대로 출력한다.
+ * Brings a product already on Coupang into this master's channel cell. Two steps — ① look up by product ID
+ * ② per option pick a master option or fill the component quantities, then [가져오기] (2609_74 — the two always
+ * agree).
+ * - Seller · platform come from the matrix row and are shown fixed (no picker in the dialog).
+ * - The step is decided only by whether `preview` exists (no separate step state — there must be a single place
+ *   to return to after a failed lookup).
+ * - ⚠️ No sale price · stock inputs. The server re-reads Coupang at commit time to settle them.
+ * - ⚠️ The preview response is not cached (price · stock change). It is dropped when the dialog closes.
+ * - `categoryWarning` is printed as is, without processing.
  */
 export function ImportCoupangProductModal({
   masterId,

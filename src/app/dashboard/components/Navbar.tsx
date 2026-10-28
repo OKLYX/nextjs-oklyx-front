@@ -101,7 +101,6 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       items: [
         { href: ROUTES.MASTER_PRODUCTS, label: '판매상품 마스터' },
         { href: ROUTES.MASTER_PRODUCT_NEW, label: '판매상품 마스터 등록' },
-        { href: ROUTES.MASTER_PRODUCT_NEW_FROM_CHANNEL, label: '마켓 상품으로 시작' },
         { href: ROUTES.SALES_PRODUCTS_RETRIEVE, label: '판매상품 조회' },
         { href: ROUTES.MARGIN_POLICIES, label: '마진 프리셋' },
         { href: ROUTES.LISTINGS_SYNC, label: '마켓 반영/승인' },
