@@ -52,7 +52,7 @@ interface ProductRegistrationFormProps {
   pickedImageUrls: string[];
   onPickedImageUrlsChange: (urls: string[]) => void;
   /**
-   * 판매 상품 관리 마스터의 왼쪽 물품 패널 안에 넣을 때 `true`(2609_78 / UX D62).
+   * 판매상품 마스터 등록의 왼쪽 물품 패널 안에 넣을 때 `true`(2609_78 / UX D62).
    * 제출 줄을 페이지 바닥 고정(sticky · 음수 여백) 대신 폼 끝에 두고, 부피 그림을 세로로 쌓는다.
    */
   embedded?: boolean;

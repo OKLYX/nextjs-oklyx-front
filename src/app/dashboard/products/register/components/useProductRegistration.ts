@@ -22,7 +22,7 @@ export type BarcodeScanOutcome = { ok: true; barcode: string } | { ok: false; me
  * File: src/app/dashboard/products/register/components/useProductRegistration.ts
  *
  * **용도**: `ProductRegistrationForm` 에 넘길 값(사진 버퍼 · 마켓 사진 URL · 바코드 중복 확인)과
- * 저장(`submit`)을 한 곳에서 소유한다. 쓰는 곳 = 물품 등록 페이지 · 판매 상품 관리 마스터의 왼쪽 물품 패널
+ * 저장(`submit`)을 한 곳에서 소유한다. 쓰는 곳 = 물품 등록 페이지 · 판매상품 마스터 등록의 왼쪽 물품 패널
  * [새 물품 등록](UX D62·D66) 두 곳 — 저장 순서·실패 알림이 두 곳에서 갈라지지 않게 하려고 뽑았다.
  *
  * **저장 순서**: 물품 생성 → 사진 파일 업로드 → 마켓 사진 URL 복제(이 순서가 갤러리 순서다).

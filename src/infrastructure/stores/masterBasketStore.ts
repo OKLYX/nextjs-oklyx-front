@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 /**
  * 마스터 바구니 — 「이 물품들로 마스터 만들기」 할 물품을 모아 두는 곳 (FEATURE_2609_78 / UX D39·D45·D49).
  *
- * **용도**: 물품 목록·물품 상세에서 담아 두었다가 [마스터 만들기] 로 판매 상품 관리 마스터를 그 물품들이
+ * **용도**: 물품 목록·물품 상세에서 담아 두었다가 [마스터 만들기] 로 판매상품 마스터 등록를 그 물품들이
  * 구성상품으로 골라진 채로 연다(`?productIds=`).
  * **파일**: src/infrastructure/stores/masterBasketStore.ts
  * **영속**: `localStorage` 키 `master-basket-storage` — 검색·페이지·화면을 오가도, 탭을 닫았다 열어도 남는다(D49).
