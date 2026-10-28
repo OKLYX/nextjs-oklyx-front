@@ -5,11 +5,12 @@ import type {
 import type { MasterOptionRequest } from '@/domain/entities/MasterProductEntity';
 
 /**
- * 「마켓 상품으로 시작」 [새 마스터로] 로 3단 페이지를 열 때의 출발 상품(2609_79 / UX D70·D71·D77).
+ * The starting product when [새 마스터로] on the 「마켓 상품으로 등록」 page opens the 3-pane page
+ * (2609_79 / UX D70·D71·D77).
  * File: src/app/dashboard/master-products/new/components/marketSource.ts
  *
- * 주소 `?sellerId=&platform=&platformProductId=` 세 값이 모두 있을 때만 만들어진다. `preview` 는
- * `POST /api/admin/master-products/from-channel/preview` 응답이다(캐시하지 않는다 — 가격·재고는 변한다).
+ * Built only when the URL has all three of `?sellerId=&platform=&platformProductId=`. `preview` is the response
+ * of `POST /api/admin/master-products/from-channel/preview` (not cached — price · stock change).
  */
 export interface MarketSource {
   sellerId: number;

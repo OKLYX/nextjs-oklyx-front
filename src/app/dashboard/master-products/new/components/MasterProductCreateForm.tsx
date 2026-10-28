@@ -152,11 +152,17 @@ interface MasterProductCreateFormProps {
   /** [상품 관계 한눈에 보기]가 켜졌는지(2609_78 / UX D50·D52). 켜지면 폼 왼쪽에 물품 패널을 그린다. */
   overviewOpen?: boolean;
   /**
-   * 2609_79 / UX D70·D71·D77: 「마켓 상품으로 시작」 [새 마스터로] 의 출발 상품. 있으면 이름·카테고리·옵션·
-   * 필수속성/고시를 마켓 값으로 채우고(사진 제외), 옵션 추가·삭제·이름 변경을 막고, 저장 뒤 판매상품을 붙인다.
-   * 🔴 초기값으로만 읽는다 — 호출부는 조회가 끝난 뒤에 이 폼을 그린다.
+   * 2609_79 / UX D70·D71·D77: the starting product of [새 마스터로] on the 「마켓 상품으로 등록」 page. When set, the
+   * name · category · options · required attributes/notices are filled with market values (photos excluded), option
+   * add · delete · rename are blocked, and the listing is attached after saving.
+   * 🔴 Read as the initial value only — the caller draws this form after the lookup ends.
    */
   market?: MarketSource;
+  /**
+   * FEATURE_2610_35 / D14: called with `hasInput` (name not blank or any component picked) on mount and whenever it
+   * changes — the page's [마켓 상품으로 등록] asks before leaving while it is true.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /**
@@ -193,6 +199,7 @@ export function MasterProductCreateForm({
   initialProductIds,
   overviewOpen = false,
   market,
+  onDirtyChange,
 }: MasterProductCreateFormProps) {
   // 이미지 그룹 카탈로그(공용 목록)는 이 모달이 직접 만든다 — 부모 props 계약을 넓히지 않는다.
   const groupUseCase = useMemo(
@@ -233,10 +240,8 @@ export function MasterProductCreateForm({
   );
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
-  // 모달이던 시절엔 ✕ 하나로만 닫혔지만, 페이지가 된 뒤로는 브라우저 뒤로가기·주소창·탭 닫기로도
-  // 이탈한다. 1200줄짜리 폼이 말없이 날아가지 않게 작성 흔적이 있으면 브라우저 경고를 띄운다.
-  // (좌측 네비 클릭은 Next.js 클라이언트 라우팅이라 이 이벤트가 안 뜬다 — `onCancel` 의 확인
-  // 다이얼로그가 그쪽을 맡는다.)
+  // As a modal it closed only with ✕; as a page it can also be left by browser back · the address bar · closing
+  // the tab. So that a 1200-line form does not vanish silently, a browser warning is shown while there is input.
   const hasInput = name.trim() !== '' || selectedIds.length > 0;
   // [취소] 확인 — 작성 흔적이 없으면 묻지 않고 바로 나간다.
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
@@ -246,6 +251,10 @@ export function MasterProductCreateForm({
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [hasInput]);
+  // FEATURE_2610_35 / D14: report the input state to the page (same shape as `ProductRegistrationForm`).
+  useEffect(() => {
+    onDirtyChange?.(hasInput);
+  }, [hasInput, onDirtyChange]);
 
   // 혼합구성 판정 = 구성품 종수 ≥ 2 (백엔드 63 미러, 중립 도메인 사실).
   const isBundle = selectedIds.length >= 2;
