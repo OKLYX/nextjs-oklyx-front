@@ -99,7 +99,7 @@ import { MasterRegistrationSuffixPanel } from './MasterRegistrationSuffixPanel';
 import { MasterShippingOverridePanel } from './MasterShippingOverridePanel';
 import { ImportCoupangProductModal } from './ImportCoupangProductModal';
 import { DetachedListingPickerModal } from './DetachedListingPickerModal';
-import { ListingOptionPickerDialog } from './ListingOptionPickerDialog';
+import { ListingOptionPickerDialog, isCoupangOneOption } from './ListingOptionPickerDialog';
 import { ListingRow, cellActionCount } from './ListingRow';
 import { MARKET_OPTION_LOCK_REASON } from './ListingDetailPanel';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
@@ -380,9 +380,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
 
   // 2609_77/D43: the listing line just created by [마켓에 올리기] of a Coupang, 11st or ESM account header. null =
   // closed.
-  const [uploadTarget, setUploadTarget] = useState<{ listingId: number; channelLabel: string } | null>(
-    null,
-  );
+  const [uploadTarget, setUploadTarget] = useState<{
+    listingId: number;
+    channelLabel: string;
+    platform: string;
+  } | null>(null);
   // 2609_61: 옵션×채널 표 → 「상품 기본 정보 > 옵션」 이동. `sectionOpenTab` 은 바깥 탭을 고르는 신호,
   // `focusOption` 은 옵션 에디터가 반응할 대상이다. ⚠️ 초기값 undefined — 객체를 처음부터 넘기면 마운트
   // 때 그 탭이 켜진다(기본 = 첫 탭).
@@ -715,8 +717,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     window.history.replaceState(null, '', `#master-option-${masterOptionId}`);
   }, []);
 
-  // 혼합구성 판정 = 구성품 종수 >= 2 (백엔드 63 미러, 생성 모달 106행과 같은 규칙). 카테고리 메타 패널과
-  // 옵션 에디터의 hideCategoryAttrs 가 함께 쓴다.
+  // Mixed composition = 2+ component kinds (backend 63 mirror, the same rule as the create form's `isBundle` in
+  // `MasterProductCreateForm.tsx`). Read by the category meta panel, the option editor's hideCategoryAttrs and the
+  // option picker (FEATURE_2610_36 / D14).
   const isBundle = (master?.components.length ?? 0) >= 2;
   // 표시/필수 = 선택 플랫폼 요구 union. 오늘 쿠팡 단일이라 항상 true.
   // TODO: 플랫폼 선택 모델 도입 시 실제 선택값으로 교체 (out of scope) — 네이버 추가 시 union 확장.
@@ -990,7 +993,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     try {
       const res = await listingUseCase.addChannel(masterId, { sellerId, platform });
       await load();
-      setUploadTarget({ listingId: res.productListingId, channelLabel });
+      setUploadTarget({ listingId: res.productListingId, channelLabel, platform });
     } catch (e: unknown) {
       toast.error(extractErrorMessage(e, '판매상품 줄을 만들지 못했습니다.'));
     } finally {
@@ -1643,6 +1646,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       onCellRemoved={handleCellRemoved}
                       hasMasterCategory={category != null}
                       onPickPlatformCategory={setRowPickerPlatform}
+                      oneOption={isCoupangOneOption(row.platform, cell, isBundle)}
                     />
                   ))}
                 </section>
@@ -1870,6 +1874,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           mode="upload"
           listingId={uploadTarget.listingId}
           channelLabel={uploadTarget.channelLabel}
+          oneOption={isCoupangOneOption(uploadTarget.platform, null, isBundle)}
           displayName={
             matrix?.rows
               .flatMap(rowCellsOf)

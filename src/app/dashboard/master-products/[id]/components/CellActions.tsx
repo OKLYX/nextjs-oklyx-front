@@ -77,6 +77,8 @@ interface CellActionsProps {
   categoryBlocked: boolean;
   /** [카테고리 선택하기] in that notice — the parent opens the picker (D21 ②). */
   onPickCategory: () => void;
+  /** FEATURE_2610_36 / D12 · D14: the option picker of this listing allows one option only (`isCoupangOneOption`). */
+  oneOption: boolean;
 }
 
 interface MenuItem {
@@ -153,6 +155,7 @@ export function CellActions({
   needsMarketSync,
   categoryBlocked,
   onPickCategory,
+  oneOption,
 }: CellActionsProps) {
   const router = useRouter();
   const useCase = useMemo(
@@ -810,6 +813,7 @@ export function CellActions({
           mode="upload"
           listingId={listing.id}
           channelLabel={channelLabel}
+          oneOption={oneOption}
           displayName={listing.name}
           onNameSaved={onNameSaved}
           onClose={() => setShowUpload(false)}
@@ -825,6 +829,7 @@ export function CellActions({
           mode="select"
           listingId={listing.id}
           channelLabel={channelLabel}
+          oneOption={oneOption}
           onClose={() => setShowOptionPicker(false)}
           onDone={() => {
             setShowOptionPicker(false);
