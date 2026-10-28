@@ -98,6 +98,8 @@ function applyQtyToMeta(
   setNotice: StringMapSetter,
   // hideCategoryAttrs 이면 속성 fill(수량·계량 속성)만 스킵하고 고시 fill 은 유지한다(값 자체는 비우지 않음).
   hideCategoryAttrs = false,
+  // FEATURE_2610_37 / D23: two or more component kinds — the measure notice stays a field the user writes.
+  manualMeasureNotice = false,
   // D7 유효 계량값(단위 포함, 예 `320g`). 빈 값이면 계량 속성·계량 고시를 채우지 않는다.
   measured = '',
   // 도출된 축. 이 축의 속성 하나에만 주입한다(반대쪽은 건드리지 않는다).
@@ -106,9 +108,10 @@ function applyQtyToMeta(
   skipNotices: ReadonlySet<string> = EMPTY_KEYS,
 ): void {
   const value = total > 0 ? String(total) : '';
-  // 계량 고시를 자동 조합으로 소유하는가 = 조합 소스(개당 계량 속성)가 있고 속성을 보내는 구성인가.
-  // 혼합구성(AB)·계량 속성 없는 카테고리는 조합이 불가하므로 사용자 입력 필드로 남긴다.
-  const autoMeasureNotice = !hideCategoryAttrs && hasMeasureAttr(attrs);
+  // Whether the measure notice is auto-composed = a composing source (per-unit measure attribute) exists and the
+  // attributes are sent. Hidden attributes, two or more component kinds (FEATURE_2610_37 / D23) and a category
+  // without a measure attribute cannot compose it, so it stays a field the user writes.
+  const autoMeasureNotice = !hideCategoryAttrs && !manualMeasureNotice && hasMeasureAttr(attrs);
   const attrNames = hideCategoryAttrs
     ? []
     : attrs.filter(isAutoQuantityAttr).map((a) => a.name);
@@ -148,9 +151,17 @@ function applyQtyToMeta(
             // 항상 덮어쓰고, 조합이 불가능해지면(개당 값을 비우면) **비운다**. 비워야 97 게이트가
             // 막아서 낡은 문자열이 그대로 마켓까지 가는 걸 방지한다.
             next[n.key] = composed;
-          } else if (composed && !skipNotices.has(n.key)) {
-            // 조합 불가(혼합구성 AB · 계량 속성 없는 카테고리) = 사용자 입력 필드 → 기존 가드 유지.
-            // ⚠️ skip 은 이 분기 안에서만 — 루프 앞에서 continue 하면 수량 전용 고시까지 막힌다.
+          } else if (
+            composed &&
+            !skipNotices.has(n.key) &&
+            !(manualMeasureNotice && (next[n.key] ?? '').trim() !== '')
+          ) {
+            // Not composable (mixed composition AB · a category without a measure attribute) = a user-input
+            // field → keep the guard. With two or more component kinds a non-blank value is kept on every path
+            // (form open · attribute edit · quantity change) — only a blank field takes the composed text
+            // (FEATURE_2610_37 / D23).
+            // ⚠️ The skip stays inside this branch — a `continue` before the loop would block the
+            // quantity-only notices too.
             next[n.key] = composed;
           }
         } else {
@@ -434,6 +445,7 @@ export function MasterOptionEditor({
             setOptAttrValues,
             setOptNoticeValues,
             hideCategoryAttrsRef.current,
+            comps.length >= 2,
             measured,
             derivedAxis(comps),
             unionKeys(touchedAttrsRef.current, seededAttrKeysRef.current),
@@ -481,6 +493,7 @@ export function MasterOptionEditor({
       setOptAttrValues,
       setOptNoticeValues,
       hideCategoryAttrs,
+      components.length >= 2,
       measured,
       derivedAxis(components),
       o.skipAttrs,
@@ -1091,6 +1104,7 @@ export function MasterOptionEditor({
                             onMeasureUnit={handleOptMeasureUnit}
                             disabled={isSubmitting}
                             hideCategoryAttrs={hideCategoryAttrs}
+                            manualMeasureNotice={components.length >= 2}
                             noticeGroup={masterNoticeGroup}
                           />
                         </>

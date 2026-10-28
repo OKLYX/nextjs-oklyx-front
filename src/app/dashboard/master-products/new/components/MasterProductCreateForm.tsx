@@ -256,14 +256,6 @@ export function MasterProductCreateForm({
     onDirtyChange?.(hasInput);
   }, [hasInput, onDirtyChange]);
 
-  // 혼합구성 판정 = 구성품 종수 ≥ 2 (백엔드 63 미러, 중립 도메인 사실).
-  const isBundle = selectedIds.length >= 2;
-  // 표시/필수 = 선택 플랫폼 요구 union. 오늘 쿠팡 단일 → coupangSelected=true.
-  // hideCategoryAttrs = "선택된 채널 중 이 필드(카테고리 속성)를 요구하는 채널이 없다".
-  // TODO: 플랫폼 선택 모델 도입 시 실제 선택값으로 교체 (out of scope) — 네이버 추가 시 union 확장.
-  const coupangSelected = true;
-  const hideCategoryAttrs = coupangSelected && isBundle;
-
   // Create mode: options are entered in the wizard and created atomically with the master.
   const [options, setOptions] = useState<MasterOptionRequest[]>(() => marketOptions ?? []);
   // 옵션을 버려야 하는 순간(구성상품·카테고리 변경): 보통 = 전부 삭제, 마켓 모드 = 옵션은 남기고 원형으로 되돌림(수량 비움 · 옵션 속성 = 마켓 값).
@@ -1032,7 +1024,7 @@ export function MasterProductCreateForm({
               coupangMetaForGate?.attrValues ?? {},
               coupangMetaForGate?.notices ?? [],
               coupangMetaForGate?.noticeValues ?? {},
-              hideCategoryAttrs,
+              false,
               coupangMetaForGate?.noticeGroup ?? null,
             )
           ? '필수 카테고리 속성을 입력하세요.'
@@ -1669,7 +1661,6 @@ export function MasterProductCreateForm({
                   value={metaByPlatform['COUPANG'] ?? EMPTY_META_VALUE}
                   onChange={(next) => handleMetaChange('COUPANG', next)}
                   onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad('COUPANG', attrs, notices)}
-                  hideCategoryAttrs={hideCategoryAttrs}
                   elevenstActive={activePlatforms.includes('ELEVENST')}
                   esmActive={activePlatforms.includes('ESM')}
                 />
@@ -1684,7 +1675,6 @@ export function MasterProductCreateForm({
                       value={metaByPlatform[platform] ?? EMPTY_META_VALUE}
                       onChange={(next) => handleMetaChange(platform, next)}
                       onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad(platform, attrs, notices)}
-                      hideCategoryAttrs={hideCategoryAttrs}
                     />
                   )}
                 </MetaPlatformTabs>
@@ -1828,7 +1818,6 @@ export function MasterProductCreateForm({
               masterAttrValues={metaByPlatform['COUPANG']?.attrValues ?? {}}
               masterNoticeValues={metaByPlatform['COUPANG']?.noticeValues ?? {}}
               masterNoticeGroup={masterNoticeGroup}
-              hideCategoryAttrs={hideCategoryAttrs}
               onFormOpenChange={setOptionFormOpen}
               marketLocked={market != null}
             />
