@@ -26,8 +26,10 @@ export const ROUTES = {
   SALES_PRODUCTS_RETRIEVE_EDIT: (id: number | string) => `/dashboard/sales-products/retrieve/${id}/edit` as const,
   MASTER_PRODUCTS: '/dashboard/master-products' as const,
   MASTER_PRODUCT_NEW: '/dashboard/master-products/new' as const,
-  // 2609_45/D17: 경로·메뉴 라벨 모두 플랫폼 중립. 플랫폼 이름은 화면의 `PLATFORMS` 표에서만 나온다.
-  // 2609_79 / UX D64: 화면·메뉴 이름 = 「마켓 상품으로 시작」. 주소·상수 이름은 그대로 둔다.
+  // 2609_45/D17: the path is platform neutral. The platform picker's names come only from the screen's
+  // `PLATFORMS` table.
+  // FEATURE_2610_35 / D1·D10: screen name = 「마켓 상품으로 등록」, with no menu item — the entry is the
+  // [마켓 상품으로 등록] button on the 「판매상품 마스터 등록」 page. The path and constant names stay as they are.
   MASTER_PRODUCT_NEW_FROM_CHANNEL: '/dashboard/master-products/new-from-channel' as const,
   MASTER_PRODUCT_DETAIL: (id: number | string) => `/dashboard/master-products/${id}` as const,
   MASTER_PRODUCT_DETAIL_EDIT: (masterId: number | string, listingId: number | string) =>

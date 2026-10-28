@@ -380,11 +380,11 @@ export interface ChannelApplyOptionNamesResponse {
   skippedAwaitingId: string[];
 }
 
-// ── 마켓 상품으로 시작 — 미리보기 (2609_45 → 2609_79) ─────────────────────────────
-// 마스터가 아직 없을 때 마켓 상품 id 하나로 옵션·카테고리·속성을 읽는다(쓰기 0회).
-// 🔁 2609_79 / UX D70: 「마스터 + 옵션 + 셀 한 번에 만들기」 커밋은 없어졌다 — 「새 마스터」 는 3단 페이지가
-// 마스터를 만든 뒤 위의 가져오기(importListing)로 판매상품을 붙인다.
-// 🔴 이름·경로는 플랫폼 중립(D17). 쿠팡은 메뉴 라벨·화면 문구에만 남는다.
+// ── 「마켓 상품으로 등록」 preview (2609_45 → 2609_79) ─────────────────────────────
+// Reads options · category · attributes from one market product id before a master exists (0 writes).
+// 🔁 2609_79 / UX D70: the 「마스터 + 옵션 + 셀 한 번에 만들기」 commit is gone — for 「새 마스터」 the 3-pane page
+// creates the master, then attaches the listing with the import above (importListing).
+// 🔴 Names · paths are platform neutral (D17). The Coupang name remains only in screen texts.
 
 export interface MasterFromChannelPreviewRequest {
   sellerId: number;
