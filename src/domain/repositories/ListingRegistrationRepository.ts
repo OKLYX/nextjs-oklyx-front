@@ -5,6 +5,8 @@ import type {
   BatchChannelAddResponse,
   ListingRegisterResponse,
   ListingStatusResponse,
+  MasterApprovalRefreshRequest,
+  MasterApprovalRefreshResponse,
   ListingSyncResponse,
   GeneratedProductResponse,
   FieldValuesUpdateRequest,
@@ -57,6 +59,11 @@ export interface ListingRegistrationRepository {
   // Update request (109): forced re-push of an already-registered cell -> re-review (SUBMITTED).
   updateRequest(listingId: number): Promise<ListingRegisterResponse>;
   fetchStatus(listingId: number): Promise<ListingStatusResponse>;
+  // FEATURE_2610_38 / D2 · D9: the picked listings of one master, refreshed one by one on the server.
+  fetchMasterStatus(
+    masterId: number,
+    data: MasterApprovalRefreshRequest,
+  ): Promise<MasterApprovalRefreshResponse>;
   syncApprovals(): Promise<ListingSyncResponse>;
   getGenerated(listingId: number): Promise<GeneratedProductResponse>;
   regenerate(listingId: number): Promise<GeneratedProductResponse>;
