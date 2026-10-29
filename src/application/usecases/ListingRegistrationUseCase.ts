@@ -6,6 +6,8 @@ import type {
   BatchChannelAddResponse,
   ListingRegisterResponse,
   ListingStatusResponse,
+  MasterApprovalRefreshRequest,
+  MasterApprovalRefreshResponse,
   ListingSyncResponse,
   GeneratedProductResponse,
   FieldValuesUpdateRequest,
@@ -72,6 +74,13 @@ export class ListingRegistrationUseCase {
 
   fetchStatus(listingId: number): Promise<ListingStatusResponse> {
     return this.repository.fetchStatus(listingId);
+  }
+
+  fetchMasterStatus(
+    masterId: number,
+    data: MasterApprovalRefreshRequest,
+  ): Promise<MasterApprovalRefreshResponse> {
+    return this.repository.fetchMasterStatus(masterId, data);
   }
 
   syncApprovals(): Promise<ListingSyncResponse> {

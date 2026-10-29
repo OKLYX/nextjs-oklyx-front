@@ -100,11 +100,19 @@ import { MasterShippingOverridePanel } from './MasterShippingOverridePanel';
 import { ImportCoupangProductModal } from './ImportCoupangProductModal';
 import { DetachedListingPickerModal } from './DetachedListingPickerModal';
 import { ListingOptionPickerDialog, isCoupangOneOption } from './ListingOptionPickerDialog';
-import { ListingRow, cellActionCount } from './ListingRow';
+import { ListingRow, STATUS_LABEL, cellActionCount, cellStatus } from './ListingRow';
+import {
+  BulkApprovalRefreshDialog,
+  REFRESHABLE_PLATFORMS,
+  REFRESHABLE_STATUSES,
+  bulkRefreshResultLine,
+  bulkRefreshSummaryText,
+  type BulkRefreshCandidate,
+} from './BulkApprovalRefreshDialog';
 import { MARKET_OPTION_LOCK_REASON } from './ListingDetailPanel';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { Button } from '@/presentation/components/ui/Button';
-import { platformDisplayName } from '@/config/platforms';
+import { platformDisplayName, platformName } from '@/config/platforms';
 import { ELEVENST_KEYS } from '@/domain/entities/ElevenstShipping';
 import { esmShippingUnset } from '@/domain/entities/EsmShipping';
 
@@ -114,7 +122,7 @@ interface CoverageMatrixProps {
 
 /**
  * Master detail = the channel checklist (account × listing) + unregistered batch / per-row registration + propagation
- * wiring.
+ * wiring + the 「전체 승인 새로고침」 of picked listings (FEATURE_2610_38).
  * File: src/app/dashboard/master-products/[id]/components/CoverageMatrix.tsx
  *
  * Channels (seller × platform) are defined on the sales-channel screen → not picked again here.
@@ -353,6 +361,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [isBatchAdding, setIsBatchAdding] = useState(false);
   const [rowBusyId, setRowBusyId] = useState<number | null>(null);
+  // `failures` = the lines under the summary: the failed channels of the batch add, or every picked listing of the
+  // 「전체 승인 새로고침」 (FEATURE_2610_38 / D5).
   const [batchSummary, setBatchSummary] = useState<
     { text: string; tone: 'green' | 'amber'; failures: string[] } | null
   >(null);
@@ -360,6 +370,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   // Propagate (A-layer) summary banner
   const [isPropagating, setIsPropagating] = useState(false);
   const [banner, setBanner] = useState<{ text: string; tone: 'green' | 'amber' } | null>(null);
+  // FEATURE_2610_38 / D12: the 「전체 승인 새로고침」 picking window (mounted only while open) and its run.
+  const [bulkRefreshOpen, setBulkRefreshOpen] = useState(false);
+  const [isBulkRefreshing, setIsBulkRefreshing] = useState(false);
   // 생성 페이지가 "마스터는 만들어졌지만 후속 저장 일부가 실패" 로 보낼 때 `?notice=` 로 사유를 넘긴다.
   // state 로 옮기지 않고 URL 에서 바로 파생한다 — 이펙트 안 setState 는 렌더를 한 번 더 돌리고,
   // 이 값은 URL 이 이미 단일 출처다. 이 화면이 스스로 만든 `banner` 가 있으면 그쪽이 이긴다(최신 동작).
@@ -961,6 +974,35 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     }
   };
 
+  // FEATURE_2610_38 / D12 · D13: the picked listings → one server call → the result box, then one reload. A failed
+  // request shows the server message (or the fallback) in the same box.
+  const handleBulkRefresh = async (listingIds: number[]) => {
+    setBulkRefreshOpen(false);
+    setIsBulkRefreshing(true);
+    setBatchSummary(null);
+    try {
+      const res = await listingUseCase.fetchMasterStatus(masterId, { productListingIds: listingIds });
+      const sellerNameOf = (listingId: number) =>
+        matrix?.rows.find((row) => rowCellsOf(row).some((c) => c.productListingId === listingId))?.sellerName;
+      setBatchSummary({
+        text: bulkRefreshSummaryText(res),
+        tone: res.failed > 0 ? 'amber' : 'green',
+        failures: res.results.map((r) =>
+          bulkRefreshResultLine(sellerNameOf(r.productListingId) ?? String(r.productListingId), r),
+        ),
+      });
+      await load();
+    } catch (e: unknown) {
+      setBatchSummary({
+        text: extractErrorMessage(e, '전체 승인 새로고침에 실패했습니다.'),
+        tone: 'amber',
+        failures: [],
+      });
+    } finally {
+      setIsBulkRefreshing(false);
+    }
+  };
+
   const handleRowAdd = async (accountId: number, sellerId: number, platform: string) => {
     setRowBusyId(accountId);
     setError('');
@@ -1162,11 +1204,26 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     );
   };
 
-  const busy = isBatchAdding || rowBusyId !== null;
+  // FEATURE_2610_38 / D12: the 「전체 승인 새로고침」 run counts as busy too — it and the buttons
+  // gated on `busy` block each other.
+  const busy = isBatchAdding || rowBusyId !== null || isBulkRefreshing;
 
   // 조치가 필요한 계정이 먼저(있다/없다 두 무리, 무리 안은 응답 순서).
   const sortedRows = [...(matrix?.rows ?? [])].sort(
     (a, b) => Number(rowActionCount(b) > 0) - Number(rowActionCount(a) > 0),
+  );
+
+  // FEATURE_2610_38 / D3 · D6 · D16 · D19: the listings the 「전체 승인 새로고침」 can pick, in table order.
+  const refreshCandidates: BulkRefreshCandidate[] = sortedRows.flatMap((row) =>
+    REFRESHABLE_PLATFORMS.includes(row.platform)
+      ? sortedCells(rowCellsOf(row))
+          .filter((c) => REFRESHABLE_STATUSES.includes(cellStatus(c)))
+          .map((c) => ({
+            productListingId: c.productListingId,
+            label: `${row.sellerName}/${platformName(row.platform)} — ${STATUS_LABEL[cellStatus(c)]}`,
+            status: cellStatus(c),
+          }))
+      : [],
   );
 
   /* 2609_73: 순서 = 보기(채널 매트릭스 표 · 채널별 옵션) → 편집(상품 기본 정보 + 섹션 5개).
@@ -1236,6 +1293,18 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                     ? ` (${syncPreview.totals.affectedChannels})`
                     : ''
                 }`
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkRefreshOpen(true)}
+              disabled={busy || refreshCandidates.length === 0}
+              className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            >
+              {isBulkRefreshing ? (
+                <Spinner label="새로고침 중..." />
+              ) : (
+                `전체 승인 새로고침 (${refreshCandidates.length})`
               )}
             </button>
             {syncPreview?.inSync && (
@@ -1357,6 +1426,14 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
         onConfirm={handlePropagateConfirm}
         onCancel={() => setConfirmOpen(false)}
       />
+
+      {bulkRefreshOpen && (
+        <BulkApprovalRefreshDialog
+          candidates={refreshCandidates}
+          onClose={() => setBulkRefreshOpen(false)}
+          onConfirm={(listingIds) => void handleBulkRefresh(listingIds)}
+        />
+      )}
 
       {/* 옵션명 일괄 적용 확인(2609_22/D4). 기존 공통 모달 재사용 — 신규 확인 모달을 만들지 말 것. */}
       <ConfirmDialog

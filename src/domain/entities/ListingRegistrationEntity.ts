@@ -131,6 +131,34 @@ export interface ListingStatusResponse {
   reviewNoteState?: 'FOUND' | 'NOT_FOUND' | 'FAILED' | null;
 }
 
+// FEATURE_2610_38 / D9: body of POST /api/admin/master-products/{id}/fetch-status — the listings picked in the window.
+export interface MasterApprovalRefreshRequest {
+  productListingIds: number[];
+}
+
+/**
+ * FEATURE_2610_38 / D10: one picked listing's line. `status` · `reviewNote*` are filled on REFRESHED only, `message` on
+ * SKIPPED · FAILED only. The seller name is not sent — the screen finds it in its matrix by `productListingId`.
+ */
+export interface MasterApprovalRefreshResult {
+  productListingId: number;
+  platform: string;
+  outcome: 'REFRESHED' | 'SKIPPED' | 'FAILED';
+  status: ListingStatus | null;
+  reviewNote: string | null;
+  reviewNoteState: 'FOUND' | 'NOT_FOUND' | 'FAILED' | null;
+  message: string | null;
+}
+
+/** FEATURE_2610_38 / D10: `requested` = ids received; `results` = one line per id, in the order received. */
+export interface MasterApprovalRefreshResponse {
+  requested: number;
+  refreshed: number;
+  skipped: number;
+  failed: number;
+  results: MasterApprovalRefreshResult[];
+}
+
 // Batch summaries
 export interface ListingSyncResponse {
   swept: number;
