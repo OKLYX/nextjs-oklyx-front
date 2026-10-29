@@ -9,6 +9,8 @@ import type {
   BatchChannelAddResponse,
   ListingRegisterResponse,
   ListingStatusResponse,
+  MasterApprovalRefreshRequest,
+  MasterApprovalRefreshResponse,
   ListingSyncResponse,
   GeneratedProductResponse,
   FieldValuesUpdateRequest,
@@ -84,6 +86,14 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async fetchStatus(listingId: number): Promise<ListingStatusResponse> {
     const response = await axiosInstance.post(`${listingBase}/${listingId}/fetch-status`);
+    return response.data.data;
+  }
+
+  async fetchMasterStatus(
+    masterId: number,
+    data: MasterApprovalRefreshRequest,
+  ): Promise<MasterApprovalRefreshResponse> {
+    const response = await axiosInstance.post(`${masterBase}/${masterId}/fetch-status`, data);
     return response.data.data;
   }
 
