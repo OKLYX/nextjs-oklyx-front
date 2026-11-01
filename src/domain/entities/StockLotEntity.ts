@@ -1,4 +1,4 @@
-import type { StockMovementType, StockReason } from './StockEntity';
+import type { StockBalance, StockMovementType, StockReason } from './StockEntity';
 
 /**
  * Lots, the daily in/out view and the seller debt screen (FEATURE_2610_19).
@@ -21,6 +21,8 @@ export interface StockDailyRow {
   reason: StockReason | null;
   productId: number;
   productName: string;
+  /** The product's representative photo as stored; null = none (FEATURE_2611_02 D8). */
+  imageUrl: string | null;
   /** Signed as stored. */
   quantity: number;
   /** Outbound = the order seller. null on an undecided intake row (its owners are in `owners`). */
@@ -61,6 +63,8 @@ export interface IntakeBarcode {
   productId: number | null;
   productName: string | null;
   price: number | null;
+  /** The found product's representative photo as stored; null = none or not found (FEATURE_2611_02 D15). */
+  imageUrl: string | null;
 }
 
 /** One seller pair of 「사업자 간 채무」 (D51 · D137). sellerA has the smaller id. */
@@ -102,4 +106,51 @@ export const UNDECIDED_SELLER_LABEL = '판매자 미정';
 /** ₩ amount with thousands separators, or 「미기입」 for null (D137 · D123). */
 export function formatWonOrUnknown(amount: number | null): string {
   return amount === null ? '미기입' : `₩${Math.round(amount).toLocaleString('ko-KR')}`;
+}
+
+/** One line of the 「재고 조회」 amount box (FEATURE_2611_02 D26 · D34). */
+export interface StockAmountLine {
+  /** `ALL_AMOUNT_KEY` = 「전체」 · `seller:{sellerId}` (`seller:null` = 「판매자 미정」). */
+  key: string;
+  label: string;
+  /** Σ `amount` of that line's rows; a row with a null amount is not added (D24 · D25). */
+  total: number;
+  /** Rows left out of `total` — 「미기입 N줄」 (D36 · D37). */
+  unknownCount: number;
+}
+
+/** The 「전체」 line of the amount box (D26). */
+export const ALL_AMOUNT_KEY = 'ALL';
+
+/** The amount-box key of a row's seller (D34). */
+export const sellerAmountKey = (balance: StockBalance) => `seller:${balance.sellerId}`;
+
+/** Whether a row belongs to an amount-box line — 「전체」 takes every row (D34 · D37). */
+export const inAmountLine = (balance: StockBalance, key: string) =>
+  key === ALL_AMOUNT_KEY || key === sellerAmountKey(balance);
+
+/**
+ * The amount box of the rows received (D26 · D34): 「전체」, then one line per seller in name order (the list's order —
+ * plain code-unit comparison, as the server sorts), 「판매자 미정」 last.
+ */
+export function stockAmountLines(balances: StockBalance[]): StockAmountLine[] {
+  const line = (key: string, label: string): StockAmountLine => {
+    const rows = balances.filter((balance) => inAmountLine(balance, key));
+    return {
+      key,
+      label,
+      total: rows.reduce((sum, balance) => sum + (balance.amount ?? 0), 0),
+      unknownCount: rows.filter((balance) => balance.amount === null).length,
+    };
+  };
+  const sellers = new Map<string, string | null>();
+  balances.forEach((balance) => sellers.set(sellerAmountKey(balance), balance.sellerName));
+  const ordered = [...sellers.entries()].sort(([, a], [, b]) => {
+    if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  return [
+    line(ALL_AMOUNT_KEY, '전체'),
+    ...ordered.map(([key, name]) => line(key, name ?? UNDECIDED_SELLER_LABEL)),
+  ];
 }

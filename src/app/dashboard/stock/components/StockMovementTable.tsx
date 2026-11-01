@@ -7,20 +7,23 @@ import {
   STOCK_REASON_LABELS,
 } from '@/domain/entities/StockEntity';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { StockProductThumb } from './StockProductThumb';
 
 /**
- * 재고 원장 이력 표 (FEATURE_2609_28).
+ * Stock ledger history table (FEATURE_2609_28).
  *
- * **용도**: 입고·조정 화면의 최근 이력과 재고 조회 화면의 행 펼침이 <b>같이 쓰는</b> 표.
- * **필수 규칙**: 이력을 그리는 화면이 생기면 이 컴포넌트를 쓴다 — 부호 색·라벨 규칙을 복제하지 않는다.
- * **파일**: src/app/dashboard/stock/components/StockMovementTable.tsx
+ * **Purpose**: the table <b>shared by</b> the recent history of 「입고·조정」 and the row expansion of 「재고 조회」.
+ * **Rule**: a screen that draws history uses this component — do not copy the sign colour or label rules.
+ * **File**: src/app/dashboard/stock/components/StockMovementTable.tsx
  *
- * **사용 예제**:
+ * **Usage**:
  * <StockMovementTable movements={movements} isLoading={isLoading} error={error} />
  * <StockMovementTable movements={movements} isLoading={false} error="" showSeller={false} />
  *
- * ⚠️ quantity 는 서버가 저장한 부호 그대로 그린다 — 화면에서 부호를 만들지 않는다(PLAN 2609_28 D6).
- * ⚠️ 처리자(createdBy)는 원장의 필수 정보다. 값이 없으면 '—' 로 비워 두되 열을 지우지 않는다(D9).
+ * ⚠️ quantity is drawn with the sign the server stored — the screen never builds a sign (PLAN 2609_28 D6).
+ * ⚠️ The handler (createdBy) is required ledger information. Without a value it shows '—', the column stays (D9).
+ * ⚠️ The 「상품」 cell and the card show the product photo left of the name (`StockProductThumb`, FEATURE_2611_02 D13 ·
+ *    D14 · D20) — in both places that use this table, with no switch.
  */
 interface StockMovementTableProps {
   movements: StockMovement[];
@@ -90,6 +93,11 @@ export function StockMovementTable({
               <span className="w-[46px] shrink-0 text-xs text-gray-500">
                 {movement.movedOn.length >= 10 ? movement.movedOn.slice(5, 10) : movement.movedOn}
               </span>
+              <StockProductThumb
+                imageUrl={movement.imageUrl}
+                productId={movement.productId}
+                alt={movement.productName}
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-medium text-gray-900">{movement.productName}</p>
                 <p className="line-clamp-2 text-[11px] text-gray-500">{detail}</p>
@@ -127,7 +135,16 @@ export function StockMovementTable({
           {movements.map((movement) => (
             <tr key={movement.id} className="hover:bg-gray-50">
               <td className="px-4 py-2 text-sm text-gray-700">{movement.movedOn}</td>
-              <td className="px-4 py-2 text-sm text-gray-700">{movement.productName}</td>
+              <td className="px-4 py-2 text-sm text-gray-700">
+                <div className="flex items-center gap-2">
+                  <StockProductThumb
+                    imageUrl={movement.imageUrl}
+                    productId={movement.productId}
+                    alt={movement.productName}
+                  />
+                  <span>{movement.productName}</span>
+                </div>
+              </td>
               {showSeller && (
                 <td className="px-4 py-2 text-sm text-gray-700">{movement.sellerName ?? UNDECIDED_SELLER_LABEL}</td>
               )}

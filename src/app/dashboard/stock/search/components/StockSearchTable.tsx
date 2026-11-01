@@ -2,8 +2,9 @@
 
 import { Fragment } from 'react';
 import type { StockBalance, StockMovement } from '@/domain/entities/StockEntity';
-import { UNDECIDED_SELLER_LABEL } from '@/domain/entities/StockLotEntity';
+import { UNDECIDED_SELLER_LABEL, formatWonOrUnknown } from '@/domain/entities/StockLotEntity';
 import { StockMovementTable } from '../../components/StockMovementTable';
+import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { DataCard } from '@/presentation/components/DataCard';
 
@@ -21,10 +22,12 @@ interface StockSearchTableProps {
 export const balanceKey = (balance: StockBalance) => `${balance.productId}:${balance.sellerId}`;
 
 /**
- * (물품 × 판매자) 잔량 표 (FEATURE_2609_28 / PLAN D14 · 2609_29 D5).
+ * On-hand table per (product × seller) (FEATURE_2609_28 / PLAN D14 · 2609_29 D5).
  *
- * 🔴 음수를 숨기거나 0 으로 그리지 않는다 — 원장이 사실이고 음수는 "입고 기록이 빠졌다"는 신호다.
- * ⚠️ 잔량은 서버 집계 결과 그대로다. 화면에서 다시 더하지 않는다.
+ * 🔴 Never hide a negative number or draw it as 0 — the ledger is the fact and a negative means "an intake is missing".
+ * ⚠️ On-hand is the server's aggregate as received. The screen never adds it up again.
+ * ⚠️ The amount box above (FEATURE_2611_02 D34) adds the rows' `amount` as received — that is a sum of the server's
+ *    amounts, not a recount of on-hand.
  */
 export function StockSearchTable({
   balances,
@@ -49,6 +52,11 @@ export function StockSearchTable({
             onClick={() => onToggle(balance)}
             body={
               <div className="flex items-center gap-2">
+                <StockProductThumb
+                  imageUrl={balance.imageUrl}
+                  productId={balance.productId}
+                  alt={balance.productName}
+                />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-base text-gray-900">
                     {isExpanded ? '▾' : '▸'} {balance.productName}
@@ -59,6 +67,7 @@ export function StockSearchTable({
                   <p className={`text-[15px] font-bold ${negative ? 'text-red-600' : 'text-gray-900'}`}>
                     {balance.onHand}
                   </p>
+                  <p className="text-[11px] text-gray-500">{formatWonOrUnknown(balance.amount)}</p>
                   {negative && <p className="text-[10px] text-red-600">입고 기록이 빠졌을 수 있습니다</p>}
                 </div>
               </div>
@@ -93,6 +102,7 @@ export function StockSearchTable({
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">상품</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">판매자</th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">잔량</th>
+            <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">매입가 금액</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -103,7 +113,16 @@ export function StockSearchTable({
               <Fragment key={key}>
                 <tr onClick={() => onToggle(balance)} className="hover:bg-gray-50 cursor-pointer">
                   <td className="px-6 py-3 text-sm text-gray-700">
-                    {isExpanded ? '▾' : '▸'} {balance.productName}
+                    <div className="flex items-center gap-2">
+                      <StockProductThumb
+                        imageUrl={balance.imageUrl}
+                        productId={balance.productId}
+                        alt={balance.productName}
+                      />
+                      <span>
+                        {isExpanded ? '▾' : '▸'} {balance.productName}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-700">{balance.sellerName ?? UNDECIDED_SELLER_LABEL}</td>
                   <td
@@ -114,10 +133,11 @@ export function StockSearchTable({
                   >
                     {balance.onHand}
                   </td>
+                  <td className="px-6 py-3 text-sm text-right text-gray-900">{formatWonOrUnknown(balance.amount)}</td>
                 </tr>
                 {isExpanded && (
                   <tr className="bg-gray-50">
-                    <td colSpan={3} className="px-6 py-3">
+                    <td colSpan={4} className="px-6 py-3">
                       <StockMovementTable
                         movements={movements}
                         isLoading={isHistoryLoading}
