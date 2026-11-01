@@ -36,6 +36,7 @@ export interface ShareActions {
 export const shareKey = (productId: number, sellerId: number) => `${productId}-${sellerId}`;
 
 const TAG_CLASS = 'ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 whitespace-nowrap';
+const UNREGISTERED_TAG_CLASS = 'ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 whitespace-nowrap';
 const STATE_CLASS = 'px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 whitespace-nowrap';
 const BUTTON_CLASS =
   'px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap';
@@ -46,6 +47,15 @@ const PRIMARY_BUTTON_CLASS =
 export function TargetMetTag({ share }: { share: PurchaseShare }) {
   if (!share.targetMet || (share.state !== 'OPEN' && share.state !== 'SKIPPED_TODAY')) return null;
   return <span className={TAG_CLASS}>목표 수량 매입 완료</span>;
+}
+
+/**
+ * 「영수증 미등록 N개」 (FEATURE_2610_19 D115 · D129): the product's intake-work purchases no receipt took yet — both
+ * tabs, whatever seller is chosen. Nothing when 0.
+ */
+export function UnregisteredTag({ qty }: { qty: number | undefined }) {
+  if (!qty || qty <= 0) return null;
+  return <span className={UNREGISTERED_TAG_CLASS}>영수증 미등록 {qty}개</span>;
 }
 
 /**

@@ -75,11 +75,12 @@ export function StockSearchContainer() {
     setIsHistoryLoading(true);
     setHistoryError('');
     try {
-      // 그 (물품 × 판매자) 조합의 이력. 기간은 서버 기본값(최근 30일)을 쓴다.
+      // The history of that (product × seller) pair, over the server's default period (the last 30 days).
+      // FEATURE_2610_19: the 「판매자 미정」 row (seller null) shows the product's rows of every seller.
       setMovements(
         await stockUseCase.getHistory({
           productId: balance.productId,
-          sellerId: balance.sellerId,
+          sellerId: balance.sellerId ?? undefined,
         })
       );
     } catch {

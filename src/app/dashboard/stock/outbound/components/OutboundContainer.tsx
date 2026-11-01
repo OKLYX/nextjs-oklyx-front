@@ -14,6 +14,7 @@ import { OutboundOrderCard } from './OutboundOrderCard';
 import { OutboundUnexpandedSection } from './OutboundUnexpandedSection';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
+import { toast } from '@/infrastructure/stores/toastStore';
 
 // 로컬 타임존 기준 오늘(YYYY-MM-DD). toISOString(UTC)은 KST에서 하루 어긋날 수 있어 직접 조립.
 const today = () => {
@@ -90,11 +91,13 @@ export function OutboundContainer() {
     setErrorKey(null);
     setConfirmError('');
     try {
-      await stockUseCase.confirmOutbound({
+      const saved = await stockUseCase.confirmOutbound({
         orderLineId,
         lines: [{ productId, quantity }],
         movedOn: today(),
       });
+      // FEATURE_2610_19 D49 · D137: one toast per borrowed-goods line.
+      saved.flatMap((movement) => movement.notices ?? []).forEach((notice) => toast.success(notice));
       // 그 줄의 확인 수치만 올린다. 전량 확인된 주문은 목록에서 빠진다(서버 규칙과 같다).
       setOrders((prev) =>
         prev

@@ -131,6 +131,8 @@ export interface PackingCompleteResult {
   parcelId: number;
   status: ParcelStatus;
   packedQty: number;
+  /** 「○○ 재고 N개 사용(채무 ₩M)」 lines (FEATURE_2610_19 D49 · D137). */
+  notices: string[];
   expectedBoxCost: number | null;
   actualBoxCost: number | null;
   expectedDeliveryCost: number | null;
