@@ -1,7 +1,12 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { StockLotRepository } from '@/domain/repositories/StockLotRepository';
 import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
-import type { IntakeRequest, SettlementRequest } from '@/application/dto/StockLotDTOs';
+import type {
+  IntakeRequest,
+  ReceiptlessAssignRequest,
+  SellerChangeRequest,
+  SettlementRequest,
+} from '@/application/dto/StockLotDTOs';
 import type { CreateReceiptRequest } from '@/application/dto/PurchaseReceiptDTOs';
 
 export class StockLotRepositoryImpl implements StockLotRepository {
@@ -28,6 +33,14 @@ export class StockLotRepositoryImpl implements StockLotRepository {
       params: { movedOn },
       headers: { 'Content-Type': undefined },
     });
+  }
+
+  async assignWithoutReceipt(movedOn: string, request: ReceiptlessAssignRequest): Promise<void> {
+    await axiosInstance.post('/api/admin/purchase-receipts/assign-without-receipt', request, { params: { movedOn } });
+  }
+
+  async changeSeller(request: SellerChangeRequest): Promise<void> {
+    await axiosInstance.post('/api/admin/stock/daily/change-seller', request);
   }
 
   async debtPairs(): Promise<SellerDebtPair[]> {

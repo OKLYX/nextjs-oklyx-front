@@ -480,6 +480,8 @@ export function PurchaseGroupDetail({
                   <li key={record.id} className="text-xs text-gray-600 flex flex-wrap gap-3">
                     <span>{record.purchasedOn.slice(5)}</span>
                     <span className="text-gray-800">{record.sellerName}</span>
+                    {/* FEATURE_2611_01 D12: assigned with 「영수증 없음」. */}
+                    {record.foundStock && <span className="text-amber-700">발견 재고</span>}
                     <span className={record.quantity < 0 ? 'text-red-600' : 'text-gray-800'}>
                       {record.quantity > 0 ? `+${record.quantity}` : record.quantity}
                     </span>
