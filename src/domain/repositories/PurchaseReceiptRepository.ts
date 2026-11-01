@@ -6,10 +6,12 @@ import type {
 } from '@/application/dto/PurchaseReceiptDTOs';
 
 // Receipt check-in = photo + JSON in one multipart request (FEATURE_2610_18 D76). Returns the new receipt id.
-// update = the header edit (D100); it returns the receipt as saved.
+// update = the header edit (D100); it returns the receipt as saved. attachPhoto = the photo of a 「영수증 나중에」 receipt
+// (FEATURE_2611_01 D4); it returns the receipt as saved.
 export interface PurchaseReceiptRepository {
   create(photo: File, request: CreateReceiptRequest): Promise<number>;
   search(params: ReceiptListParams): Promise<ReceiptSummary[]>;
   get(receiptId: number): Promise<ReceiptDetail>;
   update(receiptId: number, request: UpdateReceiptRequest): Promise<ReceiptDetail>;
+  attachPhoto(receiptId: number, photo: File): Promise<ReceiptDetail>;
 }

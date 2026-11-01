@@ -9,6 +9,10 @@ import { StockLotRepositoryImpl } from '@/infrastructure/repositories/StockLotRe
 import { CreateProductUseCase } from '@/application/usecases/CreateProductUseCase';
 import { UpdateProductUseCase } from '@/application/usecases/UpdateProductUseCase';
 import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
+import { SellerUseCase } from '@/application/usecases/SellerUseCase';
+import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
+import type { Seller } from '@/domain/entities/SellerEntity';
+import type { IntakeReason } from '@/application/dto/StockLotDTOs';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ScanInput } from '../../packing/components/ScanInput';
@@ -18,19 +22,31 @@ import { ScanInput } from '../../packing/components/ScanInput';
  *
  * - The barcode is read like the packing console: page-wide keys (scanner or keyboard), Enter confirms, no input box
  *   of its own (D117 ② · `ScanInput`).
- * - A found product goes into the list with 1; the same barcode again adds 1. The quantity can be changed or the
- *   line removed (D117 ③).
+ * - 「판매자」 (「미정」 + sellers) and 「사유」 (「매입」 · 「기초재고」) sit next to the day (FEATURE_2611_01 D1 · D16). A found
+ *   product goes into the list with 1 and those two values; the same barcode again adds 1 to the top line of that
+ *   product with the same seller and reason, else a new line (D17 · D23). The quantity can be changed or the line
+ *   removed (D117 ③).
+ * - Each line may take its own seller and reason — that line is then 「따로 정함」 and no longer follows the screen
+ *   values; every other line follows them when they change (D18 · D21). 「미정」 + 「기초재고」 cannot be picked, on the
+ *   screen or on a line (D22). One seller = that seller, fixed, only the reason is picked (D20).
  * - Not found: 「등록 안 된 바코드」 + a product search — save this barcode (and the name / registered price) on the
  *   picked product, or [새 상품으로 등록] with this barcode (D117 ④). A barcode another product owns is refused with
  *   that product's name (D117 ⑤ — the server message).
- * - [입고 저장] saves every line at once: the day (today, changeable), seller undecided, amount from the registered
- *   price (D117 ⑥ · D135).
+ * - [입고 저장] saves every line at once: the day (today, changeable), each line's seller and reason, amount from the
+ *   registered price (D117 ⑥ · D135). An 「기초재고」 line without a seller stops the whole save (D19).
  */
 
 interface CartLine {
+  /** Line key — the same product can sit on several lines (FEATURE_2611_01 D17). */
+  key: number;
   productId: number;
   productName: string;
   quantity: string;
+  /** '' = 「미정」. */
+  sellerId: string;
+  reason: IntakeReason;
+  /** 「따로 정함」 — set on the line itself, no longer follows the screen values (D21). */
+  custom: boolean;
 }
 
 // Local calendar day (YYYY-MM-DD) — toISOString (UTC) can be a day off in KST.
@@ -44,10 +60,14 @@ const today = () => {
 const INPUT_CLASS =
   'px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500';
 
+/** 「미정」 + 「기초재고」 is never a pair (FEATURE_2611_01 D22) — the option label tells what to pick first. */
+const OPENING_NEEDS_SELLER = '기초재고 (먼저 판매자를 고르세요)';
+
 export function IntakeContainer() {
   const lotUseCase = useMemo(() => new StockLotUseCase(new StockLotRepositoryImpl()), []);
   const createUseCase = useMemo(() => new CreateProductUseCase(new ProductRepositoryImpl()), []);
   const updateUseCase = useMemo(() => new UpdateProductUseCase(new ProductRepositoryImpl()), []);
+  const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
 
   const [buffer, setBuffer] = useState('');
   const [isScanning, setIsScanning] = useState(false);
@@ -61,18 +81,57 @@ export function IntakeContainer() {
   const [newPrice, setNewPrice] = useState('');
   const [message, setMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [screenSellerId, setScreenSellerId] = useState('');
+  const [screenReason, setScreenReason] = useState<IntakeReason>('PURCHASE');
+  const nextKey = useRef(1);
 
-  const addToCart = useCallback((productId: number, productName: string) => {
-    setCart((prev) => {
-      const found = prev.find((line) => line.productId === productId);
-      if (found) {
-        return prev.map((line) =>
-          line.productId === productId ? { ...line, quantity: String(Number(line.quantity || '0') + 1) } : line
+  // D20: one seller = that seller, fixed (no 「미정」) — also for a line scanned before the seller list arrived.
+  const soleSeller = sellers.length === 1 ? sellers[0] : null;
+  const lineSeller = (line: CartLine) => (soleSeller ? String(soleSeller.id) : line.sellerId);
+
+  useEffect(() => {
+    void sellerUseCase
+      .getAll()
+      .then((list) => {
+        setSellers(list);
+        if (list.length === 1) setScreenSellerId(String(list[0].id));
+      })
+      .catch(() => setSellers([]));
+  }, [sellerUseCase]);
+
+  // D17 · D23: +1 on the top line of that product with the screen seller and reason, else a new line with them.
+  const addToCart = useCallback(
+    (productId: number, productName: string) => {
+      setCart((prev) => {
+        const found = prev.find(
+          (line) => line.productId === productId && line.sellerId === screenSellerId && line.reason === screenReason
         );
-      }
-      return [...prev, { productId, productName, quantity: '1' }];
-    });
-  }, []);
+        if (found) {
+          return prev.map((line) =>
+            line.key === found.key ? { ...line, quantity: String(Number(line.quantity || '0') + 1) } : line
+          );
+        }
+        const key = nextKey.current++;
+        return [
+          ...prev,
+          { key, productId, productName, quantity: '1', sellerId: screenSellerId, reason: screenReason, custom: false },
+        ];
+      });
+    },
+    [screenSellerId, screenReason]
+  );
+
+  // D18: the lines not set on their own follow the screen values.
+  const changeScreen = (sellerId: string, reason: IntakeReason) => {
+    setScreenSellerId(sellerId);
+    setScreenReason(reason);
+    setCart((prev) => prev.map((line) => (line.custom ? line : { ...line, sellerId, reason })));
+  };
+
+  // D21: a line changed on its own stops following the screen values.
+  const changeLine = (key: number, patch: Partial<Pick<CartLine, 'sellerId' | 'reason'>>) =>
+    setCart((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch, custom: true } : line)));
 
   const lookup = useCallback(
     async (code: string) => {
@@ -179,12 +238,25 @@ export function IntakeContainer() {
       setMessage('수량은 1 이상 정수만 입력할 수 있습니다.');
       return;
     }
+    // D19: the last safety net — the selects already keep 「미정」 + 「기초재고」 apart (D22).
+    const openingWithoutSeller = cart.filter((line) => line.reason === 'OPENING' && lineSeller(line) === '');
+    if (openingWithoutSeller.length > 0) {
+      setMessage(
+        `기초재고는 판매자를 골라야 합니다: ${openingWithoutSeller.map((line) => line.productName).join(', ')}`
+      );
+      return;
+    }
     setIsSaving(true);
     setMessage('');
     try {
       await lotUseCase.intake({
         movedOn,
-        lines: cart.map((line) => ({ productId: line.productId, quantity: Number(line.quantity) })),
+        lines: cart.map((line) => ({
+          productId: line.productId,
+          quantity: Number(line.quantity),
+          ...(lineSeller(line) !== '' ? { sellerId: Number(lineSeller(line)) } : {}),
+          reason: line.reason,
+        })),
       });
       toast.success('입고를 저장했습니다.');
       setCart([]);
@@ -264,6 +336,8 @@ export function IntakeContainer() {
           <thead>
             <tr className="text-left text-gray-500">
               <th className="py-2">상품</th>
+              <th className="py-2 w-40">판매자</th>
+              <th className="py-2 w-56">사유</th>
               <th className="py-2 w-32">수량</th>
               <th className="py-2 w-20" />
             </tr>
@@ -271,23 +345,56 @@ export function IntakeContainer() {
           <tbody className="divide-y divide-gray-200">
             {cart.length === 0 && (
               <tr>
-                <td colSpan={3} className="py-6 text-center text-gray-500">
+                <td colSpan={5} className="py-6 text-center text-gray-500">
                   바코드를 스캔하면 여기에 담깁니다.
                 </td>
               </tr>
             )}
             {cart.map((line) => (
-              <tr key={line.productId}>
-                <td className="py-2 text-gray-900">{line.productName}</td>
+              <tr key={line.key}>
+                <td className="py-2 text-gray-900">
+                  {line.productName}
+                  {line.custom && <span className="ml-2 text-xs text-amber-700">따로 정함</span>}
+                </td>
+                <td className="py-2">
+                  {soleSeller ? (
+                    <span className="text-gray-700">{soleSeller.sellerName}</span>
+                  ) : (
+                    <select
+                      value={line.sellerId}
+                      onChange={(e) => changeLine(line.key, { sellerId: e.target.value })}
+                      className={INPUT_CLASS}
+                    >
+                      <option value="" disabled={line.reason === 'OPENING'}>
+                        미정
+                      </option>
+                      {sellers.map((seller) => (
+                        <option key={seller.id} value={seller.id}>
+                          {seller.sellerName}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </td>
+                <td className="py-2">
+                  <select
+                    value={line.reason}
+                    onChange={(e) => changeLine(line.key, { reason: e.target.value as IntakeReason })}
+                    className={INPUT_CLASS}
+                  >
+                    <option value="PURCHASE">매입</option>
+                    <option value="OPENING" disabled={lineSeller(line) === ''}>
+                      {lineSeller(line) === '' ? OPENING_NEEDS_SELLER : '기초재고'}
+                    </option>
+                  </select>
+                </td>
                 <td className="py-2">
                   <input
                     type="number"
                     min={1}
                     value={line.quantity}
                     onChange={(e) =>
-                      setCart((prev) =>
-                        prev.map((l) => (l.productId === line.productId ? { ...l, quantity: e.target.value } : l))
-                      )
+                      setCart((prev) => prev.map((l) => (l.key === line.key ? { ...l, quantity: e.target.value } : l)))
                     }
                     className={`${INPUT_CLASS} w-24`}
                   />
@@ -296,7 +403,7 @@ export function IntakeContainer() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() => setCart((prev) => prev.filter((l) => l.productId !== line.productId))}
+                    onClick={() => setCart((prev) => prev.filter((l) => l.key !== line.key))}
                   >
                     빼기
                   </Button>
@@ -309,6 +416,40 @@ export function IntakeContainer() {
           <div>
             <label className="block text-xs text-gray-500 mb-1">입고일</label>
             <input type="date" value={movedOn} onChange={(e) => setMovedOn(e.target.value)} className={INPUT_CLASS} />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">판매자</label>
+            {soleSeller ? (
+              <p className="py-1 text-sm text-gray-700">{soleSeller.sellerName}</p>
+            ) : (
+              <select
+                value={screenSellerId}
+                onChange={(e) => changeScreen(e.target.value, screenReason)}
+                className={INPUT_CLASS}
+              >
+                <option value="" disabled={screenReason === 'OPENING'}>
+                  미정
+                </option>
+                {sellers.map((seller) => (
+                  <option key={seller.id} value={seller.id}>
+                    {seller.sellerName}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">사유</label>
+            <select
+              value={screenReason}
+              onChange={(e) => changeScreen(screenSellerId, e.target.value as IntakeReason)}
+              className={INPUT_CLASS}
+            >
+              <option value="PURCHASE">매입</option>
+              <option value="OPENING" disabled={screenSellerId === ''}>
+                {screenSellerId === '' ? OPENING_NEEDS_SELLER : '기초재고'}
+              </option>
+            </select>
           </div>
           <Button onClick={() => void save()} disabled={cart.length === 0} isLoading={isSaving} loadingText="저장 중...">
             입고 저장

@@ -20,8 +20,9 @@ import { Modal } from '@/presentation/components/ui/Modal';
  * **File**: src/app/dashboard/purchase/receipts/components/ReceiptEditModal.tsx
  * - Fields = 「결제 카드」 (visible cards + the receipt's own hidden card + 「카드로 알 수 없음」) · 「결제 판매자」 (only for
  *   「카드로 알 수 없음」) · 「구매일」. A card decides the payer seller (D54 · D87). One seller → only 「구매일」 (D53).
- * - The photo and the product lines are not editable (D100). The server moves every line — and the stock rows tied to
- *   them — to the new payer seller (D100 · D101).
+ * - The product lines are not editable (D100). A photo is never replaced — only a receipt without one (「영수증 나중에」,
+ *   FEATURE_2611_01 D4) shows 「영수증 사진」; [저장] sends the photo first, then the header. The server moves every line
+ *   — and the stock rows tied to them — to the new payer seller (D100 · D101).
  *
  * ⚠️ `detail` null = closed. Every opening starts from `detail` and loads the cards again.
  */
@@ -63,6 +64,7 @@ function ReceiptEditForm({
   const [cardChoice, setCardChoice] = useState(detail.cardId != null ? String(detail.cardId) : UNKNOWN_CARD);
   const [payerSellerId, setPayerSellerId] = useState(String(detail.payerSellerId));
   const [purchasedOn, setPurchasedOn] = useState(detail.purchasedOn);
+  const [photo, setPhoto] = useState<File | null>(null);
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -112,6 +114,8 @@ function ReceiptEditForm({
     }
     setIsSubmitting(true);
     try {
+      // FEATURE_2611_01 D4: the photo of a 「영수증 나중에」 receipt goes first, then the header (a card may move the seller).
+      if (photo) await receiptUseCase.attachPhoto(detail.id, photo);
       const updated = await receiptUseCase.update(detail.id, { purchasedOn, ...payer });
       toast.success('영수증을 수정했습니다.');
       await onSaved(updated);
@@ -143,6 +147,19 @@ function ReceiptEditForm({
       <form id={FORM_ID} onSubmit={submit} className="space-y-4">
         {submitError && (
           <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>
+        )}
+
+        {detail.photoUrl == null && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">영수증 사진</label>
+            <input
+              type="file"
+              accept="image/jpeg,image/png"
+              disabled={isSubmitting}
+              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-gray-700"
+            />
+          </div>
         )}
 
         {!soleSeller && (

@@ -34,6 +34,17 @@ export interface StockDailyRow {
   tags: string[];
   /** Purchase-price amount; null = 「미기입」. */
   amount: number | null;
+  /** A decided incoming row without a receipt — a 「판매자 바꾸기」 target (FEATURE_2611_01 D15). */
+  sellerChangeable: boolean;
+  /** Undecided intake only: its 「영수증 없음」 shares, each a 「판매자 바꾸기」 target (D15). */
+  noReceiptShares: NoReceiptShare[];
+}
+
+/** One 「영수증 없음」 share of an undecided intake row (FEATURE_2611_01 D15). */
+export interface NoReceiptShare {
+  recordId: number;
+  sellerName: string;
+  quantity: number;
 }
 
 export interface StockDaily {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Button } from '@/presentation/components/ui/Button';
 import { TableCard } from '@/presentation/components/ui/TableCard';
@@ -18,6 +18,7 @@ import {
 } from '@/domain/entities/StockLotEntity';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ReceiptAssignModal } from './ReceiptAssignModal';
+import { SellerChangeModal } from './SellerChangeModal';
 
 /**
  * 「재고관리 > 일별 입출고 내역」 (FEATURE_2610_19 D119 · D122 · D123 · D124 · D128 · D130 · D147).
@@ -26,8 +27,19 @@ import { ReceiptAssignModal } from './ReceiptAssignModal';
  *   (null = 「미기입」). No selling price, no totals (D122 · D123 ③).
  * - Undecided intake rows show their owners 「○○ 4」 and 「영수증 미등록 N개 남음」 (D130 · D121 ⑤); outbound rows show
  *   the order seller and 「{seller} 재고 사용」 · 「영수증 미등록 재고 사용」 (D124 · D128).
- * - The top line 「영수증 미등록 N건」 (D147) with [영수증 올리기] opens the assignment popup for that day (D118 · D121).
+ * - The top line 「영수증 미등록 N건」 (D147) with [영수증 올리기] opens the assignment popup for that day (D118 · D121);
+ *   [영수증 없이 판매자 정하기] next to it opens the same popup without a photo (FEATURE_2611_01 D2 · D4).
+ * - One check column for three buttons (FEATURE_2611_01 D14): an undecided row with a quantity left, a decided incoming
+ *   row without a receipt and each 「영수증 없음」 share (a line under its undecided row) can be checked. Only undecided
+ *   rows checked → the two receipt buttons open with those products at their remaining quantity · only the others
+ *   checked → [판매자 바꾸기] (D7 · D15) · both kinds → every button is off · nothing checked → the receipt buttons
+ *   open with every product of the day at 0, [판매자 바꾸기] is off.
  */
+
+type AssignMode = 'RECEIPT' | 'WITHOUT_RECEIPT';
+
+const rowKey = (row: StockDailyRow) => `row-${row.movementId}`;
+const shareKey = (recordId: number) => `share-${recordId}`;
 
 // Local calendar day (YYYY-MM-DD) — toISOString (UTC) can be a day off in KST.
 const today = () => {
@@ -61,12 +73,15 @@ export function DailyContainer() {
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [assignMode, setAssignMode] = useState<AssignMode | null>(null);
+  const [isChangeOpen, setIsChangeOpen] = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
 
   const load = useCallback(
     async (day: string) => {
       setIsLoading(true);
       setError('');
+      setChecked(new Set());
       try {
         setDaily(await lotUseCase.daily(day));
       } catch (err) {
@@ -94,6 +109,46 @@ export function DailyContainer() {
 
   const rows = daily?.rows ?? [];
 
+  // D14: the popup gets the checked products only (every product when nothing is checked). Memoized — the popup
+  // resets its fields whenever this array changes.
+  const assignProducts = useMemo(() => {
+    const all = daily?.unregistered ?? [];
+    if (checked.size === 0) return all;
+    const picked = (daily?.rows ?? []).filter((row) => checked.has(rowKey(row)) && (row.undecidedLeft ?? 0) > 0);
+    return all.filter((p) => picked.some((row) => row.productId === p.productId));
+  }, [daily, checked]);
+
+  const toggle = (key: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  // D14: the checked rows and shares, split by kind.
+  const checkedRows = rows.filter((row) => checked.has(rowKey(row)));
+  const checkedShares = rows.flatMap((row) =>
+    row.noReceiptShares.filter((share) => checked.has(shareKey(share.recordId))).map((share) => ({ row, share }))
+  );
+  const checkedCount = checkedRows.length + checkedShares.length;
+  const undecidedChecked = checkedRows.filter((row) => (row.undecidedLeft ?? 0) > 0);
+  const changeRowsChecked = checkedRows.filter((row) => row.sellerChangeable);
+  const canAssign = checkedCount === 0 || undecidedChecked.length === checkedCount;
+  const canChange = checkedCount > 0 && changeRowsChecked.length + checkedShares.length === checkedCount;
+  const changeLabels = [
+    ...changeRowsChecked.map(
+      (row) => `${row.productName} ${row.quantity}개 · ${row.sellerName ?? UNDECIDED_SELLER_LABEL}`
+    ),
+    ...checkedShares.map(({ row, share }) => `${row.productName} ${share.quantity}개 · ${share.sellerName} (영수증 없음)`),
+  ];
+
+  const afterSave = async () => {
+    setAssignMode(null);
+    setIsChangeOpen(false);
+    await load(date);
+  };
+
   return (
     <PageContainer title="일별 입출고 내역">
       <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-end gap-3">
@@ -106,20 +161,31 @@ export function DailyContainer() {
             className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
-        {daily && daily.unregisteredProductCount > 0 && (
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-sm font-medium text-amber-800">영수증 미등록 {daily.unregisteredProductCount}건</span>
-            <Button size="sm" onClick={() => setIsAssignOpen(true)}>
-              영수증 올리기
-            </Button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          {daily && daily.unregisteredProductCount > 0 && (
+            <>
+              <span className="text-sm font-medium text-amber-800">
+                영수증 미등록 {daily.unregisteredProductCount}건
+              </span>
+              <Button size="sm" disabled={!canAssign} onClick={() => setAssignMode('RECEIPT')}>
+                영수증 올리기
+              </Button>
+              <Button size="sm" variant="secondary" disabled={!canAssign} onClick={() => setAssignMode('WITHOUT_RECEIPT')}>
+                영수증 없이 판매자 정하기
+              </Button>
+            </>
+          )}
+          <Button size="sm" variant="secondary" disabled={!canChange} onClick={() => setIsChangeOpen(true)}>
+            판매자 바꾸기
+          </Button>
+        </div>
       </div>
 
       <TableCard isLoading={isLoading} error={error} isEmpty={rows.length === 0} emptyMessage="그날 입출고가 없습니다.">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
             <tr className="text-left text-gray-500">
+              <th className="px-4 py-2 w-10" />
               <th className="px-4 py-2">구분</th>
               <th className="px-4 py-2">상품</th>
               <th className="px-4 py-2 text-right">개수</th>
@@ -131,30 +197,66 @@ export function DailyContainer() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {rows.map((row) => (
-              <tr key={row.movementId}>
-                <td className="px-4 py-2 text-gray-700">{kindLabel(row)}</td>
-                <td className="px-4 py-2 text-gray-900">{row.productName}</td>
-                <td className="px-4 py-2 text-right text-gray-900">{row.quantity}</td>
-                <td className="px-4 py-2 text-gray-700">{sellerCell(row)}</td>
-                <td className="px-4 py-2 text-gray-700">{row.orderNumber ?? '-'}</td>
-                <td className="px-4 py-2 text-amber-800">{row.tags.join(' · ')}</td>
-                <td className="px-4 py-2 text-right text-gray-900">{formatWonOrUnknown(row.amount)}</td>
-              </tr>
+              <Fragment key={row.movementId}>
+                <tr>
+                  <td className="px-4 py-2">
+                    {((row.undecidedLeft ?? 0) > 0 || row.sellerChangeable) && (
+                      <input
+                        type="checkbox"
+                        checked={checked.has(rowKey(row))}
+                        onChange={() => toggle(rowKey(row))}
+                        className="h-4 w-4 accent-blue-600"
+                      />
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-gray-700">{kindLabel(row)}</td>
+                  <td className="px-4 py-2 text-gray-900">{row.productName}</td>
+                  <td className="px-4 py-2 text-right text-gray-900">{row.quantity}</td>
+                  <td className="px-4 py-2 text-gray-700">{sellerCell(row)}</td>
+                  <td className="px-4 py-2 text-gray-700">{row.orderNumber ?? '-'}</td>
+                  <td className="px-4 py-2 text-amber-800">{row.tags.join(' · ')}</td>
+                  <td className="px-4 py-2 text-right text-gray-900">{formatWonOrUnknown(row.amount)}</td>
+                </tr>
+                {row.noReceiptShares.map((share) => (
+                  <tr key={shareKey(share.recordId)} className="bg-gray-50">
+                    <td className="px-4 py-2">
+                      <input
+                        type="checkbox"
+                        checked={checked.has(shareKey(share.recordId))}
+                        onChange={() => toggle(shareKey(share.recordId))}
+                        className="h-4 w-4 accent-blue-600"
+                      />
+                    </td>
+                    <td colSpan={7} className="px-4 py-2 text-gray-700">
+                      └ {share.sellerName} {share.quantity}개 · 영수증 없음
+                    </td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
         </table>
       </TableCard>
 
       <ReceiptAssignModal
-        isOpen={isAssignOpen}
+        isOpen={assignMode !== null}
+        mode={assignMode ?? 'RECEIPT'}
+        prefillRemaining={checkedCount > 0}
         date={date}
-        products={daily?.unregistered ?? []}
+        products={assignProducts}
         sellers={sellers}
-        onClose={() => setIsAssignOpen(false)}
-        onSaved={async () => {
-          setIsAssignOpen(false);
-          await load(date);
-        }}
+        onClose={() => setAssignMode(null)}
+        onSaved={afterSave}
+      />
+
+      <SellerChangeModal
+        isOpen={isChangeOpen}
+        movementIds={changeRowsChecked.map((row) => row.movementId)}
+        shareRecordIds={checkedShares.map(({ share }) => share.recordId)}
+        labels={changeLabels}
+        sellers={sellers}
+        onClose={() => setIsChangeOpen(false)}
+        onSaved={afterSave}
       />
     </PageContainer>
   );

@@ -1,6 +1,8 @@
 import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
 import type {
   IntakeRequest,
+  ReceiptlessAssignRequest,
+  SellerChangeRequest,
   SettlementRequest,
 } from '@/application/dto/StockLotDTOs';
 import type { CreateReceiptRequest } from '@/application/dto/PurchaseReceiptDTOs';
@@ -12,6 +14,10 @@ export interface StockLotRepository {
   intake(request: IntakeRequest): Promise<void>;
   /** Receipt assignment of the day on the screen (D118 · D121). */
   assign(movedOn: string, photo: File, request: CreateReceiptRequest): Promise<void>;
+  /** 「영수증 없이 판매자 정하기」 of the day on the screen (FEATURE_2611_01 D2 · D4). */
+  assignWithoutReceipt(movedOn: string, request: ReceiptlessAssignRequest): Promise<void>;
+  /** 「판매자 바꾸기」 (FEATURE_2611_01 D7 · D15). */
+  changeSeller(request: SellerChangeRequest): Promise<void>;
   debtPairs(): Promise<SellerDebtPair[]>;
   debtEntries(sellerAId: number, sellerBId: number): Promise<SellerDebtEntry[]>;
   settle(request: SettlementRequest): Promise<void>;

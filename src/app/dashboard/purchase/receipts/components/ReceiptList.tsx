@@ -183,7 +183,15 @@ export function ReceiptList() {
               key={row.id}
               onClick={() => setOpenReceiptId(row.id)}
               fields={[
-                { label: '날짜', value: row.purchasedOn },
+                {
+                  label: '날짜',
+                  value: (
+                    <span>
+                      {row.purchasedOn}
+                      {!row.hasPhoto && <span className="ml-2 text-xs text-amber-700">사진 없음</span>}
+                    </span>
+                  ),
+                },
                 ...(soleSeller
                   ? []
                   : [
@@ -224,7 +232,11 @@ export function ReceiptList() {
                 onClick={() => setOpenReceiptId(row.id)}
                 className="hover:bg-gray-100 cursor-pointer transition-colors"
               >
-                <td className="px-4 py-3 text-sm text-gray-700">{row.purchasedOn}</td>
+                <td className="px-4 py-3 text-sm text-gray-700">
+                  {row.purchasedOn}
+                  {/* FEATURE_2611_01 D4: a 「영수증 나중에」 receipt has no photo yet. */}
+                  {!row.hasPhoto && <span className="ml-2 text-xs text-amber-700">사진 없음</span>}
+                </td>
                 {!soleSeller && <td className="px-4 py-3 text-sm text-gray-700">{row.payerSellerName}</td>}
                 {!soleSeller && <td className="px-4 py-3 text-sm text-gray-700">{row.cardAlias ?? '카드 없음'}</td>}
                 <td className="px-4 py-3 text-sm text-gray-700">{productSummary(row)}</td>

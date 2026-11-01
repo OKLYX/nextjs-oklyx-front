@@ -1,9 +1,17 @@
 import type { StockLotRepository } from '@/domain/repositories/StockLotRepository';
 import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
-import type { IntakeRequest, SettlementRequest } from '@/application/dto/StockLotDTOs';
+import type {
+  IntakeRequest,
+  ReceiptlessAssignRequest,
+  SellerChangeRequest,
+  SettlementRequest,
+} from '@/application/dto/StockLotDTOs';
 import type { CreateReceiptRequest } from '@/application/dto/PurchaseReceiptDTOs';
 
-/** Intake work, daily in/out and seller debts (FEATURE_2610_19). Thin delegation to the repository. */
+/**
+ * Intake work, daily in/out and seller debts (FEATURE_2610_19) + the seller without a receipt (FEATURE_2611_01). Thin
+ * delegation to the repository.
+ */
 export class StockLotUseCase {
   constructor(private repository: StockLotRepository) {}
 
@@ -21,6 +29,14 @@ export class StockLotUseCase {
 
   assign(movedOn: string, photo: File, request: CreateReceiptRequest): Promise<void> {
     return this.repository.assign(movedOn, photo, request);
+  }
+
+  assignWithoutReceipt(movedOn: string, request: ReceiptlessAssignRequest): Promise<void> {
+    return this.repository.assignWithoutReceipt(movedOn, request);
+  }
+
+  changeSeller(request: SellerChangeRequest): Promise<void> {
+    return this.repository.changeSeller(request);
   }
 
   debtPairs(): Promise<SellerDebtPair[]> {
