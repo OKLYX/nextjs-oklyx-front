@@ -19,6 +19,7 @@ import {
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ReceiptAssignModal } from './ReceiptAssignModal';
 import { SellerChangeModal } from './SellerChangeModal';
+import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
 
 /**
  * 「재고관리 > 일별 입출고 내역」 (FEATURE_2610_19 D119 · D122 · D123 · D124 · D128 · D130 · D147).
@@ -228,7 +229,12 @@ export function DailyContainer() {
                     )}
                   </td>
                   <td className="px-4 py-2 text-gray-700">{kindLabel(row)}</td>
-                  <td className="px-4 py-2 text-gray-900">{row.productName}</td>
+                  <td className="px-4 py-2 text-gray-900">
+                    <div className="flex items-center gap-2">
+                      <StockProductThumb imageUrl={row.imageUrl} productId={row.productId} alt={row.productName} />
+                      <span>{row.productName}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-2 text-right text-gray-900">{row.quantity}</td>
                   <td className="px-4 py-2 text-gray-700">{sellerCell(row)}</td>
                   <td className="px-4 py-2 text-gray-700">{row.orderNumber ?? '-'}</td>

@@ -86,6 +86,8 @@ export interface StockMovement {
   id: number;
   productId: number;
   productName: string;
+  /** The product's representative photo as stored; null = none (FEATURE_2611_02 D8). */
+  imageUrl: string | null;
   sellerId: number | null;
   sellerName: string | null;
   movementType: StockMovementType;
@@ -104,14 +106,19 @@ export interface StockMovement {
 /**
  * On-hand per (product × seller) — the server's aggregate.
  * ⚠️ onHand can be negative. Never hide it or draw it as 0 (PLAN 04 Step 6) — a negative number is a signal.
- * A null seller is the 「판매자 미정」 row (FEATURE_2610_19 D116 ②).
+ * A null seller is the 「판매자 미정」 row (FEATURE_2610_19 D116 ②); the server leaves it out at 0 once everything went
+ * to sellers (FEATURE_2611_02 D1).
  */
 export interface StockBalance {
   productId: number;
   productName: string;
+  /** The product's representative photo as stored; null = none (FEATURE_2611_02 D8). */
+  imageUrl: string | null;
   sellerId: number | null;
   sellerName: string | null;
   onHand: number;
+  /** Purchase-price value of what is on hand; null = 「미기입」 (FEATURE_2611_02 D24 · D25 · D28). */
+  amount: number | null;
 }
 
 /** 출고 대상 주문 라인이 소진하는 물품 1건. remainingQty = requiredQty − confirmedQty. */
@@ -120,6 +127,8 @@ export interface OutboundProductLine {
   productName: string;
   requiredQty: number;
   confirmedQty: number;
+  /** The product's representative photo as stored; null = none (FEATURE_2611_02 D8). */
+  imageUrl: string | null;
 }
 
 /** 출고 확인 화면의 주문 라인 1건 (D11). 오래된 주문이 위에 온다. */

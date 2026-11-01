@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { OutboundOrder } from '@/domain/entities/StockEntity';
 import { getOrderStatusLabel } from '@/domain/entities/OrderEntity';
+import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
 
 interface OutboundOrderCardProps {
   order: OutboundOrder;
@@ -52,6 +53,11 @@ export function OutboundOrderCard({
           return (
             <div key={product.productId} className="py-2 space-y-1">
               <div className="flex flex-wrap items-center gap-3 text-sm">
+                <StockProductThumb
+                  imageUrl={product.imageUrl}
+                  productId={product.productId}
+                  alt={product.productName}
+                />
                 <span className="min-w-40 text-gray-800">{product.productName}</span>
                 <span className="text-gray-600">필요 {product.requiredQty}</span>
                 <span className="text-gray-600">확인 {product.confirmedQty}</span>
