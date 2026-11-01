@@ -4,7 +4,7 @@ import { Fragment } from 'react';
 import type { PurchaseListItem } from '@/domain/entities/PurchaseListEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PurchaseGroupDetail } from './PurchaseGroupDetail';
-import { ShareActionCell, TargetMetTag, type ShareActions } from './purchaseShareUi';
+import { ShareActionCell, TargetMetTag, UnregisteredTag, type ShareActions } from './purchaseShareUi';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { DataCard } from '@/presentation/components/DataCard';
 import { ZoomableThumb } from '@/presentation/components/ZoomableThumb';
@@ -77,7 +77,12 @@ export function PurchaseListTable({
               />
             }
             title={item.productName}
-            badges={rowShare ? <TargetMetTag share={rowShare} /> : undefined}
+            badges={
+              <>
+                {rowShare && <TargetMetTag share={rowShare} />}
+                <UnregisteredTag qty={item.unregisteredQty} />
+              </>
+            }
             trailing={<span className="text-gray-400">{isExpanded ? '▲' : '▼'}</span>}
             body={
               <div className="flex items-end justify-between gap-2">
@@ -196,6 +201,7 @@ export function PurchaseListTable({
                         )}
                         <span className="text-gray-900">{item.productName}</span>
                         {rowShare && <TargetMetTag share={rowShare} />}
+                        <UnregisteredTag qty={item.unregisteredQty} />
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-700">{item.brand?.trim() || '-'}</td>
