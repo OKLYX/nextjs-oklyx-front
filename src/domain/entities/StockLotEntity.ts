@@ -14,7 +14,7 @@ export interface UnregisteredProduct {
   remainingQty: number;
 }
 
-/** One ledger row of 「그날 입출고 내역」 (D119 · D123 · D124 · D128 · D130). */
+/** One ledger row of 「일별 입출고 내역」 (D119 · D123 · D124 · D128 · D130). */
 export interface StockDailyRow {
   movementId: number;
   movementType: StockMovementType;
