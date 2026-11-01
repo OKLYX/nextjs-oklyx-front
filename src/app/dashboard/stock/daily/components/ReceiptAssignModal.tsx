@@ -15,7 +15,7 @@ import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
 
 /**
- * Receipt assignment popup of 「그날 입출고 내역」 (FEATURE_2610_19 D118 · D121 · D87 · D135).
+ * Receipt assignment popup of 「일별 입출고 내역」 (FEATURE_2610_19 D118 · D121 · D87 · D135).
  *
  * - Photo (required, D121 ⑦) · 「결제 카드」 = visible cards + 「카드로 알 수 없음」 (then 「결제 판매자」) · 「구매일」 (first = the
  *   screen day). The card fields follow the receipt check-in popup (`ReceiptIntakeModal`).

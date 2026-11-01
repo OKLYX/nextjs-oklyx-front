@@ -170,7 +170,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         ...(stockLinked === true ? [{ href: ROUTES.STOCK_SEARCH, label: '재고 조회' }] : []),
         // FEATURE_2610_19 D148 ①: the daily in/out view follows 「재고 조회」 — stock link on only, ADMIN only
         // (`/api/admin/stock/daily`).
-        ...(stockLinked === true ? [{ href: ROUTES.STOCK_DAILY, label: '그날 입출고 내역', adminOnly: true }] : []),
+        ...(stockLinked === true ? [{ href: ROUTES.STOCK_DAILY, label: '일별 입출고 내역', adminOnly: true }] : []),
       ],
     },
     {
