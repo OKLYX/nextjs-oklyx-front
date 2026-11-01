@@ -126,6 +126,14 @@ export function DailyContainer() {
       return next;
     });
 
+  // Header [전체 선택]: every checkable row and share on the day; a second click clears them.
+  const checkableKeys = rows.flatMap((row) => [
+    ...((row.undecidedLeft ?? 0) > 0 || row.sellerChangeable ? [rowKey(row)] : []),
+    ...row.noReceiptShares.map((share) => shareKey(share.recordId)),
+  ]);
+  const allChecked = checkableKeys.length > 0 && checkableKeys.every((key) => checked.has(key));
+  const toggleAll = () => setChecked(allChecked ? new Set() : new Set(checkableKeys));
+
   // D14: the checked rows and shares, split by kind.
   const checkedRows = rows.filter((row) => checked.has(rowKey(row)));
   const checkedShares = rows.flatMap((row) =>
@@ -185,7 +193,17 @@ export function DailyContainer() {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
             <tr className="text-left text-gray-500">
-              <th className="px-4 py-2 w-10" />
+              <th className="px-4 py-2 w-10">
+                {checkableKeys.length > 0 && (
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    onChange={toggleAll}
+                    aria-label="전체 선택"
+                    className="h-4 w-4 accent-blue-600"
+                  />
+                )}
+              </th>
               <th className="px-4 py-2">구분</th>
               <th className="px-4 py-2">상품</th>
               <th className="px-4 py-2 text-right">개수</th>
