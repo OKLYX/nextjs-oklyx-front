@@ -16,6 +16,7 @@ import type { IntakeReason } from '@/application/dto/StockLotDTOs';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ScanInput } from '../../packing/components/ScanInput';
+import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
 
 /**
  * 「재고관리 > 입고 작업」 (FEATURE_2610_19 D113 · D117).
@@ -41,6 +42,8 @@ interface CartLine {
   key: number;
   productId: number;
   productName: string;
+  /** The product's representative photo as stored; null = none (FEATURE_2611_02 D15). */
+  imageUrl: string | null;
   quantity: string;
   /** '' = 「미정」. */
   sellerId: string;
@@ -101,8 +104,9 @@ export function IntakeContainer() {
   }, [sellerUseCase]);
 
   // D17 · D23: +1 on the top line of that product with the screen seller and reason, else a new line with them.
+  // FEATURE_2611_02 D15: a new line keeps the photo of the value it came from.
   const addToCart = useCallback(
-    (productId: number, productName: string) => {
+    (productId: number, productName: string, imageUrl: string | null) => {
       setCart((prev) => {
         const found = prev.find(
           (line) => line.productId === productId && line.sellerId === screenSellerId && line.reason === screenReason
@@ -115,7 +119,16 @@ export function IntakeContainer() {
         const key = nextKey.current++;
         return [
           ...prev,
-          { key, productId, productName, quantity: '1', sellerId: screenSellerId, reason: screenReason, custom: false },
+          {
+            key,
+            productId,
+            productName,
+            imageUrl,
+            quantity: '1',
+            sellerId: screenSellerId,
+            reason: screenReason,
+            custom: false,
+          },
         ];
       });
     },
@@ -142,7 +155,7 @@ export function IntakeContainer() {
       try {
         const result = await lotUseCase.barcode(value);
         if (result.found && result.productId !== null) {
-          addToCart(result.productId, result.productName ?? '');
+          addToCart(result.productId, result.productName ?? '', result.imageUrl);
           setUnknownBarcode(null);
         } else {
           setUnknownBarcode(value);
@@ -204,7 +217,7 @@ export function IntakeContainer() {
         ...(editName.trim() !== '' ? { productName: editName.trim() } : {}),
         ...(price !== undefined ? { price } : {}),
       });
-      addToCart(saved.id, saved.productName);
+      addToCart(saved.id, saved.productName, saved.imageUrl ?? null);
       setUnknownBarcode(null);
     } catch (err) {
       setMessage(extractErrorMessage(err, '상품에 바코드를 저장하지 못했습니다.'));
@@ -225,7 +238,7 @@ export function IntakeContainer() {
         barcodeId: unknownBarcode,
         ...(price !== undefined ? { price } : {}),
       });
-      addToCart(created.id, created.productName);
+      addToCart(created.id, created.productName, created.imageUrl ?? null);
       setUnknownBarcode(null);
     } catch (err) {
       setMessage(extractErrorMessage(err, '새 상품을 등록하지 못했습니다.'));
@@ -353,8 +366,13 @@ export function IntakeContainer() {
             {cart.map((line) => (
               <tr key={line.key}>
                 <td className="py-2 text-gray-900">
-                  {line.productName}
-                  {line.custom && <span className="ml-2 text-xs text-amber-700">따로 정함</span>}
+                  <div className="flex items-center gap-2">
+                    <StockProductThumb imageUrl={line.imageUrl} productId={line.productId} alt={line.productName} />
+                    <span>
+                      {line.productName}
+                      {line.custom && <span className="ml-2 text-xs text-amber-700">따로 정함</span>}
+                    </span>
+                  </div>
                 </td>
                 <td className="py-2">
                   {soleSeller ? (

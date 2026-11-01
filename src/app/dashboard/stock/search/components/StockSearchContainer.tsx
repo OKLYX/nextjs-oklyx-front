@@ -8,13 +8,17 @@ import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerReposi
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { StockBalance, StockMovement } from '@/domain/entities/StockEntity';
+import { inAmountLine, stockAmountLines } from '@/domain/entities/StockLotEntity';
 import { StockSearchForm } from './StockSearchForm';
 import { StockSearchTable, balanceKey } from './StockSearchTable';
+import { StockAmountSummary } from './StockAmountSummary';
 
 /**
- * 재고 조회 화면 (FEATURE_2609_28 / PLAN D14 · 2609_29 D5).
+ * 「재고 조회」 screen (FEATURE_2609_28 / PLAN D14 · 2609_29 D5).
  *
- * 잔량은 (물품 × 판매자) 단위 서버 집계다. 행을 누르면 그 조합의 이력이 아래로 펼쳐진다.
+ * On-hand is the server's aggregate per (product × seller). A row click opens that pair's history right below it.
+ * FEATURE_2611_02: every row carries its photo and purchase-price amount; the amount box above the list adds the rows
+ * received (D26 · D34) and its 「미기입 N줄」 narrows the list to the rows without an amount (D35 · D37).
  */
 export function StockSearchContainer() {
   const stockUseCase = useMemo(() => new StockUseCase(new StockRepositoryImpl()), []);
@@ -31,11 +35,20 @@ export function StockSearchContainer() {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  /** Key of the lit 「미기입 N줄」 (FEATURE_2611_02 D35 · D37); null = the whole list. */
+  const [amountFilter, setAmountFilter] = useState<string | null>(null);
+
+  // D35 · D37: a lit 「미기입 N줄」 shows only that line's rows without an amount.
+  const filterRows = (key: string | null) =>
+    key === null
+      ? balances
+      : balances.filter((balance) => balance.amount === null && inAmountLine(balance, key));
 
   const loadBalances = async (nextKeyword: string = keyword, nextSellerId: string = sellerId) => {
     setIsLoading(true);
     setError('');
     setExpandedKey(null);
+    setAmountFilter(null);
     try {
       setBalances(
         await stockUseCase.getBalances({
@@ -63,6 +76,18 @@ export function StockSearchContainer() {
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // D37 · D39: one 「미기입 N줄」 at a time — a click on the lit one turns it off. A row the filter hides is collapsed.
+  const handleAmountFilter = (key: string) => {
+    const next = amountFilter === key ? null : key;
+    setAmountFilter(next);
+    if (
+      expandedKey !== null &&
+      !filterRows(next).some((balance) => balanceKey(balance) === expandedKey)
+    ) {
+      setExpandedKey(null);
+    }
+  };
 
   const handleToggle = async (balance: StockBalance) => {
     const key = balanceKey(balance);
@@ -106,8 +131,16 @@ export function StockSearchContainer() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
       )}
 
+      {balances.length > 0 && (
+        <StockAmountSummary
+          lines={stockAmountLines(balances)}
+          activeKey={amountFilter}
+          onToggle={handleAmountFilter}
+        />
+      )}
+
       <StockSearchTable
-        balances={balances}
+        balances={filterRows(amountFilter)}
         isLoading={isLoading}
         expandedKey={expandedKey}
         movements={movements}
