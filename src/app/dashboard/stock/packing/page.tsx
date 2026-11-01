@@ -724,18 +724,17 @@ export default function StockPackingPage() {
 
     setIsSubmitting(true);
     try {
-      await packingUseCase.complete(scanResult.parcel.id, {
+      const result = await packingUseCase.complete(scanResult.parcel.id, {
         boxPackageId: selectedPackageId,
         items: packedItems,
       });
       const left = remainingTotal - packedTotal;
       playSound('parcelComplete'); // ⑤ 박스 완료 — 손을 떼도 되는 유일한 순간
       resetBox();
-      notify(
-        'success',
-        left > 0 ? `완료 — 남은 ${left}개, 다음 송장을 스캔하세요` : '완료 — 다음 송장을 스캔하세요',
-        '완료'
-      );
+      // FEATURE_2610_19 D49 · D137: borrowed-goods lines ride on the same one-line message.
+      const borrowed = (result.notices ?? []).join(' · ');
+      const done = left > 0 ? `완료 — 남은 ${left}개, 다음 송장을 스캔하세요` : '완료 — 다음 송장을 스캔하세요';
+      notify('success', borrowed ? `${done} · ${borrowed}` : done, '완료');
       loadPending();
     } catch (error) {
       // 🔴 담은 내용은 지우지 않는다 — 다시 스캔시키면 안 된다

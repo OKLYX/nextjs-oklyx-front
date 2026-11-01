@@ -13,6 +13,9 @@ export const ROUTES = {
   STOCK_OUTBOUND: '/dashboard/stock/outbound',
   STOCK_PACKING: '/dashboard/stock/packing',
   STOCK_SEARCH: '/dashboard/stock/search',
+  // FEATURE_2610_19 D117 · D119: intake work (scan in, seller undecided) and the daily in/out view.
+  STOCK_INTAKE: '/dashboard/stock/intake',
+  STOCK_DAILY: '/dashboard/stock/daily',
   USER_REGISTER: '/dashboard/users/register',
   USER_MANAGE: '/dashboard/users/manage',
   COSTS_CARRIER: '/dashboard/costs/carrier',
@@ -77,6 +80,8 @@ export const ROUTES = {
   SALES_BY_PRODUCT: '/dashboard/sales/products' as const,
   SETTLEMENT_PAYOUTS: '/dashboard/sales/settlement' as const,
   SETTLEMENT_PAYOUT_DETAIL: (id: number | string) => `/dashboard/sales/settlement/${id}` as const,
+  // FEATURE_2610_19 D51: 「정산관리 > 사업자 간 채무」.
+  SETTLEMENT_SELLER_DEBTS: '/dashboard/sales/seller-debts' as const,
   PROCESSING_PRESETS: '/dashboard/processing-presets' as const,
   PROCESSING_PRESET_NEW: '/dashboard/processing-presets/new' as const,
   PROCESSING_PRESET_EDIT: (id: number | string) => `/dashboard/processing-presets/${id}` as const,

@@ -77,13 +77,17 @@ export function unexpandedReasonLabel(reason: string): string {
   return UNEXPANDED_REASON_LABELS[reason] ?? reason;
 }
 
-/** 원장 한 줄. quantity 는 저장된 부호 그대로다 — 화면에서 부호를 다시 만들지 않는다(D6). */
+/**
+ * One ledger row. quantity keeps the stored sign — the screen never rebuilds the sign (D6).
+ * A null seller is 「판매자 미정」 (FEATURE_2610_19 D105 · D124). `notices` = the outbound confirm's borrowed-goods
+ * lines (D49 · D137); empty or absent elsewhere.
+ */
 export interface StockMovement {
   id: number;
   productId: number;
   productName: string;
-  sellerId: number;
-  sellerName: string;
+  sellerId: number | null;
+  sellerName: string | null;
   movementType: StockMovementType;
   quantity: number;
   reason: StockReason | null;
@@ -94,17 +98,19 @@ export interface StockMovement {
   purchaseRecordId: number | null;
   movedOn: string;
   createdBy: string | null;
+  notices?: string[];
 }
 
 /**
- * (물품 × 판매자) 잔량 — 서버 집계 결과다.
- * ⚠️ onHand 는 음수일 수 있다. 숨기거나 0 으로 그리지 않는다(PLAN 04 Step 6) — 음수는 신호다.
+ * On-hand per (product × seller) — the server's aggregate.
+ * ⚠️ onHand can be negative. Never hide it or draw it as 0 (PLAN 04 Step 6) — a negative number is a signal.
+ * A null seller is the 「판매자 미정」 row (FEATURE_2610_19 D116 ②).
  */
 export interface StockBalance {
   productId: number;
   productName: string;
-  sellerId: number;
-  sellerName: string;
+  sellerId: number | null;
+  sellerName: string | null;
   onHand: number;
 }
 

@@ -2,6 +2,7 @@
 
 import { Fragment } from 'react';
 import type { StockBalance, StockMovement } from '@/domain/entities/StockEntity';
+import { UNDECIDED_SELLER_LABEL } from '@/domain/entities/StockLotEntity';
 import { StockMovementTable } from '../../components/StockMovementTable';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { DataCard } from '@/presentation/components/DataCard';
@@ -52,7 +53,7 @@ export function StockSearchTable({
                   <p className="truncate text-base text-gray-900">
                     {isExpanded ? '▾' : '▸'} {balance.productName}
                   </p>
-                  <p className="text-[11px] text-gray-500">{balance.sellerName}</p>
+                  <p className="text-[11px] text-gray-500">{balance.sellerName ?? UNDECIDED_SELLER_LABEL}</p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className={`text-[15px] font-bold ${negative ? 'text-red-600' : 'text-gray-900'}`}>
@@ -104,7 +105,7 @@ export function StockSearchTable({
                   <td className="px-6 py-3 text-sm text-gray-700">
                     {isExpanded ? '▾' : '▸'} {balance.productName}
                   </td>
-                  <td className="px-6 py-3 text-sm text-gray-700">{balance.sellerName}</td>
+                  <td className="px-6 py-3 text-sm text-gray-700">{balance.sellerName ?? UNDECIDED_SELLER_LABEL}</td>
                   <td
                     className={`px-6 py-3 text-sm text-right font-semibold ${
                       balance.onHand < 0 ? 'text-red-600' : 'text-gray-900'

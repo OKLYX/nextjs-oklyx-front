@@ -73,6 +73,8 @@ export interface PurchaseListItem {
   /** Seller chosen: that one share. 「전체」: every shown share, seller id ascending. */
   shares: PurchaseShare[];
   lines: PurchaseListLine[];
+  /** 「영수증 미등록 N개」 (FEATURE_2610_19 D115 · D129); 0 or absent = not shown. */
+  unregisteredQty?: number;
 }
 
 export interface UnmappedOrder {

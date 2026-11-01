@@ -1,6 +1,7 @@
 'use client';
 
 import type { StockMovement } from '@/domain/entities/StockEntity';
+import { UNDECIDED_SELLER_LABEL } from '@/domain/entities/StockLotEntity';
 import {
   STOCK_MOVEMENT_TYPE_LABELS,
   STOCK_REASON_LABELS,
@@ -76,7 +77,7 @@ export function StockMovementTable({
       const detail = [
         STOCK_MOVEMENT_TYPE_LABELS[movement.movementType] ?? movement.movementType,
         reasonText,
-        movement.sellerName,
+        movement.sellerName ?? UNDECIDED_SELLER_LABEL,
         movement.createdBy ?? '',
       ]
         .filter((part) => part)
@@ -128,7 +129,7 @@ export function StockMovementTable({
               <td className="px-4 py-2 text-sm text-gray-700">{movement.movedOn}</td>
               <td className="px-4 py-2 text-sm text-gray-700">{movement.productName}</td>
               {showSeller && (
-                <td className="px-4 py-2 text-sm text-gray-700">{movement.sellerName}</td>
+                <td className="px-4 py-2 text-sm text-gray-700">{movement.sellerName ?? UNDECIDED_SELLER_LABEL}</td>
               )}
               <td className="px-4 py-2 text-sm text-gray-700">
                 {STOCK_MOVEMENT_TYPE_LABELS[movement.movementType] ?? movement.movementType}

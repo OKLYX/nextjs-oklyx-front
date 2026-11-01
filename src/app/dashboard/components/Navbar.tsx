@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Package,
@@ -21,6 +21,8 @@ import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { ROUTES } from '@/config/routes';
 import { useAlertStore } from '@/infrastructure/stores/alertStore';
 import { usePurchaseSettingStore } from '@/infrastructure/stores/purchaseSettingStore';
+import { SellerUseCase } from '@/application/usecases/SellerUseCase';
+import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import { NavbarHeader } from './NavbarHeader';
 import { NavBadge } from './NavBadge';
 
@@ -90,6 +92,16 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
     void loadPurchaseSetting();
   }, [loadPurchaseSetting]);
 
+  // FEATURE_2610_19 D53 · D148 ②: 「사업자 간 채무」 shows only with two or more sellers. null = not loaded yet (hidden).
+  const [sellerCount, setSellerCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (user?.role !== 'ADMIN') return;
+    void new SellerUseCase(new SellerRepositoryImpl())
+      .getAll()
+      .then((sellers) => setSellerCount(sellers.length))
+      .catch(() => setSellerCount(null));
+  }, [user?.role]);
+
   // Display order. ADMIN-only groups are marked and filtered below rather than
   // appended, so this array reads top-to-bottom exactly as the sidebar renders.
   const allMenuGroups: MenuGroup[] = [
@@ -151,9 +163,14 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       items: [
         { href: ROUTES.STOCK_IN_OUT, label: '입고·조정' },
         { href: ROUTES.STOCK_OUTBOUND, label: '출고 확인' },
+        // FEATURE_2610_19 D117 ①: intake work sits before packing — ADMIN only, stock link on only.
+        ...(stockLinked === true ? [{ href: ROUTES.STOCK_INTAKE, label: '입고 작업', adminOnly: true }] : []),
         // 포장 콘솔은 `/api/admin/packing` 전용이다 — 일반 사용자에게 보이면 열자마자 403 이 된다.
         { href: ROUTES.STOCK_PACKING, label: '포장 작업', adminOnly: true },
         ...(stockLinked === true ? [{ href: ROUTES.STOCK_SEARCH, label: '재고 조회' }] : []),
+        // FEATURE_2610_19 D148 ①: the daily in/out view follows 「재고 조회」 — stock link on only, ADMIN only
+        // (`/api/admin/stock/daily`).
+        ...(stockLinked === true ? [{ href: ROUTES.STOCK_DAILY, label: '그날 입출고 내역', adminOnly: true }] : []),
       ],
     },
     {
@@ -167,6 +184,10 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       items: [
         { href: ROUTES.SALES_SUMMARY, label: '매출' },
         { href: ROUTES.SETTLEMENT_PAYOUTS, label: '정산 내역' },
+        // FEATURE_2610_19 D51 · D53 · D148 ②: two or more sellers, whatever the stock link.
+        ...(sellerCount !== null && sellerCount >= 2
+          ? [{ href: ROUTES.SETTLEMENT_SELLER_DEBTS, label: '사업자 간 채무' }]
+          : []),
       ],
     },
     {
