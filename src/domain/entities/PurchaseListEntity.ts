@@ -17,6 +17,8 @@ export interface PurchaseRecord {
   sellerName: string;
   /** Set = the purchase came in with a receipt → [영수증] (FEATURE_2610_18 D93 ①). null = per-product check-in. */
   receiptId: number | null;
+  /** true = 「발견 재고」 — assigned with 「영수증 없음」 (FEATURE_2611_01 D12). */
+  foundStock: boolean;
 }
 
 /**

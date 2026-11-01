@@ -33,4 +33,13 @@ export class PurchaseReceiptRepositoryImpl implements PurchaseReceiptRepository 
     const response = await axiosInstance.put(`/api/admin/purchase-receipts/${receiptId}`, request);
     return response.data.data;
   }
+
+  async attachPhoto(receiptId: number, photo: File): Promise<ReceiptDetail> {
+    const formData = new FormData();
+    formData.append('photo', photo);
+    const response = await axiosInstance.post(`/api/admin/purchase-receipts/${receiptId}/photo`, formData, {
+      headers: { 'Content-Type': undefined },
+    });
+    return response.data.data;
+  }
 }

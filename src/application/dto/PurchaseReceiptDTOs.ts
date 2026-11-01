@@ -24,7 +24,8 @@ export interface CreateReceiptRequest {
 
 /**
  * Receipt header edit (D100) — same card rule as CreateReceiptRequest: cardId set → the card owner pays (payerSellerId
- * omitted); cardId omitted (「카드로 알 수 없음」) → payerSellerId is required. The photo and lines never change.
+ * omitted); cardId omitted (「카드로 알 수 없음」) → payerSellerId is required. The lines never change; a missing photo is
+ * added by attachPhoto before this edit (FEATURE_2611_01 D4), a saved photo never changes.
  */
 export interface UpdateReceiptRequest {
   purchasedOn: string;

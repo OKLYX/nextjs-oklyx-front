@@ -2,7 +2,8 @@
  * One row of the receipt list (FEATURE_2610_18 D94).
  *
  * cardAlias null = the card was unknown (shown as 「카드 없음」). totalAmount = sum of the lines with an amount; null when
- * every line was left blank (shown as 「미기입」). productCount = number of lines.
+ * every line was left blank (shown as 「미기입」). productCount = number of lines. hasPhoto false = a 「영수증 나중에」
+ * receipt (shown as 「사진 없음」, FEATURE_2611_01 D4).
  */
 export interface ReceiptSummary {
   id: number;
@@ -13,6 +14,7 @@ export interface ReceiptSummary {
   firstProductName: string | null;
   productCount: number;
   totalAmount: number | null;
+  hasPhoto: boolean;
 }
 
 /** One line of a receipt. totalAmount/unitPrice null = amount not entered (D41 · D68). */
@@ -25,7 +27,8 @@ export interface ReceiptLine {
 }
 
 /**
- * One receipt with its photo (stored value — render through resolveThumbUrl) and every line (D93 · D94).
+ * One receipt with its photo (stored value — render through resolveThumbUrl; null = a 「영수증 나중에」 receipt without its
+ * photo yet, FEATURE_2611_01 D4) and every line (D93 · D94).
  * payerSellerId · cardId · cardMaskedNumber start the header edit (D100); cardId null = the card was unknown, and a
  * hidden card keeps its alias and number here (D91 · D100 ⑥).
  */
@@ -37,6 +40,6 @@ export interface ReceiptDetail {
   cardId: number | null;
   cardAlias: string | null;
   cardMaskedNumber: string | null;
-  photoUrl: string;
+  photoUrl: string | null;
   lines: ReceiptLine[];
 }

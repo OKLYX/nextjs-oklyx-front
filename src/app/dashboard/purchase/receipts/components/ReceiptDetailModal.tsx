@@ -28,6 +28,7 @@ import { ReceiptEditModal } from './ReceiptEditModal';
  * ⚠️ `receiptId` null = closed. The modal loads the receipt itself every time `receiptId` changes.
  * ⚠️ After an edit the modal shows the saved receipt and calls `onEdited` — the caller reloads what it shows.
  * ⚠️ The photo is the stored value — it goes through `resolveThumbUrl` (S3 URL as is, local path via the uploads proxy).
+ *   No photo (a 「영수증 나중에」 receipt, FEATURE_2611_01 D4) reads 「사진 없음」; [수정] can add it.
  * ❌ Do not copy this modal per screen.
  */
 interface ReceiptDetailModalProps {
@@ -72,7 +73,7 @@ export function ReceiptDetailModal({ receiptId, sellers, onClose, onEdited }: Re
 
   if (receiptId == null) return null;
 
-  const photoSrc = detail ? resolveThumbUrl(detail.photoUrl) : '';
+  const photoSrc = detail?.photoUrl ? resolveThumbUrl(detail.photoUrl) : '';
 
   return (
     <Modal
@@ -97,13 +98,17 @@ export function ReceiptDetailModal({ receiptId, sellers, onClose, onEdited }: Re
             <span>결제 판매자 {detail.payerSellerName}</span>
             <span>카드 {detail.cardAlias ?? '카드 없음'}</span>
           </div>
-          <div className="space-y-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photoSrc} alt="영수증 사진" className="max-h-96 w-auto rounded border border-gray-200" />
-            <a href={photoSrc} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
-              원본 열기
-            </a>
-          </div>
+          {photoSrc === '' ? (
+            <p className="text-sm text-amber-700">사진 없음 — [수정]에서 사진을 붙일 수 있습니다.</p>
+          ) : (
+            <div className="space-y-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photoSrc} alt="영수증 사진" className="max-h-96 w-auto rounded border border-gray-200" />
+              <a href={photoSrc} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
+                원본 열기
+              </a>
+            </div>
+          )}
           <DataCardSwitch
             placement="nested"
             renderCards={() =>

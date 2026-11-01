@@ -24,4 +24,8 @@ export class PurchaseReceiptUseCase {
   async update(receiptId: number, request: UpdateReceiptRequest): Promise<ReceiptDetail> {
     return this.repository.update(receiptId, request);
   }
+
+  async attachPhoto(receiptId: number, photo: File): Promise<ReceiptDetail> {
+    return this.repository.attachPhoto(receiptId, photo);
+  }
 }
