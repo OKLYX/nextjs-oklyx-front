@@ -20,7 +20,7 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ReceiptAssignModal } from './ReceiptAssignModal';
 
 /**
- * 「재고관리 > 그날 입출고 내역」 (FEATURE_2610_19 D119 · D122 · D123 · D124 · D128 · D130 · D147).
+ * 「재고관리 > 일별 입출고 내역」 (FEATURE_2610_19 D119 · D122 · D123 · D124 · D128 · D130 · D147).
  *
  * - One day (today first): every ledger row moved that day, record order, quantity + purchase-price amount
  *   (null = 「미기입」). No selling price, no totals (D122 · D123 ③).
@@ -70,7 +70,7 @@ export function DailyContainer() {
       try {
         setDaily(await lotUseCase.daily(day));
       } catch (err) {
-        setError(extractErrorMessage(err, '그날 입출고 내역을 불러오지 못했습니다.'));
+        setError(extractErrorMessage(err, '일별 입출고 내역을 불러오지 못했습니다.'));
       } finally {
         setIsLoading(false);
       }
@@ -95,7 +95,7 @@ export function DailyContainer() {
   const rows = daily?.rows ?? [];
 
   return (
-    <PageContainer title="그날 입출고 내역">
+    <PageContainer title="일별 입출고 내역">
       <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">날짜</label>
