@@ -8,6 +8,8 @@ import type {
   BoxCandidateItem,
   PackingCloseResult,
   PackingCompleteResult,
+  PackingHistoryQuery,
+  PackingHistoryRow,
   PackingScanResponse,
   ParcelCompleteRequest,
   PendingParcel,
@@ -54,6 +56,19 @@ export class PackingRepositoryImpl implements PackingRepository {
 
   async markUnused(parcelId: number): Promise<PackingCloseResult> {
     const response = await axiosInstance.post(`/api/admin/packing/parcels/${parcelId}/unused`);
+    return response.data.data;
+  }
+
+  async restore(parcelId: number): Promise<PackingCloseResult> {
+    const response = await axiosInstance.post(`/api/admin/packing/parcels/${parcelId}/restore`);
+    return response.data.data;
+  }
+
+  async history(query: PackingHistoryQuery): Promise<PackingHistoryRow[]> {
+    const keyword = query.keyword?.trim();
+    const response = await axiosInstance.get('/api/admin/packing/history', {
+      params: keyword ? { from: query.from, to: query.to, keyword } : { from: query.from, to: query.to },
+    });
     return response.data.data;
   }
 }

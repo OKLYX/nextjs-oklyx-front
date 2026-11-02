@@ -5,6 +5,8 @@ import type {
   BoxCandidateItem,
   PackingCloseResult,
   PackingCompleteResult,
+  PackingHistoryQuery,
+  PackingHistoryRow,
   PackingScanResponse,
   ParcelCompleteRequest,
   PendingParcel,
@@ -39,5 +41,13 @@ export class PackingUseCase {
 
   async markUnused(parcelId: number): Promise<PackingCloseResult> {
     return this.repository.markUnused(parcelId);
+  }
+
+  async restore(parcelId: number): Promise<PackingCloseResult> {
+    return this.repository.restore(parcelId);
+  }
+
+  async history(query: PackingHistoryQuery): Promise<PackingHistoryRow[]> {
+    return this.repository.history(query);
   }
 }
