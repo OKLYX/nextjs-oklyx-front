@@ -9,6 +9,8 @@ import type { ChannelSales, ProductProfit, SalesLine } from '@/domain/entities/S
 import { channelLabel } from '@/domain/entities/SalesSummary';
 import { SalesTabs } from '../../components/SalesTabs';
 import { PeriodFilter, currentMonthRange } from '../../components/PeriodFilter';
+import { useShippedOnly } from '@/app/dashboard/sales/components/ShippedOnlyContext';
+import { ShippedOnlySwitch } from '@/app/dashboard/sales/components/ShippedOnlySwitch';
 import { ChannelSummaryCard } from './ChannelSummaryCard';
 import { ChannelSalesLines } from './ChannelSalesLines';
 import { ChannelSaleRecords } from './ChannelSaleRecords';
@@ -62,6 +64,7 @@ export function ChannelSalesContainer() {
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [accountId, setAccountId] = useState<number | null>(initial.accountId);
+  const { excludeUnshipped, setExcludeUnshipped } = useShippedOnly();
 
   const [channels, setChannels] = useState<ChannelSales[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -99,7 +102,7 @@ export function ChannelSalesContainer() {
     setProductsError('');
 
     const channelSales = salesStatsUseCase
-      .getChannelSales({ from, to })
+      .getChannelSales({ from, to, excludeUnshipped })
       .then((result) => {
         if (requestId !== requestIdRef.current) return;
         setChannels(result);
@@ -121,7 +124,7 @@ export function ChannelSalesContainer() {
 
     // 🔴 `crossChannel: false` 여야 채널이 붙어 온다 — true 면 채널이 합쳐진 마스터 1행이라 나눌 수 없다.
     const productSales = salesStatsUseCase
-      .getProductProfit({ from, to, crossChannel: false })
+      .getProductProfit({ from, to, crossChannel: false, excludeUnshipped })
       .then((result) => {
         if (requestId !== requestIdRef.current) return;
         setProducts(result);
@@ -136,7 +139,7 @@ export function ChannelSalesContainer() {
       });
 
     await Promise.all([channelSales, productSales]);
-  }, [salesStatsUseCase, from, to]);
+  }, [salesStatsUseCase, from, to, excludeUnshipped]);
 
   // `reloadTick` 은 [다시 시도] 전용 — 조건이 그대로면 이펙트가 안 돌기 때문에 카운터로 강제한다.
   useEffect(() => {
@@ -155,7 +158,7 @@ export function ChannelSalesContainer() {
     setRecordsLoading(true);
     setRecordsError('');
     try {
-      const result = await salesStatsUseCase.getSalesLines({ from, to, accountId });
+      const result = await salesStatsUseCase.getSalesLines({ from, to, accountId, excludeUnshipped });
       if (requestId !== recordsRequestIdRef.current) return;
       setRecords(result);
     } catch {
@@ -165,7 +168,7 @@ export function ChannelSalesContainer() {
     } finally {
       if (requestId === recordsRequestIdRef.current) setRecordsLoading(false);
     }
-  }, [salesStatsUseCase, from, to, accountId]);
+  }, [salesStatsUseCase, from, to, accountId, excludeUnshipped]);
 
   useEffect(() => {
     void (async () => {
@@ -202,6 +205,7 @@ export function ChannelSalesContainer() {
             ))}
           </select>
         </div>
+        <ShippedOnlySwitch checked={excludeUnshipped} disabled={isLoading} onChange={setExcludeUnshipped} />
       </PeriodFilter>
 
       {invalidRange && (

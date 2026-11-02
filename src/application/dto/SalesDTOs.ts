@@ -9,6 +9,11 @@ export interface SalesStatsParams {
   to?: string;
   /** 생략 = 전 판매자. */
   sellerId?: number;
+  /**
+   * `true` = the 「출고 전 주문 제외」 switch — the server leaves out the lines still `PAID` · `PREPARING` (FEATURE_2611_04
+   * D1 · D2). Absent = every line, as before (the dashboard cards never send it — D4).
+   */
+  excludeUnshipped?: boolean;
 }
 
 /**
@@ -21,6 +26,8 @@ export interface SalesLinesParams {
   from?: string;
   to?: string;
   accountId: number;
+  /** Same switch as {@link SalesStatsParams.excludeUnshipped} — the list must follow the channel total (D2). */
+  excludeUnshipped?: boolean;
 }
 
 /** 상품별 수익성 전용 파라미터. */
