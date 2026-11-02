@@ -12,6 +12,8 @@ export const ROUTES = {
   STOCK_IN_OUT: '/dashboard/stock/in-out',
   STOCK_OUTBOUND: '/dashboard/stock/outbound',
   STOCK_PACKING: '/dashboard/stock/packing',
+  // FEATURE_2611_03 D28: read-only parcel status history (packed · unused · restored).
+  STOCK_PACKING_HISTORY: '/dashboard/stock/packing-history',
   STOCK_SEARCH: '/dashboard/stock/search',
   // FEATURE_2610_19 D117 · D119: intake work (scan in, seller undecided) and the daily in/out view.
   STOCK_INTAKE: '/dashboard/stock/intake',
