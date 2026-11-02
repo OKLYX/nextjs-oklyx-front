@@ -167,6 +167,8 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         ...(stockLinked === true ? [{ href: ROUTES.STOCK_INTAKE, label: '입고 작업', adminOnly: true }] : []),
         // 포장 콘솔은 `/api/admin/packing` 전용이다 — 일반 사용자에게 보이면 열자마자 403 이 된다.
         { href: ROUTES.STOCK_PACKING, label: '포장 작업', adminOnly: true },
+        // FEATURE_2611_03 D28: packing history follows packing work — ADMIN only (`/api/admin/packing/history`).
+        { href: ROUTES.STOCK_PACKING_HISTORY, label: '포장 이력', adminOnly: true },
         ...(stockLinked === true ? [{ href: ROUTES.STOCK_SEARCH, label: '재고 조회' }] : []),
         // FEATURE_2610_19 D148 ①: the daily in/out view follows 「재고 조회」 — stock link on only, ADMIN only
         // (`/api/admin/stock/daily`).

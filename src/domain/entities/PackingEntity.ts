@@ -164,3 +164,48 @@ export interface ParcelCompleteRequest {
   /** 출고 기록일(YYYY-MM-DD). 생략하면 서버가 오늘로 남긴다 */
   movedOn?: string;
 }
+
+/**
+ * One row of the 「포장 이력」 screen (FEATURE_2611_03 / PLAN D30).
+ *
+ * 1:1 with the backend `com.pms.dto.response.PackingHistoryView`. The action is the
+ * (`fromStatus`, `toStatus`) pair — turn it into a name with `parcelActionLabel` only.
+ */
+export interface PackingHistoryRow {
+  id: number;
+  /**
+   * History row time as a KST wall clock (`yyyy-MM-ddTHH:mm:ss`, no zone — the server
+   * converts it, D40). Print it as is (`yyyy-MM-dd HH:mm`) — no time zone math on this side.
+   */
+  changedAt: string;
+  parcelId: number;
+  invoiceNumber: string;
+  carrierName: string | null;
+  externalOrderId: string;
+  sellerName: string | null;
+  fromStatus: ParcelStatus;
+  toStatus: ParcelStatus;
+  /** Who moved it. `null` = unknown */
+  changedBy: string | null;
+}
+
+/**
+ * `GET /api/admin/packing/history` query — both KST days inclusive (`yyyy-MM-dd`, D40),
+ * blank keyword = none (D34)
+ */
+export interface PackingHistoryQuery {
+  from: string;
+  to: string;
+  keyword?: string;
+}
+
+/**
+ * Action name of a status pair (D30): 「포장 완료」 · 「미사용 처리」 · 「미사용 되돌리기」.
+ * Any other pair is never written (D16) and shows `-`.
+ */
+export const parcelActionLabel = (fromStatus: ParcelStatus, toStatus: ParcelStatus): string => {
+  if (fromStatus === 'PENDING' && toStatus === 'PACKED') return '포장 완료';
+  if (fromStatus === 'PENDING' && toStatus === 'UNUSED') return '미사용 처리';
+  if (fromStatus === 'UNUSED' && toStatus === 'PENDING') return '미사용 되돌리기';
+  return '-';
+};

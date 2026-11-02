@@ -4,6 +4,8 @@ import type {
   BoxCandidateItem,
   PackingCloseResult,
   PackingCompleteResult,
+  PackingHistoryQuery,
+  PackingHistoryRow,
   PackingScanResponse,
   ParcelCompleteRequest,
   PendingParcel,
@@ -34,4 +36,10 @@ export interface PackingRepository {
 
   /** 송장을 안 쓴 박스를 닫는다 — 출고·기억·절약 없음 (D32) */
   markUnused(parcelId: number): Promise<PackingCloseResult>;
+
+  /** Restores an unused box to `PENDING` (FEATURE_2611_03 / D13). Refusals come back as 400 with the server text */
+  restore(parcelId: number): Promise<PackingCloseResult>;
+
+  /** Parcel status history, newest first (FEATURE_2611_03 / D34) */
+  history(query: PackingHistoryQuery): Promise<PackingHistoryRow[]>;
 }

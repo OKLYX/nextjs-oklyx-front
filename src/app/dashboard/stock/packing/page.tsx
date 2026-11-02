@@ -159,7 +159,7 @@ const SHORTCUT_HELP: [string, string][] = [
   ['↑ ↓', '송장 대기: 작업 대상 박스 이동 / 박스 잡은 중: 담을 것 줄 이동'],
   ['← →', '상자 고르기 (즉시 선택)'],
   ['F1 · F2 · F3', '추천 상자 1 · 2 · 3'],
-  ['F4', '송장 미사용 처리'],
+  ['F4', '송장 미사용 처리 / 미사용 송장 되돌리기'],
   ['F6 / F7', '이 박스 완료 / 취소'],
   ['F8 / F9', '단축키 / 안내 음성'],
   ['F10', '오른쪽 열 탭 (작업 대상 / 오늘 완료)'],
@@ -245,6 +245,8 @@ export default function StockPackingPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [unusedOpen, setUnusedOpen] = useState(false);
+  /** Restore confirm for an UNUSED parcel (FEATURE_2611_03 / D13 · D21) */
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   /**
@@ -528,7 +530,7 @@ export default function StockPackingPage() {
         if (result.parcel.status === 'PACKED') {
           notify('error', '이미 출고된 박스입니다', '이미 출고된 박스입니다');
         } else if (result.parcel.status === 'UNUSED') {
-          notify('error', '미사용 처리된 송장입니다', '미사용 처리된 송장입니다');
+          notify('error', '미사용 처리된 송장입니다 — [F4] 로 되돌릴 수 있습니다', '미사용 처리된 송장입니다');
         } else if (result.unexpanded.length > 0) {
           notify(
             'error',
@@ -783,6 +785,28 @@ export default function StockPackingPage() {
     }
   }, [scanResult, packingUseCase, resetBox, notify, loadPending]);
 
+  /**
+   * Restores an UNUSED parcel to PENDING (FEATURE_2611_03 / D13), then re-opens the same
+   * invoice so packing can start right away (R7). On failure the closed card stays as is.
+   */
+  const handleRestore = useCallback(async () => {
+    if (!scanResult) return;
+    setRestoreOpen(false);
+    const invoiceNumber = scanResult.parcel.invoiceNumber;
+    setIsSubmitting(true);
+    try {
+      await packingUseCase.restore(scanResult.parcel.id);
+      notify('success', '미사용 처리를 되돌렸습니다', '되돌렸습니다');
+      setIsSubmitting(false);
+      await handleInvoiceScan(invoiceNumber);
+      loadPending();
+    } catch (error) {
+      const text = serverMessage(error, '미사용 처리를 되돌리지 못했습니다');
+      notify('error', text, text);
+      setIsSubmitting(false);
+    }
+  }, [scanResult, packingUseCase, notify, handleInvoiceScan, loadPending]);
+
   /** 나가기 = 몰입 해제 + 시작 화면으로. 라우터를 건드리지 않는다 (D2) */
   const handleExit = useCallback(() => {
     setExitOpen(false);
@@ -918,7 +942,7 @@ export default function StockPackingPage() {
    */
   const lastCharAtRef = useRef(0);
   useEffect(() => {
-    if (!exitOpen && !unusedOpen) return;
+    if (!exitOpen && !unusedOpen && !restoreOpen) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key.length === 1) {
         lastCharAtRef.current = Date.now();
@@ -937,11 +961,22 @@ export default function StockPackingPage() {
         return;
       }
       if (exitOpen) handleExit();
+      else if (restoreOpen) handleRestore();
       else handleMarkUnused();
     };
     window.addEventListener('keydown', onKey, true); // 캡처 단계
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [exitOpen, unusedOpen, isSubmitting, isScanning, handleExit, handleMarkUnused, notify]);
+  }, [
+    exitOpen,
+    unusedOpen,
+    restoreOpen,
+    isSubmitting,
+    isScanning,
+    handleExit,
+    handleMarkUnused,
+    handleRestore,
+    notify,
+  ]);
 
   // ── 전역 키 수신 ───────────────────────────────────────────────────────────
 
@@ -973,7 +1008,7 @@ export default function StockPackingPage() {
   useEffect(() => {
     handlersRef.current = {
       // 확인 팝업·도움말이 떠 있으면 키는 팝업의 것이다
-      enabled: started && !unusedOpen && !exitOpen && !helpOpen,
+      enabled: started && !unusedOpen && !restoreOpen && !exitOpen && !helpOpen,
       busy: isSubmitting || isScanning,
       submit: () => {
         const value = bufferRef.current;
@@ -984,8 +1019,11 @@ export default function StockPackingPage() {
       backspace: () => setScanBuffer(bufferRef.current.slice(0, -1)),
       // 박스를 잡고 있으면 이 박스 취소, 송장 대기면 나갈 차례다 (D3)
       cancel: () => (scanResult ? handleCancelBox() : setExitOpen(true)),
+      // UNUSED card = restore confirm, otherwise the unused confirm (FEATURE_2611_03 / D21)
       unused: () => {
-        if (scanResult) setUnusedOpen(true);
+        if (!scanResult) return;
+        if (scanResult.parcel.status === 'UNUSED') setRestoreOpen(true);
+        else setUnusedOpen(true);
       },
       selectCandidate: handleSelectCandidate,
       submitBox: handleComplete,
@@ -1479,9 +1517,16 @@ export default function StockPackingPage() {
       title={scanResult.parcel.status === 'PACKED' ? '출고 완료된 박스' : '미사용 처리된 송장'}
       className="xl:min-h-0 xl:overflow-y-auto"
     >
-      <Button variant="secondary" onClick={handleCancelBox} disabled={isSubmitting}>
-        [Esc] 다음 송장 스캔
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        {scanResult.parcel.status === 'UNUSED' && (
+          <Button onClick={() => setRestoreOpen(true)} disabled={isSubmitting}>
+            [F4] 미사용 되돌리기
+          </Button>
+        )}
+        <Button variant="secondary" onClick={handleCancelBox} disabled={isSubmitting}>
+          [Esc] 다음 송장 스캔
+        </Button>
+      </div>
     </Card>
   );
 
@@ -1610,11 +1655,22 @@ export default function StockPackingPage() {
       <ConfirmDialog
         isOpen={unusedOpen}
         title="송장 미사용 처리"
-        message="이 송장을 쓰지 않은 것으로 닫습니다. 출고·상자 기억을 남기지 않으며 되돌릴 수 없습니다. ⚠️ 택배사의 송장이 취소되는 것은 아닙니다 — 실물 라벨은 폐기하세요."
+        message="이 송장을 쓰지 않은 것으로 닫습니다. 출고·상자 기억을 남기지 않습니다. 잘못 눌렀다면 이 송장을 다시 스캔한 뒤 [F4] 로 되돌릴 수 있습니다. ⚠️ 택배사의 송장이 취소되는 것은 아닙니다 — 실물 라벨은 폐기하세요."
         confirmText="미사용으로 닫기"
         onConfirm={handleMarkUnused}
         onCancel={() => setUnusedOpen(false)}
         isDangerous
+        isLoading={isSubmitting}
+      />
+
+      <ConfirmDialog
+        isOpen={restoreOpen}
+        title="미사용 처리 되돌리기"
+        message="이 송장을 다시 포장할 수 있게 되돌립니다. 되돌리면 바로 담기 화면이 열립니다. [Enter] 되돌리기 · [Esc] 돌아가기"
+        confirmText="되돌리기"
+        onConfirm={handleRestore}
+        cancelText="미사용 처리 취소"
+        onCancel={() => setRestoreOpen(false)}
         isLoading={isSubmitting}
       />
 
