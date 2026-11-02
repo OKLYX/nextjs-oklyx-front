@@ -18,6 +18,8 @@ import {
 } from '@/domain/entities/PackingSavingsEntity';
 import { SalesTabs } from '../../components/SalesTabs';
 import { PeriodFilter, currentMonthRange } from '../../components/PeriodFilter';
+import { useShippedOnly } from '@/app/dashboard/sales/components/ShippedOnlyContext';
+import { ShippedOnlySwitch } from '@/app/dashboard/sales/components/ShippedOnlySwitch';
 import { CrossChannelToggle } from './CrossChannelToggle';
 import { ProductProfitTable } from './ProductProfitTable';
 import type { ProductProfitSortKey } from './ProductProfitTable';
@@ -50,6 +52,7 @@ export function ProductProfitContainer() {
   const [to, setTo] = useState(initialRange.to);
   const [sellerId, setSellerId] = useState('');
   const [crossChannel, setCrossChannel] = useState(true);
+  const { excludeUnshipped, setExcludeUnshipped } = useShippedOnly();
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [rows, setRows] = useState<ProductProfit[]>([]);
@@ -89,6 +92,7 @@ export function ProductProfitContainer() {
         to,
         sellerId: sellerId ? Number(sellerId) : undefined,
         crossChannel,
+        excludeUnshipped,
       });
       if (requestId !== requestIdRef.current) return;
       setRows(result);
@@ -99,7 +103,7 @@ export function ProductProfitContainer() {
     } finally {
       if (requestId === requestIdRef.current) setIsLoading(false);
     }
-  }, [salesStatsUseCase, from, to, sellerId, crossChannel]);
+  }, [salesStatsUseCase, from, to, sellerId, crossChannel, excludeUnshipped]);
 
   // 🔴 `crossChannel` 을 보내지 않는다(S13) — 포장은 창고 행위라 채널 축이 없다.
   //    조회 실패해도 손익 표는 그대로 뜬다(절약 열만 `—`).
@@ -211,6 +215,7 @@ export function ProductProfitContainer() {
             setExpandedSavingsMasterId(null);
           }}
         />
+        <ShippedOnlySwitch checked={excludeUnshipped} disabled={isLoading} onChange={setExcludeUnshipped} />
       </PeriodFilter>
 
       {invalidRange && (
