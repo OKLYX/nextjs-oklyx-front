@@ -23,14 +23,18 @@ import type {
   BoxCandidate,
   BoxCandidateItem,
   PackedItemRequest,
+  PackingHistoryRow,
   PackingScanResponse,
   PendingParcel,
 } from '@/domain/entities/PackingEntity';
+import type { CreatePackageRequest } from '@/application/dto/CreatePackageRequest';
 import { ScanInput } from './components/ScanInput';
 import { PackingItemList, type PackedRow } from './components/PackingItemList';
 import { BoxCandidateRow } from './components/BoxCandidateRow';
 import { PendingParcelList } from './components/PendingParcelList';
 import { RightRailTabs, type RailTab } from './components/RightRailTabs';
+import { TodayDoneList } from './components/TodayDoneList';
+import { BoxChangeModal, UNREGISTERED_RECYCLED_BOX_TYPE } from './components/BoxChangeModal';
 import { platformName } from '@/config/platforms';
 
 /**
@@ -84,6 +88,21 @@ const clampIndex = (index: number, length: number) => Math.max(0, Math.min(index
  */
 const SCAN_ENTER_GUARD_MS = 400;
 
+/**
+ * [B] 다음 글자가 이 시간 안에 오면 사람이 아니라 스캐너다 — 그 B 는 바코드의 첫 글자로 돌려놓는다
+ * (2026-11-03 박스 변경 키 B → X). 스캐너는 글자 사이가 보통 10ms 안팎이고, 사람이 B 다음 X 를
+ * 누르는 데는 100ms 넘게 걸린다.
+ */
+const SCAN_CHAR_GAP_MS = 50;
+
+/** 오늘 = 브라우저 날짜 `yyyy-MM-dd`. 🔴 UTC 문자열(`toISOString`)을 쓰지 않는다 — KST 에서 하루 밀린다 */
+const todayDateInput = (): string => {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${today.getFullYear()}-${month}-${day}`;
+};
+
 type MessageTone = 'info' | 'error' | 'success';
 
 /**
@@ -119,7 +138,12 @@ interface KeyHandlers {
   /** 완료·닫기 전송 중 = 모든 키 차단(중복 전송 방지) */
   busy: boolean;
   submit: () => void;
-  append: (char: string) => void;
+  /** 글자 1개 — `code` 는 [B] → [X] 박스 변경 키를 한/영 상태와 상관없이 읽으려고 함께 받는다 */
+  append: (char: string, code: string) => void;
+  /** [B] 로 「박스 추천」 칸을 고른 상태인가 — Esc 는 이 상태만 풀고 박스를 취소하지 않는다 */
+  boxFocused: () => boolean;
+  /** Esc (박스 칸 고른 상태) — 고른 상태만 푼다 */
+  leaveBoxFocus: () => void;
   backspace: () => void;
   /** Esc · F7 — 박스를 잡고 있으면 이 박스 취소, 송장 대기면 나가기 팝업 (D3) */
   cancel: () => void;
@@ -162,7 +186,8 @@ const SHORTCUT_HELP: [string, string][] = [
   ['F4', '송장 미사용 처리 / 미사용 송장 되돌리기'],
   ['F6 / F7', '이 박스 완료 / 취소'],
   ['F8 / F9', '단축키 / 안내 음성'],
-  ['F10', '오른쪽 열 탭 (작업 대상 / 오늘 완료)'],
+  ['F10', '오른쪽 열 탭 (오늘 완료 / 작업 대상)'],
+  ['B → X', '박스 추천 칸 고르기 → 박스 변경 (다른 상자 · 재활용 상자 · 새 상자 등록)'],
   ['Ctrl + Alt + D', '라이트 ↔ 다크 모드'],
   ['Esc', '박스 잡은 중: 이 박스 취소 · 송장 대기: 나가기'],
 ];
@@ -240,8 +265,20 @@ export default function StockPackingPage() {
   const [pendingLoading, setPendingLoading] = useState(false);
   /** 작업 대상 박스 목록에서 ↑↓ 로 고른 줄. 목록이 짧아질 수 있어 쓰는 쪽에서 clamp 한다 */
   const [parcelIndex, setParcelIndex] = useState(0);
-  /** 오른쪽 열 탭 — F10 으로 오간다 (2609_55/D5 · D6) */
-  const [railTab, setRailTab] = useState<RailTab>('PENDING');
+  /** 오른쪽 열 탭 — F10 으로 오간다 (2609_55/D5 · D6). 🔁 기본 = 「오늘 완료」(2026-11-03 사용자 지시) */
+  const [railTab, setRailTab] = useState<RailTab>('DONE');
+  /** 「오늘 완료」 = 오늘의 「포장 완료」 이력 줄 */
+  const [doneRows, setDoneRows] = useState<PackingHistoryRow[]>([]);
+  const [doneLoading, setDoneLoading] = useState(false);
+
+  /** [박스 변경] 창 */
+  const [boxChangeOpen, setBoxChangeOpen] = useState(false);
+  /**
+   * [B] 로 「박스 추천」 칸을 고른 상태. 🔴 ref 가 판정의 원본이다 — 스캐너는 렌더보다 빨리 글자를 보낸다.
+   * `at` = B 를 받은 시각, `char` = 스캔이었을 때 버퍼로 돌려놓을 실제 글자(대소문자 그대로).
+   */
+  const boxFocusRef = useRef<{ at: number; char: string } | null>(null);
+  const [boxFocused, setBoxFocused] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [unusedOpen, setUnusedOpen] = useState(false);
@@ -446,10 +483,25 @@ export default function StockPackingPage() {
     }
   }, [packingUseCase]);
 
+  /** 오늘의 「포장 완료」 줄만 — 미사용 처리·되돌리기 줄은 이 목록의 것이 아니다 */
+  const loadDone = useCallback(async () => {
+    setDoneLoading(true);
+    try {
+      const today = todayDateInput();
+      const rows = await packingUseCase.history({ from: today, to: today });
+      setDoneRows(rows.filter((row) => row.fromStatus === 'PENDING' && row.toStatus === 'PACKED'));
+    } catch {
+      setDoneRows([]);
+    } finally {
+      setDoneLoading(false);
+    }
+  }, [packingUseCase]);
+
   // set-state-in-effect 회피 = 인라인 async IIFE (프로젝트 표준)
   useEffect(() => {
     void (async () => {
       await loadPending();
+      await loadDone();
       try {
         // 🔴 기억이 없는 조합에서 고를 전체 목록 — 필터 없이 = 재활용 상자 포함
         setAllPackages(await packageUseCase.getPackages());
@@ -457,7 +509,7 @@ export default function StockPackingPage() {
         setAllPackages([]);
       }
     })();
-  }, [loadPending, packageUseCase]);
+  }, [loadPending, loadDone, packageUseCase]);
 
   /**
    * 송장을 찍으면 **한 번** 후보를 묻는다 (D23 · 2026-09-17 사용자 지시).
@@ -500,8 +552,12 @@ export default function StockPackingPage() {
 
   const resetBox = useCallback(() => {
     setScanResult(null);
-    // 🔴 대기로 돌아오면 ↑↓ 의 대상이 보여야 한다 (2609_55/D5). 대기로 오는 모든 경로가 여기를 지난다
-    setRailTab('PENDING');
+    // 🔁 대기로 돌아오면 기본 탭(「오늘 완료」)으로 — 방금 닫은 박스가 거기 올라온다(2026-11-03 사용자 지시).
+    //    ↑↓ 를 누르면 `moveParcel` 이 「작업 대상」으로 넘긴다(2609_55/D5). 대기로 오는 모든 경로가 여기를 지난다
+    setRailTab('DONE');
+    boxFocusRef.current = null;
+    setBoxFocused(false);
+    setBoxChangeOpen(false);
     setPacked({});
     setActiveRowKey(null);
     setCandidates([]);
@@ -738,6 +794,7 @@ export default function StockPackingPage() {
       const done = left > 0 ? `완료 — 남은 ${left}개, 다음 송장을 스캔하세요` : '완료 — 다음 송장을 스캔하세요';
       notify('success', borrowed ? `${done} · ${borrowed}` : done, '완료');
       loadPending();
+      loadDone();
     } catch (error) {
       // 🔴 담은 내용은 지우지 않는다 — 다시 스캔시키면 안 된다
       const text = serverMessage(error, '박스 완료에 실패했습니다');
@@ -757,7 +814,58 @@ export default function StockPackingPage() {
     resetBox,
     notify,
     loadPending,
+    loadDone,
   ]);
+
+  /** [박스 변경] 창 열기 — 담는 중에만 (B → X · 카드 버튼이 같은 함수를 쓴다) */
+  const openBoxChange = useCallback(() => {
+    boxFocusRef.current = null;
+    setBoxFocused(false);
+    if (!isPending || isSubmitting) return;
+    setBoxChangeOpen(true);
+  }, [isPending, isSubmitting]);
+
+  /** 공용 미등록 재활용 상자를 찾고, 없으면 한 번 만든다 (2026-11-03 사용자 결정) */
+  const handlePickUnregistered = useCallback(async () => {
+    const existing = allPackages.find(
+      (pkg) => pkg.type === UNREGISTERED_RECYCLED_BOX_TYPE && boxKindOf(pkg) === 'RECYCLED'
+    );
+    if (existing) {
+      handleSelectBox(existing.id);
+      return;
+    }
+    try {
+      // 치수는 모른다 — 서버가 0.1cm 이상을 요구해서 1cm 로 둔다. 비용 0 = 재활용 상자만 허용된다
+      const created = await packageUseCase.createPackage({
+        type: UNREGISTERED_RECYCLED_BOX_TYPE,
+        cost: 0,
+        widthCm: 1,
+        lengthCm: 1,
+        heightCm: 1,
+        isDefault: false,
+        boxKind: 'RECYCLED',
+      });
+      setAllPackages((previous) => [...previous, created]);
+      handleSelectBox(created.id);
+    } catch (error) {
+      throw new Error(serverMessage(error, '재활용 상자를 준비하지 못했습니다'));
+    }
+  }, [allPackages, packageUseCase, handleSelectBox]);
+
+  /** [박스 변경] 창의 새 상자 등록 — 저장 → 목록에 넣기 → 이 송장의 상자로 고르기 */
+  const handleCreateBox = useCallback(
+    async (request: CreatePackageRequest) => {
+      try {
+        const created = await packageUseCase.createPackage(request);
+        setAllPackages((previous) => [...previous, created]);
+        handleSelectBox(created.id);
+        notify('success', `상자를 등록했습니다 — ${created.type}`);
+      } catch (error) {
+        throw new Error(serverMessage(error, '상자를 등록하지 못했습니다'));
+      }
+    },
+    [packageUseCase, handleSelectBox, notify]
+  );
 
   const handleCancelBox = useCallback(() => {
     if (!scanResult) {
@@ -990,6 +1098,8 @@ export default function StockPackingPage() {
     busy: false,
     submit: noop,
     append: noop,
+    boxFocused: () => false,
+    leaveBoxFocus: noop,
     backspace: noop,
     cancel: noop,
     unused: noop,
@@ -1008,14 +1118,54 @@ export default function StockPackingPage() {
   useEffect(() => {
     handlersRef.current = {
       // 확인 팝업·도움말이 떠 있으면 키는 팝업의 것이다
-      enabled: started && !unusedOpen && !restoreOpen && !exitOpen && !helpOpen,
+      enabled: started && !unusedOpen && !restoreOpen && !exitOpen && !helpOpen && !boxChangeOpen,
       busy: isSubmitting || isScanning,
       submit: () => {
-        const value = bufferRef.current;
+        // B 바로 뒤 Enter = 「B」 한 글자짜리 스캔이었다 → 그 글자를 돌려놓고 보낸다
+        const focus = boxFocusRef.current;
+        if (focus) {
+          boxFocusRef.current = null;
+          setBoxFocused(false);
+        }
+        const restored = focus && Date.now() - focus.at < SCAN_CHAR_GAP_MS ? focus.char : '';
+        const value = bufferRef.current + restored;
         setScanBuffer('');
         handleScannedValue(value);
       },
-      append: (char: string) => setScanBuffer(bufferRef.current + char),
+      /*
+       * 🔴 [B] → [X] = 박스 변경 (2026-11-03 사용자 결정 — 글자 키라 스캔과 겹칠 수 있음을 알고 고른 것).
+       *    겹침을 줄이는 규칙 두 가지:
+       *    ① B 는 **버퍼가 비어 있고 담는 중일 때만** 키로 읽는다 — 바코드 중간의 B 는 그대로 글자다.
+       *    ② B 다음 글자가 `SCAN_CHAR_GAP_MS` 안에 오면 스캐너다 → B 를 버퍼 맨 앞에 돌려놓는다.
+       *    `code` 로 보는 이유: 한글 입력 상태면 `key` 가 'ㅠ'·'ㅌ' 로 온다.
+       */
+      append: (char: string, code: string) => {
+        const now = Date.now();
+        const focus = boxFocusRef.current;
+        if (focus) {
+          boxFocusRef.current = null;
+          setBoxFocused(false);
+          if (now - focus.at < SCAN_CHAR_GAP_MS) {
+            setScanBuffer(bufferRef.current + focus.char + char);
+            return;
+          }
+          if (code === 'KeyX') {
+            openBoxChange();
+            return;
+          }
+          // 사람이 B 를 누르고 다른 글자를 쳤다 = 칸 고르기를 그만둔 것. 그 글자는 평소처럼 받는다
+        } else if (code === 'KeyB' && bufferRef.current === '' && scanResult && isPending) {
+          boxFocusRef.current = { at: now, char };
+          setBoxFocused(true);
+          return;
+        }
+        setScanBuffer(bufferRef.current + char);
+      },
+      boxFocused: () => boxFocusRef.current !== null,
+      leaveBoxFocus: () => {
+        boxFocusRef.current = null;
+        setBoxFocused(false);
+      },
       backspace: () => setScanBuffer(bufferRef.current.slice(0, -1)),
       // 박스를 잡고 있으면 이 박스 취소, 송장 대기면 나갈 차례다 (D3)
       cancel: () => (scanResult ? handleCancelBox() : setExitOpen(true)),
@@ -1086,6 +1236,11 @@ export default function StockPackingPage() {
 
       if (event.key === 'Escape') {
         event.preventDefault();
+        // [B] 로 박스 칸만 고른 상태면 그것만 푼다 — 담던 박스를 날리지 않는다
+        if (handlers.boxFocused()) {
+          handlers.leaveBoxFocus();
+          return;
+        }
         if (handlers.busy) return;
         handlers.cancel();
         return;
@@ -1115,7 +1270,7 @@ export default function StockPackingPage() {
       }
       if (event.key.length === 1) {
         event.preventDefault();
-        handlers.append(event.key);
+        handlers.append(event.key, event.code);
       }
     };
 
@@ -1355,7 +1510,26 @@ export default function StockPackingPage() {
    * 읽는 자리(`selectedBox` 등)는 이미 옵셔널을 거치고 있다. 새 `?.` 를 덧붙이며 조건을 바꾸지 않는다.
    */
   const boxCard = (
-    <Card title="박스 추천" className="space-y-3 xl:min-h-0 xl:overflow-y-auto">
+    <Card
+      title="박스 추천"
+      action={
+        /* 🔴 키(B → X)와 **같은 함수**를 쓴다 — 두 길이 갈라지면 한쪽만 고쳐진다 */
+        <Button
+          variant="secondary"
+          onClick={(event) => {
+            event.currentTarget.blur(); // 포커스를 남기면 다음 Enter 가 이 버튼을 다시 누른다
+            openBoxChange();
+          }}
+          disabled={isSubmitting}
+        >
+          [B → X] 박스 변경
+        </Button>
+      }
+      /* [B] 로 고른 상태 = 테두리로 표시한다. 🔴 `ring-*` 은 그림자라 Card 규칙상 쓰지 않는다 → outline */
+      className={`space-y-3 xl:min-h-0 xl:overflow-y-auto ${
+        boxFocused ? 'outline outline-4 outline-offset-2 outline-blue-500' : ''
+      }`}
+    >
       {selectedBox ? (
         <div>
           <div className="text-4xl font-bold text-gray-900">{selectedBox.type}</div>
@@ -1428,7 +1602,11 @@ export default function StockPackingPage() {
         </div>
       )}
 
-      <p className="text-sm text-gray-700">상자 = F1 · F2 · F3 또는 ← →</p>
+      <p className="text-sm text-gray-700">
+        {boxFocused
+          ? '박스 칸을 골랐습니다 — X = 박스 변경 · Esc = 그만두기'
+          : '상자 = F1 · F2 · F3 또는 ← → · 박스 변경 = B → X'}
+      </p>
 
     </Card>
   );
@@ -1539,6 +1717,7 @@ export default function StockPackingPage() {
     <RightRailTabs
       tab={railTab}
       onSelectTab={setRailTab}
+      donePanel={<TodayDoneList rows={doneRows} loading={doneLoading} />}
       pendingPanel={
         <PendingParcelList
           parcels={pendingParcels}
@@ -1651,6 +1830,18 @@ export default function StockPackingPage() {
   const dialogs = (
     <>
       <PackingSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* 🔴 열 때만 마운트한다 — 창 안 선택·입력이 열 때마다 새로 시작한다 */}
+      {boxChangeOpen && (
+        <BoxChangeModal
+          packages={allPackages}
+          selectedPackageId={selectedPackageId}
+          onClose={() => setBoxChangeOpen(false)}
+          onPick={handleSelectBox}
+          onPickUnregistered={handlePickUnregistered}
+          onCreate={handleCreateBox}
+        />
+      )}
 
       <ConfirmDialog
         isOpen={unusedOpen}
