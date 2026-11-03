@@ -1,13 +1,14 @@
 'use client';
 
 /**
- * 매출 화면 공통 기간 필터 (FEATURE_2609_30 / 04 Step 3).
+ * Shared period filter of the sales screens (FEATURE_2609_30 / 04 Step 3).
  *
- * **순수 controlled**: `from`/`to` 는 부모(Container)가 소유하고 여기서 상태를 들지 않는다.
- * 세 탭(통합 매출 조회 · 채널별 매출 · 상품별 매출)이 각자 자기 기간을 갖는다 — 전역 스토어로 올리지 않는다.
+ * **Purely controlled**: the parent (Container) owns `from`/`to`; this component holds no state.
+ * Each of the three tabs (「통합 매출 조회」 · 「채널별 매출」 · 「상품별 매출」) keeps its own period — do not lift it
+ * into a global store.
  *
- * ⚠️ 이 필터는 <b>판매일</b> 축이다. 판매자 표의 "정산 추정 금액"(`pendingPayout`)은 매출인식일 축이라
- * 여기서 기간을 바꿔도 값이 변하지 않는다(PLAN 2609_30 D4). 그 사실은 표 헤더가 라벨로 설명한다.
+ * ⚠️ This filter is on the <b>sale-date</b> axis, and every sales amount follows it, 「정산 추정 금액」 included
+ * (FEATURE_2611_05 D6). The one cash-basis value is 「지급확정」, and its own small line 「기간 내 입금」 says so.
  */
 
 /** `yyyy-MM-dd` (로컬 기준). `toISOString()` 은 UTC 로 밀려 하루가 어긋난다. */
