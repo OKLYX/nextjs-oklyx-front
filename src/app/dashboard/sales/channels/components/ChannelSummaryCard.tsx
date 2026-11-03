@@ -3,6 +3,7 @@
 import type { ChannelSales } from '@/domain/entities/SalesSummary';
 import {
   PROFIT_PENDING_HINT,
+  SETTLEMENT_PENDING_HINT,
   fixedCostHintFor,
   formatFixedCost,
   formatMoney,
@@ -10,15 +11,17 @@ import {
 } from '@/domain/entities/SalesSummary';
 
 /**
- * 선택한 채널 <b>한 개</b>의 기간 합계 (FEATURE_2609_34).
+ * Period totals of <b>one</b> selected channel (FEATURE_2609_34).
  *
- * 🔴 <b>정산 금액(정산 추정·지급확정)은 싣지 않는다.</b> 여기는 매출 화면이고 그 둘은 매출인식월·현금주의
- * 축이라, 판매일 합계 옆에 두면 반드시 빼 보게 된다. 정산은 통합 매출과 정산 화면이 다룬다.
+ * 🔴 <b>「정산 추정 금액」 sits right after 「순이익(추정)」</b> — it is on the sale-date axis like the other totals
+ * here (FEATURE_2611_05 D3 · D11 · D14). 「지급확정」 (cash basis) is still <b>not</b> shown here: next to sale-date
+ * totals it would be read as part of them. Payouts belong to the combined sales view and the settlement screen.
  *
- * 🔴 <b>서버가 계산한 값을 그대로 그린다.</b> 아래 매출 내역·판매 내역을 더해서 만들지 않는다 — 화면에서
- * 다시 더하기 시작하면 같은 채널의 숫자가 화면마다 달라지고, 어느 쪽이 맞는지 아무도 모르게 된다.
+ * 🔴 <b>Draw the server's values as they are.</b> Do not build them by adding up the sales / order lists below —
+ * once the screen starts re-adding, the same channel shows different numbers on different screens and nobody
+ * knows which one is right.
  *
- * ⚠️ 표시 전용이다.
+ * ⚠️ Display only.
  */
 interface ChannelSummaryCardProps {
   channel: ChannelSales;
@@ -35,6 +38,11 @@ export function ChannelSummaryCard({ channel }: ChannelSummaryCardProps) {
       label: '순이익(추정)',
       value: formatProfit(channel),
       hint: channel.costBasisReady ? undefined : PROFIT_PENDING_HINT,
+    },
+    {
+      label: '정산 추정 금액',
+      value: formatMoney(channel.estSettlement),
+      hint: channel.estSettlement == null ? SETTLEMENT_PENDING_HINT : undefined,
     },
     {
       label: '취소수량',

@@ -6,6 +6,7 @@ import type { PayoutSummary } from '@/domain/entities/Settlement';
 import {
   FIXED_COST_HINT_MIXED,
   PROFIT_PENDING_HINT,
+  SETTLEMENT_PENDING_HINT,
   formatFixedCost,
   formatMoney,
   formatProfit,
@@ -41,18 +42,19 @@ interface SellerSummaryTableProps {
 const COLUMN_COUNT = 7;
 
 /**
- * 판매자별 매출 표 (FEATURE_2609_30 / 04 Step 3). 한 행 = 판매자, 클릭하면 채널 행이 펼쳐진다.
+ * Sales table per seller (FEATURE_2609_30 / 04 Step 3). One row = one seller; a click opens its channel rows.
  *
- * 🔴 <b>"정산 추정 금액" 헤더의 `기간 무관 · 미지급 잔액` 라벨을 지우지 말 것</b>(PLAN D4). 이 값만 기간
- * 필터를 따라 움직이지 않아서, 라벨이 없으면 사용자가 버그로 신고한다. 툴팁으로 대체 불가.
+ * 🔴 「정산 추정 금액」 follows the period and the switch like 「매출액」 (FEATURE_2611_05 D2 · D6), so it has no small
+ * line under its name (D15). It is `—` when a line has no commission base, with the hint only then (D7 · D10).
  *
- * 🔴 순이익이 없으면 `—` 다. 0 으로 그리면 "안 남았다"로 읽힌다 — 실제는 "아직 모른다"다(D15).
+ * 🔴 No profit is `—`. Drawn as 0 it reads "nothing left" — the truth is "not known yet" (D15).
  *
- * 🔴 <b>대사 상태 배지를 이 표에 다시 넣지 말 것</b>(FEATURE_2609_34). 지급 묶음은 매출인식일 축이라
- * 기간을 바꿔도 건수가 안 변하는데, 기간 필터 옆에 있으면 "이번 달에 13건이 어긋났다"로 읽힌다.
- * 대사 상태는 판매자를 펼쳤을 때 나오는 인식월별 정산 목록이 건별로 보여준다.
+ * 🔴 <b>Do not put the reconciliation status badge back into this table</b> (FEATURE_2609_34). Payouts are on the
+ * revenue-recognition axis, so the count does not change with the period, and next to the period filter it reads as
+ * "13 mismatched this month". Reconciliation status is shown per payout by the recognition-month list under an
+ * opened seller.
  *
- * ⚠️ 표시 전용이다. 조회·펼침 상태는 Container 가 소유한다.
+ * ⚠️ Display only. The Container owns the lookups and the open state.
  */
 export function SellerSummaryTable({
   rows,
@@ -92,12 +94,14 @@ export function SellerSummaryTable({
       // 고정비 합계는 `totalProfitReady` 와 무관하게 항상 숫자다 — 원가가 미확정이어도 나가는 돈은 안다(D6).
       fixedCost: acc.fixedCost + (row.fixedCost ?? 0),
       estNetProfit: acc.estNetProfit + (row.estNetProfit ?? 0),
-      pendingPayout: acc.pendingPayout + row.pendingPayout,
+      estSettlement: acc.estSettlement + (row.estSettlement ?? 0),
     }),
-    { grossSales: 0, discount: 0, netQty: 0, fixedCost: 0, estNetProfit: 0, pendingPayout: 0 }
+    { grossSales: 0, discount: 0, netQty: 0, fixedCost: 0, estNetProfit: 0, estSettlement: 0 }
   );
   // 한 행이라도 원가 스냅샷이 없으면 합계도 모르는 값이다 — 부분합을 총계처럼 보이면 안 된다.
   const totalProfitReady = rows.length > 0 && rows.every((row) => row.costBasisReady);
+  // FEATURE_2611_05 D7 · D12: the same rule for the estimated settlement — one `—` row makes the total `—`.
+  const totalSettlementReady = rows.length > 0 && rows.every((row) => row.estSettlement != null);
 
   // Narrow-screen cards (FEATURE_2610_31 D14 · D33): the app's seller sales card — 「▸ seller」, then 「판매수량」 · 「매출액」 ·
   // 「할인」 · 「고정비」 · 「순이익(추정)」 · 「정산 추정 금액」 lines; a tap opens the channel rows inside the card. The totals card
@@ -133,7 +137,11 @@ export function SellerSummaryTable({
                 value={formatProfit(row)}
                 hint={row.costBasisReady ? undefined : PROFIT_PENDING_HINT}
               />
-              <SalesValueRow label="정산 추정 금액" sub="기간 무관 · 미지급 잔액" value={formatMoney(row.pendingPayout)} />
+              <SalesValueRow
+                label="정산 추정 금액"
+                value={formatMoney(row.estSettlement)}
+                hint={row.estSettlement == null ? SETTLEMENT_PENDING_HINT : undefined}
+              />
             </div>
           }
           expansion={
@@ -170,8 +178,8 @@ export function SellerSummaryTable({
           />
           <SalesValueRow
             label="정산 추정 금액"
-            sub="기간 무관 · 미지급 잔액"
-            value={formatMoney(totals.pendingPayout)}
+            value={totalSettlementReady ? formatMoney(totals.estSettlement) : '—'}
+            hint={totalSettlementReady ? undefined : SETTLEMENT_PENDING_HINT}
             bold
           />
         </div>
@@ -210,10 +218,6 @@ export function SellerSummaryTable({
             </th>
             <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
               정산 추정 금액
-              {/* 🔴 이 라벨이 없으면 "기간을 바꿨는데 값이 안 변한다"가 버그 신고로 온다(D4). */}
-              <span className="block text-[11px] font-normal text-gray-500">
-                기간 무관 · 미지급 잔액
-              </span>
             </th>
           </tr>
         </thead>
@@ -257,8 +261,11 @@ export function SellerSummaryTable({
                   >
                     {formatProfit(row)}
                   </td>
-                  <td className="px-6 py-3 text-sm text-right text-gray-900">
-                    {formatMoney(row.pendingPayout)}
+                  <td
+                    className="px-6 py-3 text-sm text-right text-gray-900"
+                    title={row.estSettlement == null ? SETTLEMENT_PENDING_HINT : undefined}
+                  >
+                    {formatMoney(row.estSettlement)}
                   </td>
                 </tr>
                 {isExpanded && (
@@ -303,8 +310,11 @@ export function SellerSummaryTable({
               >
                 {totalProfitReady ? formatMoney(totals.estNetProfit) : '—'}
               </td>
-              <td className="px-6 py-3 text-sm text-right font-semibold text-gray-900">
-                {formatMoney(totals.pendingPayout)}
+              <td
+                className="px-6 py-3 text-sm text-right font-semibold text-gray-900"
+                title={totalSettlementReady ? undefined : SETTLEMENT_PENDING_HINT}
+              >
+                {totalSettlementReady ? formatMoney(totals.estSettlement) : '—'}
               </td>
             </tr>
           </tfoot>
