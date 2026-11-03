@@ -42,4 +42,10 @@ export interface PackingRepository {
 
   /** Parcel status history, newest first (FEATURE_2611_03 / D34) */
   history(query: PackingHistoryQuery): Promise<PackingHistoryRow[]>;
+
+  /**
+   * Changes the box of a packed parcel (FEATURE_2611_06 / D8). Returns the complete result with the costs after
+   * the change. Refusals (not packed · unknown box) come back as 400 with the server text
+   */
+  changeBox(parcelId: number, boxPackageId: number): Promise<PackingCompleteResult>;
 }

@@ -189,6 +189,11 @@ export interface PackingHistoryRow {
   changedBy: string | null;
   /** The box the parcel is packed in (`Package.type`). `null` = none (never packed) */
   boxName: string | null;
+  /**
+   * Id of that box (FEATURE_2611_06 / D9). `null` = none. The box change dialog preselects it —
+   * box names are not unique, so never look the box up by `boxName`.
+   */
+  boxPackageId: number | null;
 }
 
 /**
@@ -202,12 +207,13 @@ export interface PackingHistoryQuery {
 }
 
 /**
- * Action name of a status pair (D30): 「포장 완료」 · 「미사용 처리」 · 「미사용 되돌리기」.
- * Any other pair is never written (D16) and shows `-`.
+ * Action name of a status pair (D30): 「포장 완료」 · 「미사용 처리」 · 「미사용 되돌리기」 ·
+ * 「상자 변경」 (PACKED → PACKED, FEATURE_2611_06 / D14). Any other pair is never written and shows `-`.
  */
 export const parcelActionLabel = (fromStatus: ParcelStatus, toStatus: ParcelStatus): string => {
   if (fromStatus === 'PENDING' && toStatus === 'PACKED') return '포장 완료';
   if (fromStatus === 'PENDING' && toStatus === 'UNUSED') return '미사용 처리';
   if (fromStatus === 'UNUSED' && toStatus === 'PENDING') return '미사용 되돌리기';
+  if (fromStatus === 'PACKED' && toStatus === 'PACKED') return '상자 변경';
   return '-';
 };

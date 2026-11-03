@@ -50,4 +50,9 @@ export class PackingUseCase {
   async history(query: PackingHistoryQuery): Promise<PackingHistoryRow[]> {
     return this.repository.history(query);
   }
+
+  /** Changes the box of a packed parcel (FEATURE_2611_06 / D8) */
+  async changeBox(parcelId: number, boxPackageId: number): Promise<PackingCompleteResult> {
+    return this.repository.changeBox(parcelId, boxPackageId);
+  }
 }

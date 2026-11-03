@@ -9,9 +9,16 @@ import { Input } from '@/presentation/components/ui/Input';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { PackingUseCase } from '@/application/usecases/PackingUseCase';
 import { PackingRepositoryImpl } from '@/infrastructure/repositories/PackingRepositoryImpl';
+import { PackageUseCase } from '@/application/usecases/PackageUseCase';
+import { PackageRepositoryImpl } from '@/infrastructure/repositories/PackageRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { toast } from '@/infrastructure/stores/toastStore';
 import { formatChangedAt } from '@/domain/entities/PriceHistoryEntity';
 import { parcelActionLabel, type PackingHistoryRow } from '@/domain/entities/PackingEntity';
+import type { Package } from '@/domain/entities/PackageEntity';
+import type { CreatePackageRequest } from '@/application/dto/CreatePackageRequest';
+import { BoxChangeModal } from '@/app/dashboard/stock/packing/components/BoxChangeModal';
+import { findOrCreateUnregisteredRecycledBox } from '@/app/dashboard/stock/packing/components/unregisteredRecycledBox';
 
 /** `yyyy-MM-dd` from the local date — never the UTC date string (it shifts a day in KST). */
 const toDateInput = (date: Date): string => {
@@ -23,6 +30,10 @@ interface DateRange {
   from: string;
   to: string;
 }
+
+/** 「포장 완료」 row = the only row that offers [상자 변경] (FEATURE_2611_06 / D15) */
+const isPackedRow = (row: PackingHistoryRow): boolean =>
+  row.fromStatus === 'PENDING' && row.toStatus === 'PACKED';
 
 /** Last n days including today. n=1 = today only. */
 const recentDays = (days: number): DateRange => {
@@ -42,19 +53,26 @@ const PRESETS: { label: string; range: () => DateRange }[] = [
  * (FEATURE_2611_03 / PLAN D19 · D30).
  * File: src/app/dashboard/stock/packing-history/components/PackingHistoryContainer.tsx
  *
- * - Read only (D32): no row click, no edit / delete buttons. The server has no write path here.
+ * - Rows stay read only (D32): no row click, no edit / delete buttons. The one action (FEATURE_2611_06 / D18) =
+ *   [상자 변경] on a 「포장 완료」 row (table cell and card) — changes that parcel's box with the packing screen's
+ *   `BoxChangeModal` (reused, never copied — D17).
  * - Period = shortcut buttons only, no date inputs (D29).
  * - 「처리 시각」 prints the server's KST wall clock as is — no time zone math in this file (D40).
  * - Row order is the server's; never re-sorted here.
  */
 export function PackingHistoryContainer() {
   const useCase = useMemo(() => new PackingUseCase(new PackingRepositoryImpl()), []);
+  const packageUseCase = useMemo(() => new PackageUseCase(new PackageRepositoryImpl()), []);
 
   const [range, setRange] = useState<DateRange>(() => recentDays(1));
   const [keyword, setKeyword] = useState('');
   const [rows, setRows] = useState<PackingHistoryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  /** Box list for the [상자 변경] dialog — loaded once after the first history load (empty on failure) */
+  const [packages, setPackages] = useState<Package[]>([]);
+  /** Row whose parcel box is being changed. `null` = dialog closed */
+  const [boxTarget, setBoxTarget] = useState<PackingHistoryRow | null>(null);
 
   const load = useCallback(
     async (params: { range: DateRange; keyword: string }) => {
@@ -83,8 +101,59 @@ export function PackingHistoryContainer() {
     // Inline async IIFE — a sync setState in the effect body is blocked by the project lint.
     void (async () => {
       await load(initialQuery.current);
+      try {
+        setPackages(await packageUseCase.getPackages());
+      } catch {
+        setPackages([]);
+      }
     })();
-  }, [load]);
+  }, [load, packageUseCase]);
+
+  /**
+   * Changes the target parcel's box, then reloads with the period and the current search text as they are
+   * (FEATURE_2611_06 / D17 · D20). Failure throws the server text — the dialog shows it and stays open.
+   */
+  const changeBox = async (box: Package) => {
+    if (!boxTarget) return;
+    try {
+      await useCase.changeBox(boxTarget.parcelId, box.id);
+    } catch (e) {
+      throw new Error(extractErrorMessage(e, '상자를 바꾸지 못했습니다'));
+    }
+    setBoxTarget(null);
+    await load({ range, keyword });
+    toast.success(`상자를 바꿨습니다 — ${box.type}`);
+  };
+
+  const handlePick = async (packageId: number) => {
+    const box = packages.find((pkg) => pkg.id === packageId);
+    if (!box) return;
+    await changeBox(box);
+  };
+
+  const handlePickUnregistered = async () => {
+    const { box, created } = await findOrCreateUnregisteredRecycledBox(packages, packageUseCase);
+    if (created) setPackages((previous) => [...previous, box]);
+    await changeBox(box);
+  };
+
+  const handleCreate = async (request: CreatePackageRequest) => {
+    let created: Package;
+    try {
+      created = await packageUseCase.createPackage(request);
+    } catch (e) {
+      throw new Error(extractErrorMessage(e, '상자를 등록하지 못했습니다'));
+    }
+    setPackages((previous) => [...previous, created]);
+    await changeBox(created);
+  };
+
+  // Same button in the table cell and on the card (017-responsive: card keeps the row actions).
+  const boxChangeButton = (row: PackingHistoryRow) => (
+    <Button size="sm" variant="secondary" onClick={() => setBoxTarget(row)}>
+      상자 변경
+    </Button>
+  );
 
   const search = (next: DateRange = range) => {
     setRange(next);
@@ -108,8 +177,10 @@ export function PackingHistoryContainer() {
           { label: '주문번호', value: row.externalOrderId },
           { label: '판매자', value: row.sellerName ?? '-' },
           { label: '동작', value: parcelActionLabel(row.fromStatus, row.toStatus) },
+          { label: '상자', value: row.boxName ?? '-' },
           { label: '처리자', value: row.changedBy ?? '-' },
         ]}
+        actions={isPackedRow(row) ? boxChangeButton(row) : undefined}
       />
     ));
 
@@ -182,6 +253,7 @@ export function PackingHistoryContainer() {
                 <th className="px-4 py-2">주문번호</th>
                 <th className="px-4 py-2">판매자</th>
                 <th className="px-4 py-2">동작</th>
+                <th className="px-4 py-2">상자</th>
                 <th className="px-4 py-2">처리자</th>
               </tr>
             </thead>
@@ -196,12 +268,29 @@ export function PackingHistoryContainer() {
                   <td className="px-4 py-2 whitespace-nowrap">
                     {parcelActionLabel(row.fromStatus, row.toStatus)}
                   </td>
+                  <td className="px-4 py-2 whitespace-nowrap">
+                    <span className="flex items-center gap-2">
+                      {row.boxName ?? '-'}
+                      {isPackedRow(row) && boxChangeButton(row)}
+                    </span>
+                  </td>
                   <td className="px-4 py-2 whitespace-nowrap">{row.changedBy ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </DataCardSwitch>
+      )}
+
+      {boxTarget && (
+        <BoxChangeModal
+          packages={packages}
+          selectedPackageId={boxTarget.boxPackageId}
+          onClose={() => setBoxTarget(null)}
+          onPick={handlePick}
+          onPickUnregistered={handlePickUnregistered}
+          onCreate={handleCreate}
+        />
       )}
     </PageContainer>
   );
