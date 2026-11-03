@@ -4,8 +4,10 @@
 // Extracted from CategoryMetaPanel so the detail container and the create modal apply
 // an identical rule. The presentation component (CategoryMetaFields) carries no validation.
 //
-// 개당 용량/중량·수량 은 옵션 소유(각 옵션이 설정)이므로 마스터 게이트에서는 제외하고,
-// 옵션 게이트(computeMissingOptionRequired)에서만 검증한다.
+// Per-unit volume/weight/quantity are option-owned (each option sets them), so the master gate skips them and
+// only the option gate (computeMissingOptionRequired) checks them. Required attributes sharing a Coupang
+// groupNumber are one-of (choiceGroups.ts — FEATURE_2611_08 / D2); a group with an option-owned member is
+// checked by the option gate only, with the master value as fallback (D3 · D5).
 
 import type { CategoryAttribute, CategoryNotice } from '@/domain/entities/MasterProductEntity';
 import {
@@ -15,25 +17,20 @@ import {
   resolveNoticeGroup,
 } from './noticeTemplates';
 import {
-  derivedUnit,
-  isPairRequired,
-  pairMeasureAttributes,
-  type MeasurePair,
-} from './measureAttributes';
+  isGroupFilled,
+  isOptionGroup,
+  requiredChoiceGroups,
+  requiredGroupNumber,
+} from './choiceGroups';
 import { isOptionField, isOptionNotice } from './optionMetaFields';
 import { ELEVENST_NOTICE_PREFIX } from '@/domain/entities/ElevenstNotice';
 import { ESM_NOTICE_PREFIX } from '@/domain/entities/EsmNotice';
 
-const pairFilled = (p: MeasurePair, values: Record<string, string>): boolean => {
-  const u = derivedUnit(p, values);
-  const name = u === '용량' ? p.volume.name : u === '중량' ? p.weight.name : '';
-  return !!name && (values[name] ?? '').trim().length > 0;
-};
-
 /**
  * True when any MASTER-owned required field is still missing. Excludes the option-owned
- * physical fields (용량/중량/수량) — those are validated per option. A weight/volume pair is
- * satisfied when the chosen unit's value is filled (one-of).
+ * physical fields (용량/중량/수량) — those are validated per option. Required attributes sharing a
+ * groupNumber are satisfied by any one of them (one-of, FEATURE_2611_08 / D2); a group with any option-owned
+ * member is not checked here — the option gate checks it (D5).
  */
 export function computeMissingRequired(
   attributes: CategoryAttribute[],
@@ -47,7 +44,6 @@ export function computeMissingRequired(
   noticeGroup: string | null = null,
 ): boolean {
   const masterAttributes = attributes.filter((a) => !isOptionField(a.name));
-  const { pairs, singles } = pairMeasureAttributes(masterAttributes);
   const masterNotices = notices.filter((n) => !isOptionNotice(n));
   // Only the selected notice group is submitted → validate that group's required fields only.
   const group = resolveNoticeGroup(masterNotices, noticeValues, noticeGroup);
@@ -56,8 +52,12 @@ export function computeMissingRequired(
   const refAll = isNoticeRefAll(groupNotices, noticeValues);
   const missingAttr =
     !hideCategoryAttrs &&
-    (singles.some((a) => a.required && !(attrValues[a.name] ?? '').trim()) ||
-      pairs.some((p) => isPairRequired(p) && !pairFilled(p, attrValues)));
+    (masterAttributes.some(
+      (a) => a.required && requiredGroupNumber(a) === '' && !(attrValues[a.name] ?? '').trim(),
+    ) ||
+      requiredChoiceGroups(attributes).some(
+        (g) => !isOptionGroup(g) && !isGroupFilled(g, (n) => (attrValues[n] ?? '').trim()),
+      ));
   return (
     missingAttr ||
     (!refAll && groupNotices.some((n) => n.required && !(noticeValues[n.key] ?? '').trim()))
@@ -136,7 +136,10 @@ export function optionNoticesToSubmit(
  * checked. A mixed composition no longer sets it (FEATURE_2610_37 / D17 · D20): its attributes are checked like a
  * single composition's.
  *
- * Weight/volume pairs are one-of (either required side satisfied).
+ * Attributes follow the same merge rule (FEATURE_2611_08 / D3): the option value, or the master value
+ * (`attrCtx.masterAttrValues`) when the option value is blank. Required attributes sharing a groupNumber are
+ * one-of (D2). Only groups with an option-owned member are checked here — master-only groups belong to the
+ * master gate — and their master-owned members count through the master value (D5).
  */
 export function computeMissingOptionRequired(
   attributes: CategoryAttribute[],
@@ -151,13 +154,16 @@ export function computeMissingOptionRequired(
     masterNoticeValues?: Record<string, string>; // 빈값=상속 → 마스터 값도 충족으로 본다
     noticeGroup: string | null; // 실효 그룹(submitNoticeGroup 결과)
   },
+  // Master attribute values for the blank-option fallback (R3 — one object, same reason as noticeCtx).
+  attrCtx?: { masterAttrValues: Record<string, string> },
 ): boolean {
   const optionAttributes = attributes.filter((a) => isOptionField(a.name));
-  const { pairs, singles } = pairMeasureAttributes(optionAttributes);
+  const valueOf = (name: string): string =>
+    (optAttrValues[name] ?? '').trim() || ((attrCtx?.masterAttrValues ?? {})[name] ?? '').trim();
   const missingAttrs = hideCategoryAttrs
     ? false
-    : singles.some((a) => a.required && !(optAttrValues[a.name] ?? '').trim()) ||
-      pairs.some((p) => isPairRequired(p) && !pairFilled(p, optAttrValues));
+    : optionAttributes.some((a) => a.required && requiredGroupNumber(a) === '' && valueOf(a.name) === '') ||
+      requiredChoiceGroups(attributes).some((g) => isOptionGroup(g) && !isGroupFilled(g, valueOf));
   const missingNotices = !noticeCtx
     ? false
     : noticeCtx.notices

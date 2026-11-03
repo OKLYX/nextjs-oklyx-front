@@ -109,9 +109,11 @@ function applyQtyToMeta(
 ): void {
   const value = total > 0 ? String(total) : '';
   // Whether the measure notice is auto-composed = a composing source (per-unit measure attribute) exists and the
-  // attributes are sent. Hidden attributes, two or more component kinds (FEATURE_2610_37 / D23) and a category
-  // without a measure attribute cannot compose it, so it stays a field the user writes.
-  const autoMeasureNotice = !hideCategoryAttrs && !manualMeasureNotice && hasMeasureAttr(attrs);
+  // attributes are sent. Hidden attributes, two or more component kinds (FEATURE_2610_37 / D23), a category
+  // without a measure attribute and no measure value yet (FEATURE_2611_08 / D10) cannot compose it, so it stays a
+  // field the user writes.
+  const autoMeasureNotice =
+    !hideCategoryAttrs && !manualMeasureNotice && hasMeasureAttr(attrs) && measured.trim() !== '';
   const attrNames = hideCategoryAttrs
     ? []
     : attrs.filter(isAutoQuantityAttr).map((a) => a.name);
@@ -147,16 +149,16 @@ function applyQtyToMeta(
       for (const n of noticeTargets) {
         if (isMeasureNotice(n.key)) {
           if (autoMeasureNotice) {
-            // 조합 소스가 있으면 계량 고시는 **파생값**이다(화면에서도 읽기 전용) → dirty 가드 없이
-            // 항상 덮어쓰고, 조합이 불가능해지면(개당 값을 비우면) **비운다**. 비워야 97 게이트가
-            // 막아서 낡은 문자열이 그대로 마켓까지 가는 걸 방지한다.
+            // While a measure value exists the measure notice is a **derived value** (read-only on screen too) →
+            // overwritten every time without a dirty guard. When the measure value becomes empty the notice
+            // turns back into a field the user writes and its text is not erased (FEATURE_2611_08 / D10).
             next[n.key] = composed;
           } else if (
             composed &&
             !skipNotices.has(n.key) &&
             !(manualMeasureNotice && (next[n.key] ?? '').trim() !== '')
           ) {
-            // Not composable (mixed composition AB · a category without a measure attribute) = a user-input
+            // Not composable (mixed composition AB · a category without a measure attribute · no measure value) = a user-input
             // field → keep the guard. With two or more component kinds a non-blank value is kept on every path
             // (form open · attribute edit · quantity change) — only a blank field takes the composed text
             // (FEATURE_2610_37 / D23).
@@ -675,18 +677,26 @@ export function MasterOptionEditor({
       setFormError('옵션 이름을 입력하세요.');
       return;
     }
-    // 옵션-소유 필드 중 **카테고리 스키마가 required 로 표시한 것**(속성 + 선택 품목군의 고시)이
-    // 비어 있으면 저장 차단 — 백엔드 96 과 같은 규칙으로 먼저 막는다. 필수 여부는 스키마(쿠팡 메타)
-    // 플래그만 따른다(이름 기반 강제 없음). 고시는 마스터 값 상속도 충족으로 본다.
+    // Block saving while an option-owned field the **category schema marks required** (attributes + the selected
+    // notice group's notices) is empty — the same rule as backend 96, checked first. Required-ness follows the
+    // schema (Coupang meta) flag only (no name-based forcing). Attributes and notices both count an inherited
+    // master value as filled, and required attributes sharing a Coupang groupNumber are one-of (FEATURE_2611_08 /
+    // D2 · D3).
     if (
       categoryId != null &&
       !attrLoading &&
-      computeMissingOptionRequired(attributes, optAttrValues, hideCategoryAttrs, {
-        notices,
-        optNoticeValues,
-        masterNoticeValues,
-        noticeGroup: masterNoticeGroup,
-      })
+      computeMissingOptionRequired(
+        attributes,
+        optAttrValues,
+        hideCategoryAttrs,
+        {
+          notices,
+          optNoticeValues,
+          masterNoticeValues,
+          noticeGroup: masterNoticeGroup,
+        },
+        { masterAttrValues },
+      )
     ) {
       setFormError('이 옵션의 필수 항목(카테고리가 요구하는 속성·고시)을 입력하세요.');
       // 2609_73: 「옵션별 설정」이 기본 접힘이라, 막힌 채로 두면 어디를 고쳐야 하는지 보이지 않는다.
@@ -836,21 +846,31 @@ export function MasterOptionEditor({
       ? '구성상품을 먼저 선택하면 옵션을 추가할 수 있습니다.'
       : '카테고리를 먼저 선택하면 옵션을 추가할 수 있습니다.';
 
-  // 2609_73: 「옵션별 설정」이 접혀 있을 때 <summary> 에 붙이는 미입력 경고의 판정.
-  // 🔴 저장 게이트(handleSubmit)와 **같은 함수**를 쓴다. 개수를 세는 두 번째 구현을 만들지 말 것 —
-  // 쌍 속성·고시 품목군·마스터 상속 폴백이 그 함수 안에 있어 어긋나면 "미입력 0인데 저장이 막히는"
-  // 상태가 된다. ⚠️ 저장 핸들러의 호출과 중복 계산이지만 그대로 둔다(값의 출처가 하나인 것이 중요
-  // 하고, 저장 핸들러의 호출을 이 변수로 갈아끼우면 `!attrLoading` 타이밍이 렌더 시점과 저장 시점
-  // 에서 달라질 수 있다).
+  // 2609_73: the missing-field warning on the <summary> of the collapsed 「옵션별 설정」.
+  // 🔴 Uses the **same function** as the save gate (handleSubmit). Do not write a second implementation that
+  // counts — the choice groups (groupNumber), the notice group and the master-value fallback live inside that
+  // function, and a drift gives "0 missing but saving is blocked". ⚠️ It repeats the save handler's call, and
+  // that stays (one source of the value matters, and swapping the save handler's call for this variable could
+  // make the `!attrLoading` timing differ between render time and save time).
   const optionMetaMissing =
     categoryId != null &&
     !attrLoading &&
-    computeMissingOptionRequired(attributes, optAttrValues, hideCategoryAttrs, {
-      notices,
-      optNoticeValues,
-      masterNoticeValues,
-      noticeGroup: masterNoticeGroup,
-    });
+    computeMissingOptionRequired(
+      attributes,
+      optAttrValues,
+      hideCategoryAttrs,
+      {
+        notices,
+        optNoticeValues,
+        masterNoticeValues,
+        noticeGroup: masterNoticeGroup,
+      },
+      { masterAttrValues },
+    );
+  // FEATURE_2611_08 / D10 · R6: same expression as applyItemQtyToMeta — the measure notice is auto-composed only
+  // while this is true.
+  const hasMeasureValue =
+    (readMeasureValue(attributes, optAttrValues) || deriveMeasured(components)).trim() !== '';
 
   /* 2609_73: 목록(왼쪽) ↔ 편집 폼(오른쪽) 2열. 폼이 목록을 아래로 밀지 않아 [수정] 을 눌러도
      스크롤 위치를 잃지 않고, 세로 길이가 대략 절반이 된다. 선례 = MasterImagePool 의 2열 + 내부 스크롤.
@@ -1105,6 +1125,7 @@ export function MasterOptionEditor({
                             disabled={isSubmitting}
                             hideCategoryAttrs={hideCategoryAttrs}
                             manualMeasureNotice={components.length >= 2}
+                            hasMeasureValue={hasMeasureValue}
                             noticeGroup={masterNoticeGroup}
                           />
                         </>

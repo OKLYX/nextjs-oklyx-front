@@ -1,9 +1,12 @@
-// 중량/용량 either-or 페어링 — 백엔드가 동적으로 내려주는 필수속성(CategoryAttribute) 중
-// "개당 중량"·"개당 용량" 처럼 단위만 다른 한 쌍을 감지해 택1 입력으로 묶기 위한 순수 헬퍼.
+// Weight/volume either-or pairing — pure helpers that detect, among the category attributes the backend sends
+// (CategoryAttribute), a pair that differs only by unit such as "개당 중량" · "개당 용량", and render it as one
+// either-or input.
 //
-// 배경: 쿠팡 category-related-metas 는 중량/용량을 별도 attributeTypeName 으로 내려주고 둘 다
-// MANDATORY 일 수 있으나, 상품 형태(고체=중량, 액체=용량)상 실제로는 하나만 기재한다.
-// 페어를 감지해 "구분(중량/용량) 선택 + 값 1개" 로 렌더하고, 검증도 '둘 중 하나' 로 완화한다.
+// Background: Coupang category-related-metas sends weight and volume as separate attributeTypeNames and both may
+// be MANDATORY, but by the product form (solid = weight, liquid = volume) only one is filled in practice.
+// A detected pair is rendered as "구분(중량/용량) 선택 + 값 1개".
+// The name pair is for display and auto-fill only — the required check follows the Coupang group number
+// (groupNumber, choiceGroups.ts — FEATURE_2611_08 / D2), not this pairing.
 
 import type { CategoryAttribute } from '@/domain/entities/MasterProductEntity';
 import { hasBoundaryToken, isOptionField } from './optionMetaFields';

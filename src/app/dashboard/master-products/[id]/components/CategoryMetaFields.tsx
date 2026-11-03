@@ -17,6 +17,13 @@ import {
 } from './measureAttributes';
 import { isOptionField, isOptionNotice } from './optionMetaFields';
 import { unitPlaceholder, unitSuffix } from './basicUnit';
+import {
+  choiceGroupGuide,
+  isOptionGroup,
+  optionGroupMasterNote,
+  requiredChoiceGroups,
+  type ChoiceGroup,
+} from './choiceGroups';
 import { Input } from '@/presentation/components/ui/Input';
 import { Spinner } from '@/presentation/components/Spinner';
 import type { ElevenstNotification } from '@/domain/entities/ElevenstNotice';
@@ -148,17 +155,33 @@ export function CategoryMetaFields({
   const activeGroupNotices = masterNotices.filter((n) => noticeGroupName(n) === activeNoticeGroup);
   const refAll = isNoticeRefAll(activeGroupNotices, noticeValues); // "전체 상세페이지 참조" 활성 여부(선택 그룹)
   const { pairs, singles } = pairMeasureAttributes(masterAttributes);
+  // Coupang one-of groups (FEATURE_2611_08) — computed on the whole schema so option-owned members are known.
+  const choiceGroups = requiredChoiceGroups(attributes);
+  // D12: a master-owned member of a group that also has option-owned members → no star, note under the field.
+  const optionGroupOf = new Map<string, ChoiceGroup>();
+  for (const g of choiceGroups.filter(isOptionGroup)) {
+    for (const m of g.members) if (!isOptionField(m.name)) optionGroupOf.set(m.name, g);
+  }
+  // R4: an all-master group with two or more members is drawn as one bordered box above the grid.
+  const boxGroups = choiceGroups.filter((g) => !isOptionGroup(g) && g.members.length >= 2);
+  const boxMemberNames = new Set(boxGroups.flatMap((g) => g.members.map((m) => m.name)));
 
   // Current unit for a pair: explicit choice wins, else inferred from existing values.
   const unitOf = (p: MeasurePair): string =>
     measureUnit[p.base] !== undefined ? measureUnit[p.base] : derivedUnit(p, attrValues);
 
+  // R7: a box counts once; D12 fields are not counted (D8 · D13).
   const requiredCount =
     (hideCategoryAttrs
       ? 0
-      : singles.filter((a) => a.required).length + pairs.filter(isPairRequired).length) +
+      : singles.filter((a) => a.required && !optionGroupOf.has(a.name) && !boxMemberNames.has(a.name)).length +
+        boxGroups.length +
+        pairs.filter(isPairRequired).length) +
     activeGroupNotices.filter((n) => n.required).length;
-  const visibleSingles = onlyRequired ? singles.filter((a) => a.required) : singles;
+  // Box members render only inside their box.
+  const visibleSingles = (onlyRequired ? singles.filter((a) => a.required) : singles).filter(
+    (a) => !boxMemberNames.has(a.name),
+  );
   const visiblePairs = onlyRequired ? pairs.filter(isPairRequired) : pairs;
   // Only the selected group's notices render (and are submitted).
   const visibleNotices = onlyRequired
@@ -170,6 +193,46 @@ export function CategoryMetaFields({
   const pickMeasureUnit = (p: MeasurePair, unit: string) => {
     setMeasureUnit((prev) => ({ ...prev, [p.base]: unit }));
     onMeasureUnit(p, unit);
+  };
+
+  // One master single field. Inside a choice-group box (inBox) and for D12 fields the star is not drawn
+  // (FEATURE_2611_08 / D8 · D9); a D12 field gets the grey note line under its input.
+  const renderSingle = (a: CategoryAttribute, inBox: boolean) => {
+    const optionGroup = optionGroupOf.get(a.name);
+    return (
+      <div key={a.name}>
+        <label className="mb-1 block text-xs font-medium text-gray-600">
+          {a.name}
+          {unitSuffix(a) && <span className="ml-1 font-normal text-gray-400">{unitSuffix(a)}</span>}
+          {!inBox && !optionGroup && a.required && <span className="text-red-600"> *</span>}
+        </label>
+        {a.inputType === 'SELECT' ? (
+          <select
+            className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+            value={attrValues[a.name] ?? ''}
+            onChange={(e) => onAttrChange(a.name, e.target.value)}
+            disabled={disabled}
+          >
+            <option value="">선택</option>
+            {a.options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <Input
+            type={a.inputType === 'NUMBER' ? 'number' : 'text'}
+            size="sm"
+            placeholder={unitPlaceholder(a)}
+            value={attrValues[a.name] ?? ''}
+            onChange={(e) => onAttrChange(a.name, e.target.value)}
+            disabled={disabled}
+          />
+        )}
+        {optionGroup && <p className="mt-1 text-[11px] text-gray-400">{optionGroupMasterNote(optionGroup)}</p>}
+      </div>
+    );
   };
 
   const renderTag = (platform: string) => (
@@ -314,7 +377,20 @@ export function CategoryMetaFields({
           혼합구성(여러 상품) 상품은 쿠팡에 수량/용량/중량 등 속성을 보내지 않습니다(옵션명으로 표현).
         </p>
       ) : (
-        (visibleSingles.length > 0 || visiblePairs.length > 0) && (
+        <>
+        {/* Coupang one-of groups (all master members) — one bordered box each, single star on the guide line. */}
+        {boxGroups.map((g) => (
+          <div key={`g-${g.groupNumber}`} className="mb-4 rounded border border-gray-200 p-3">
+            <p className="mb-2 text-xs font-medium text-gray-600">
+              <span className="text-red-600">* </span>
+              {choiceGroupGuide(g)}
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {g.members.map((a) => renderSingle(a, true))}
+            </div>
+          </div>
+        ))}
+        {(visibleSingles.length > 0 || visiblePairs.length > 0) && (
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visiblePairs.map((p) => {
             const unit = unitOf(p);
@@ -351,41 +427,10 @@ export function CategoryMetaFields({
               </div>
             );
           })}
-          {visibleSingles.map((a) => (
-            <div key={a.name}>
-              <label className="mb-1 block text-xs font-medium text-gray-600">
-                {a.name}
-                {unitSuffix(a) && <span className="ml-1 font-normal text-gray-400">{unitSuffix(a)}</span>}
-                {a.required && <span className="text-red-600"> *</span>}
-              </label>
-              {a.inputType === 'SELECT' ? (
-                <select
-                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-                  value={attrValues[a.name] ?? ''}
-                  onChange={(e) => onAttrChange(a.name, e.target.value)}
-                  disabled={disabled}
-                >
-                  <option value="">선택</option>
-                  {a.options.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  type={a.inputType === 'NUMBER' ? 'number' : 'text'}
-                  size="sm"
-                  placeholder={unitPlaceholder(a)}
-                  value={attrValues[a.name] ?? ''}
-                  onChange={(e) => onAttrChange(a.name, e.target.value)}
-                  disabled={disabled}
-                />
-              )}
-            </div>
-          ))}
+          {visibleSingles.map((a) => renderSingle(a, false))}
         </div>
-        )
+        )}
+        </>
       )}
 
       {/* 상품정보제공고시: 카테고리가 여러 품목군을 줄 수 있어 품목군을 하나 선택해 그 그룹만
