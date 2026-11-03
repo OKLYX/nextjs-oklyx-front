@@ -201,6 +201,9 @@ export interface CategoryAttribute {
   options: string[]; // SELECT candidates; empty for TEXT/NUMBER
   // Base unit (Coupang basicUnit, backend 94). null/undefined = no unit ("없음" is normalized by backend)
   basicUnit?: string | null;
+  // Coupang choice-group number (groupNumber, backend 2026-08-30). Required attributes sharing one number are
+  // satisfied by any one of them. null/undefined = no group (the backend turns "NONE" and blank into null).
+  groupNumber?: string | null;
 }
 
 export interface CategoryNotice {

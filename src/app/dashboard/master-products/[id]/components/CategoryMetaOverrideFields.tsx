@@ -26,6 +26,7 @@ import {
 } from './optionMetaFields';
 import { noticeGroupName } from './noticeTemplates';
 import { unitPlaceholder, unitSuffix } from './basicUnit';
+import { choiceGroupGuide, isOptionGroup, requiredChoiceGroups, type ChoiceGroup } from './choiceGroups';
 
 interface CategoryMetaOverrideFieldsProps {
   attributes: CategoryAttribute[];
@@ -42,6 +43,9 @@ interface CategoryMetaOverrideFieldsProps {
   // FEATURE_2610_37 / D23: two or more component kinds — the measure notice stays an input field (not read-only);
   // the composed text fills it only while it is blank.
   manualMeasureNotice?: boolean;
+  // FEATURE_2611_08 / D10 · R6: the option editor computes "a measure value exists" with the same expression as the
+  // auto-fill (saved/entered measure attribute, else the component net-content value) and passes it here.
+  hasMeasureValue?: boolean;
   // 선택된 품목군(실효). 이 그룹의 고시만 노출·검증 대상(96 ⑨/⑩ 과 같은 규칙)
   noticeGroup?: string | null;
 }
@@ -97,6 +101,7 @@ export function CategoryMetaOverrideFields({
   disabled = false,
   hideCategoryAttrs = false,
   manualMeasureNotice = false,
+  hasMeasureValue = false,
   noticeGroup = null,
 }: CategoryMetaOverrideFieldsProps) {
   // Display-only unit pick per pair; the actual value lives in the parent's attrValues.
@@ -133,6 +138,22 @@ export function CategoryMetaOverrideFields({
     ...requiredPairs.map((p): AttrCell => ({ kind: 'pair', p })),
     ...requiredSingles.map((a): AttrCell => ({ kind: 'single', a })),
   ];
+  // Coupang one-of groups shown here as one bordered box (FEATURE_2611_08 / D8 · R4 · R5): groups with two or more
+  // option-owned members. A required cell joins the box of the first group that holds one of its attribute names
+  // (a pair cell carries two names); the cells left over stay in the plain required grid.
+  const boxGroups: ChoiceGroup[] = hideCategoryAttrs
+    ? []
+    : requiredChoiceGroups(attributes).filter(
+        (g) => isOptionGroup(g) && g.members.filter((m) => isOptionField(m.name)).length >= 2,
+      );
+  const cellNames = (cell: AttrCell): string[] =>
+    cell.kind === 'pair' ? [cell.p.weight.name, cell.p.volume.name] : [cell.a.name];
+  const boxOf = (cell: AttrCell): ChoiceGroup | undefined =>
+    boxGroups.find((g) => g.members.some((m) => cellNames(cell).includes(m.name)));
+  const boxes = boxGroups
+    .map((g) => ({ g, cells: requiredCells.filter((c) => boxOf(c) === g) }))
+    .filter((b) => b.cells.length > 0);
+  const remainingRequiredCells = requiredCells.filter((c) => !boxOf(c));
   const optionalCells: AttrCell[] = showAll
     ? [
         ...optionalPairs.map((p): AttrCell => ({ kind: 'pair', p })),
@@ -143,9 +164,10 @@ export function CategoryMetaOverrideFields({
   const hasNoticeFields = visibleNoticeFields.length > 0;
   // The measure notice (`포장단위별 …용량(중량),수량`) is a string **derived from the per-unit measure + quantity**,
   // so it is not edited by hand (read-only). Judged by the **same function** as the auto-fill (hasMeasureAttr) — a
-  // category without a composing source, hidden attributes and two or more component kinds (FEATURE_2610_37 / D23)
-  // cannot compose it, so it stays an input field.
-  const autoMeasureNotice = !hideCategoryAttrs && !manualMeasureNotice && hasMeasureAttr(attributes);
+  // category without a composing source, hidden attributes, two or more component kinds (FEATURE_2610_37 / D23) and
+  // no measure value yet (FEATURE_2611_08 / D10) cannot compose it, so it stays an input field.
+  const autoMeasureNotice =
+    !hideCategoryAttrs && !manualMeasureNotice && hasMeasureAttr(attributes) && hasMeasureValue;
   const hasAnyOption = pairs.length > 0 || singles.length > 0 || noticeFields.length > 0;
   // Is there anything hidden behind 상세입력? (optional attrs or any notice fields)
   const hasOptional =
@@ -230,8 +252,9 @@ export function CategoryMetaOverrideFields({
   };
 
   // One attribute cell (pair 택1 or single). flex-col + mt-auto pins the control to the bottom
-  // so uneven label heights still align inputs across a grid row.
-  const renderAttrCell = (cell: AttrCell) => {
+  // so uneven label heights still align inputs across a grid row. Inside a choice-group box the
+  // required star is drawn once on the box header, not on each cell (FEATURE_2611_08 / D8).
+  const renderAttrCell = (cell: AttrCell, inBox = false) => {
     if (cell.kind === 'pair') {
       const p = cell.p;
       const unit = unitOf(p);
@@ -244,7 +267,7 @@ export function CategoryMetaOverrideFields({
         <div key={`p-${p.base}`} className="flex min-w-0 flex-col @sm:col-span-2">
           <label className="mb-1 block text-xs font-medium text-gray-600">
             {p.base || '중량/용량'}
-            {isPairRequired(p) && <span className="text-red-600"> *</span>}
+            {!inBox && isPairRequired(p) && <span className="text-red-600"> *</span>}
             <span className="ml-1 font-normal text-gray-400">(중량·용량 중 택1)</span>
           </label>
           <div className="mt-auto flex gap-2 max-md:flex-wrap">
@@ -285,7 +308,7 @@ export function CategoryMetaOverrideFields({
         <label className="mb-1 block text-xs font-medium text-gray-600">
           {a.name}
           {unitSuffix(a) && <span className="ml-1 font-normal text-gray-400">{unitSuffix(a)}</span>}
-          {a.required && <span className="text-red-600"> *</span>}
+          {!inBox && a.required && <span className="text-red-600"> *</span>}
           {autoQty && (
             <span className="ml-1 font-normal text-gray-400">
               {isGrandTotalQuantityName(a.name) ? '(개당 수량 × 수량 자동)' : '(구성상품 수량에서 자동)'}
@@ -387,10 +410,23 @@ export function CategoryMetaOverrideFields({
         </div>
       )}
 
+      {/* Coupang one-of groups — one bordered box each, guide line with a single star on top (FEATURE_2611_08 / D8). */}
+      {boxes.map(({ g, cells }) => (
+        <div key={`g-${g.groupNumber}`} className="rounded border border-gray-200 p-3">
+          <p className="mb-2 text-xs font-medium text-gray-600">
+            <span className="text-red-600">* </span>
+            {choiceGroupGuide(g)}
+          </p>
+          <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @2xl:grid-cols-3">
+            {cells.map((c) => renderAttrCell(c, true))}
+          </div>
+        </div>
+      ))}
+
       {/* 필수속성(개당 용량/중량·수량) — 상단 그리드. 셀은 flex-col + mt-auto 로 input 하단 정렬. */}
-      {requiredCells.length > 0 && (
+      {remainingRequiredCells.length > 0 && (
         <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @2xl:grid-cols-3">
-          {requiredCells.map(renderAttrCell)}
+          {remainingRequiredCells.map((c) => renderAttrCell(c))}
         </div>
       )}
 
@@ -399,7 +435,7 @@ export function CategoryMetaOverrideFields({
         <div className="border-t border-gray-100 pt-3">
           <p className="mb-2 text-[11px] text-gray-400">상세 항목 (선택)</p>
           <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @2xl:grid-cols-3">
-            {optionalCells.map(renderAttrCell)}
+            {optionalCells.map((c) => renderAttrCell(c))}
           </div>
         </div>
       )}
