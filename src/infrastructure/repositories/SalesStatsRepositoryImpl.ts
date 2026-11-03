@@ -25,6 +25,8 @@ export class SalesStatsRepositoryImpl implements SalesStatsRepository {
     if (params.to) query.to = params.to;
     if (params.sellerId != null) query.sellerId = params.sellerId;
     if (params.crossChannel != null) query.crossChannel = params.crossChannel;
+    // FEATURE_2611_04 D4: sent only when on — a request without it keeps the numbers as before.
+    if (params.excludeUnshipped) query.excludeUnshipped = true;
     return query;
   }
 
@@ -43,9 +45,10 @@ export class SalesStatsRepositoryImpl implements SalesStatsRepository {
   }
 
   async getSalesLines(params: SalesLinesParams): Promise<SalesLine[]> {
-    const query: Record<string, string | number> = { accountId: params.accountId };
+    const query: Record<string, string | number | boolean> = { accountId: params.accountId };
     if (params.from) query.from = params.from;
     if (params.to) query.to = params.to;
+    if (params.excludeUnshipped) query.excludeUnshipped = true;
     const response = await axiosInstance.get('/api/admin/sales/lines', { params: query });
     return response.data.data;
   }

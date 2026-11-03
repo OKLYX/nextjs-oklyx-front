@@ -15,6 +15,8 @@ import type { PayoutSummary } from '@/domain/entities/Settlement';
 import type { BoxSaving, SavingsSummary } from '@/domain/entities/PackingSavingsEntity';
 import { SalesTabs } from '../../components/SalesTabs';
 import { PeriodFilter, currentMonthRange } from '../../components/PeriodFilter';
+import { useShippedOnly } from '@/app/dashboard/sales/components/ShippedOnlyContext';
+import { ShippedOnlySwitch } from '@/app/dashboard/sales/components/ShippedOnlySwitch';
 import { SellerSummaryTable } from './SellerSummaryTable';
 import { PackingSavingsCard } from './PackingSavingsCard';
 import { BoxSavingsTable } from './BoxSavingsTable';
@@ -69,6 +71,7 @@ export function SalesSummaryContainer() {
   const initialRange = useMemo(() => currentMonthRange(), []);
   const [from, setFrom] = useState(initialRange.from);
   const [to, setTo] = useState(initialRange.to);
+  const { excludeUnshipped, setExcludeUnshipped } = useShippedOnly();
 
   const [rows, setRows] = useState<SellerSales[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -105,7 +108,7 @@ export function SalesSummaryContainer() {
     setIsLoading(true);
     setError('');
     try {
-      const result = await salesStatsUseCase.getSellerSummary({ from, to });
+      const result = await salesStatsUseCase.getSellerSummary({ from, to, excludeUnshipped });
       if (requestId !== requestIdRef.current) return;
       setRows(result);
     } catch {
@@ -115,7 +118,7 @@ export function SalesSummaryContainer() {
     } finally {
       if (requestId === requestIdRef.current) setIsLoading(false);
     }
-  }, [salesStatsUseCase, from, to]);
+  }, [salesStatsUseCase, from, to, excludeUnshipped]);
 
   // 절약 조회. 🔴 매출과 한 요청으로 묶지 않는다 — 절약 API 가 실패해도 매출 표는 그대로 떠야 한다.
   const loadSavings = useCallback(async () => {
@@ -165,6 +168,19 @@ export function SalesSummaryContainer() {
     setPayoutsError('');
   }, []);
 
+  const handleShippedOnlyChange = useCallback(
+    (next: boolean) => {
+      setExcludeUnshipped(next);
+      // Expanded channel rows were loaded with the previous switch value — collapse them like a period change.
+      setExpandedSellerId(null);
+      setChannels([]);
+      setChannelsError('');
+      setPayouts([]);
+      setPayoutsError('');
+    },
+    [setExcludeUnshipped]
+  );
+
   const handleToggle = useCallback(
     async (sellerId: number) => {
       if (expandedSellerId === sellerId) {
@@ -181,7 +197,7 @@ export function SalesSummaryContainer() {
 
       // 채널 매출과 정산 건은 서로를 기다릴 이유가 없다 — 한쪽이 실패해도 다른 쪽은 그린다.
       const channelSales = salesStatsUseCase
-        .getChannelSales({ from, to, sellerId })
+        .getChannelSales({ from, to, sellerId, excludeUnshipped })
         .then((channelRows) => setChannels(channelRows))
         .catch(() => setChannelsError('채널별 매출 조회에 실패했습니다.'))
         .finally(() => setChannelsLoading(false));
@@ -194,7 +210,7 @@ export function SalesSummaryContainer() {
 
       await Promise.all([channelSales, channelPayouts]);
     },
-    [salesStatsUseCase, settlementUseCase, expandedSellerId, from, to]
+    [salesStatsUseCase, settlementUseCase, expandedSellerId, from, to, excludeUnshipped]
   );
 
   /**
@@ -229,7 +245,9 @@ export function SalesSummaryContainer() {
     <PageContainer title="매출">
       <SalesTabs />
 
-      <PeriodFilter from={from} to={to} isLoading={isLoading} onChange={handlePeriodChange} />
+      <PeriodFilter from={from} to={to} isLoading={isLoading} onChange={handlePeriodChange}>
+        <ShippedOnlySwitch checked={excludeUnshipped} disabled={isLoading} onChange={handleShippedOnlyChange} />
+      </PeriodFilter>
 
       {invalidRange && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
