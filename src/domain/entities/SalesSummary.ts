@@ -1,20 +1,20 @@
 /**
- * 매출 집계 (FEATURE_2609_30 / PLAN D2 · D3 · D4 · D14 · D15, 백엔드 03 SSOT).
+ * Sales aggregates (FEATURE_2609_30 / PLAN D2 · D3 · D4 · D14 · D15, backend 03 SSOT).
  *
- * 🔴 <b>축이 둘 섞여 있다.</b> `grossSales`/`discount`/`estFee`/`estNetProfit` 은 <b>판매일</b> 축의 기간
- * 합계이고, `pendingPayout`("정산 추정 금액")은 <b>매출인식일</b> 축의 <b>기간 무관</b> 총액이다(D4).
- * 화면은 기간을 바꿔도 안 변하는 이 값에 반드시 `기간 무관 · 미지급 잔액` 라벨을 붙인다 —
- * 라벨이 없으면 버그로 오해받는다.
+ * 🔴 The sales amounts here are <b>sale-date</b> sums of the period — `estSettlement` (「정산 추정 금액」) too
+ * (FEATURE_2611_05 D2 · D6). `ChannelSales.paidAmount` is the one cash-basis value (paid in the period). The money
+ * still to be received regardless of the period is no longer sent (D9 · D13).
  *
- * 🔴 <b>대사 상태 건수(금액 차이 N)는 이 응답에 없다</b>(FEATURE_2609_34). 지급 묶음은 매출인식일 축이라
- * 기간을 좁혀도 건수가 변하지 않는데, 그것을 기간 필터가 달린 행에 배지로 걸면 "이번 달에 N건이 어긋났다"로
- * 읽힌다(실제로는 그 채널의 전체 건수였다). 대사 상태는 채널을 펼쳤을 때 나오는 인식월별 정산 목록이
- * 건별로 보여준다 — 배지를 되살리지 말 것.
+ * 🔴 <b>Reconciliation status counts (amount mismatch N) are not in this response</b> (FEATURE_2609_34). Payouts are
+ * on the revenue-recognition axis, so narrowing the period does not change the count, and as a badge on a row with a
+ * period filter it reads as "N mismatched this month" (it was the channel's whole count). Reconciliation status is
+ * shown per payout by the recognition-month list under an opened channel — do not bring the badge back.
  *
- * 🔴 `estNetProfit === null`(= `costBasisReady === false`)은 <b>"아직 모른다"</b>는 뜻이다.
- * 0 으로 그리지 않는다 — 0 은 "안 남았다"는 뜻이라 정반대다(D15).
+ * 🔴 `estNetProfit === null` (= `costBasisReady === false`) means <b>"not known yet"</b>. Never draw it as 0 — 0 means
+ * "nothing left", the opposite (D15). `estSettlement === null` is the same: unknown, not 0 (FEATURE_2611_05 D7).
  *
- * ⚠️ 이 화면은 정산 배치·금액 확인을 다루지 않는다. 그쪽 진입점은 `ROUTES.SETTLEMENT_PAYOUTS` 뿐이다.
+ * ⚠️ These screens do not handle payout batches or amount checks. Their entry point is `ROUTES.SETTLEMENT_PAYOUTS`
+ * only.
  */
 
 import { platformName } from '@/config/platforms';
@@ -33,8 +33,11 @@ export interface SellerSales {
   /** 원가 스냅샷이 없는 라인이 하나라도 섞이면 null (D15). */
   estNetProfit: number | null;
   costBasisReady: boolean;
-  /** 🔴 기간 무관 "정산 추정 금액". 기간 필터와 함께 묶어 라벨링하지 말 것(D4). */
-  pendingPayout: number;
+  /**
+   * 「정산 추정 금액」 of the period's sales (FEATURE_2611_05 D12): sales − (discount − platform discount) − estimated fee
+   * − `fixedCost`. 🔴 null = some line has no commission base (D7) — shown as `—`, never 0.
+   */
+  estSettlement: number | null;
   /**
    * 조회 기간에 이 판매자의 채널들이 부담하는 월 고정비 합 (PLAN 2609_33 D4 · D7).
    * 🔴 `estNetProfit` 에는 이미 반영돼 있다 — 화면에서 다시 빼지 않는다.
@@ -66,7 +69,8 @@ export interface ChannelSales {
    * 🔴 서버가 유효수량 상한을 걸어 준 값이다 — 이미 취소 확정된 몫을 다시 세지 않는다.
    */
   pendingRefundAmount: number;
-  pendingPayout: number;
+  /** Same as `SellerSales.estSettlement`, for one channel (FEATURE_2611_05 D12). */
+  estSettlement: number | null;
   /** 현금주의(지급 확정). 🔴 채널에만 있다 — 정산 주기가 채널마다 달라 판매자 합산은 뜻을 잃는다(D4-1). */
   paidAmount: number;
   lastSettlementSyncAt: string | null;
@@ -193,3 +197,6 @@ export const fixedCostHintFor = (platform: string | null | undefined): string =>
 /** 순이익이 비어 있는 이유를 셀 툴팁으로 설명한다(헤더 툴팁만으론 행마다 다른 상태를 못 보여준다). */
 export const PROFIT_PENDING_HINT =
   '순이익 추정치는 상품 단가와 비용(택배비, 상자비 등)이 모두 작성 완료되어야 표시가능합니다.';
+
+/** Why 「정산 추정 금액」 is `—` — the cell hint, only when the value is `—` (FEATURE_2611_05 D10 · D14 · D15). */
+export const SETTLEMENT_PENDING_HINT = '수수료 기준이 없는 주문이 있어 정산 추정 금액을 계산할 수 없습니다.';

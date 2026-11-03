@@ -7,6 +7,7 @@ import {
   ELEVENST_FIXED_COST_HINT,
   FIXED_COST_HINT_MIXED,
   PROFIT_PENDING_HINT,
+  SETTLEMENT_PENDING_HINT,
   channelLabel,
   formatFixedCost,
   formatMoney,
@@ -121,7 +122,11 @@ export function SellerChannelRows({
                 value={formatProfit(channel)}
                 hint={channel.costBasisReady ? undefined : PROFIT_PENDING_HINT}
               />
-              <SalesValueRow label="정산 추정 금액" sub="기간 무관 · 미지급 잔액" value={formatMoney(channel.pendingPayout)} />
+              <SalesValueRow
+                label="정산 추정 금액"
+                value={formatMoney(channel.estSettlement)}
+                hint={channel.estSettlement == null ? SETTLEMENT_PENDING_HINT : undefined}
+              />
               <SalesValueRow label="지급확정" sub="기간 내 입금" value={formatMoney(channel.paidAmount)} />
               <div className="pl-3 pt-1 text-xs" onClick={(e) => e.stopPropagation()}>
                 <ChannelPayoutList
@@ -151,7 +156,6 @@ export function SellerChannelRows({
           <th className="px-3 py-2 text-right font-medium">순이익(추정)</th>
           <th className="px-3 py-2 text-right font-medium">
             정산 추정 금액
-            <span className="block text-[11px] font-normal text-gray-400">기간 무관 · 미지급 잔액</span>
           </th>
           <th className="px-3 py-2 text-right font-medium">
             지급확정
@@ -181,7 +185,12 @@ export function SellerChannelRows({
               >
                 {formatProfit(channel)}
               </td>
-              <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.pendingPayout)}</td>
+              <td
+                className="px-3 py-2 text-right text-gray-900"
+                title={channel.estSettlement == null ? SETTLEMENT_PENDING_HINT : undefined}
+              >
+                {formatMoney(channel.estSettlement)}
+              </td>
               <td className="px-3 py-2 text-right text-gray-900">{formatMoney(channel.paidAmount)}</td>
               <td className="px-3 py-2 text-right">
                 {/* 🔴 로딩 중에는 그리지 않는다 — 도착하자마자 사라지는 버튼은 잘못 눌린다. */}
