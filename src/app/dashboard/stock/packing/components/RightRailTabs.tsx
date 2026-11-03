@@ -16,7 +16,7 @@ export type RailTab = 'PENDING' | 'DONE';
  * 선택 표시·클릭 허용이 달라지기 때문이다(D7).
  * 🔴 The two tab buttons are the only click targets this part adds. That is why F10 exists (D6) — do not add other
  * buttons here. The screen's rule is no action without a key path, with one exception: clicking a 「오늘 완료」 row =
- * change the box of a completed parcel (FEATURE_2611_06 / D10) — mouse · touch only, an exception to the 2609_55
+ * open the order detail of that parcel (FEATURE_2611_07 / D1 · D6) — mouse · touch only, an exception to the 2609_55
  * rule; a keyboard · scanner path is follow-up work.
  * 🔴 카드는 열 높이를 꽉 채우고(몰입 레이어가 뷰포트를 채운다) 탭 바는 위에 고정된다 —
  * 목록이 길면 **본문만** 스크롤한다. 탭 바가 같이 밀려 올라가면 F10 의 대상이 화면 밖으로 나간다.

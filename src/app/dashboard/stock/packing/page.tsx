@@ -36,6 +36,10 @@ import { RightRailTabs, type RailTab } from './components/RightRailTabs';
 import { TodayDoneList } from './components/TodayDoneList';
 import { BoxChangeModal } from './components/BoxChangeModal';
 import { findOrCreateUnregisteredRecycledBox } from './components/unregisteredRecycledBox';
+import { OrderDetailsModal } from '@/app/dashboard/orders/components/OrderDetailsModal';
+import { OrderUseCase } from '@/application/usecases/OrderUseCase';
+import { OrderRepositoryImpl } from '@/infrastructure/repositories/OrderRepositoryImpl';
+import type { OrderDetailParcel } from '@/domain/entities/OrderEntity';
 import { platformName } from '@/config/platforms';
 
 /**
@@ -207,6 +211,7 @@ const defaultCandidate = (candidates: BoxCandidate[]): number | null => {
 export default function StockPackingPage() {
   const packingUseCase = useMemo(() => new PackingUseCase(new PackingRepositoryImpl()), []);
   const packageUseCase = useMemo(() => new PackageUseCase(new PackageRepositoryImpl()), []);
+  const orderUseCase = useMemo(() => new OrderUseCase(new OrderRepositoryImpl()), []);
 
   // 🔴 브라우저는 사용자가 한 번 클릭하기 전에는 소리를 내지 않는다 → [작업 시작] 이 그 클릭이다
   const [started, setStarted] = useState(false);
@@ -274,11 +279,15 @@ export default function StockPackingPage() {
 
   /** [박스 변경] 창 */
   const [boxChangeOpen, setBoxChangeOpen] = useState(false);
+  /** Parcel whose order detail is open, from a 「오늘 완료」 row (FEATURE_2611_07 / D1 · D6). `null` = closed */
+  const [detailParcelId, setDetailParcelId] = useState<number | null>(null);
+  /** Bumped after a box change — the open order detail reads again, same chip (D7 · D28) */
+  const [detailReloadKey, setDetailReloadKey] = useState(0);
   /**
-   * Completed parcel whose box is being changed from a 「오늘 완료」 row (FEATURE_2611_06 / D10). `null` = dialog
-   * closed. Kept apart from `boxChangeOpen` (box being packed) — it never touches `selectedPackageId`.
+   * Packed parcel whose box is being changed from the order detail [상자 변경] (FEATURE_2611_07 / D2). `null` = dialog
+   * closed. Kept apart from `boxChangeOpen` (box being packed) — it never touches `selectedPackageId` (D8).
    */
-  const [doneBoxTarget, setDoneBoxTarget] = useState<PackingHistoryRow | null>(null);
+  const [doneBoxTarget, setDoneBoxTarget] = useState<OrderDetailParcel | null>(null);
   /**
    * [B] 로 「박스 추천」 칸을 고른 상태. 🔴 ref 가 판정의 원본이다 — 스캐너는 렌더보다 빨리 글자를 보낸다.
    * `at` = B 를 받은 시각, `char` = 스캔이었을 때 버퍼로 돌려놓을 실제 글자(대소문자 그대로).
@@ -854,8 +863,9 @@ export default function StockPackingPage() {
   );
 
   /**
-   * Changes the box of the completed parcel picked in 「오늘 완료」 (FEATURE_2611_06 / D10). Failure throws the
-   * server text — the dialog shows it and stays open. Never touches the box being packed.
+   * Changes the box of the packed parcel picked in the order detail (FEATURE_2611_07 / D2 · D7). Failure throws the
+   * server text — the dialog shows it and stays open. Success closes only the box dialog; the order detail reads
+   * again with the same chip. Never touches the box being packed.
    */
   const changeDoneBox = useCallback(
     async (box: Package) => {
@@ -866,6 +876,7 @@ export default function StockPackingPage() {
         throw new Error(serverMessage(error, '상자를 바꾸지 못했습니다'));
       }
       setDoneBoxTarget(null);
+      setDetailReloadKey((key) => key + 1);
       await loadDone();
       notify('success', `상자를 바꿨습니다 — ${box.type}`);
     },
@@ -1155,7 +1166,8 @@ export default function StockPackingPage() {
   useEffect(() => {
     handlersRef.current = {
       // 확인 팝업·도움말이 떠 있으면 키는 팝업의 것이다
-      enabled: started && !unusedOpen && !restoreOpen && !exitOpen && !helpOpen && !boxChangeOpen && !doneBoxTarget,
+      enabled: started && !unusedOpen && !restoreOpen && !exitOpen && !helpOpen && !boxChangeOpen && !doneBoxTarget
+        && detailParcelId == null,
       busy: isSubmitting || isScanning,
       submit: () => {
         // B 바로 뒤 Enter = 「B」 한 글자짜리 스캔이었다 → 그 글자를 돌려놓고 보낸다
@@ -1754,7 +1766,7 @@ export default function StockPackingPage() {
     <RightRailTabs
       tab={railTab}
       onSelectTab={setRailTab}
-      donePanel={<TodayDoneList rows={doneRows} loading={doneLoading} onPick={setDoneBoxTarget} />}
+      donePanel={<TodayDoneList rows={doneRows} loading={doneLoading} onPick={(row) => setDetailParcelId(row.parcelId)} />}
       pendingPanel={
         <PendingParcelList
           parcels={pendingParcels}
@@ -1880,9 +1892,21 @@ export default function StockPackingPage() {
         />
       )}
 
-      {/* Completed parcel box change (FEATURE_2611_06 / D10) — mounted only while a target is set */}
+      {/* Order detail of a 「오늘 완료」 parcel (FEATURE_2611_07 / D1 · D6) — mounted only while open */}
+      {detailParcelId != null && (
+        <OrderDetailsModal
+          parcelId={detailParcelId}
+          orderUseCase={orderUseCase}
+          reloadKey={detailReloadKey}
+          onClose={() => setDetailParcelId(null)}
+          onChangeBox={setDoneBoxTarget}
+        />
+      )}
+
+      {/* Packed parcel box change from the order detail (FEATURE_2611_07 / D2) — above the order detail */}
       {doneBoxTarget && (
         <BoxChangeModal
+          nested
           packages={allPackages}
           selectedPackageId={doneBoxTarget.boxPackageId}
           onClose={() => setDoneBoxTarget(null)}

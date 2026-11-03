@@ -7,7 +7,7 @@ import { UNREGISTERED_RECYCLED_BOX_TYPE } from './BoxChangeModal';
  * Finds the shared 「재활용 상자(미등록)」 box, or creates it once (FEATURE_2611_06 / D17 · D20).
  *
  * **Purpose**: the only place that looks up / creates the shared unregistered recycled box. Both the packing
- * screen (box being packed · 「오늘 완료」 row) and the 「포장 이력」 [상자 변경] call this.
+ * screen (box being packed · order detail [상자 변경]) and the 「포장 이력」 [상자 변경] call this.
  * **File**: src/app/dashboard/stock/packing/components/unregisteredRecycledBox.ts
  *
  * **Usage**:

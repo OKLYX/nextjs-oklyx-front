@@ -1,3 +1,6 @@
+import { platformName } from '@/config/platforms';
+import type { ParcelStatus } from '@/domain/entities/PackingEntity';
+
 /**
  * 플랫폼 중립 주문 상태 (백엔드 `OrderStatus`).
  *
@@ -64,6 +67,71 @@ export interface OrderItem {
   thumbnailProductId: number | null;
   thumbnailImageUrl: string | null;
 }
+
+/**
+ * One order for the shared order detail (FEATURE_2611_07 / PLAN D17 · D30) — 1:1 with the backend
+ * `OrderDetailResponse`. The same shape comes from both reads: by the clicked order line (「주문내역」 · 「출고관리」) and by
+ * the clicked parcel (「포장 작업」 「오늘 완료」). No phone, postcode or address (D22).
+ */
+export interface OrderDetail {
+  externalOrderId: string;
+  sellerName: string | null;
+  /** Sales channel (`Platform` name, e.g. `COUPANG`) */
+  platform: string | null;
+  accountAlias: string | null;
+  ordererName: string | null;
+  receiverName: string | null;
+  paidAt: string | null;
+  /** Every line of the order, id order — each the same fields as one order list row */
+  lines: OrderItem[];
+  /** Every parcel of the order — bundle order, then parcel sequence (D29); empty = no invoice yet (D26) */
+  parcels: OrderDetailParcel[];
+}
+
+/** One parcel (invoice) of the order (D23 · D36 · D37). */
+export interface OrderDetailParcel {
+  parcelId: number;
+  invoiceNumber: string;
+  carrierName: string | null;
+  parcelSeq: number | null;
+  status: ParcelStatus;
+  /** Processed time as a KST wall clock (D38) — null for 「작업 전」 */
+  packedAt: string | null;
+  /** Only for 「포장 완료」, otherwise null (D37) */
+  boxName: string | null;
+  boxPackageId: number | null;
+  /** Only for 「포장 완료」, otherwise empty (D37) — merged per product */
+  items: OrderDetailParcelItem[];
+}
+
+export interface OrderDetailParcelItem {
+  productId: number;
+  productName: string | null;
+  /** `Product.imageUrl` as stored — draw it with `getProductThumbUrl(imageUrl, productId)` */
+  imageUrl: string | null;
+  quantity: number;
+}
+
+/** Parcel status words of the order detail chips (D25 · D29). */
+export const PARCEL_STATUS_LABELS: Record<ParcelStatus, string> = {
+  PENDING: '작업 전',
+  PACKED: '포장 완료',
+  UNUSED: '미사용',
+};
+
+/** Chip text = the whole invoice number + the status, e.g. 「123456789012 · 포장 완료」 (D29). */
+export const parcelChipLabel = (parcel: Pick<OrderDetailParcel, 'invoiceNumber' | 'status'>): string =>
+  `${parcel.invoiceNumber} · ${PARCEL_STATUS_LABELS[parcel.status]}`;
+
+/**
+ * 「판매처」 text of the order detail (D35): 「{channel} · {alias}」, or only 「{channel}」 when the alias is blank.
+ * ⚠️ Not the packing screen's channel text (alias alone) — that one stays as it is (D35).
+ */
+export const salesChannelLabel = (platform: string | null, accountAlias: string | null): string => {
+  const channel = platformName(platform ?? '') || '-';
+  const alias = accountAlias?.trim();
+  return alias ? `${channel} · ${alias}` : channel;
+};
 
 // The reserved-sale label next to the status (FEATURE_2610_17 / D67) — one source for the list and the detail.
 export const ELEVENST_RESERVED_LABEL = '11번가 예약판매';

@@ -28,7 +28,8 @@ type BoxPick = number | 'UNREGISTERED' | null;
  *
  * Opened from three places — one dialog, never copied:
  * 1. Packing screen 「박스 추천」 card (B → X, or the button) — the box being packed.
- * 2. Packing screen 「오늘 완료」 row click — the box of a completed parcel.
+ * 2. Packing screen order detail (opened from a 「오늘 완료」 row) [상자 변경] — the box of a packed parcel, above the
+ *    order detail (`nested`).
  * 3. 「포장 이력」 [상자 변경] on a 「포장 완료」 row — the box of that parcel.
  *
  * What it can do:
@@ -56,6 +57,8 @@ export interface BoxChangeModalProps {
   onPickUnregistered: () => Promise<void>;
   /** 새 상자 등록 — 페이지가 저장하고 목록에 넣고 고른다 */
   onCreate: (request: CreatePackageRequest) => Promise<void>;
+  /** `true` = opened above another modal (the packing screen order detail) — passed straight to `Modal` */
+  nested?: boolean;
 }
 
 export function BoxChangeModal({
@@ -65,6 +68,7 @@ export function BoxChangeModal({
   onPick,
   onPickUnregistered,
   onCreate,
+  nested = false,
 }: BoxChangeModalProps) {
   const selected = packages.find((pkg) => pkg.id === selectedPackageId);
   const [recycled, setRecycled] = useState(selected ? boxKindOf(selected) === 'RECYCLED' : false);
@@ -156,6 +160,7 @@ export function BoxChangeModal({
   return (
     <Modal
       isOpen
+      nested={nested}
       onClose={onClose}
       title="박스 변경"
       disableClose={submitting}
