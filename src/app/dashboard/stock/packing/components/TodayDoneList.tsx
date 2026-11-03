@@ -17,12 +17,14 @@ import type { PackingHistoryRow } from '@/domain/entities/PackingEntity';
 export interface TodayDoneListProps {
   rows: PackingHistoryRow[];
   loading: boolean;
+  /** Row click = change the box of that completed parcel (FEATURE_2611_06 / D10) */
+  onPick: (row: PackingHistoryRow) => void;
 }
 
 /** `yyyy-MM-ddTHH:mm:ss` KST 벽시계 → `HH:mm`. 서버가 이미 KST 로 준다 — 시간대 계산을 하지 않는다 */
 const timeOf = (changedAt: string): string => changedAt.slice(11, 16) || '-';
 
-export function TodayDoneList({ rows, loading }: TodayDoneListProps) {
+export function TodayDoneList({ rows, loading, onPick }: TodayDoneListProps) {
   if (loading) return <StateBlock variant="loading" message="불러오는 중..." />;
   if (rows.length === 0) return <StateBlock variant="empty" message="오늘 완료한 박스가 없습니다" />;
   return (
@@ -37,7 +39,12 @@ export function TodayDoneList({ rows, loading }: TodayDoneListProps) {
       </thead>
       <tbody>
         {rows.map((row, index) => (
-          <tr key={row.id} className="border-b border-gray-100" title={`주문 ${row.externalOrderId} · ${row.sellerName ?? '-'}`}>
+          <tr
+            key={row.id}
+            className="cursor-pointer border-b border-gray-100 hover:bg-gray-50"
+            onClick={() => onPick(row)}
+            title={`주문 ${row.externalOrderId} · ${row.sellerName ?? '-'}`}
+          >
             <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">{rows.length - index}</td>
             <td className="px-2 py-1.5 text-gray-700">{timeOf(row.changedAt)}</td>
             <td className="px-2 py-1.5 font-mono text-gray-900">{row.invoiceNumber}</td>
