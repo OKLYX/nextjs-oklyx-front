@@ -1,4 +1,4 @@
-import type { OrderItem } from '@/domain/entities/OrderEntity';
+import type { OrderDetail, OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
   CancelReasonOption, ElevenstCancelFaultRejectPayload, ElevenstCancelRejectPayload, ElevenstCancelRequest,
@@ -34,4 +34,8 @@ export interface OrderRepository {
   sendElevenstDeliveryDelay(orderItemId: number, payload: ElevenstDeliveryDelayPayload): Promise<void>;
   completeElevenstVisitPickup(orderItemId: number, certCode: string): Promise<void>;
   confirmElevenstStock(orderItemId: number): Promise<void>;
+  /** The shared order detail of the order this line belongs to (FEATURE_2611_07 / D17 · D18 · D30) */
+  getOrderDetail(orderLineId: number): Promise<OrderDetail>;
+  /** The shared order detail of the order this parcel belongs to — ADMIN only (FEATURE_2611_07 / D17 · D30) */
+  getParcelOrderDetail(parcelId: number): Promise<OrderDetail>;
 }

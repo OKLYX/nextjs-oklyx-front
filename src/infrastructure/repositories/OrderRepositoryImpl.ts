@@ -2,7 +2,7 @@
 
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { OrderRepository } from '@/domain/repositories/OrderRepository';
-import type { OrderItem } from '@/domain/entities/OrderEntity';
+import type { OrderDetail, OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
   CancelReasonOption, ElevenstCancelFaultRejectPayload, ElevenstCancelRejectPayload, ElevenstCancelRequest,
@@ -161,5 +161,17 @@ export class OrderRepositoryImpl implements OrderRepository {
 
   async confirmElevenstStock(orderItemId: number): Promise<void> {
     await axiosInstance.post(`/api/admin/orders/${orderItemId}/elevenst-stock-confirm`);
+  }
+
+  // FEATURE_2611_07 / D30 ①: any logged-in user, same as the order list.
+  async getOrderDetail(orderLineId: number): Promise<OrderDetail> {
+    const response = await axiosInstance.get(`/api/orders/lines/${orderLineId}/detail`);
+    return response.data.data;
+  }
+
+  // FEATURE_2611_07 / D30 ②: the packing endpoint group — ADMIN only.
+  async getParcelOrderDetail(parcelId: number): Promise<OrderDetail> {
+    const response = await axiosInstance.get(`/api/admin/packing/parcels/${parcelId}/order`);
+    return response.data.data;
   }
 }

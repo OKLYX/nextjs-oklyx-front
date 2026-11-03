@@ -1,5 +1,5 @@
 import type { OrderRepository } from '@/domain/repositories/OrderRepository';
-import type { OrderItem } from '@/domain/entities/OrderEntity';
+import type { OrderDetail, OrderItem } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
   CancelReasonOption, ElevenstCancelFaultRejectPayload, ElevenstCancelRejectPayload, ElevenstCancelRequest,
@@ -112,5 +112,13 @@ export class OrderUseCase {
 
   async confirmElevenstStock(orderItemId: number): Promise<void> {
     return this.repository.confirmElevenstStock(orderItemId);
+  }
+
+  async getOrderDetail(orderLineId: number): Promise<OrderDetail> {
+    return this.repository.getOrderDetail(orderLineId);
+  }
+
+  async getParcelOrderDetail(parcelId: number): Promise<OrderDetail> {
+    return this.repository.getParcelOrderDetail(parcelId);
   }
 }
