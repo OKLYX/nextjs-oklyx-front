@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Spinner } from '@/presentation/components/Spinner';
 import { addressHead } from '@/infrastructure/utils/address';
-import type { OrderItem } from '@/domain/entities/OrderEntity';
-import { ELEVENST_RESERVED_LABEL, getOrderStatusLabel, isAlreadyShipped } from '@/domain/entities/OrderEntity';
+import type { OrderDetail, OrderDetailParcel, OrderItem } from '@/domain/entities/OrderEntity';
+import {
+  ELEVENST_RESERVED_LABEL, getOrderStatusLabel, isAlreadyShipped, salesChannelLabel,
+} from '@/domain/entities/OrderEntity';
 import type { InternalStage } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { OrderUseCase } from '@/application/usecases/OrderUseCase';
@@ -39,10 +41,19 @@ import { ElevenstDeliveryDelayForm } from './ElevenstDeliveryDelayForm';
 import { ElevenstSplitShipmentForm } from './ElevenstSplitShipmentForm';
 import type { ElevenstSplitSubmit } from './ElevenstSplitShipmentForm';
 import { ElevenstVisitPickupForm } from './ElevenstVisitPickupForm';
+import { OrderDetailSummary, formatDate } from './OrderDetailSummary';
+import type { OrderDetailField } from './OrderDetailSummary';
 import { platformName } from '@/config/platforms';
 
 /**
- * Order detail modal — read-only info + (ADMIN · Coupang / 11st) single-order label sheet lookup and download.
+ * The shared order detail modal (FEATURE_2611_07 / D4 · D21) — one modal, two entries:
+ * - line mode (props `order` …): 「주문내역」 · 「출고관리」 open it by the clicked order line.
+ * - packing mode (props `parcelId` …): 「포장 작업」 「오늘 완료」 opens it by the clicked parcel — fields, 「상품 목록」 ·
+ *   「송장 목록」 and [상자 변경] only, none of the actions below (D13 · D14).
+ * Both modes read the order from the server (`getOrderDetail` / `getParcelOrderDetail`, D18 · D30); the body is
+ * `OrderDetailSummary`.
+ *
+ * Line mode — read-only info + (ADMIN · Coupang / 11st) single-order label sheet lookup and download.
  * 11st orders also get their cancel requests and the seller return request (FEATURE_2610_17 / D19 · D35), and the
  * 11st seller actions — sale refusal in the cancel tab, delay notice · partial / split shipment · visit pickup in
  * the shipment tab, and [입고완료 처리] in place of [발주처리] for a reserved sale (D61 ~ D67).
@@ -63,7 +74,7 @@ import { platformName } from '@/config/platforms';
  * ⚠️ useCase reuses the parent's (OrderContainer) useMemo instance — do not create a new one here.
  * ⚠️ Phone / postcode / full address are never rendered in the DOM; they stay in state only (for the export POST).
  */
-interface OrderDetailsModalProps {
+interface LineModeProps {
   order: OrderItem | null;
   /** true = 발송처리가 성공했다 → 부모가 목록을 다시 불러와야 한다(PLAN 2609_11 D13). */
   onClose: (didSucceed: boolean) => void;
@@ -77,6 +88,19 @@ interface OrderDetailsModalProps {
    */
   onRefreshed?: () => Promise<void> | void;
 }
+
+/** Packing mode — opened from a 「포장 작업」 「오늘 완료」 row (FEATURE_2611_07 / D1 · D6 · D30 ②). */
+interface PackingModeProps {
+  parcelId: number;
+  orderUseCase: OrderUseCase;
+  /** A change re-reads the order detail, keeping the open chip (D7 · D28) */
+  reloadKey: number;
+  onClose: () => void;
+  /** [상자 변경] of a packed parcel (D2 · D24) */
+  onChangeBox: (parcel: OrderDetailParcel) => void;
+}
+
+type OrderDetailsModalProps = LineModeProps | PackingModeProps;
 
 const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
 
@@ -105,15 +129,88 @@ function formatAmount(value: number | null): string {
   return `${value.toLocaleString('ko-KR')}원`;
 }
 
-// Format ISO LocalDateTime to ko-KR readable string; '-' for null
-function formatDate(value: string | null): string {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('ko-KR');
+/** Load state of the order detail — 「불러오는 중...」 only before the first response; a failure shows its text (D18). */
+function DetailLoadState({ loaded, error }: { loaded: boolean; error: string }) {
+  if (error) return <p className="py-2 text-sm text-red-600">{error}</p>;
+  if (loaded) return null;
+  return <p className="py-2 text-sm text-gray-500">불러오는 중...</p>;
 }
 
-export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase, onRefreshed }: OrderDetailsModalProps) {
+/** The chip that opens: the one picked if it is still there, otherwise the first chip (D28). */
+function openChipOf(detail: OrderDetail, picked: number | null): number | null {
+  if (picked != null && detail.parcels.some((parcel) => parcel.parcelId === picked)) return picked;
+  return detail.parcels[0]?.parcelId ?? null;
+}
+
+export function OrderDetailsModal(props: OrderDetailsModalProps) {
+  if ('parcelId' in props) return <PackingOrderDetailsModal {...props} />;
+  return <LineOrderDetailsModal {...props} />;
+}
+
+function PackingOrderDetailsModal({ parcelId, orderUseCase, reloadKey, onClose, onChangeBox }: PackingModeProps) {
+  const [detail, setDetail] = useState<OrderDetail | null>(null);
+  const [detailError, setDetailError] = useState('');
+  // The clicked parcel's chip opens first (D28); a reload keeps the open chip (D7).
+  const [openParcelId, setOpenParcelId] = useState<number | null>(parcelId);
+
+  // Reads on open and on every `reloadKey` change; the drawn content stays until the new response arrives.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const loaded = await orderUseCase.getParcelOrderDetail(parcelId);
+        if (alive) {
+          setDetail(loaded);
+          setDetailError('');
+        }
+      } catch (err) {
+        if (alive) setDetailError(extractErrorMessage(err, '주문 상세를 불러오지 못했습니다.'));
+      }
+    })();
+    return () => { alive = false; };
+  }, [parcelId, orderUseCase, reloadKey]);
+
+  // Packing mode fields (PLAN R17) — no line fields, amounts or quantities (D13).
+  const fields: OrderDetailField[] = detail == null ? [] : [
+    { label: '주문번호', value: detail.externalOrderId },
+    { label: '판매자', value: detail.sellerName ?? '-' },
+    { label: '판매처', value: salesChannelLabel(detail.platform, detail.accountAlias) },
+    { label: '주문자', value: detail.ordererName ?? '-' },
+    { label: '수취인', value: detail.receiverName ?? '-' },
+    { label: '결제일', value: formatDate(detail.paidAt) },
+  ];
+
+  return (
+    <Modal isOpen onClose={onClose} title="주문 상세" fullHeight>
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <DetailLoadState loaded={detail != null} error={detailError} />
+        {detail && (
+          <OrderDetailSummary
+            detail={detail}
+            fields={fields}
+            highlightLineId={null}
+            openParcelId={openChipOf(detail, openParcelId)}
+            onSelectParcel={setOpenParcelId}
+            onChangeBox={onChangeBox}
+          />
+        )}
+      </div>
+
+      <div className="shrink-0 border-t border-gray-200">
+        <div className="flex justify-end pt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-400 transition-colors"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase, onRefreshed }: LineModeProps) {
   // Hooks must precede the `order == null` guard — a conditional hook breaks the Rules of Hooks.
   const [rows, setRows] = useState<ShippingLabelExportRow[]>([]);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -178,6 +275,32 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
   const [isConfirmingStock, setIsConfirmingStock] = useState(false);
   const [stockSent, setStockSent] = useState(false);
   const [stockError, setStockError] = useState('');
+  // Shared order detail (FEATURE_2611_07 / D18 · D30 ①) — read on open; `detailReloadTick` re-reads it (R12).
+  const [detail, setDetail] = useState<OrderDetail | null>(null);
+  const [detailError, setDetailError] = useState('');
+  const [detailReloadTick, setDetailReloadTick] = useState(0);
+  // The chip the user picked; before a pick the first chip is open (D28).
+  const [pickedParcelId, setPickedParcelId] = useState<number | null>(null);
+
+  // Order detail load — independent of the action areas, which render as before. The drawn content stays while a
+  // re-read is in flight; the new response replaces it.
+  useEffect(() => {
+    const lineId = order?.id;
+    if (lineId == null) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const loaded = await orderUseCase.getOrderDetail(lineId);
+        if (alive) {
+          setDetail(loaded);
+          setDetailError('');
+        }
+      } catch (err) {
+        if (alive) setDetailError(extractErrorMessage(err, '주문 상세를 불러오지 못했습니다.'));
+      }
+    })();
+    return () => { alive = false; };
+  }, [order?.id, orderUseCase, detailReloadTick]);
 
   // Carrier list load — the platform's code table (Coupang has no carrier-list API; 11st uses the same catalog),
   // served from our own backend, not a marketplace call, so it runs on open without a button. The guard mirrors
@@ -470,6 +593,8 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
         setRefreshBanner('이미 최신입니다.');
       }
       await onRefreshed?.();
+      // The fields come from the server response, so the order detail is read again (R12).
+      setDetailReloadTick((tick) => tick + 1);
     } catch (err) {
       setRefreshBanner(extractErrorMessage(err, '주문 상태 갱신에 실패했습니다. 다시 시도해주세요.'));
     } finally {
@@ -566,36 +691,36 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
     }
   };
 
-  // No detail API exists — display the row's fields read-only
-  const fields: { label: string; value: string | number }[] = [
-    { label: '플랫폼', value: order.platform },
-    { label: '주문번호', value: order.externalOrderId },
-    { label: '박스 ID', value: order.externalBoxId ?? '-' },
-    { label: '아이템 ID', value: order.externalItemId },
-    { label: '상품명', value: order.itemName ?? '-' },
-    { label: '주문자', value: order.ordererName ?? '-' },
-    { label: '수취인', value: order.receiverName ?? '-' },
-    { label: '주문수량', value: order.orderCount },
+  // Line mode fields (PLAN R17 · D40): order fields from the response, the rest from the clicked line in the response
+  // (`order` until it is there). 「플랫폼」 · 「박스 ID」 · 「상품명」 · 「마켓 계정 ID」 are gone (D16 · D32).
+  const line = detail?.lines.find((candidate) => candidate.id === order.id) ?? order;
+  const fields: OrderDetailField[] = detail == null ? [] : [
+    { label: '주문번호', value: detail.externalOrderId },
+    { label: '판매자', value: detail.sellerName ?? '-' },
+    { label: '판매처', value: salesChannelLabel(detail.platform, detail.accountAlias) },
+    { label: '아이템 ID', value: line.externalItemId },
+    { label: '주문자', value: detail.ordererName ?? '-' },
+    { label: '수취인', value: detail.receiverName ?? '-' },
+    { label: '주문수량', value: line.orderCount },
     // 취소 성공 라인은 서버가 준 결과값으로 덮어쓴다(PLAN 2609_25 D14) — 즉시취소는 취소수량이,
     // 출고중지는 보류수량이 는다(D7). 주문수량은 그대로다(쿠팡도 원 주문수량은 바꾸지 않는다).
-    { label: '취소수량', value: cancelledLine?.resultCancelCount ?? order.cancelCount },
-    { label: '보류수량', value: cancelledLine?.resultHoldCount ?? order.holdCount },
-    { label: '구매가능수량', value: cancelledLine?.resultPurchasableQty ?? order.purchasableQty },
+    { label: '취소수량', value: cancelledLine?.resultCancelCount ?? line.cancelCount },
+    { label: '보류수량', value: cancelledLine?.resultHoldCount ?? line.holdCount },
+    { label: '구매가능수량', value: cancelledLine?.resultPurchasableQty ?? line.purchasableQty },
     // 금액은 주문 시점 스냅샷이라 취소·동기화로 바뀌지 않는다. 배송비는 박스 단위라 여기 없다.
-    { label: '단가', value: formatAmount(order.unitPrice) },
-    { label: '주문금액', value: formatAmount(order.lineAmount) },
-    { label: '할인금액', value: formatAmount(order.discountAmount) },
-    { label: '플랫폼 부담 할인', value: formatAmount(order.platformDiscountAmount) },
+    { label: '단가', value: formatAmount(line.unitPrice) },
+    { label: '주문금액', value: formatAmount(line.lineAmount) },
+    { label: '할인금액', value: formatAmount(line.discountAmount) },
+    { label: '플랫폼 부담 할인', value: formatAmount(line.platformDiscountAmount) },
     // A successful CREATE writes 「발송처리」 back server-side; show it straight from the result (D4).
     // ⚠️ The shipment result comes first — reversing the order hides 「발송처리」 from a user who confirmed and then
     // shipped in one modal. The cancel is the last step, so the cancel result wins — a full cancel comes back as
     // 'CANCELLED' from the server (D14).
     // FEATURE_2610_17 / D67: a reserved-sale line shows the 11st label beside its status.
     { label: '상태', value: getOrderStatusLabel(
-        cancelledLine?.resultStatus ?? result?.resultStatus ?? (ackSucceeded ? 'PREPARING' : order.status))
-        + (order.reservedSale ? ` · ${ELEVENST_RESERVED_LABEL}` : '') },
-    { label: '결제일', value: formatDate(order.paidAt) },
-    { label: '마켓 계정 ID', value: order.marketplaceAccountId },
+        cancelledLine?.resultStatus ?? result?.resultStatus ?? (ackSucceeded ? 'PREPARING' : line.status))
+        + (line.reservedSale ? ` · ${ELEVENST_RESERVED_LABEL}` : '') },
+    { label: '결제일', value: formatDate(detail.paidAt) },
   ];
 
   // 기하 고정(D1) — 시트를 펼쳐도 모달 크기가 변하지 않는다. `fullHeight` 가 그 역할을 승계한다.
@@ -629,14 +754,16 @@ export function OrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCa
 
         {/* Only this middle band scrolls — the table keeps no scroller of its own (D2). */}
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <dl className="divide-y divide-gray-200">
-            {fields.map((field) => (
-              <div key={field.label} className="flex justify-between py-2">
-                <dt className="text-sm font-medium text-gray-500">{field.label}</dt>
-                <dd className="text-sm text-gray-900 text-right">{field.value}</dd>
-              </div>
-            ))}
-          </dl>
+          <DetailLoadState loaded={detail != null} error={detailError} />
+          {detail && (
+            <OrderDetailSummary
+              detail={detail}
+              fields={fields}
+              highlightLineId={order.id}
+              openParcelId={openChipOf(detail, pickedParcelId)}
+              onSelectParcel={setPickedParcelId}
+            />
+          )}
 
           {/* FEATURE_2610_17 / D19 · D35 — 11st only: the buyer's open cancel requests, and the seller return
               request for a shipped line that is not fully cancelled (D39 ⑤). */}

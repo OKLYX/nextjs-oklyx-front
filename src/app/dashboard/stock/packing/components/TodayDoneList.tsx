@@ -17,7 +17,7 @@ import type { PackingHistoryRow } from '@/domain/entities/PackingEntity';
 export interface TodayDoneListProps {
   rows: PackingHistoryRow[];
   loading: boolean;
-  /** Row click = change the box of that completed parcel (FEATURE_2611_06 / D10) */
+  /** Row click = open the order detail of that parcel (FEATURE_2611_07 / D1 · D6) */
   onPick: (row: PackingHistoryRow) => void;
 }
 
