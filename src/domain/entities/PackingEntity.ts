@@ -187,6 +187,8 @@ export interface PackingHistoryRow {
   toStatus: ParcelStatus;
   /** Who moved it. `null` = unknown */
   changedBy: string | null;
+  /** The box the parcel is packed in (`Package.type`). `null` = none (never packed) */
+  boxName: string | null;
 }
 
 /**
