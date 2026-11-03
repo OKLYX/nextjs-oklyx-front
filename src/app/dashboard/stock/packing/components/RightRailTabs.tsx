@@ -6,13 +6,13 @@ import { Card } from '@/presentation/components/ui/Card';
 export type RailTab = 'PENDING' | 'DONE';
 
 /**
- * 포장 작업 화면 오른쪽 열(20rem) — 「작업 대상」 · 「오늘 완료」 탭 2개
- * (FEATURE_2609_55 / PLAN D5 · D6).
+ * 포장 작업 화면 오른쪽 열(20rem) — 「오늘 완료」 · 「작업 대상」 탭 2개
+ * (FEATURE_2609_55 / PLAN D5 · D6). 🔁 2026-11-03 사용자 지시: 「오늘 완료」가 왼쪽이고 기본 탭이다.
  *
  * **파일**: src/app/dashboard/stock/packing/components/RightRailTabs.tsx
  * **쓰는 곳**: 포장 작업 몰입 레이어의 「송장 대기」 · 「담는 중」 · 「닫힌 박스」 세 상태 모두 같은 자리.
  *
- * 🔴 상태는 페이지가 소유한다 — 탭 값도 `pendingPanel` 도 페이지가 만들어 넘긴다. 상태에 따라
+ * 🔴 상태는 페이지가 소유한다 — 탭 값도 `pendingPanel` · `donePanel` 도 페이지가 만들어 넘긴다. 상태에 따라
  * 선택 표시·클릭 허용이 달라지기 때문이다(D7).
  * 🔴 탭 버튼 2개가 이 화면에서 **새로 생기는 유일한 클릭 대상**이다. 그래서 F10 이 있다(D6) —
  * 여기에 다른 버튼을 더하지 않는다. 키 경로 없는 조작을 만들지 않는 것이 이 화면의 규칙이다.
@@ -26,14 +26,16 @@ interface RightRailTabsProps {
   onSelectTab: (tab: RailTab) => void;
   /** 「작업 대상」 탭 본문. 상태에 따라 선택 표시·클릭 허용이 달라서 페이지가 만들어 넘긴다 */
   pendingPanel: ReactNode;
+  /** 「오늘 완료」 탭 본문 — 오늘 완료한 박스 목록(`TodayDoneList`) */
+  donePanel: ReactNode;
 }
 
 const TABS: [RailTab, string][] = [
-  ['PENDING', '작업 대상'],
   ['DONE', '오늘 완료'],
+  ['PENDING', '작업 대상'],
 ];
 
-export function RightRailTabs({ tab, onSelectTab, pendingPanel }: RightRailTabsProps) {
+export function RightRailTabs({ tab, onSelectTab, pendingPanel, donePanel }: RightRailTabsProps) {
   return (
     <Card className="xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
       <div className="mb-3 flex items-center justify-between border-b border-gray-200">
@@ -61,17 +63,7 @@ export function RightRailTabs({ tab, onSelectTab, pendingPanel }: RightRailTabsP
         <span className="text-xs text-gray-700">[F10]</span>
       </div>
       <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
-        {tab === 'PENDING' ? (
-          pendingPanel
-        ) : (
-          /*
-           * 🔴 무엇을 표시할지는 **아직 정해지지 않았다**(2026-09-16 사용자 확정: "목록 UI만, 내용은 추후").
-           * 그래서 조회 API 도, 가짜 데이터도, 동작 없는 버튼도 두지 않는다 — 내용이 정해지면 이 파일에
-           * props 를 더한다. 지금 채워 두면 "있는데 안 맞는 목록"이 된다.
-           * 🔴 건수를 탭 라벨에 붙이지 않는다 — 셀 데이터가 없다(2609_54/D6 · D8).
-           */
-          <p className="text-sm text-gray-700">아직 표시할 내용이 없습니다</p>
-        )}
+        {tab === 'PENDING' ? pendingPanel : donePanel}
       </div>
     </Card>
   );
