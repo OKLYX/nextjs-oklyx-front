@@ -71,4 +71,11 @@ export class PackingRepositoryImpl implements PackingRepository {
     });
     return response.data.data;
   }
+
+  async changeBox(parcelId: number, boxPackageId: number): Promise<PackingCompleteResult> {
+    const response = await axiosInstance.post(`/api/admin/packing/parcels/${parcelId}/box`, {
+      boxPackageId,
+    });
+    return response.data.data;
+  }
 }

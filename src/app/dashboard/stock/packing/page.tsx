@@ -34,7 +34,8 @@ import { BoxCandidateRow } from './components/BoxCandidateRow';
 import { PendingParcelList } from './components/PendingParcelList';
 import { RightRailTabs, type RailTab } from './components/RightRailTabs';
 import { TodayDoneList } from './components/TodayDoneList';
-import { BoxChangeModal, UNREGISTERED_RECYCLED_BOX_TYPE } from './components/BoxChangeModal';
+import { BoxChangeModal } from './components/BoxChangeModal';
+import { findOrCreateUnregisteredRecycledBox } from './components/unregisteredRecycledBox';
 import { platformName } from '@/config/platforms';
 
 /**
@@ -273,6 +274,11 @@ export default function StockPackingPage() {
 
   /** [박스 변경] 창 */
   const [boxChangeOpen, setBoxChangeOpen] = useState(false);
+  /**
+   * Completed parcel whose box is being changed from a 「오늘 완료」 row (FEATURE_2611_06 / D10). `null` = dialog
+   * closed. Kept apart from `boxChangeOpen` (box being packed) — it never touches `selectedPackageId`.
+   */
+  const [doneBoxTarget, setDoneBoxTarget] = useState<PackingHistoryRow | null>(null);
   /**
    * [B] 로 「박스 추천」 칸을 고른 상태. 🔴 ref 가 판정의 원본이다 — 스캐너는 렌더보다 빨리 글자를 보낸다.
    * `at` = B 를 받은 시각, `char` = 스캔이었을 때 버퍼로 돌려놓을 실제 글자(대소문자 그대로).
@@ -825,31 +831,11 @@ export default function StockPackingPage() {
     setBoxChangeOpen(true);
   }, [isPending, isSubmitting]);
 
-  /** 공용 미등록 재활용 상자를 찾고, 없으면 한 번 만든다 (2026-11-03 사용자 결정) */
+  /** Finds the shared unregistered recycled box (or creates it once) and picks it for the box being packed */
   const handlePickUnregistered = useCallback(async () => {
-    const existing = allPackages.find(
-      (pkg) => pkg.type === UNREGISTERED_RECYCLED_BOX_TYPE && boxKindOf(pkg) === 'RECYCLED'
-    );
-    if (existing) {
-      handleSelectBox(existing.id);
-      return;
-    }
-    try {
-      // 치수는 모른다 — 서버가 0.1cm 이상을 요구해서 1cm 로 둔다. 비용 0 = 재활용 상자만 허용된다
-      const created = await packageUseCase.createPackage({
-        type: UNREGISTERED_RECYCLED_BOX_TYPE,
-        cost: 0,
-        widthCm: 1,
-        lengthCm: 1,
-        heightCm: 1,
-        isDefault: false,
-        boxKind: 'RECYCLED',
-      });
-      setAllPackages((previous) => [...previous, created]);
-      handleSelectBox(created.id);
-    } catch (error) {
-      throw new Error(serverMessage(error, '재활용 상자를 준비하지 못했습니다'));
-    }
+    const { box, created } = await findOrCreateUnregisteredRecycledBox(allPackages, packageUseCase);
+    if (created) setAllPackages((previous) => [...previous, box]);
+    handleSelectBox(box.id);
   }, [allPackages, packageUseCase, handleSelectBox]);
 
   /** [박스 변경] 창의 새 상자 등록 — 저장 → 목록에 넣기 → 이 송장의 상자로 고르기 */
@@ -865,6 +851,57 @@ export default function StockPackingPage() {
       }
     },
     [packageUseCase, handleSelectBox, notify]
+  );
+
+  /**
+   * Changes the box of the completed parcel picked in 「오늘 완료」 (FEATURE_2611_06 / D10). Failure throws the
+   * server text — the dialog shows it and stays open. Never touches the box being packed.
+   */
+  const changeDoneBox = useCallback(
+    async (box: Package) => {
+      if (!doneBoxTarget) return;
+      try {
+        await packingUseCase.changeBox(doneBoxTarget.parcelId, box.id);
+      } catch (error) {
+        throw new Error(serverMessage(error, '상자를 바꾸지 못했습니다'));
+      }
+      setDoneBoxTarget(null);
+      await loadDone();
+      notify('success', `상자를 바꿨습니다 — ${box.type}`);
+    },
+    [doneBoxTarget, packingUseCase, loadDone, notify]
+  );
+
+  /** 「오늘 완료」 box change — a registered box */
+  const handleDonePick = useCallback(
+    async (packageId: number) => {
+      const box = allPackages.find((pkg) => pkg.id === packageId);
+      if (!box) return;
+      await changeDoneBox(box);
+    },
+    [allPackages, changeDoneBox]
+  );
+
+  /** 「오늘 완료」 box change — the shared unregistered recycled box */
+  const handleDonePickUnregistered = useCallback(async () => {
+    const { box, created } = await findOrCreateUnregisteredRecycledBox(allPackages, packageUseCase);
+    if (created) setAllPackages((previous) => [...previous, box]);
+    await changeDoneBox(box);
+  }, [allPackages, packageUseCase, changeDoneBox]);
+
+  /** 「오늘 완료」 box change — register a new box, then use it */
+  const handleDoneCreate = useCallback(
+    async (request: CreatePackageRequest) => {
+      let created: Package;
+      try {
+        created = await packageUseCase.createPackage(request);
+      } catch (error) {
+        throw new Error(serverMessage(error, '상자를 등록하지 못했습니다'));
+      }
+      setAllPackages((previous) => [...previous, created]);
+      await changeDoneBox(created);
+    },
+    [packageUseCase, changeDoneBox]
   );
 
   const handleCancelBox = useCallback(() => {
@@ -1118,7 +1155,7 @@ export default function StockPackingPage() {
   useEffect(() => {
     handlersRef.current = {
       // 확인 팝업·도움말이 떠 있으면 키는 팝업의 것이다
-      enabled: started && !unusedOpen && !restoreOpen && !exitOpen && !helpOpen && !boxChangeOpen,
+      enabled: started && !unusedOpen && !restoreOpen && !exitOpen && !helpOpen && !boxChangeOpen && !doneBoxTarget,
       busy: isSubmitting || isScanning,
       submit: () => {
         // B 바로 뒤 Enter = 「B」 한 글자짜리 스캔이었다 → 그 글자를 돌려놓고 보낸다
@@ -1717,7 +1754,7 @@ export default function StockPackingPage() {
     <RightRailTabs
       tab={railTab}
       onSelectTab={setRailTab}
-      donePanel={<TodayDoneList rows={doneRows} loading={doneLoading} />}
+      donePanel={<TodayDoneList rows={doneRows} loading={doneLoading} onPick={setDoneBoxTarget} />}
       pendingPanel={
         <PendingParcelList
           parcels={pendingParcels}
@@ -1840,6 +1877,18 @@ export default function StockPackingPage() {
           onPick={handleSelectBox}
           onPickUnregistered={handlePickUnregistered}
           onCreate={handleCreateBox}
+        />
+      )}
+
+      {/* Completed parcel box change (FEATURE_2611_06 / D10) — mounted only while a target is set */}
+      {doneBoxTarget && (
+        <BoxChangeModal
+          packages={allPackages}
+          selectedPackageId={doneBoxTarget.boxPackageId}
+          onClose={() => setDoneBoxTarget(null)}
+          onPick={handleDonePick}
+          onPickUnregistered={handleDonePickUnregistered}
+          onCreate={handleDoneCreate}
         />
       )}
 
