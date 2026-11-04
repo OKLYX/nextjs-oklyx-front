@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { QuantityStepper } from '@/presentation/components/QuantityStepper';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
@@ -8,6 +8,8 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { getImageUrl } from '@/infrastructure/utils/imageUrl';
 import type { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
+import { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
+import { ProductRepositoryImpl } from '@/infrastructure/repositories/ProductRepositoryImpl';
 import type { MasterProductResponse } from '@/domain/entities/MasterProductEntity';
 import type { Product } from '@/domain/entities/Product';
 
@@ -71,39 +73,47 @@ export function MasterCompositionForm({
   const [newOptionSeq, setNewOptionSeq] = useState(0);
 
   const [productFilter, setProductFilter] = useState('');
-  const [productQuery, setProductQuery] = useState('');
   const [productHasSearched, setProductHasSearched] = useState(false);
+  // Search results come from the server (`GET /api/products?search=`), not from `products`: that list is
+  // only the newest 1000.
+  const productsUseCase = useMemo(() => new GetProductsUseCase(new ProductRepositoryImpl()), []);
+  const [searchHits, setSearchHits] = useState<Product[]>([]);
+  const [searchTotal, setSearchTotal] = useState(0);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  // Drops a late response of an earlier search.
+  const searchSeq = useRef(0);
+  // Search hits picked from outside `products` — merged in below so their name and thumbnail show.
+  const [pickedProducts, setPickedProducts] = useState<Product[]>([]);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // 이름 표시용. 새로 고른 상품은 products 목록에, 원래 구성상품은 master.components 에 있다.
+  // 이름 표시용. 새로 고른 상품은 products 목록(또는 pickedProducts)에, 원래 구성상품은 master.components 에 있다.
   const nameOf = useMemo(() => {
     const map = new Map<number, string>();
     master.components.forEach((c) => map.set(c.productId, c.productName));
     products.forEach((p) => map.set(p.id, p.productName));
+    pickedProducts.forEach((p) => map.set(p.id, p.productName));
     return (id: number) => map.get(id) ?? `#${id}`;
-  }, [master.components, products]);
+  }, [master.components, products, pickedProducts]);
 
   const productById = useMemo(() => {
     const map = new Map<number, Product>();
     products.forEach((p) => map.set(p.id, p));
+    pickedProducts.forEach((p) => map.set(p.id, p));
     return map;
-  }, [products]);
-
-  const filteredProducts = useMemo(() => {
-    const q = productQuery.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter((p) => (p.productName ?? '').toLowerCase().includes(q));
-  }, [products, productQuery]);
+  }, [products, pickedProducts]);
 
   // 검색 결과 = 아직 고르지 않은 것만(이미 고른 것은 아래 격자 열로 보인다).
   const searchMatches = useMemo(() => {
     const selected = new Set(selectedIds);
-    return filteredProducts.filter((p) => !selected.has(p.id));
-  }, [filteredProducts, selectedIds]);
+    return searchHits.filter((p) => !selected.has(p.id));
+  }, [searchHits, selectedIds]);
   const searchResults = searchMatches.slice(0, PRODUCT_SEARCH_LIMIT);
+  // Server total minus the selected rows that came back in this page.
+  const searchMatchCount = searchTotal - (searchHits.length - searchMatches.length);
 
   // 요청에서 빠진 기존 옵션 = 저장 시 삭제된다. 되돌릴 수 있게 원본을 들고 있는다.
   const removedOptions = useMemo(
@@ -111,10 +121,36 @@ export function MasterCompositionForm({
     [master.options, drafts],
   );
 
-  const handleProductSearch = () => {
-    if (!productFilter.trim()) return;
-    setProductQuery(productFilter);
+  const handleProductSearch = async () => {
+    const q = productFilter.trim();
+    if (!q) return;
+    const seq = ++searchSeq.current;
     setProductHasSearched(true);
+    setIsSearching(true);
+    setSearchError('');
+    try {
+      // Fetch enough to still fill the list after the already-selected rows are dropped.
+      const page = await productsUseCase.getProducts({
+        page: 0,
+        size: PRODUCT_SEARCH_LIMIT + selectedIds.length,
+        search: q,
+      });
+      if (seq !== searchSeq.current) return;
+      setSearchHits(page.content);
+      setSearchTotal(page.totalElements);
+    } catch (e: unknown) {
+      if (seq !== searchSeq.current) return;
+      setSearchHits([]);
+      setSearchTotal(0);
+      setSearchError(extractErrorMessage(e, '물품을 검색하지 못했습니다. 다시 시도하세요.'));
+    } finally {
+      if (seq === searchSeq.current) setIsSearching(false);
+    }
+  };
+
+  const pickSearchResult = (product: Product) => {
+    setPickedProducts((prev) => (prev.some((p) => p.id === product.id) ? prev : [...prev, product]));
+    addComponent(product.id);
   };
 
   // 🔴 구성상품을 더하고 뺄 때 모든 draft 의 수량 벡터를 같이 손본다. 빠뜨리면 저장에서 백엔드 400
@@ -248,20 +284,20 @@ export function MasterCompositionForm({
           <div className="mb-2 flex gap-2 max-md:flex-wrap">
             <input
               className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-              placeholder="상품명으로 검색"
+              placeholder="상품명 · 바코드 · 물품번호로 검색"
               value={productFilter}
               onChange={(e) => setProductFilter(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  handleProductSearch();
+                  void handleProductSearch();
                 }
               }}
             />
             <button
               type="button"
-              onClick={handleProductSearch}
-              disabled={productFilter.trim() === ''}
+              onClick={() => void handleProductSearch()}
+              disabled={productFilter.trim() === '' || isSearching}
               className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
               검색
@@ -270,7 +306,13 @@ export function MasterCompositionForm({
 
           {productHasSearched && (
             <div className="mb-2 max-h-40 overflow-y-auto rounded border border-gray-200">
-              {searchResults.length === 0 ? (
+              {isSearching ? (
+                <div className="px-3 py-2">
+                  <Spinner label="검색 중..." />
+                </div>
+              ) : searchError ? (
+                <p className="px-3 py-2 text-sm text-red-600">{searchError}</p>
+              ) : searchResults.length === 0 ? (
                 <p className="px-3 py-2 text-sm text-gray-500">검색 결과가 없습니다.</p>
               ) : (
                 <ul className="divide-y divide-gray-100">
@@ -278,7 +320,7 @@ export function MasterCompositionForm({
                     <li key={p.id}>
                       <button
                         type="button"
-                        onClick={() => addComponent(p.id)}
+                        onClick={() => pickSearchResult(p)}
                         className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-blue-50"
                       >
                         {renderThumb(p)}
@@ -295,9 +337,9 @@ export function MasterCompositionForm({
                   ))}
                 </ul>
               )}
-              {searchMatches.length > searchResults.length && (
+              {!isSearching && !searchError && searchMatchCount > searchResults.length && (
                 <p className="border-t border-gray-100 px-3 py-1.5 text-[11px] text-gray-400">
-                  {searchMatches.length}개 중 {searchResults.length}개 표시 — 더 구체적으로 검색하세요.
+                  {searchMatchCount}개 중 {searchResults.length}개 표시 — 더 구체적으로 검색하세요.
                 </p>
               )}
             </div>
