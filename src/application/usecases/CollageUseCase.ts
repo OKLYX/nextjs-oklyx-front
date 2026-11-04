@@ -1,11 +1,13 @@
 import type { CollageRepository } from '@/domain/repositories/CollageRepository';
 import type {
+  CollageCoverRequest,
   CollageOverview,
   CollagePreviewRequest,
   CollageSaveRequest,
   CollageStageKey,
   CollageStageResponse,
 } from '@/domain/entities/CollageEntity';
+import type { MasterPoolImage } from '@/domain/entities/DetailTemplateEntity';
 
 export class CollageUseCase {
   constructor(private repository: CollageRepository) {}
@@ -28,5 +30,9 @@ export class CollageUseCase {
 
   preview(masterId: number, data: CollagePreviewRequest): Promise<Blob> {
     return this.repository.preview(masterId, data);
+  }
+
+  saveAsCover(masterId: number, data: CollageCoverRequest): Promise<MasterPoolImage> {
+    return this.repository.saveAsCover(masterId, data);
   }
 }
