@@ -757,9 +757,15 @@ export function MasterProductCreateForm({
   const [carrierRates, setCarrierRates] = useState<CarrierRate[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [productFilter, setProductFilter] = useState('');
-  // Submitted query (검색 버튼/Enter). Typing alone shows nothing — same flow as the category search.
-  const [productQuery, setProductQuery] = useState('');
+  // Search runs on 검색 버튼/Enter only — same flow as the category search. Results come from the server
+  // (`GET /api/products?search=`), not from `products`: that list is only the newest 1000.
   const [productHasSearched, setProductHasSearched] = useState(false);
+  const [productSearchHits, setProductSearchHits] = useState<Product[]>([]);
+  const [productSearchTotal, setProductSearchTotal] = useState(0);
+  const [productSearching, setProductSearching] = useState(false);
+  const [productSearchError, setProductSearchError] = useState('');
+  // Drops a late response of an earlier search.
+  const productSearchSeq = useRef(0);
   // Once applied, the component set is frozen (search + add/remove disabled) until 수정 is pressed.
   // 2609_46: 잠긴 상태 = "이 조합으로 만들어도 된다는 확인이 끝났다" → 나머지 입력이 열린다.
   const [componentsLocked, setComponentsLocked] = useState(false);
@@ -852,8 +858,9 @@ export function MasterProductCreateForm({
         return;
       }
       setProductFilter('');
-      setProductQuery('');
+      productSearchSeq.current += 1;
       setProductHasSearched(false);
+      setProductSearchHits([]);
       setComponentsLocked(true);
     } catch (e) {
       setComponentsError(
@@ -946,25 +953,49 @@ export function MasterProductCreateForm({
     doAdd();
   };
 
-  const handleProductSearch = () => {
-    if (!productFilter.trim()) return;
-    setProductQuery(productFilter);
+  const PRODUCT_SEARCH_LIMIT = 50;
+
+  const handleProductSearch = async () => {
+    const q = productFilter.trim();
+    if (!q) return;
+    const seq = ++productSearchSeq.current;
     setProductHasSearched(true);
+    setProductSearching(true);
+    setProductSearchError('');
+    try {
+      // Fetch enough to still fill the list after the already-selected rows are dropped.
+      const page = await productsUseCase.getProducts({
+        page: 0,
+        size: PRODUCT_SEARCH_LIMIT + selectedIds.length,
+        search: q,
+      });
+      if (seq !== productSearchSeq.current) return;
+      setProductSearchHits(page.content);
+      setProductSearchTotal(page.totalElements);
+    } catch (e) {
+      if (seq !== productSearchSeq.current) return;
+      setProductSearchHits([]);
+      setProductSearchTotal(0);
+      setProductSearchError(extractErrorMessage(e, '물품을 검색하지 못했습니다. 다시 시도하세요.'));
+    } finally {
+      if (seq === productSearchSeq.current) setProductSearching(false);
+    }
   };
 
-  const filteredProducts = useMemo(() => {
-    const q = productQuery.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter((p) => (p.productName ?? '').toLowerCase().includes(q));
-  }, [products, productQuery]);
-
   // Search results = matches excluding already-selected items (they show in the list below).
-  const PRODUCT_SEARCH_LIMIT = 50;
   const searchMatches = useMemo(() => {
     const selected = new Set(selectedIds);
-    return filteredProducts.filter((p) => !selected.has(p.id));
-  }, [filteredProducts, selectedIds]);
+    return productSearchHits.filter((p) => !selected.has(p.id));
+  }, [productSearchHits, selectedIds]);
   const searchResults = searchMatches.slice(0, PRODUCT_SEARCH_LIMIT);
+  // Server total minus the selected rows that came back in this page.
+  const searchMatchCount = productSearchTotal - (productSearchHits.length - searchMatches.length);
+
+  // A search hit may be outside the preloaded list — add it there so the picked rows can show it.
+  const pickSearchResult = (product: Product) => {
+    setProducts((prev) => (prev.some((p) => p.id === product.id) ? prev : [product, ...prev]));
+    toggleProduct(product.id);
+  };
 
   // The picked component set as full product rows (thumbnail/name/brand/price).
   const selectedProducts = useMemo(
@@ -1275,21 +1306,21 @@ export function MasterProductCreateForm({
             <div className="mb-2 flex gap-2 max-md:flex-wrap">
               <input
                 className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100"
-                placeholder="상품명으로 검색"
+                placeholder="상품명 · 바코드 · 물품번호로 검색"
                 value={productFilter}
                 disabled={optionFormOpen || componentsLocked}
                 onChange={(e) => setProductFilter(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    handleProductSearch();
+                    void handleProductSearch();
                   }
                 }}
               />
               <button
                 type="button"
-                onClick={handleProductSearch}
-                disabled={optionFormOpen || componentsLocked || productFilter.trim() === ''}
+                onClick={() => void handleProductSearch()}
+                disabled={optionFormOpen || componentsLocked || productFilter.trim() === '' || productSearching}
                 className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 검색
@@ -1316,7 +1347,13 @@ export function MasterProductCreateForm({
 
             {!componentsLocked && productHasSearched && (
               <div className="mb-2 max-h-40 overflow-y-auto rounded border border-gray-200">
-                {searchResults.length === 0 ? (
+                {productSearching ? (
+                  <div className="px-3 py-2">
+                    <Spinner label="검색 중..." />
+                  </div>
+                ) : productSearchError ? (
+                  <p className="px-3 py-2 text-sm text-red-600">{productSearchError}</p>
+                ) : searchResults.length === 0 ? (
                   <p className="px-3 py-2 text-sm text-gray-500">검색 결과가 없습니다.</p>
                 ) : (
                   <ul className="divide-y divide-gray-100">
@@ -1325,7 +1362,7 @@ export function MasterProductCreateForm({
                         {/* Row click adds the product (same affordance as the category search list). */}
                         <button
                           type="button"
-                          onClick={() => toggleProduct(p.id)}
+                          onClick={() => pickSearchResult(p)}
                           disabled={optionFormOpen}
                           className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -1341,9 +1378,9 @@ export function MasterProductCreateForm({
                     ))}
                   </ul>
                 )}
-                {searchMatches.length > searchResults.length && (
+                {!productSearching && !productSearchError && searchMatchCount > searchResults.length && (
                   <p className="border-t border-gray-100 px-3 py-1.5 text-[11px] text-gray-400">
-                    {searchMatches.length}개 중 {searchResults.length}개 표시 — 더 구체적으로 검색하세요.
+                    {searchMatchCount}개 중 {searchResults.length}개 표시 — 더 구체적으로 검색하세요.
                   </p>
                 )}
               </div>
