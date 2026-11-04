@@ -159,7 +159,7 @@ export function MasterProductList() {
         key={m.id}
         onClick={() => router.push(detailHrefWithReturn(ROUTES.MASTER_PRODUCT_DETAIL(m.id), searchKey))}
         image={
-          <div className="h-12 w-12 overflow-hidden rounded bg-gray-100">
+          <div className="h-20 w-20 overflow-hidden rounded bg-gray-100">
             {m.sourceImageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={resolveThumbUrl(m.sourceImageUrl)} alt={m.name} className="h-full w-full object-contain" />
@@ -255,7 +255,7 @@ export function MasterProductList() {
                     }
                   >
                     <td className="px-4 py-2">
-                      <div className="h-12 w-12 overflow-hidden rounded bg-gray-100">
+                      <div className="h-24 w-24 overflow-hidden rounded bg-gray-100">
                         {m.sourceImageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
