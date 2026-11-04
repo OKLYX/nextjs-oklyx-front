@@ -110,3 +110,11 @@ export interface CollagePreviewRequest {
   listingId: number | null;
   layout: CollageLayout;
 }
+
+/**
+ * [대표사진으로 저장] (FEATURE_2611_10 D15 · D30): `listingId` = the chosen preview template's listing, null = the
+ * tenant default template — the saved master-default collage is drawn at that template's canvas size.
+ */
+export interface CollageCoverRequest {
+  listingId: number | null;
+}
