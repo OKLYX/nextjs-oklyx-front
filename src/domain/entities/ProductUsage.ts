@@ -1,16 +1,19 @@
 /**
- * 이 물품이 어디에 쓰이는지 (FEATURE_2609_69 / A).
+ * Where this product is used (FEATURE_2609_69 / A).
  *
- * 백엔드 `ProductUsageResponse` 와 1:1 이다.
+ * One to one with the backend `ProductUsageResponse`.
  *
- * 🔴 두 갈래(`masterProducts` · `listingOptions`)는 **삭제를 막는 연결**이고 자동으로 옮겨지지 않는다.
- * 🔴 **끊는 곳은 마스터 상품 화면 한 군데다**(2609_71 이후 셀 구성품 사본이 사라졌다) — `listingOptions` 는
- * 마스터를 통해 이 물품이 흘러간 **파급 범위**이고, 비어 있지 않으면 `masterProducts` 도 반드시 비어 있지 않다.
- * 🔴 화면은 이 목록을 그리지 않는다 — 판매 채널은 `masterProducts[].channels` 가 준다(2026-09-23).
- * 여기는 삭제를 막는 근거(`deletable`·`blockers`)의 출처로만 남는다.
- * 🔴 `history` 는 참고 건수일 뿐 삭제를 막지 않는다 — 막으면 한 번이라도 사고 움직이고 보낸 물품은
- * 영영 지울 수 없다.
- * 🔴 `blockers` 는 서버가 만든 명사구다. 프론트가 **한 글자도 고치지 않는다**(꼬리 문구만 붙인다).
+ * 🔴 The two branches (`masterProducts` · `listingOptions`) are **links that block deletion**. A plain delete never
+ * moves them; only the product merge moves them to the kept product (FEATURE_2611_09 / D1).
+ * 🔴 **They are unlinked in one place, the master product screen** (the cell component copies are gone since
+ * 2609_71) — `listingOptions` is the **reach** of this product through its masters; when it is not empty,
+ * `masterProducts` is never empty either.
+ * 🔴 The screen does not draw this list — the sales channels come from `masterProducts[].channels` (2026-09-23).
+ * It stays only as the source of the delete blockers (`deletable` · `blockers`).
+ * 🔴 `history` is an informational count and never blocks deletion — otherwise a product that was ever bought,
+ * moved or shipped could never be deleted.
+ * 🔴 `blockers` are noun phrases built by the server. The front **does not change a single character** (it only
+ * appends the closing clause).
  */
 export interface ProductUsageOptionQty {
   optionId: number;

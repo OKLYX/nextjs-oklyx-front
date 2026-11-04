@@ -6,7 +6,12 @@ import axios from 'axios';
 import type { Product } from '@/domain/entities/Product';
 import type { ProductImage } from '@/domain/entities/ProductImage';
 import type { ProductUsage } from '@/domain/entities/ProductUsage';
-import type { MergeTransferOptions } from '@/domain/repositories/ProductMergeRepository';
+import type {
+  MasterOptionChoice,
+  MergePreviewOptionRow,
+  MergePreviewResponse,
+  MergeTransferOptions,
+} from '@/domain/repositories/ProductMergeRepository';
 import { GetProductDetailUseCase } from '@/application/usecases/GetProductDetailUseCase';
 import { GetProductsUseCase } from '@/application/usecases/GetProductsUseCase';
 import { GetProductUsageUseCase } from '@/application/usecases/GetProductUsageUseCase';
@@ -31,6 +36,7 @@ import { ProductUsageSection } from '../../components/ProductUsageSection';
 import { MergeCounterpartSearch } from './MergeCounterpartSearch';
 import { MergeFieldTable } from './MergeFieldTable';
 import { MergeImagePicker } from './MergeImagePicker';
+import { MergeMasterMovePanel, type MergeMasterOptionChoice } from './MergeMasterMovePanel';
 import { MergeTransferPanel } from './MergeTransferPanel';
 import {
   TRANSFER_ROWS,
@@ -44,21 +50,24 @@ import {
 } from './mergeFields';
 
 /**
- * 중복 물품 병합 화면 (FEATURE_2609_69 / B).
+ * Duplicate product merge screen (FEATURE_2609_69 / B · FEATURE_2611_09).
  *
- * **용도**: 중복 등록된 물품 2건을 나란히 놓고 **어느 쪽을 남길지 · 각 항목을 어느 쪽 값으로 할지**
- * 사람이 고른 뒤 병합한다. 자동 추천은 만들지 않는다(사용자 결정 2026-09-22).
- * **파일**: src/app/dashboard/products/[id]/merge/components/ProductMergeContainer.tsx
+ * **Purpose**: put two duplicate products side by side; a person picks **which one to keep and which side's
+ * value each field takes**, then merges. No automatic recommendation (user decision 2026-09-22).
+ * **File**: src/app/dashboard/products/[id]/merge/components/ProductMergeContainer.tsx
  *
- * **필수 규칙**
- * - 팝업이 아니라 **페이지**다. 긴 작업을 팝업에 넣지 않는다(선례: 마스터 생성 `/master-products/new`).
- * - 조회는 레이어드 usecase 로만 한다(`useQuery`/`useMutation` 금지).
- * - 연결 현황은 **02 의 `ProductUsageSection` 을 `compact` 로 재사용**한다. 다시 만들지 않는다.
- * - 🔴 **연결은 옮겨지지 않는다.** 버릴 쪽에 연결이 하나라도 있으면 [병합하기]를 막는다
- *   (서버도 409 로 거절한다 — 화면이 먼저 알려줄 뿐이다).
- * - 🔴 연결 현황 카드의 **[연결 새로고침]** 은 다른 탭에서 마스터·셀의 연결을 끊고 돌아온 사용자를 위한
- *   것이다(2026-09-24). 화면을 떠났다 오지 않아도 여기서 다시 조회해 막힌 [병합하기]가 풀린다.
- *   양쪽을 함께 다시 부른다 — 남길 쪽의 연결 수도 같이 변했을 수 있다.
+ * **Rules**
+ * - A **page**, not a popup. Long work does not go into a popup (precedent: master creation `/master-products/new`).
+ * - Reads go through the layered usecases only (no `useQuery`/`useMutation`).
+ * - The link overview **reuses `ProductUsageSection` with `compact`** (from 02). Do not rebuild it.
+ * - 🔴 **Master links move with every merge** (FEATURE_2611_09 / D1 · D2 — no checkbox). Links of the discarded
+ *   product no longer block [병합하기].
+ * - 🔴 Once both sides are set, the merge preview is loaded and the option picking panel
+ *   (`MergeMasterMovePanel`) is drawn for every master the merge deletes (D28). A preview 409 (D4 — a master
+ *   holds both products) blocks [병합하기] and its server message shows in the link overview card.
+ * - 🔴 **[연결 새로고침]** in the link overview card reloads both sides' links (2026-09-24) — for a user who
+ *   changed masters in another tab. Both sides are reloaded since the kept side may have changed too, and the
+ *   new links load the preview again.
  */
 const ALL_TRANSFERRED: MergeTransferOptions = {
   purchaseRecords: true,
@@ -72,6 +81,21 @@ const ALL_TRANSFERRED: MergeTransferOptions = {
 
 function linkCount(usage: ProductUsage): number {
   return usage.masterProducts.length + usage.listingOptions.length;
+}
+
+/** First choice of a row (D24 ② ④): the server's default option, else a new option named after the row. */
+function initialMasterChoice(row: MergePreviewOptionRow): MergeMasterOptionChoice {
+  return { targetOptionId: row.defaultOptionId ?? 'new', newOptionName: row.sourceOptionName };
+}
+
+function initialMasterChoices(preview: MergePreviewResponse): Record<number, MergeMasterOptionChoice> {
+  const result: Record<number, MergeMasterOptionChoice> = {};
+  for (const pair of preview.pairs) {
+    for (const row of pair.optionRows) {
+      result[row.sourceOptionId] = initialMasterChoice(row);
+    }
+  }
+  return result;
 }
 
 function historyCount(usage: ProductUsage): number {
@@ -114,6 +138,11 @@ export function ProductMergeContainer({ id }: { id: number }) {
   const [linkConflict, setLinkConflict] = useState<string | null>(null);
   const [mergedSummary, setMergedSummary] = useState<string | null>(null);
   const [mergedTargetId, setMergedTargetId] = useState<number | null>(null);
+
+  const [preview, setPreview] = useState<MergePreviewResponse | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [masterChoices, setMasterChoices] = useState<Record<number, MergeMasterOptionChoice>>({});
 
   /** 한쪽에 필요한 것 셋(상세·연결 현황·사진)을 한 번에 싣는다. */
   const loadSide = useCallback(
@@ -283,9 +312,71 @@ export function ProductMergeContainer({ id }: { id: number }) {
     [keepData, discardData, representativeImageId]
   );
 
-  const discardHasLinks = discardData ? linkCount(discardData.usage) > 0 : false;
+  const keepId = keepData?.product.id ?? null;
+  const discardId = discardData?.product.id ?? null;
+  const keepUsage = keepData?.usage ?? null;
+  const discardUsage = discardData?.usage ?? null;
+
+  /**
+   * Master preview (FEATURE_2611_09 / R12): reload whenever either product or either side's links change
+   * (picking the kept side and [연결 새로고침] both do). A late answer of an earlier call is dropped.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (keepId === null || discardId === null || !keepUsage || !discardUsage) {
+        setPreview(null);
+        setPreviewError(null);
+        setPreviewLoading(false);
+        return;
+      }
+      setPreviewLoading(true);
+      setPreviewError(null);
+      try {
+        const result = await mergeUseCase.preview({ targetProductId: keepId, sourceProductId: discardId });
+        if (cancelled) return;
+        setPreview(result);
+        setMasterChoices(initialMasterChoices(result));
+      } catch (err) {
+        if (cancelled) return;
+        setPreview(null);
+        setPreviewError(extractErrorMessage(err, '마스터 연결 미리 보기를 불러오지 못했습니다.'));
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [keepId, discardId, keepUsage, discardUsage, mergeUseCase]);
+
+  const handleMasterChoiceChange = useCallback(
+    (sourceOptionId: number, choice: MergeMasterOptionChoice) => {
+      setMasterChoices((prev) => ({ ...prev, [sourceOptionId]: choice }));
+    },
+    []
+  );
+
+  // Same rule as ImportCoupangProductModal: a new option needs a non-blank name.
+  const newOptionNameMissing =
+    preview != null &&
+    preview.pairs.some((pair) =>
+      pair.optionRows.some((row) => {
+        const choice = masterChoices[row.sourceOptionId] ?? initialMasterChoice(row);
+        return choice.targetOptionId === 'new' && choice.newOptionName.trim() === '';
+      })
+    );
+
   const canMerge =
-    !!keepData && !!discardData && !!choices && !rightLoading && !isMerging && !discardHasLinks;
+    !!keepData &&
+    !!discardData &&
+    !!choices &&
+    !rightLoading &&
+    !isMerging &&
+    !!preview &&
+    !previewLoading &&
+    !previewError &&
+    !newOptionNameMissing;
 
   const confirmSummary = useMemo(() => {
     if (!keepData || !discardData) return null;
@@ -308,6 +399,16 @@ export function ProductMergeContainer({ id }: { id: number }) {
 
   const handleMerge = useCallback(async () => {
     if (!keepData || !discardData || !choices) return;
+    const masterOptionChoices: MasterOptionChoice[] = (preview?.pairs ?? []).flatMap((pair) =>
+      pair.optionRows.map((row) => {
+        const choice = masterChoices[row.sourceOptionId] ?? initialMasterChoice(row);
+        return {
+          sourceOptionId: row.sourceOptionId,
+          targetOptionId: choice.targetOptionId === 'new' ? null : choice.targetOptionId,
+          newOptionName: choice.targetOptionId === 'new' ? choice.newOptionName.trim() : null,
+        };
+      })
+    );
     setIsMerging(true);
     setMergeError(null);
     setBarcodeConflict(null);
@@ -324,6 +425,7 @@ export function ProductMergeContainer({ id }: { id: number }) {
           representativeImageId
         ),
         transfer,
+        masterOptionChoices,
       });
       setShowConfirm(false);
       setMergedTargetId(response.targetProductId);
@@ -347,7 +449,17 @@ export function ProductMergeContainer({ id }: { id: number }) {
     } finally {
       setIsMerging(false);
     }
-  }, [keepData, discardData, choices, keepSide, representativeImageId, transfer, mergeUseCase]);
+  }, [
+    keepData,
+    discardData,
+    choices,
+    keepSide,
+    representativeImageId,
+    transfer,
+    preview,
+    masterChoices,
+    mergeUseCase,
+  ]);
 
   // 바코드가 양쪽 같으면 그 줄이 숨겨져 409 문구를 붙일 자리가 없다 → 아래 오류 영역에 그대로 띄운다.
   const barcodeConflictHasNoRow =
@@ -447,7 +559,7 @@ export function ProductMergeContainer({ id }: { id: number }) {
             disabled={isMerging}
           />
 
-          {/* 연결 현황 — 02 의 컴포넌트를 좌우에 하나씩. 🔴 연결은 옮겨지지 않는다 */}
+          {/* Link overview — the shared section on each side. Master links move with the merge (D10 · D28) */}
           <Card
             title="연결 현황"
             action={
@@ -464,10 +576,34 @@ export function ProductMergeContainer({ id }: { id: number }) {
             }
           >
             <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <p>연결(마스터 구성품 · 판매 옵션 구성품)은 옮겨지지 않습니다.</p>
-              <p>버릴 물품에 연결이 남아 있으면 삭제할 수 없습니다 — 마스터와 셀에서 먼저 빼주세요.</p>
+              <p>
+                버릴 물품이 들어 있는 마스터 상품 {discardData.usage.masterProducts.length}개의 구성품이 남길
+                물품으로 바뀝니다. 옵션 수량은 그대로입니다.
+              </p>
+              <p>마켓에 올라간 판매상품에는 [수정 요청] 표시가 켜집니다. 마켓에는 자동으로 보내지 않습니다.</p>
+              {discardData.usage.masterProducts.length > 0 && (
+                <ul className="mt-1">
+                  {discardData.usage.masterProducts.map((master) => (
+                    <li key={master.id}>
+                      {master.name}(#{master.id})
+                    </li>
+                  ))}
+                </ul>
+              )}
               <p>다른 탭에서 연결을 끊었다면 [연결 새로고침]으로 다시 불러오세요.</p>
             </div>
+            {previewLoading && <p className="mt-3 text-sm text-gray-600">불러오는 중…</p>}
+            {previewError && (
+              <p className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{previewError}</p>
+            )}
+            {preview && !previewLoading && (
+              <MergeMasterMovePanel
+                pairs={preview.pairs}
+                choices={masterChoices}
+                onChange={handleMasterChoiceChange}
+                disabled={isMerging}
+              />
+            )}
             {linkConflict && (
               <p className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{linkConflict}</p>
             )}
@@ -514,11 +650,6 @@ export function ProductMergeContainer({ id }: { id: number }) {
           )}
 
           <div className="flex items-center justify-end gap-3">
-            {discardHasLinks && (
-              <span className="text-sm text-red-600">
-                버릴 물품에 연결이 남아 있어 병합할 수 없습니다 — 마스터와 셀에서 먼저 빼주세요.
-              </span>
-            )}
             <Button
               variant="danger"
               disabled={!canMerge}
