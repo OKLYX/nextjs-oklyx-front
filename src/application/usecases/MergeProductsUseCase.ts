@@ -1,4 +1,6 @@
 import type {
+  MergePreviewRequest,
+  MergePreviewResponse,
   MergeProductsRequest,
   MergeProductsResponse,
   ProductMergeRepository,
@@ -15,5 +17,10 @@ export class MergeProductsUseCase {
 
   execute(request: MergeProductsRequest): Promise<MergeProductsResponse> {
     return this.repository.merge(request);
+  }
+
+  /** What the merge would do to the masters (FEATURE_2611_09 / D28) — read-only, no calculation here. */
+  preview(request: MergePreviewRequest): Promise<MergePreviewResponse> {
+    return this.repository.preview(request);
   }
 }

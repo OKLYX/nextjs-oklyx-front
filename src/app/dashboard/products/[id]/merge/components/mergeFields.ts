@@ -173,10 +173,17 @@ export const TRANSFER_ROWS: {
   { key: 'priceChangeLogs', label: '가격 이력', shortLabel: '가격이력', unit: '건', countKey: 'priceChangeLogs' },
 ];
 
-/** 병합 결과(`moved`)를 「매입 3 · 재고 12 · 사진 4」로. 0건은 빼고 적는다. */
+/**
+ * Merge result (`moved`) as 「매입 3 · 재고 12 · 사진 4」 — zero counts are left out. Masters the discarded
+ * product was in come last as 「마스터 {n}개」 (FEATURE_2611_09 / D11).
+ */
 export function movedSummary(moved: Record<string, number>): string {
   const parts = TRANSFER_ROWS.filter((row) => (moved[row.key] ?? 0) > 0).map(
     (row) => `${row.shortLabel} ${moved[row.key]}`
   );
+  const masterProducts = moved.masterProducts ?? 0;
+  if (masterProducts > 0) {
+    parts.push(`마스터 ${masterProducts}개`);
+  }
   return parts.join(' · ');
 }
