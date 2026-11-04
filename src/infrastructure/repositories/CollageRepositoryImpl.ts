@@ -3,12 +3,14 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { CollageRepository } from '@/domain/repositories/CollageRepository';
 import type {
+  CollageCoverRequest,
   CollageOverview,
   CollagePreviewRequest,
   CollageSaveRequest,
   CollageStageKey,
   CollageStageResponse,
 } from '@/domain/entities/CollageEntity';
+import type { MasterPoolImage } from '@/domain/entities/DetailTemplateEntity';
 
 const base = (masterId: number) => `/api/admin/master-products/${masterId}/collage`;
 
@@ -37,5 +39,11 @@ export class CollageRepositoryImpl implements CollageRepository {
     // Backend returns raw image/jpeg bytes — do NOT unwrap response.data.data.
     const response = await axiosInstance.post(`${base(masterId)}/preview`, data, { responseType: 'blob' });
     return response.data;
+  }
+
+  async saveAsCover(masterId: number, data: CollageCoverRequest): Promise<MasterPoolImage> {
+    const params = data.listingId === null ? {} : { listingId: data.listingId };
+    const response = await axiosInstance.post(`${base(masterId)}/cover`, null, { params });
+    return response.data.data;
   }
 }

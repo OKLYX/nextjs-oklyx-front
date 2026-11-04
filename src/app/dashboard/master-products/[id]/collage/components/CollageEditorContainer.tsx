@@ -13,6 +13,7 @@ import { toast } from '@/infrastructure/stores/toastStore';
 import { CollageUseCase } from '@/application/usecases/CollageUseCase';
 import { CollageRepositoryImpl } from '@/infrastructure/repositories/CollageRepositoryImpl';
 import type {
+  CollageCell,
   CollageLayout,
   CollageShape,
   CollageStageKey,
@@ -50,6 +51,37 @@ function keyFromQuery(stage?: string, sellerId?: string, listingId?: string): Co
   return { stage: 'MASTER' };
 }
 
+/** Missing (`undefined`) and `null` count as the same value — the server may omit null fields. */
+function sameValue<T>(a: T | null | undefined, b: T | null | undefined): boolean {
+  return (a ?? null) === (b ?? null);
+}
+
+function sameCell(a: CollageCell, b: CollageCell): boolean {
+  return (
+    a.productId === b.productId &&
+    a.zoom === b.zoom &&
+    a.cx === b.cx &&
+    a.cy === b.cy &&
+    sameValue(a.productImageId, b.productImageId)
+  );
+}
+
+/** Field-by-field layout equality (cell order matters, key order does not) — the "no unsaved change" check (FEATURE_2611_10 D29). */
+function sameLayout(a: CollageLayout | null, b: CollageLayout | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.shape === b.shape &&
+    sameValue(a.main, b.main) &&
+    a.lines.length === b.lines.length &&
+    a.lines.every((line, i) => line.length === b.lines[i].length && line.every((r, j) => r === b.lines[i][j])) &&
+    a.gap === b.gap &&
+    a.gapColor === b.gapColor &&
+    a.useTemplate === b.useTemplate &&
+    a.cells.length === b.cells.length &&
+    a.cells.every((c, i) => sameCell(c, b.cells[i]))
+  );
+}
+
 /**
  * Thumbnail collage editor page (FEATURE_2610_21 D20 · D25~D34 · D40~D48 · D51).
  * File: src/app/dashboard/master-products/[id]/collage/components/CollageEditorContainer.tsx
@@ -66,6 +98,10 @@ function keyFromQuery(stage?: string, sellerId?: string, listingId?: string): Co
  *
  * 「이 단계에서 따로 만들기」 starts from the inherited collage, or from the initial collage when there is none
  * (D32 · D41). Saving never regenerates a thumbnail (D20).
+ *
+ * The 「마스터 기본」 stage has [대표사진으로 저장] at the end of both button rows — enabled only when a saved,
+ * switched-on collage exists and there is no unsaved change. The server draws the saved collage at the chosen preview
+ * template's canvas size and makes it the master cover photo. No thumbnail regeneration (FEATURE_2611_10 D15 · D29 · D32).
  */
 export function CollageEditorContainer({ id, stage, sellerId, listingId }: CollageEditorContainerProps) {
   const router = useRouter();
@@ -77,7 +113,7 @@ export function CollageEditorContainer({ id, stage, sellerId, listingId }: Colla
   const [draft, setDraft] = useState<CollageLayout | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState<'save' | 'off' | 'delete' | 'preview' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'off' | 'delete' | 'preview' | 'cover' | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [targetIndex, setTargetIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -179,6 +215,18 @@ export function CollageEditorContainer({ id, stage, sellerId, listingId }: Colla
     }
   };
 
+  const handleSaveAsCover = async () => {
+    setBusy('cover');
+    try {
+      await useCase.saveAsCover(masterId, { listingId: target?.listingId ?? null });
+      toast.success(`마스터 대표사진을 이 콜라주로 바꿨습니다. ${APPLY_HINT}`);
+    } catch (e: unknown) {
+      toast.error(extractErrorMessage(e, '대표사진으로 저장하지 못했습니다.'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const startOwn = () => {
     if (!data) return;
     setDraft(data.inheritedLayout ?? initialLayout(data.products.map((p) => p.productId)));
@@ -216,6 +264,18 @@ export function CollageEditorContainer({ id, stage, sellerId, listingId }: Colla
   };
 
   const isOwn = data?.stage.source === 'OWN';
+  const coverDisabled = busy !== null || !data || data.ownLayout === null || !sameLayout(draft, data.ownLayout);
+  const coverButton = key.stage === 'MASTER' && (
+    <Button
+      variant="secondary"
+      onClick={handleSaveAsCover}
+      isLoading={busy === 'cover'}
+      loadingText="저장 중..."
+      disabled={coverDisabled}
+    >
+      대표사진으로 저장
+    </Button>
+  );
   const deleteMessage =
     key.stage === 'MASTER'
       ? '마스터 기본 콜라주를 지웁니다. 따로 만든 판매자·판매상품 콜라주가 없는 판매상품은 사진 한 장 썸네일이 됩니다.'
@@ -418,6 +478,7 @@ export function CollageEditorContainer({ id, stage, sellerId, listingId }: Colla
                       취소
                     </Button>
                   )}
+                  {coverButton}
                 </div>
               </div>
             ) : (
@@ -450,6 +511,7 @@ export function CollageEditorContainer({ id, stage, sellerId, listingId }: Colla
                       이 단계에서 콜라주 끄기
                     </Button>
                   )}
+                  {coverButton}
                 </div>
               </div>
             )}
