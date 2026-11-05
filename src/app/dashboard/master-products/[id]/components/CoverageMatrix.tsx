@@ -1625,8 +1625,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       )}
                       {/* 2609_22: 이미 마켓에 올라간 상품을 이 계정의 셀로 편입. 셀을 지목하지 않는
                           계정 단위 액션이라 헤더에 둔다(등록된 계정에도 — 두 번째 쿠팡 페이지의 입구).
-                          ⚠️ 출고지 가드를 걸지 않는다 — 이미 팔고 있는 상품이다.
-                          Shown on Coupang · 11st rows only (FEATURE_2611_12 R11). */}
+                          ⚠️ 출고지 가드를 걸지 않는다 — 이미 팔고 있는 상품이다. */}
+                      {/* Shown on Coupang · 11st rows only (FEATURE_2611_12 R11). */}
                       {isAdmin && IMPORT_PLATFORMS.includes(row.platform) && (
                         <button
                           type="button"

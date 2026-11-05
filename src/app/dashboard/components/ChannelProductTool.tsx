@@ -280,6 +280,9 @@ export function ChannelProductTool() {
     </>
   );
 
+  // Search keyword length limit for the picked market (Coupang 20 chars; 11st none).
+  const nameLimit = platform === 'COUPANG' ? 20 : undefined;
+
   return (
     <div className="space-y-4">
       {/* ① 조회 줄 */}
@@ -337,9 +340,9 @@ export function ChannelProductTool() {
               aria-label={mode === 'name' ? '상품명' : '상품 ID'}
               placeholder={mode === 'name' ? '상품명 일부' : `${platformName(platform)} 상품 ID`}
               inputMode={mode === 'name' ? 'text' : 'numeric'}
-              // 🔴 쿠팡 검색어 제한 20자 — 잘라서 보내지 말고 입력을 막는다 (Coupang only; 11st has no limit)
-              maxLength={mode === 'name' && platform === 'COUPANG' ? 20 : undefined}
-              hint={mode === 'name' && platform === 'COUPANG' ? '20자까지' : undefined}
+              // 🔴 Coupang search keyword limit is 20 chars — block input instead of truncating (Coupang only; 11st has no limit)
+              maxLength={mode === 'name' ? nameLimit : undefined}
+              hint={mode === 'name' && nameLimit ? '20자까지' : undefined}
               value={query}
               disabled={looking}
               onChange={(e) =>
