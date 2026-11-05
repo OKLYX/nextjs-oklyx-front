@@ -4,7 +4,9 @@
 
 export type ListingStatus = 'DRAFT' | 'SUBMITTED' | 'SELLING' | 'REJECTED' | 'SUSPENDED';
 export type ApprovalStatus = 'APPROVED' | 'NOT_APPROVED';
-export type GeneratedSource = 'AUTO' | 'MANUAL_OVERRIDE';
+// FEATURE_2611_11 / D7 · D23: 'MARKET' = taken from the market (thumbnail 「마켓 이미지」 · detail 「마켓 상세」).
+// Only `source` / `thumbnailSource` carry it — a price or an option name never does.
+export type GeneratedSource = 'AUTO' | 'MANUAL_OVERRIDE' | 'MARKET';
 
 // Channel add (15): category·delivery·box live on the master and every option is
 // copied, so the channel-add payload only identifies the target channel.
@@ -237,6 +239,22 @@ export interface FieldValuesUpdateRequest {
 // (no body) — 저장은 로컬만; 마켓 반영은 [수정 요청](109) 필요. Caller refetches the matrix.
 export interface DisplayNameUpdateRequest {
   name: string;
+}
+
+// FEATURE_2611_11 / D5: PATCH /{id}/registration-name. A typed name is stored for this listing;
+// null (or blank) clears it = [자동 이름으로 되돌리기]. Backend returns no body -> void.
+export interface RegistrationNameUpdateRequest {
+  registrationName: string | null;
+}
+
+// FEATURE_2611_11 / D9 · D11 · D35: POST /{id}/market-sync — 「마켓 기준으로 맞추기」 result.
+export interface MarketSyncResponse {
+  // 「노출상품명」 after the sync.
+  name: string;
+  // Stored 「등록상품명」 after the sync; null = the automatic name is used.
+  registrationName: string | null;
+  // Why the photos were left as they were (e.g. 「11번가 사진을 가져오지 못했습니다」); null = no notice.
+  imageNotice: string | null;
 }
 
 // Per-channel option activation (prompt 42/43). A channel cell copies the master's

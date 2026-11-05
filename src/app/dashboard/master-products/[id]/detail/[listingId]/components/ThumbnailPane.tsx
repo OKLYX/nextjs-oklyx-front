@@ -70,6 +70,8 @@ export function ThumbnailPane({
 
   const busy = isRegenerating || isUploading || isClearing;
   const isOverridden = generated.thumbnailSource === 'MANUAL_OVERRIDE';
+  // FEATURE_2611_11 / D7 · D22: the thumbnail was taken from the market — kept on regenerate like a manual one.
+  const isMarket = generated.thumbnailSource === 'MARKET';
 
   // Reserved keys (brandName/productName) are always editable, even if the template
   // omits them; template-defined fields override the label and add custom keys.
@@ -136,7 +138,10 @@ export function ThumbnailPane({
   };
 
   const handleClear = async () => {
-    if (!window.confirm('수동 썸네일을 삭제하고 자동 생성으로 되돌립니다.')) return;
+    const confirmText = isMarket
+      ? '마켓 이미지 대신 자동 생성 썸네일을 씁니다. 마켓의 추가 사진은 그대로 남습니다.'
+      : '수동 썸네일을 삭제하고 자동 생성으로 되돌립니다.';
+    if (!window.confirm(confirmText)) return;
     setIsClearing(true);
     setError('');
     try {
@@ -174,6 +179,10 @@ export function ThumbnailPane({
             <span className="inline-block rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
               수동 교체됨
             </span>
+          ) : isMarket ? (
+            <span className="inline-block rounded bg-sky-100 px-2 py-1 text-xs font-medium text-sky-700">
+              마켓 이미지
+            </span>
           ) : (
             <span className="inline-block rounded bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
               자동 생성
@@ -182,7 +191,9 @@ export function ThumbnailPane({
           <p className="max-w-md text-xs text-gray-500">
             {isOverridden
               ? '직접 올린 이미지가 적용된 상태입니다. [저장 후 재생성]해도 썸네일은 그대로 유지되고 필드값·상세만 갱신됩니다. 자동 생성으로 되돌리려면 [자동 생성으로 되돌리기]를 누르세요.'
-              : '아래 필드값을 채우고 [저장 후 재생성]하면 썸네일·상세에 반영됩니다.'}
+              : isMarket
+                ? '마켓에서 가져온 이미지가 적용된 상태입니다. [저장 후 재생성]해도 썸네일은 그대로 유지됩니다. 자동 생성으로 바꾸려면 [자동 생성으로 되돌리기]를 누르세요.'
+                : '아래 필드값을 채우고 [저장 후 재생성]하면 썸네일·상세에 반영됩니다.'}
           </p>
         </div>
       </div>
@@ -236,7 +247,7 @@ export function ThumbnailPane({
           />
         </label>
 
-        {isOverridden && (
+        {(isOverridden || isMarket) && (
           <button
             type="button"
             onClick={handleClear}

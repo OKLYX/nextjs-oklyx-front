@@ -11,6 +11,8 @@ import type {
   GeneratedProductResponse,
   FieldValuesUpdateRequest,
   DisplayNameUpdateRequest,
+  RegistrationNameUpdateRequest,
+  MarketSyncResponse,
   PropagateResponse,
   ChannelSyncPreview,
   PendingSyncResponse,
@@ -72,6 +74,10 @@ export interface ListingRegistrationRepository {
   updateFieldValues(listingId: number, data: FieldValuesUpdateRequest): Promise<GeneratedProductResponse>;
   // Display name (35): 로컬 저장 PATCH(마켓 반영은 [수정 요청]), backend returns no body -> void.
   updateDisplayName(listingId: number, data: DisplayNameUpdateRequest): Promise<void>;
+  // FEATURE_2611_11 / D5: 「등록상품명」 local save (null clears it); the market gets it with [수정 요청].
+  updateRegistrationName(listingId: number, data: RegistrationNameUpdateRequest): Promise<void>;
+  // FEATURE_2611_11 / D9 · D11: 「마켓 기준으로 맞추기」 — names, photos and detail from the market.
+  syncFromMarket(listingId: number): Promise<MarketSyncResponse>;
   updateTags(listingId: number, data: TagsUpdateRequest): Promise<GeneratedProductResponse>;
   // Channel shipping override (75): PATCH replaces this cell's override (no regenerate).
   updateShippingOverride(
