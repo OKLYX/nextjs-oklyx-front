@@ -115,10 +115,13 @@ export default function MasterProductDetailEditPage() {
             className={`rounded px-2 py-1 text-xs font-medium ${
               source === 'MANUAL_OVERRIDE'
                 ? 'bg-amber-100 text-amber-700'
-                : 'bg-green-100 text-green-700'
+                : source === 'MARKET'
+                  ? 'bg-sky-100 text-sky-700'
+                  : 'bg-green-100 text-green-700'
             }`}
           >
-            {source === 'MANUAL_OVERRIDE' ? '수동 수정됨' : '자동생성'}
+            {/* FEATURE_2611_11 / D23: 'MARKET' = the detail was taken from the market. */}
+            {source === 'MANUAL_OVERRIDE' ? '수동 수정됨' : source === 'MARKET' ? '마켓 상세' : '자동생성'}
           </span>
         )}
       </div>

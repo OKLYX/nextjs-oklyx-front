@@ -21,6 +21,8 @@ const OPTION_LINK_UNSUPPORTED_REASONS: Record<string, string> = {
   ESM: 'G마켓 · 옥션 옵션 연결은 아직 지원하지 않습니다',
 };
 const OPTION_ID_PENDING_HINT = '승인 후 부여';
+/** FEATURE_2611_11 / D19: platforms whose listing has no 「등록상품명」 line. */
+const NO_REGISTRATION_NAME_PLATFORMS = new Set(['ELEVENST', 'ESM']);
 
 /**
  * 마켓에 이미 올라간 옵션은 끌 수 없는 이유(사용자 결정 2026-08-29). 승인된 마켓 옵션은 물리적으로
@@ -68,8 +70,10 @@ export interface ListingOptionView {
 interface ListingDetailPanelProps {
   listingId: number;
   name: string;
-  // Registration name (등록상품명, 67/68): always auto-computed, read-only.
+  // Registration name (등록상품명): the listing's stored name, else the automatic one (67/68 · FEATURE_2611_11 / D5).
   registrationName: string;
+  /** FEATURE_2611_11 / D24: true = `registrationName` is the automatic name → 「자동」 badge. */
+  registrationNameAuto: boolean;
   tags: string[];
   isAdmin: boolean;
   /**
@@ -100,7 +104,11 @@ interface ListingDetailPanelProps {
  *
  * - 「노출상품명」: [수정] toggles view ↔ edit (a blank value cannot be saved). Local save only — the market gets it with
  *   [수정 요청].
- * - 「등록상품명」 (67/68): automatic value from the channel's active options → read only.
+ * - 「등록상품명」 (67/68 · FEATURE_2611_11 / D5 · D19 · D24): automatic value from the channel's active options unless a
+ *   person stored one. 「자동」 badge only for the automatic value; ADMIN [수정] stores a name, [자동 이름으로 되돌리기] clears
+ *   it. Not drawn on an 11st or ESM listing.
+ * - [마켓 기준으로 맞추기] (FEATURE_2611_11 / D9 · D11 · D35): ADMIN, on a market only — takes the names (and photos ·
+ *   detail) from the market. No confirm dialog; the server's `imageNotice` is shown as it came.
  * - Option table: option name / price / (ADMIN) margin / stock / option ID / [수정]. 🔴 **This is the one place that
  *   shows options, prices and stock** (the old matrix 「판매가」 column is gone). 🔴 There is no used/unused checkbox (2609_77/D57) —
  *   the options to upload are picked only in the [마켓에 올리기] confirm · [⋯ > 올릴 옵션 고르기] window; here unused
@@ -118,6 +126,7 @@ export function ListingDetailPanel({
   listingId,
   name,
   registrationName,
+  registrationNameAuto,
   tags,
   isAdmin,
   onMarket,
@@ -139,6 +148,18 @@ export function ListingDetailPanel({
   const [nameDraft, setNameDraft] = useState(name);
   const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState('');
+
+  // Registration name (등록상품명, FEATURE_2611_11 / D5)
+  const [isEditingRegName, setIsEditingRegName] = useState(false);
+  const [regNameDraft, setRegNameDraft] = useState(registrationName);
+  const [savingRegName, setSavingRegName] = useState(false);
+  const [regNameError, setRegNameError] = useState('');
+
+  // [마켓 기준으로 맞추기] (FEATURE_2611_11 / D9 · D11)
+  const [syncing, setSyncing] = useState(false);
+  const [syncDone, setSyncDone] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState('');
 
   // Channel raw tags
   const [isEditingTags, setIsEditingTags] = useState(false);
@@ -334,6 +355,47 @@ export function ListingDetailPanel({
     }
   };
 
+  const trimmedRegName = regNameDraft.trim();
+
+  const startEditRegName = () => {
+    setRegNameDraft(registrationName);
+    setRegNameError('');
+    setIsEditingRegName(true);
+  };
+
+  // null = [자동 이름으로 되돌리기] (clears the stored name).
+  const saveRegName = async (value: string | null) => {
+    if (value !== null && !value) return;
+    setSavingRegName(true);
+    setRegNameError('');
+    try {
+      await listingUseCase.updateRegistrationName(listingId, { registrationName: value });
+      setIsEditingRegName(false);
+      onSaved();
+    } catch {
+      setRegNameError('등록상품명 저장에 실패했습니다.');
+    } finally {
+      setSavingRegName(false);
+    }
+  };
+
+  const syncFromMarket = async () => {
+    setSyncing(true);
+    setSyncDone(false);
+    setSyncNotice(null);
+    setSyncError('');
+    try {
+      const res = await listingUseCase.syncFromMarket(listingId);
+      setSyncDone(true);
+      setSyncNotice(res.imageNotice);
+      onSaved();
+    } catch (e: unknown) {
+      setSyncError(extractErrorMessage(e, '마켓 기준으로 맞추지 못했습니다.'));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const startEditTags = () => {
     setTagsDraft(tags);
     setTagsError('');
@@ -402,11 +464,85 @@ export function ListingDetailPanel({
         {nameError && <span className="text-xs text-red-600">{nameError}</span>}
       </div>
 
-      {/* 등록상품명 (67/68): 읽기 전용 — 채널 활성옵션 기준 자동값 */}
-      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
-        <span className="w-16 shrink-0 text-xs font-semibold text-gray-500">등록상품명</span>
-        <span className="min-w-0 break-words text-gray-900">{registrationName}</span>
-      </div>
+      {/* 등록상품명 (67/68 · FEATURE_2611_11 / D5 · D24): 저장값 없으면 자동값. 11번가 · ESM 은 줄 없음(D19). */}
+      {!NO_REGISTRATION_NAME_PLATFORMS.has(platform) && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+          <span className="w-16 shrink-0 text-xs font-semibold text-gray-500">등록상품명</span>
+          {isEditingRegName ? (
+            <>
+              <input
+                type="text"
+                value={regNameDraft}
+                onChange={(e) => setRegNameDraft(e.target.value)}
+                disabled={savingRegName}
+                className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => saveRegName(trimmedRegName)}
+                disabled={savingRegName || !trimmedRegName}
+                className="flex items-center gap-1 rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+              >
+                {savingRegName ? <Spinner size={12} label="저장 중" /> : '저장'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingRegName(false)}
+                disabled={savingRegName}
+                className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              >
+                취소
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="min-w-0 break-words text-gray-900">{registrationName}</span>
+              {registrationNameAuto && (
+                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">자동</span>
+              )}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={startEditRegName}
+                  disabled={savingRegName}
+                  className="rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  수정
+                </button>
+              )}
+              {isAdmin && !registrationNameAuto && (
+                <button
+                  type="button"
+                  onClick={() => saveRegName(null)}
+                  disabled={savingRegName}
+                  className="flex items-center gap-1 rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  {savingRegName ? <Spinner size={12} label="저장 중" /> : '자동 이름으로 되돌리기'}
+                </button>
+              )}
+            </>
+          )}
+          {regNameError && <span className="text-xs text-red-600">{regNameError}</span>}
+        </div>
+      )}
+
+      {/* [마켓 기준으로 맞추기] (FEATURE_2611_11 / D9 · D11): ADMIN · 마켓에 올라간 판매상품만, 확인 창 없음 */}
+      {isAdmin && onMarket && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+          <span className="w-16 shrink-0" aria-hidden />
+          <button
+            type="button"
+            onClick={syncFromMarket}
+            disabled={syncing}
+            className="flex items-center gap-1 rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          >
+            {syncing ? <Spinner size={12} label="맞추는 중" /> : '마켓 기준으로 맞추기'}
+          </button>
+          {syncDone && <span className="text-xs text-green-700">마켓 기준으로 맞췄습니다.</span>}
+          {syncNotice && <span className="text-xs text-amber-700">{syncNotice}</span>}
+          {syncError && <span className="text-xs text-red-600">{syncError}</span>}
+        </div>
+      )}
 
       {/* 옵션 표 — 옵션·가격·재고를 보여주는 유일한 자리.
           ⚠️ 열 폭이 고정이라 좁은 칸([상품 관계 한눈에 보기] 오른쪽 20rem)에서는 옵션명 칸이 눌려 깨진다 →

@@ -245,6 +245,7 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
       items: [
         { href: ROUTES.SETTINGS_LOGGING, label: '로그 설정' },
         { href: ROUTES.SETTINGS_PURCHASE_PLACES, label: '구매처 관리' },
+        { href: ROUTES.SETTINGS_ELEVENST_PHOTO_KEY, label: '11번가 사진 조회 키' },
       ],
     },
   ];

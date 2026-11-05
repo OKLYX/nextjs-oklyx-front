@@ -15,6 +15,8 @@ import type {
   GeneratedProductResponse,
   FieldValuesUpdateRequest,
   DisplayNameUpdateRequest,
+  RegistrationNameUpdateRequest,
+  MarketSyncResponse,
   PropagateResponse,
   ChannelSyncPreview,
   PendingSyncResponse,
@@ -136,6 +138,15 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async updateDisplayName(listingId: number, data: DisplayNameUpdateRequest): Promise<void> {
     await axiosInstance.patch(`${listingBase}/${listingId}/name`, data);
+  }
+
+  async updateRegistrationName(listingId: number, data: RegistrationNameUpdateRequest): Promise<void> {
+    await axiosInstance.patch(`${listingBase}/${listingId}/registration-name`, data);
+  }
+
+  async syncFromMarket(listingId: number): Promise<MarketSyncResponse> {
+    const response = await axiosInstance.post(`${listingBase}/${listingId}/market-sync`);
+    return response.data.data;
   }
 
   async updateTags(listingId: number, data: TagsUpdateRequest): Promise<GeneratedProductResponse> {
