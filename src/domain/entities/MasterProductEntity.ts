@@ -246,9 +246,11 @@ export interface MatrixCell {
   productListingId: number;
   // Display name (노출상품명) = ProductListing.name, channel-scoped, always present (35).
   name: string;
-  // Registration name (등록상품명) = always auto-computed from the channel's active options (67).
-  // Read-only in the UI; refreshed in place when the active option set is toggled (43/68).
+  // Registration name (「등록상품명」) = the listing's own stored name, else auto-computed from the channel's
+  // active options (67 · FEATURE_2611_11 / D15). Refreshed in place when the active option set is toggled (43/68).
   registrationName: string;
+  // FEATURE_2611_11 / D24: true = `registrationName` is the automatic name (the panel shows 「자동」).
+  registrationNameAuto: boolean;
   platformProductId: string | null;
   sellingPrice: number | null;
   // FEATURE_2610_26 / D50: the Auction price of the same option on an ESM cell (`sellingPrice` = Gmarket); null elsewhere.

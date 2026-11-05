@@ -358,6 +358,7 @@ export function ListingRow({
           listingId={listingId}
           name={cell.name}
           registrationName={cell.registrationName}
+          registrationNameAuto={cell.registrationNameAuto}
           tags={gen?.tags ?? []}
           isAdmin={isAdmin}
           onMarket={cell.platformProductId != null}

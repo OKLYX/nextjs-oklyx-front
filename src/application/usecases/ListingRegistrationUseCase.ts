@@ -12,6 +12,8 @@ import type {
   GeneratedProductResponse,
   FieldValuesUpdateRequest,
   DisplayNameUpdateRequest,
+  RegistrationNameUpdateRequest,
+  MarketSyncResponse,
   PropagateResponse,
   ChannelSyncPreview,
   PendingSyncResponse,
@@ -109,6 +111,14 @@ export class ListingRegistrationUseCase {
 
   updateDisplayName(listingId: number, data: DisplayNameUpdateRequest): Promise<void> {
     return this.repository.updateDisplayName(listingId, data);
+  }
+
+  updateRegistrationName(listingId: number, data: RegistrationNameUpdateRequest): Promise<void> {
+    return this.repository.updateRegistrationName(listingId, data);
+  }
+
+  syncFromMarket(listingId: number): Promise<MarketSyncResponse> {
+    return this.repository.syncFromMarket(listingId);
   }
 
   updateTags(listingId: number, data: TagsUpdateRequest): Promise<GeneratedProductResponse> {

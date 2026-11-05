@@ -45,6 +45,8 @@ export function TemplateSwitchPane({
   const [error, setError] = useState('');
 
   const isOverridden = generated.source === 'MANUAL_OVERRIDE';
+  // FEATURE_2611_11 / D23: the detail was taken from the market.
+  const isMarket = generated.source === 'MARKET';
   const isDirty = selectedId !== (generated.detailTemplateId ?? null);
   const busy = isLoadingList || isPreviewing || isSaving;
 
@@ -104,6 +106,13 @@ export function TemplateSwitchPane({
     ) {
       return;
     }
+    // FEATURE_2611_11 / R4: saving a template drops a market detail too.
+    if (
+      isMarket &&
+      !window.confirm('마켓 상세가 사라지고 선택한 템플릿의 자동생성본으로 대체됩니다. 계속하시겠습니까?')
+    ) {
+      return;
+    }
     setIsSaving(true);
     setError('');
     try {
@@ -136,6 +145,12 @@ export function TemplateSwitchPane({
       {isOverridden && (
         <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">
           이 셀은 HTML 직접수정 상태입니다. 템플릿을 저장하면 수정본이 사라집니다.
+        </p>
+      )}
+
+      {isMarket && (
+        <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          이 셀은 마켓 상세를 쓰는 중입니다. 템플릿을 저장하면 마켓 상세가 사라집니다.
         </p>
       )}
 
