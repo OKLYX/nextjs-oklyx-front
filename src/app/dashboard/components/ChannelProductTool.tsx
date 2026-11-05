@@ -21,6 +21,7 @@ import { setSmallDragImage } from '@/infrastructure/utils/dragGhost';
 import { DragNotice } from '@/presentation/components/WideScreenOnly';
 import { useIsMobile } from '@/presentation/hooks/useIsMobile';
 import { MarketImagePreviewModal } from './MarketImagePreviewModal';
+import { platformName } from '@/config/platforms';
 
 /**
  * One tool in the global tool panel — **「판매 상품 조회」** (FEATURE_2609_67 · moved to the global panel in 2609_68).
@@ -36,15 +37,17 @@ import { MarketImagePreviewModal } from './MarketImagePreviewModal';
  *
  * ⚠️ This component lives outside `<form>` (global layout), yet its buttons stay `type="button"` and the
  *    search input keeps its **Enter guard** — it cannot know which screen it sits on.
- * ⚠️ A lookup goes out when [조회] is pressed (no auto-search while typing — Coupang call budget).
+ * **Market picker** (FEATURE_2611_12 R12): Coupang · 11st. The picked value is the platform sent to search ·
+ *   [더 보기] · detail; switching it clears the lookup state.
+ * ⚠️ A lookup goes out when [조회] is pressed (no auto-search while typing — market call budget).
  * 🔴 Photos go into a product by **dragging** (no pick checkbox, 2609_68). The drop targets are two: the
  *    clipboard on the toolbar and the product image area. **A click zooms** — the browser tells a click from
  *    a drag, so do not write code that measures distance or time.
  * 🔴 Market URLs are absolute — passing them through `resolveThumbUrl`·`getImageUrl` gives a 404.
  */
 
-/** 오늘 지원하는 플랫폼은 쿠팡 하나다 — select 를 만들지 않는다. */
-const PLATFORM = 'COUPANG';
+/** Markets this tool can look up, in picker order (FEATURE_2611_12 R12). The first one is the initial value. */
+const MARKETS = ['COUPANG', 'ELEVENST'];
 
 // 상태 enum → 화면 문구(enum 원문을 사용자에게 노출하지 않는다). 마스터 생성 화면과 같은 한 줄짜리
 // 표지만, 서로 import 하면 화면 간 결합이 생기므로 지역으로 둔다.
@@ -111,6 +114,7 @@ export function ChannelProductTool() {
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [sellerId, setSellerId] = useState<number | ''>('');
+  const [platform, setPlatform] = useState(MARKETS[0]);
   const [mode, setMode] = useState<'name' | 'id'>('name');
   const [query, setQuery] = useState('');
   const [looking, setLooking] = useState(false);
@@ -146,7 +150,7 @@ export function ChannelProductTool() {
       setLooking(true);
       setError('');
       try {
-        setDetail(await channelUseCase.detail(sellerId, PLATFORM, platformProductId));
+        setDetail(await channelUseCase.detail(sellerId, platform, platformProductId));
       } catch (e: unknown) {
         setDetail(null);
         setError(lookupErrorMessage(e));
@@ -154,7 +158,7 @@ export function ChannelProductTool() {
         setLooking(false);
       }
     },
-    [channelUseCase, sellerId],
+    [channelUseCase, platform, sellerId],
   );
 
   const handleLookup = useCallback(async () => {
@@ -171,7 +175,7 @@ export function ChannelProductTool() {
 
     setLooking(true);
     try {
-      const res = await channelUseCase.search(sellerId, PLATFORM, trimmed);
+      const res = await channelUseCase.search(sellerId, platform, trimmed);
       setCandidates(res.items);
       setNextToken(res.nextToken);
     } catch (e: unknown) {
@@ -179,7 +183,7 @@ export function ChannelProductTool() {
     } finally {
       setLooking(false);
     }
-  }, [channelUseCase, loadDetail, looking, mode, sellerId, trimmed]);
+  }, [channelUseCase, loadDetail, looking, mode, platform, sellerId, trimmed]);
 
   /** [더 보기] — 기존 목록에 덧붙인다(무한 스크롤 아님). */
   const handleMore = useCallback(async () => {
@@ -187,7 +191,7 @@ export function ChannelProductTool() {
     setLoadingMore(true);
     setError('');
     try {
-      const res = await channelUseCase.search(sellerId, PLATFORM, trimmed, nextToken);
+      const res = await channelUseCase.search(sellerId, platform, trimmed, nextToken);
       setCandidates((prev) => [...(prev ?? []), ...res.items]);
       setNextToken(res.nextToken);
     } catch (e: unknown) {
@@ -195,7 +199,17 @@ export function ChannelProductTool() {
     } finally {
       setLoadingMore(false);
     }
-  }, [channelUseCase, loadingMore, nextToken, sellerId, trimmed]);
+  }, [channelUseCase, loadingMore, nextToken, platform, sellerId, trimmed]);
+
+  /** Switching the market drops the input, candidates, the [더 보기] cursor, detail and error (mode stays). */
+  const handlePlatformChange = (next: string) => {
+    setPlatform(next);
+    setQuery('');
+    setCandidates(null);
+    setNextToken(null);
+    setDetail(null);
+    setError('');
+  };
 
   const description = detail ? noticesToDescription(detail.notices) : '';
 
@@ -285,6 +299,20 @@ export function ChannelProductTool() {
           ))}
         </select>
 
+        <select
+          aria-label="마켓"
+          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+          value={platform}
+          disabled={looking}
+          onChange={(e) => handlePlatformChange(e.target.value)}
+        >
+          {MARKETS.map((p) => (
+            <option key={p} value={p}>
+              {platformName(p)}
+            </option>
+          ))}
+        </select>
+
         <div className="flex gap-3 text-xs text-gray-700 max-md:flex-wrap">
           {(['name', 'id'] as const).map((value) => (
             <label key={value} className="flex cursor-pointer items-center gap-1">
@@ -307,11 +335,11 @@ export function ChannelProductTool() {
             <Input
               size="sm"
               aria-label={mode === 'name' ? '상품명' : '상품 ID'}
-              placeholder={mode === 'name' ? '상품명 일부' : '쿠팡 상품 ID'}
+              placeholder={mode === 'name' ? '상품명 일부' : `${platformName(platform)} 상품 ID`}
               inputMode={mode === 'name' ? 'text' : 'numeric'}
-              // 🔴 쿠팡 검색어 제한 20자 — 잘라서 보내지 말고 입력을 막는다
-              maxLength={mode === 'name' ? 20 : undefined}
-              hint={mode === 'name' ? '20자까지' : undefined}
+              // 🔴 쿠팡 검색어 제한 20자 — 잘라서 보내지 말고 입력을 막는다 (Coupang only; 11st has no limit)
+              maxLength={mode === 'name' && platform === 'COUPANG' ? 20 : undefined}
+              hint={mode === 'name' && platform === 'COUPANG' ? '20자까지' : undefined}
               value={query}
               disabled={looking}
               onChange={(e) =>

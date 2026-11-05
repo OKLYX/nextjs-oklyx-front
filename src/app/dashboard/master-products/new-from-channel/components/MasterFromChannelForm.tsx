@@ -36,7 +36,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * 오늘 지원하는 플랫폼은 쿠팡 하나다(D17 · UX D64: 플랫폼이 늘면 여기 한 줄만 는다).
+ * Supported platforms: Coupang and 11st (D17 · UX D64 · FEATURE_2611_12 D26: a new platform adds one line here).
  * ⚠️ 화면 JSX 에 플랫폼 이름을 직접 쓰지 말 것 — 플랫폼이 늘 때 고칠 자리가 흩어진다.
  */
 type PlatformOption = {
@@ -50,6 +50,7 @@ type PlatformOption = {
 
 const PLATFORMS: PlatformOption[] = [
   { value: 'COUPANG', label: platformName('COUPANG'), idLabel: '쿠팡 상품 ID', idNumeric: true },
+  { value: 'ELEVENST', label: platformName('ELEVENST'), idLabel: '11번가 상품 ID', idNumeric: true },
 ];
 
 /** 상품명에서 물품 후보를 찾을 때 쓰는 낱말 수 · 보여 줄 후보 수 · 검색 한 번의 크기(UX D79). */
@@ -79,7 +80,8 @@ const nameTokens = (name: string): string[] =>
  * 판정은 HTTP status + substring — 프론트에는 예외 클래스명이 오지 않는다.
  * ⚠️ 문구는 백엔드 `DetachedCellPolicy` · `MarketProductAccess` 소유다. 바꾸려면 그쪽을 먼저 본다.
  */
-const lookupErrorMessage = (e: unknown): string => {
+const lookupErrorMessage = (e: unknown, platform: string): string => {
+  const market = platformName(platform);
   const status = (e as { response?: { status?: number } })?.response?.status;
   const message = extractErrorMessage(e, '상품을 조회하지 못했습니다.');
   if (status === 429) return '잠시 후 다시 시도하세요.';
@@ -90,11 +92,11 @@ const lookupErrorMessage = (e: unknown): string => {
     return `${message} 위에서 판매자를 바꿔 다시 조회하세요.`;
   }
   if (status === 400 && message.includes('계정')) {
-    return `${message} 판매자 관리에서 쿠팡 계정을 먼저 등록·활성화하세요.`;
+    return `${message} 판매자 관리에서 ${market} 계정을 먼저 등록·활성화하세요.`;
   }
   if (status === 404) {
     // 🔴 404 를 substring 으로 판정하지 말 것 — 백엔드가 영문으로 보낸다. 이 화면에서 404 는 판매자·계정뿐이다.
-    return '이 판매자의 쿠팡 계정을 찾을 수 없습니다. 판매자 관리에서 먼저 등록·활성화하세요.';
+    return `이 판매자의 ${market} 계정을 찾을 수 없습니다. 판매자 관리에서 먼저 등록·활성화하세요.`;
   }
   return message;
 };
@@ -261,7 +263,7 @@ export function MasterFromChannelForm() {
       setLookedUp(target);
       void loadCandidates(res.productName ?? '', seq);
     } catch (e: unknown) {
-      setError(lookupErrorMessage(e));
+      setError(lookupErrorMessage(e, target.platform));
       const status = (e as { response?: { status?: number } })?.response?.status;
       if (status === 400 && extractErrorMessage(e, '').includes(ALREADY_LINKED)) {
         // 어느 마스터에 붙어 있는지 알려 준다 — 마스터 목록 검색은 상품 ID 를 완전일치로 찾는다.
