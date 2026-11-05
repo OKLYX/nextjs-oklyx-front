@@ -3,8 +3,10 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/presentation/components/ui/Button';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
-import type { OrderDetail, OrderDetailParcel } from '@/domain/entities/OrderEntity';
+import { ROUTES } from '@/config/routes';
+import type { OrderDetail, OrderDetailParcel, OrderLineMaster } from '@/domain/entities/OrderEntity';
 import { PARCEL_STATUS_LABELS, getOrderStatusLabel, parcelChipLabel } from '@/domain/entities/OrderEntity';
+import { unexpandedReasonLabel } from '@/domain/entities/StockEntity';
 
 export interface OrderDetailField {
   label: string;
@@ -27,6 +29,7 @@ interface OrderDetailSummaryProps {
 const CHIP_BASE = 'px-4 py-2 text-sm font-medium rounded-full border transition-colors';
 const CHIP_ACTIVE = 'bg-blue-600 text-white border-blue-600';
 const CHIP_IDLE = 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100';
+const LINK_CLASS = 'font-medium text-blue-600 hover:underline';
 
 // Format ISO LocalDateTime to ko-KR readable string; '-' for null
 export function formatDate(value: string | null): string {
@@ -45,6 +48,55 @@ function Thumb({ src, alt }: { src: string | null; alt: string }) {
   );
 }
 
+/**
+ * Where one order line comes from (FEATURE_2611_15 / D1 · D3 · D5 · D8 · D19 · D20) — the master product and option,
+ * then every component product with its quantity; a broken link shows its reason only.
+ */
+function LineMaster({ lineMaster, admin }: { lineMaster: OrderLineMaster; admin: boolean }) {
+  if (lineMaster.unexpandedReason !== null) {
+    return <p className="mt-1 text-xs text-gray-500">{unexpandedReasonLabel(lineMaster.unexpandedReason)}</p>;
+  }
+  const masterName = lineMaster.masterProductName ?? '-';
+  return (
+    <div className="mt-2 space-y-2 text-xs text-gray-500">
+      <p>
+        판매상품 마스터{' '}
+        {admin && lineMaster.masterProductId != null ? (
+          <a
+            href={ROUTES.MASTER_PRODUCT_DETAIL(lineMaster.masterProductId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={LINK_CLASS}
+          >
+            {masterName}
+          </a>
+        ) : (
+          <span className="text-gray-900">{masterName}</span>
+        )}
+        {' · '}
+        {lineMaster.masterOptionName ?? '-'}
+      </p>
+      <p className="font-medium text-gray-700">구성상품</p>
+      <ul className="space-y-2">
+        {lineMaster.products.map((product) => (
+          <li key={product.productId} className="flex items-center gap-3">
+            <Thumb src={getProductThumbUrl(product.imageUrl, product.productId)} alt={product.productName} />
+            <a
+              href={ROUTES.PRODUCT_DETAIL(product.productId)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`break-words ${LINK_CLASS}`}
+            >
+              {product.productName}
+            </a>
+            <span className="shrink-0">× {product.quantity}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex justify-between gap-2 py-2">
@@ -57,6 +109,9 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 /**
  * Body of the shared order detail (FEATURE_2611_07 / D13 · D23 · D26 · D33 · D36) — the field list, 「상품 목록」 and
  * 「송장 목록」 (one chip per parcel, the open chip's content below it).
+ * Each 「상품 목록」 line also shows its master product · master option and component products × quantity, or the broken
+ * link's reason (FEATURE_2611_15) — the master name is a new-tab link only when the server says `detail.admin`, every
+ * component product name is a new-tab link for everyone.
  *
  * **File**: src/app/dashboard/orders/components/OrderDetailSummary.tsx
  *
@@ -103,6 +158,11 @@ export function OrderDetailSummary({
               <div className="min-w-0 flex-1">
                 <p className="text-gray-900 break-words">{line.itemName ?? '-'}</p>
                 <p className="mt-1 text-xs text-gray-500">수량 {line.orderCount}</p>
+                {detail.lineMasters
+                  ?.filter((lineMaster) => lineMaster.orderLineId === line.id)
+                  .map((lineMaster) => (
+                    <LineMaster key={lineMaster.orderLineId} lineMaster={lineMaster} admin={detail.admin === true} />
+                  ))}
               </div>
               <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
                 {getOrderStatusLabel(line.status)}
