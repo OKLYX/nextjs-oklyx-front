@@ -7,6 +7,7 @@ import { TagChipsInput } from '@/presentation/components/TagChipsInput';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { toast } from '@/infrastructure/stores/toastStore';
 import type { OptionMargin } from '@/domain/entities/ListingRegistrationEntity';
 import { CopyIdButton } from './CopyIdButton';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
@@ -70,7 +71,7 @@ export interface ListingOptionView {
 interface ListingDetailPanelProps {
   listingId: number;
   name: string;
-  // Registration name (등록상품명): the listing's stored name, else the automatic one (67/68 · FEATURE_2611_11 / D5).
+  // Registration name (「등록상품명」): the listing's stored name, else the automatic one (67/68 · FEATURE_2611_11 / D5).
   registrationName: string;
   /** FEATURE_2611_11 / D24: true = `registrationName` is the automatic name → 「자동」 badge. */
   registrationNameAuto: boolean;
@@ -149,7 +150,7 @@ export function ListingDetailPanel({
   const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState('');
 
-  // Registration name (등록상품명, FEATURE_2611_11 / D5)
+  // Registration name (「등록상품명」, FEATURE_2611_11 / D5)
   const [isEditingRegName, setIsEditingRegName] = useState(false);
   const [regNameDraft, setRegNameDraft] = useState(registrationName);
   const [savingRegName, setSavingRegName] = useState(false);
@@ -157,8 +158,6 @@ export function ListingDetailPanel({
 
   // [마켓 기준으로 맞추기] (FEATURE_2611_11 / D9 · D11)
   const [syncing, setSyncing] = useState(false);
-  const [syncDone, setSyncDone] = useState(false);
-  const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [syncError, setSyncError] = useState('');
 
   // Channel raw tags
@@ -381,13 +380,12 @@ export function ListingDetailPanel({
 
   const syncFromMarket = async () => {
     setSyncing(true);
-    setSyncDone(false);
-    setSyncNotice(null);
     setSyncError('');
     try {
       const res = await listingUseCase.syncFromMarket(listingId);
-      setSyncDone(true);
-      setSyncNotice(res.imageNotice);
+      // Success goes to the shared toast, before onSaved() reloads the matrix and this panel closes (PLAN R24).
+      toast.success('마켓 기준으로 맞췄습니다.');
+      if (res.imageNotice) toast.error(res.imageNotice);
       onSaved();
     } catch (e: unknown) {
       setSyncError(extractErrorMessage(e, '마켓 기준으로 맞추지 못했습니다.'));
@@ -464,7 +462,7 @@ export function ListingDetailPanel({
         {nameError && <span className="text-xs text-red-600">{nameError}</span>}
       </div>
 
-      {/* 등록상품명 (67/68 · FEATURE_2611_11 / D5 · D24): 저장값 없으면 자동값. 11번가 · ESM 은 줄 없음(D19). */}
+      {/* 「등록상품명」 (67/68 · FEATURE_2611_11 / D5 · D24): stored name, else automatic. No line on 11st · ESM (D19). */}
       {!NO_REGISTRATION_NAME_PLATFORMS.has(platform) && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
           <span className="w-16 shrink-0 text-xs font-semibold text-gray-500">등록상품명</span>
@@ -526,7 +524,7 @@ export function ListingDetailPanel({
         </div>
       )}
 
-      {/* [마켓 기준으로 맞추기] (FEATURE_2611_11 / D9 · D11): ADMIN · 마켓에 올라간 판매상품만, 확인 창 없음 */}
+      {/* [마켓 기준으로 맞추기] (FEATURE_2611_11 / D9 · D11): ADMIN, listings on a market only, no confirm dialog. Success = toast (R24). */}
       {isAdmin && onMarket && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
           <span className="w-16 shrink-0" aria-hidden />
@@ -538,8 +536,6 @@ export function ListingDetailPanel({
           >
             {syncing ? <Spinner size={12} label="맞추는 중" /> : '마켓 기준으로 맞추기'}
           </button>
-          {syncDone && <span className="text-xs text-green-700">마켓 기준으로 맞췄습니다.</span>}
-          {syncNotice && <span className="text-xs text-amber-700">{syncNotice}</span>}
           {syncError && <span className="text-xs text-red-600">{syncError}</span>}
         </div>
       )}
