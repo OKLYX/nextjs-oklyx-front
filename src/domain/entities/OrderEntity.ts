@@ -66,7 +66,25 @@ export interface OrderItem {
   // Both null when the server could not expand the line (unmapped option etc.) — draw an empty box.
   thumbnailProductId: number | null;
   thumbnailImageUrl: string | null;
+  // Real products of the line (FEATURE_2611_15 / D16 · D18): every component product of the line's master option,
+  // BOM order, quantity = per-set quantity × purchasableQty. Empty when the server could not expand the line.
+  components: OrderComponentQuantity[];
 }
+
+/** One component product of an order line and how many go out (FEATURE_2611_15 / D16 · D18). */
+export interface OrderComponentQuantity {
+  productName: string;
+  quantity: number;
+}
+
+/**
+ * The order list's real product quantity text (FEATURE_2611_15 / D16): 「{name} × {quantity}」 joined by 「 · 」, e.g.
+ * 「노란 수세미 × 3 · 초록 수세미 × 6」; 「-」 when the line has no components (a broken link) or an older server sent none.
+ */
+export const componentQuantitiesLabel = (components: OrderComponentQuantity[] | undefined): string =>
+  !components || components.length === 0
+    ? '-'
+    : components.map((component) => `${component.productName} × ${component.quantity}`).join(' · ');
 
 /**
  * One order for the shared order detail (FEATURE_2611_07 / PLAN D17 · D30) — 1:1 with the backend
@@ -86,6 +104,34 @@ export interface OrderDetail {
   lines: OrderItem[];
   /** Every parcel of the order — bundle order, then parcel sequence (D29); empty = no invoice yet (D26) */
   parcels: OrderDetailParcel[];
+  /** Where each line comes from — one per line, the order of `lines` (FEATURE_2611_15 / D1 · D3 · D5) */
+  lineMasters: OrderLineMaster[];
+  /** true = the viewer is an ADMIN — draw the master product link only then (FEATURE_2611_15 / D8 · D20) */
+  admin: boolean;
+}
+
+/**
+ * The master product, master option and component products of one order line (FEATURE_2611_15 / D1 · D3 · D5).
+ * `unexpandedReason` null = linked; otherwise the broken link's code — show `unexpandedReasonLabel(code)` only.
+ */
+export interface OrderLineMaster {
+  orderLineId: number;
+  masterProductId: number | null;
+  masterProductName: string | null;
+  masterOptionName: string | null;
+  /** BOM order — empty when `unexpandedReason` is set */
+  products: OrderLineProduct[];
+  /** `UNMAPPED_OPTION` · `NO_MASTER_OPTION` · `EMPTY_BOM`, null = linked */
+  unexpandedReason: string | null;
+}
+
+/** One component product: quantity = per-set quantity × the line's purchasable quantity (FEATURE_2611_15 / D4 · D18). */
+export interface OrderLineProduct {
+  productId: number;
+  productName: string;
+  /** `Product.imageUrl` as stored — draw it with `getProductThumbUrl(imageUrl, productId)` */
+  imageUrl: string | null;
+  quantity: number;
 }
 
 /** One parcel (invoice) of the order (D23 · D36 · D37). */

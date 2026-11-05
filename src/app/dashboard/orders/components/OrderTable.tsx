@@ -1,6 +1,7 @@
 'use client';
 
-import { getCustomerName } from '@/domain/entities/OrderEntity';
+import { Fragment } from 'react';
+import { componentQuantitiesLabel, getCustomerName } from '@/domain/entities/OrderEntity';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { InternalStageBadge } from './InternalStageBadge';
@@ -95,7 +96,7 @@ export function OrderTable({
 
   // Narrow-screen cards (FEATURE_2610_31 D13 · D14 · D31 · D34): the app's order card — the row checkbox
   // (「출고관리」 acknowledgement), the photo (tap = zoom), bold order number with the stage · reserved badges and [송장 수정], 「고객 …」,
-  // the product, 「주문수량 N · 취소 N」 and 「결제일 …」. A tap opens the order like a row tap. 「전체 선택」 and the
+  // the product, 「주문수량 N · 취소 N」, 「실제 상품 수량 …」 (FEATURE_2611_15 / D17) and 「결제일 …」. A tap opens the order like a row tap. 「전체 선택」 and the
   // sort select with the direction button sit above the cards.
   const renderCards = () =>
     orders.map((order) => {
@@ -156,6 +157,7 @@ export function OrderTable({
                 <span>주문수량 {order.orderCount}</span>
                 <span>취소 {order.cancelCount}</span>
               </p>
+              <p className="text-xs text-gray-500">실제 상품 수량 {componentQuantitiesLabel(order.components)}</p>
               <p className="text-xs text-gray-500">결제일 {formatDate(order.paidAt)}</p>
             </div>
           }
@@ -226,16 +228,21 @@ export function OrderTable({
               </th>
             )}
             {COLUMNS.map((col) => (
-              <th
-                key={col.key}
-                onClick={() => onSort(col.key)}
-                className={`px-6 py-3 text-sm font-semibold text-gray-900 cursor-pointer select-none hover:bg-gray-200 transition-colors ${alignClass(col.align)}`}
-              >
-                {col.label}
-                {sortKey === col.key && (
-                  <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>
+              <Fragment key={col.key}>
+                <th
+                  onClick={() => onSort(col.key)}
+                  className={`px-6 py-3 text-sm font-semibold text-gray-900 cursor-pointer select-none hover:bg-gray-200 transition-colors ${alignClass(col.align)}`}
+                >
+                  {col.label}
+                  {sortKey === col.key && (
+                    <span className="ml-1">{sortDir === 'asc' ? '▲' : '▼'}</span>
+                  )}
+                </th>
+                {/* Real product quantity (FEATURE_2611_15 / D15 · D17) — right of 주문수량, not sortable, so not in COLUMNS. */}
+                {col.key === 'orderCount' && (
+                  <th className="px-6 py-3 text-sm font-semibold text-gray-900 text-left">실제 상품 수량</th>
                 )}
-              </th>
+              </Fragment>
             ))}
           </tr>
         </thead>
@@ -282,6 +289,7 @@ export function OrderTable({
                 </div>
               </td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">{order.orderCount}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">{componentQuantitiesLabel(order.components)}</td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">{order.cancelCount}</td>
               <td className="px-6 py-3 text-sm text-gray-700">{formatDate(order.paidAt)}</td>
             </tr>
