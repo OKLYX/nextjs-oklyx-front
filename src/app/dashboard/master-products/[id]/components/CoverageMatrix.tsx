@@ -142,6 +142,8 @@ interface CoverageMatrixProps {
  */
 /** Platforms whose account header offers [마켓에 올리기] (2609_77/D43 · FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2). */
 const UPLOAD_PLATFORMS = ['COUPANG', 'ELEVENST', 'ESM'];
+/** Platforms whose row shows [마켓 상품 추가하기] (FEATURE_2611_12 R11 — ESM is excluded, D40). */
+const IMPORT_PLATFORMS = ['COUPANG', 'ELEVENST'];
 
 const SHIPPING_BLOCK_REASON =
   '이 판매자의 출고지·반품지가 지정되지 않아 채널을 만들 수 없습니다. 판매채널 [수정] > 「배송」 탭에서 출고지·반품지를 먼저 지정하세요.';
@@ -1121,8 +1123,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   };
 
   // 2609_22: 가져오기 성공 → 매트릭스 재조회 + 커밋에서 처음 온 카테고리 경고를 그대로 노출.
-  const handleImportDone = async (categoryWarning: string | null) => {
-    toast.success('쿠팡 상품을 가져왔습니다.');
+  // The toast names the platform of the row that opened the dialog (FEATURE_2611_12 R10).
+  const handleImportDone = async (platform: string, categoryWarning: string | null) => {
+    toast.success(`${platformName(platform)} 상품을 가져왔습니다.`);
     setBanner(categoryWarning ? { text: categoryWarning, tone: 'amber' } : null);
     await load();
   };
@@ -1623,7 +1626,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                       {/* 2609_22: 이미 마켓에 올라간 상품을 이 계정의 셀로 편입. 셀을 지목하지 않는
                           계정 단위 액션이라 헤더에 둔다(등록된 계정에도 — 두 번째 쿠팡 페이지의 입구).
                           ⚠️ 출고지 가드를 걸지 않는다 — 이미 팔고 있는 상품이다. */}
-                      {isAdmin && row.platform === 'COUPANG' && (
+                      {/* Shown on Coupang · 11st rows only (FEATURE_2611_12 R11). */}
+                      {isAdmin && IMPORT_PLATFORMS.includes(row.platform) && (
                         <button
                           type="button"
                           onClick={() =>
@@ -1972,7 +1976,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           masterOptions={options}
           initialProductId={importTarget.initialProductId}
           onClose={() => setImportTarget(null)}
-          onDone={handleImportDone}
+          onDone={(categoryWarning) => handleImportDone(importTarget.platform, categoryWarning)}
         />
       )}
 

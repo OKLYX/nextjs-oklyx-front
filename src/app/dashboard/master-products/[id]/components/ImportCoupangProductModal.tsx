@@ -10,7 +10,7 @@ import type { ImportPreviewResponse } from '@/domain/entities/ListingRegistratio
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
-import { platformDisplayName } from '@/config/platforms';
+import { platformDisplayName, platformName } from '@/config/platforms';
 
 interface ImportCoupangProductModalProps {
   masterId: number;
@@ -46,7 +46,7 @@ const STATUS_LABEL: Record<string, string> = {
  * 409 를 낼 수 없다 — 그 예외를 던지는 곳은 신규 등록(`ChannelAddServiceImpl`) 하나뿐이다.
  * 남겨 두면 "기존 셀을 지우세요" 라는 **틀린 안내**가 된다.
  */
-const importErrorMessage = (e: unknown): string => {
+const importErrorMessage = (e: unknown, market: string): string => {
   const status = (e as { response?: { status?: number } })?.response?.status;
   const message = extractErrorMessage(e, '가져오기에 실패했습니다.');
   if (status === 429) return '잠시 후 다시 시도하세요.';
@@ -55,7 +55,7 @@ const importErrorMessage = (e: unknown): string => {
     return `${message} 그 마스터에서 [마스터 연결 해제] 한 뒤 다시 시도하세요.`;
   }
   if ((status === 400 || status === 404) && message.includes('계정')) {
-    return `${message} 판매자 관리에서 쿠팡 계정을 먼저 등록·활성화하세요.`;
+    return `${message} 판매자 관리에서 ${market} 계정을 먼저 등록·활성화하세요.`;
   }
   return message;
 };
@@ -123,13 +123,14 @@ const isPositiveInt = (raw: string) => {
  * ❌ Do not build a separate dialog per opener.
  * File: src/app/dashboard/master-products/[id]/components/ImportCoupangProductModal.tsx
  *
- * Brings a product already on Coupang into this master's channel cell. Two steps — ① look up by product ID
+ * Brings a product already on the market (Coupang · 11st, FEATURE_2611_12 D26) into this master's channel cell.
+ * Market words on screen come from the `platform` prop (`platformName`). Two steps — ① look up by product ID
  * ② per option pick a master option or fill the component quantities, then [가져오기] (2609_74 — the two always
  * agree).
  * - Seller · platform come from the matrix row and are shown fixed (no picker in the dialog).
  * - The step is decided only by whether `preview` exists (no separate step state — there must be a single place
  *   to return to after a failed lookup).
- * - ⚠️ No sale price · stock inputs. The server re-reads Coupang at commit time to settle them.
+ * - ⚠️ No sale price · stock inputs. The server re-reads the market at commit time to settle them.
  * - ⚠️ The preview response is not cached (price · stock change). It is dropped when the dialog closes.
  * - `categoryWarning` is printed as is, without processing.
  */
@@ -147,6 +148,7 @@ export function ImportCoupangProductModal({
     () => new ListingRegistrationUseCase(new ListingRegistrationRepositoryImpl()),
     [],
   );
+  const market = platformName(platform);
 
   const [productId, setProductId] = useState(initialProductId ?? '');
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
@@ -171,7 +173,7 @@ export function ImportCoupangProductModal({
         setDraft(buildDraft(res, masterOptions));
       } catch (e: unknown) {
         if (!alive) return;
-        setError(importErrorMessage(e));
+        setError(importErrorMessage(e, market));
       } finally {
         if (alive) setBusy(false);
       }
@@ -198,7 +200,7 @@ export function ImportCoupangProductModal({
       setPreview(res);
       setDraft(buildDraft(res, masterOptions));
     } catch (e: unknown) {
-      setError(importErrorMessage(e));
+      setError(importErrorMessage(e, market));
     } finally {
       setBusy(false);
     }
@@ -253,7 +255,7 @@ export function ImportCoupangProductModal({
       onDone(res.categoryWarning ?? null);
       onClose();
     } catch (e: unknown) {
-      setError(importErrorMessage(e));
+      setError(importErrorMessage(e, market));
     } finally {
       setBusy(false);
     }
@@ -272,7 +274,7 @@ export function ImportCoupangProductModal({
 
       <div className="mb-3 flex shrink-0 items-center gap-2 max-md:flex-wrap">
         <label className="text-sm text-gray-700 max-md:min-w-0 max-md:truncate" htmlFor="coupang-product-id">
-          쿠팡 상품 ID
+          {market} 상품 ID
         </label>
         <input
           id="coupang-product-id"
@@ -313,9 +315,9 @@ export function ImportCoupangProductModal({
                 건너뛴다. 🔴 되돌리는 창구는 이미 있다([기본값으로 변경]·[옵션명 일괄 적용]). */}
             {preview.reusesExistingListing && (
               <p className="rounded bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                이 쿠팡 상품에는 마스터 연결이 끊긴 판매상품이 있습니다. 새로 만들지 않고 그 판매상품을
+                이 {market} 상품에는 마스터 연결이 끊긴 판매상품이 있습니다. 새로 만들지 않고 그 판매상품을
                 이 마스터에 다시 붙입니다 — 주문·고객문의·정산 기록이 함께 따라옵니다. 판매가·옵션명은
-                쿠팡의 현재 값으로 들어오니, 이 마스터 기준으로 자동 계산하려면 가져온 뒤 [가격 설정] →
+                {' '}{market}의 현재 값으로 들어오니, 이 마스터 기준으로 자동 계산하려면 가져온 뒤 [가격 설정] →
                 [기본값으로 변경] 을 누르세요.
               </p>
             )}
