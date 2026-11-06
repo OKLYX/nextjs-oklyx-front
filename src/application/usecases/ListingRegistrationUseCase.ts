@@ -48,6 +48,7 @@ import type {
 import type { ShippingConfig } from '@/domain/entities/ShippingEntity';
 import type { ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import type { EsmShippingMap } from '@/domain/entities/EsmShipping';
+import type { LotteonShippingMap } from '@/domain/entities/LotteonShipping';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -142,6 +143,10 @@ export class ListingRegistrationUseCase {
 
   getInheritedEsmShipping(listingId: number): Promise<EsmShippingMap> {
     return this.repository.getInheritedEsmShipping(listingId);
+  }
+
+  getInheritedLotteonShipping(listingId: number): Promise<LotteonShippingMap> {
+    return this.repository.getInheritedLotteonShipping(listingId);
   }
 
   propagate(masterId: number): Promise<PropagateResponse> {

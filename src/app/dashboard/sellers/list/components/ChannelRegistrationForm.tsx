@@ -42,6 +42,7 @@ export function ChannelRegistrationForm({
   const isCoupang = platform === 'COUPANG';
   const isElevenst = platform === 'ELEVENST';
   const isEsm = platform === 'ESM';
+  const isLotteon = platform === 'LOTTEON';
 
   const onSubmit = async (data: CreateMarketplaceAccountForm) => {
     try {
@@ -104,8 +105,9 @@ export function ChannelRegistrationForm({
         )}
       </div>
 
-      {/* FEATURE_2610_13 / D5 · FEATURE_2610_26 / D40: each platform shows its own credential fields — Coupang the
-          four below, 11st 「API 키」 alone, ESM the four ESM fields; no platform chosen yet = none. */}
+      {/* FEATURE_2610_13 / D5 · FEATURE_2610_26 / D40 · FEATURE_2610_24 / D4: each platform shows its own credential
+          fields — Coupang the four below, 11st 「API 키」 alone, ESM the four ESM fields, LotteON 「인증키」 alone; no
+          platform chosen yet = none. */}
       {isCoupang && (
         <>
           <div>
@@ -188,6 +190,26 @@ export function ChannelRegistrationForm({
             id="apiKey"
             type="password"
             placeholder="11번가 오픈API 키를 입력하세요"
+            disabled={isLoading}
+            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {formState.errors.apiKey && (
+            <p className="mt-1 text-sm text-red-600">{formState.errors.apiKey.message}</p>
+          )}
+        </div>
+      )}
+
+      {/* FEATURE_2610_24 / D4 · D7: LotteON's one key, sent as apiKey — no server IP notice. */}
+      {isLotteon && (
+        <div>
+          <label htmlFor="apiKey" className="block text-sm font-medium mb-1">
+            인증키 <span className="text-red-600">*</span>
+          </label>
+          <input
+            {...register('apiKey')}
+            id="apiKey"
+            type="password"
+            placeholder="롯데ON 판매자센터에서 받은 인증키를 입력하세요"
             disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />

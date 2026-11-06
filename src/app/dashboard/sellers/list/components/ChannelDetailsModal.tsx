@@ -89,6 +89,7 @@ function ChannelDetailsContent({
   const isCoupang = channel.platform === 'COUPANG';
   const isElevenst = channel.platform === 'ELEVENST';
   const isEsm = channel.platform === 'ESM';
+  const isLotteon = channel.platform === 'LOTTEON';
 
   // 인라인 async IIFE — 이펙트 본문에서 setState 를 동기 호출하지 않기 위한 프로젝트 관례.
   useEffect(() => {
@@ -168,7 +169,8 @@ function ChannelDetailsContent({
           </div>
 
           {/* FEATURE_2610_16 / D10 · FEATURE_2610_26 / D40: the Coupang credential rows on a Coupang channel only — an
-              11st channel shows none (its API key is never shown), an ESM channel its three IDs below. */}
+              11st or LotteON channel shows none (its key is never shown, FEATURE_2610_24 / D57), an ESM channel its
+              three IDs below. */}
           {isCoupang && (
             <>
               <div>
@@ -282,9 +284,12 @@ function ChannelDetailsContent({
         </div>
 
         <div role="tabpanel" hidden={activeTab !== 'platform'} className="space-y-4">
-          {/* FEATURE_2610_26 / D57: an ESM channel has no platform default — one line instead of fields. */}
+          {/* FEATURE_2610_26 / D57 · FEATURE_2610_24 / D55: an ESM or LotteON channel has no platform default — one
+              line instead of fields. */}
           {isEsm ? (
             <p className="text-sm text-gray-500">G마켓 · 옥션은 따로 정할 플랫폼 기본값이 없습니다</p>
+          ) : isLotteon ? (
+            <p className="text-sm text-gray-500">롯데ON 은 따로 정할 플랫폼 기본값이 없습니다</p>
           ) : isElevenst ? (
             NOTICE_TEXT_FIELDS.map((f) => (
               <div key={f.key}>

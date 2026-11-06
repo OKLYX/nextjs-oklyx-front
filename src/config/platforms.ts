@@ -10,17 +10,19 @@
  * ⚠️ A new marketplace adds its value here in its sales-channel work (D10).
  *    Mobile twin: `lib/core/utils/platform_display.dart` `kPlatforms`.
  */
-export const PLATFORMS = ['COUPANG', 'ELEVENST', 'ESM'];
+export const PLATFORMS = ['COUPANG', 'ELEVENST', 'ESM', 'LOTTEON'];
 
 /**
- * Screen name of a platform value. The stored / API values stay `ELEVENST` and `ESM`; screens show 「11번가」 and
- * 「G마켓 · 옥션」 (FEATURE_2610_26 / D71). Other platforms are returned unchanged.
+ * Screen name of a platform value. The stored / API values stay `ELEVENST`, `ESM` and `LOTTEON`; screens show
+ * 「11번가」, 「G마켓 · 옥션」 (FEATURE_2610_26 / D71) and 「롯데ON」 (FEATURE_2610_24). Other platforms are returned
+ * unchanged.
  *
  * ❌ Do not send the returned text to the server — it is display only.
  */
 export const platformDisplayName = (platform: string): string => {
   if (platform === 'ELEVENST') return '11번가';
   if (platform === 'ESM') return 'G마켓 · 옥션';
+  if (platform === 'LOTTEON') return '롯데ON';
   return platform;
 };
 
@@ -29,11 +31,12 @@ const PLATFORM_NAMES: Record<string, string> = {
   NAVER: '네이버',
   ELEVENST: '11번가',
   ESM: 'G마켓 · 옥션',
+  LOTTEON: '롯데ON',
 };
 
 /**
  * Screen name of a platform value (FEATURE_2610_22 / D15 · D18): 「쿠팡」 · 「네이버」 · 「11번가」 · 「G마켓 · 옥션」
- * (FEATURE_2610_26 / D3). A value missing from the table is returned unchanged. The marketplace name tables and the
+ * (FEATURE_2610_26 / D3) · 「롯데ON」 (FEATURE_2610_24). A value missing from the table is returned unchanged. The marketplace name tables and the
  * platform select labels use this.
  *
  * ❌ Do not send the returned text to the server — it is display only.

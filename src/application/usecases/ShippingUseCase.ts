@@ -7,6 +7,7 @@ import {
 } from '@/domain/entities/ShippingEntity';
 import type { ElevenstShippingConfig, ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import type { EsmChoice, EsmShippingConfig, EsmShippingMap } from '@/domain/entities/EsmShipping';
+import type { LotteonChoice, LotteonShippingConfig, LotteonShippingMap } from '@/domain/entities/LotteonShipping';
 
 export class ShippingUseCase {
   constructor(private repository: ShippingRepository) {}
@@ -53,5 +54,17 @@ export class ShippingUseCase {
 
   listEsmDeliveryCompanies(accountId: number): Promise<EsmChoice[]> {
     return this.repository.listEsmDeliveryCompanies(accountId);
+  }
+
+  getLotteonConfig(accountId: number): Promise<LotteonShippingConfig> {
+    return this.repository.getLotteonConfig(accountId);
+  }
+
+  upsertLotteonConfig(accountId: number, settings: LotteonShippingMap): Promise<LotteonShippingConfig> {
+    return this.repository.upsertLotteonConfig(accountId, settings);
+  }
+
+  listLotteonFeePolicies(accountId: number): Promise<LotteonChoice[]> {
+    return this.repository.listLotteonFeePolicies(accountId);
   }
 }

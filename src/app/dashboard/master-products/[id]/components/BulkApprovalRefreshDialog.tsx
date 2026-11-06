@@ -14,8 +14,8 @@ import { STATUS_LABEL } from './ListingRow';
 /** FEATURE_2610_38 / D3: the statuses whose row menu shows [승인 새로고침]. */
 export const REFRESHABLE_STATUSES: ListingStatus[] = ['SUBMITTED', 'SELLING', 'REJECTED'];
 
-/** FEATURE_2610_38 / D6: the markets the server can refresh (Coupang · 11st · ESM). */
-export const REFRESHABLE_PLATFORMS = ['COUPANG', 'ELEVENST', 'ESM'];
+/** FEATURE_2610_38 / D6: the markets the server can refresh (Coupang · 11st · ESM · LotteON, FEATURE_2610_24 / D59). */
+export const REFRESHABLE_PLATFORMS = ['COUPANG', 'ELEVENST', 'ESM', 'LOTTEON'];
 
 /** FEATURE_2610_38 / D18: shown above the run button while a SELLING listing is checked. */
 export const SELLING_PRICE_NOTICE =

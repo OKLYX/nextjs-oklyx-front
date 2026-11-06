@@ -47,6 +47,7 @@ import type {
 import type { ShippingConfig } from '@/domain/entities/ShippingEntity';
 import type { ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import type { EsmShippingMap } from '@/domain/entities/EsmShipping';
+import type { LotteonShippingMap } from '@/domain/entities/LotteonShipping';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -90,6 +91,8 @@ export interface ListingRegistrationRepository {
   getInheritedElevenstShipping(listingId: number): Promise<ElevenstShippingMap>;
   // FEATURE_2610_26 / D36: an ESM listing's inherited baseline (the ESM channel layer — no master level), esm.* keys.
   getInheritedEsmShipping(listingId: number): Promise<EsmShippingMap>;
+  // FEATURE_2610_24 / D42: a LotteON listing's inherited baseline (the LotteON channel layer), lotteon.* keys.
+  getInheritedLotteonShipping(listingId: number): Promise<LotteonShippingMap>;
   propagate(masterId: number): Promise<PropagateResponse>;
   // Channel sync preview (89): what a propagate run would change, read-only.
   getChannelSyncPreview(masterId: number): Promise<ChannelSyncPreview>;

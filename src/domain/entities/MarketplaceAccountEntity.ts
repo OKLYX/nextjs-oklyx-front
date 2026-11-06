@@ -27,6 +27,9 @@ export interface MarketplaceAccount {
   esmMasterId?: string | null;
   gmarketSellerId?: string | null;
   auctionSellerId?: string | null;
+  // FEATURE_2610_24 / D6 · D57: LotteON only (null elsewhere) — when the key was saved, and whether 335 days passed.
+  lotteonKeySavedAt?: string | null;
+  lotteonKeyRenewalNeeded?: boolean | null;
   createdAt: string;
   updatedAt: string;
 }

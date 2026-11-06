@@ -30,6 +30,7 @@ import type {
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 import type { ElevenstNoticePreviewRequest, ElevenstNotification } from '@/domain/entities/ElevenstNotice';
 import type { EsmNoticePreviewRequest, EsmNotification } from '@/domain/entities/EsmNotice';
+import type { LotteonNoticePreviewRequest, LotteonNotification } from '@/domain/entities/LotteonNotice';
 
 const base = '/api/admin/master-products';
 const lookupBase = '/api/admin/category-lookup';
@@ -185,6 +186,11 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
 
   async previewEsmNotice(data: EsmNoticePreviewRequest): Promise<EsmNotification> {
     const response = await axiosInstance.post('/api/admin/esm/notice-preview', data);
+    return response.data.data;
+  }
+
+  async previewLotteonNotice(data: LotteonNoticePreviewRequest): Promise<LotteonNotification> {
+    const response = await axiosInstance.post('/api/admin/lotteon/notice-preview', data);
     return response.data.data;
   }
 

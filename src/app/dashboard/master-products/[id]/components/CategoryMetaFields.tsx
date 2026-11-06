@@ -28,18 +28,21 @@ import { Input } from '@/presentation/components/ui/Input';
 import { Spinner } from '@/presentation/components/Spinner';
 import type { ElevenstNotification } from '@/domain/entities/ElevenstNotice';
 import type { EsmNotification } from '@/domain/entities/EsmNotice';
+import type { LotteonNotification } from '@/domain/entities/LotteonNotice';
 import { platformName } from '@/config/platforms';
 
 /**
- * FEATURE_2610_13 / D97 · D109 and FEATURE_2610_26 / D45: the tabs shown when a switched-on 11st or Gmarket · Auction
- * channel exists — the 11st tab only with an 11st channel, the Gmarket · Auction tab only with an ESM channel.
+ * FEATURE_2610_13 / D97 · D109, FEATURE_2610_26 / D45 and FEATURE_2610_24 / D38: the tabs shown when a switched-on
+ * 11st, Gmarket · Auction or LotteON channel exists — the 11st tab only with an 11st channel, the Gmarket · Auction tab
+ * only with an ESM channel, the LotteON tab only with a LotteON channel.
  */
-type MetaTab = 'ALL' | 'COUPANG' | 'ELEVENST' | 'ESM';
+type MetaTab = 'ALL' | 'COUPANG' | 'ELEVENST' | 'ESM' | 'LOTTEON';
 const META_TABS: { key: MetaTab; label: string }[] = [
   { key: 'ALL', label: '통합' },
   { key: 'COUPANG', label: platformName('COUPANG') },
   { key: 'ELEVENST', label: platformName('ELEVENST') },
   { key: 'ESM', label: platformName('ESM') },
+  { key: 'LOTTEON', label: platformName('LOTTEON') },
 ];
 /** D99: the gray line under a read-only shared field. */
 const SHARED_NOTE = '공통 항목은 「통합」 에서 고칩니다';
@@ -86,7 +89,7 @@ interface CategoryMetaFieldsProps {
   onNoticeGroupChange?: (group: string) => void;
   /**
    * FEATURE_2610_13 / D97 · D109: given only when a switched-on 11st channel exists → 「통합」 · 「쿠팡」 · 「11번가」 tabs.
-   * Absent together with `esmPreview` = the single-platform screen as before.
+   * Absent together with `esmPreview` and `lotteonPreview` = the single-platform screen as before.
    */
   elevenstPreview?: { notification: ElevenstNotification | null; failed: boolean };
   /**
@@ -94,6 +97,11 @@ interface CategoryMetaFieldsProps {
    * Absent = no such tab.
    */
   esmPreview?: { notification: EsmNotification | null; failed: boolean };
+  /**
+   * FEATURE_2610_24 / D38 · D63: given only when a switched-on LotteON channel exists → the 「롯데ON」 tab.
+   * Absent = no such tab.
+   */
+  lotteonPreview?: { notification: LotteonNotification | null; failed: boolean };
 }
 
 /**
@@ -123,24 +131,36 @@ export function CategoryMetaFields({
   onNoticeGroupChange,
   elevenstPreview,
   esmPreview,
+  lotteonPreview,
 }: CategoryMetaFieldsProps) {
   // Display-only unit pick per pair; the actual value lives in the parent's attrValues.
   const [measureUnit, setMeasureUnit] = useState<Record<string, string>>({});
   const [metaTab, setMetaTab] = useState<MetaTab>('ALL');
-  const tabbed = elevenstPreview != null || esmPreview != null;
+  const tabbed = elevenstPreview != null || esmPreview != null || lotteonPreview != null;
   const tabs = META_TABS.filter(
-    (t) => (t.key !== 'ELEVENST' || elevenstPreview != null) && (t.key !== 'ESM' || esmPreview != null),
+    (t) =>
+      (t.key !== 'ELEVENST' || elevenstPreview != null) &&
+      (t.key !== 'ESM' || esmPreview != null) &&
+      (t.key !== 'LOTTEON' || lotteonPreview != null),
   );
   const notification = elevenstPreview?.notification ?? null;
   const esmNotification = esmPreview?.notification ?? null;
-  // Coupang items another shown platform also reads (shared) — the union over the 11st and Gmarket · Auction previews.
-  // null = a shown preview is not known yet / failed → no tags, nothing read-only.
+  const lotteonNotification = lotteonPreview?.notification ?? null;
+  // Coupang items another shown platform also reads (shared) — the union over the 11st, Gmarket · Auction and LotteON
+  // previews. null = a shown preview is not known yet / failed → no tags, nothing read-only.
   const shared =
-    (elevenstPreview != null && notification == null) || (esmPreview != null && esmNotification == null)
+    (elevenstPreview != null && notification == null) ||
+    (esmPreview != null && esmNotification == null) ||
+    (lotteonPreview != null && lotteonNotification == null)
       ? null
-      : new Set([...(notification?.usedCoupangItems ?? []), ...(esmNotification?.usedCoupangItems ?? [])]);
+      : new Set([
+          ...(notification?.usedCoupangItems ?? []),
+          ...(esmNotification?.usedCoupangItems ?? []),
+          ...(lotteonNotification?.usedCoupangItems ?? []),
+        ]);
   const ownLines = notification ? notification.lines.filter((l) => l.ownKey != null) : [];
   const esmOwnLines = esmNotification ? esmNotification.lines.filter((l) => l.ownKey != null) : [];
+  const lotteonOwnLines = lotteonNotification ? lotteonNotification.lines.filter((l) => l.ownKey != null) : [];
   // D109 (b) · (c): 「통합」 shows notices only and owns the group select; the Coupang tab shows the attributes too.
   const showAttributes = !tabbed || metaTab === 'COUPANG';
   const coupangView = tabbed && metaTab === 'COUPANG';
@@ -336,6 +356,42 @@ export function CategoryMetaFields({
     </div>
   );
 
+  // FEATURE_2610_24 / D38 · D63 ④: on the LotteON tab every item shows the value LotteON receives, all read-only —
+  // the LotteON-only items are edited in 「통합」.
+  const lotteonView = (
+    <div className="mb-4 space-y-3">
+      {lotteonPreview?.failed ? (
+        <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">롯데ON 고시 미리보기를 불러오지 못했습니다.</p>
+      ) : lotteonNotification == null ? (
+        <div className="flex min-h-16 items-center justify-center">
+          <Spinner size={20} label="불러오는 중..." />
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-gray-600">
+            롯데ON 고시 품목: <span className="font-medium text-gray-900">{lotteonNotification.itemGroupName}</span>
+            <span className="ml-1 text-gray-400">(쿠팡 품목군으로 정해집니다)</span>
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {lotteonNotification.lines.map((line) => (
+              <div key={line.code}>
+                <label className="mb-1 block text-xs font-medium text-gray-600">{line.name}</label>
+                <input
+                  type="text"
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                  value={line.value}
+                  disabled
+                  readOnly
+                />
+                <p className="mt-1 text-[11px] text-gray-400">{SHARED_NOTE}</p>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -435,7 +491,13 @@ export function CategoryMetaFields({
 
       {/* 상품정보제공고시: 카테고리가 여러 품목군을 줄 수 있어 품목군을 하나 선택해 그 그룹만
           입력·전송한다(선택된 그룹만 마켓에 전송). */}
-      {tabbed && metaTab === 'ELEVENST' ? elevenstView : tabbed && metaTab === 'ESM' ? esmView : (
+      {tabbed && metaTab === 'ELEVENST'
+        ? elevenstView
+        : tabbed && metaTab === 'ESM'
+          ? esmView
+          : tabbed && metaTab === 'LOTTEON'
+            ? lotteonView
+            : (
       <div className="mb-4 border-t border-gray-100 pt-3">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -545,6 +607,28 @@ export function CategoryMetaFields({
                 <label className="mb-1 block text-xs font-medium text-gray-600">
                   {line.name}
                   {renderTag(platformName('ESM'))}
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900 disabled:bg-gray-100"
+                  value={noticeValues[line.ownKey as string] ?? ''}
+                  placeholder="비우면 「상품 상세페이지 참조」"
+                  onChange={(e) => onNoticeChange(line.ownKey as string, e.target.value)}
+                  disabled={disabled}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* FEATURE_2610_24 / D63 ③ · D68: the LotteON-only items of the LotteON group, stored under LOTTEON:{item}. */}
+        {tabbed && metaTab === 'ALL' && lotteonOwnLines.length > 0 && (
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {lotteonOwnLines.map((line) => (
+              <div key={line.code}>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  {line.name}
+                  {renderTag(platformName('LOTTEON'))}
                 </label>
                 <input
                   type="text"

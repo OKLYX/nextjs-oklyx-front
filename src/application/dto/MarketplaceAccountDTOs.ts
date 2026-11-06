@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
-// FEATURE_2610_13 / D5 · FEATURE_2610_26 / D4 · D5 · D40: each marketplace has its own credential fields — 11st
-// 「API 키」 alone, ESM the master ID · secret key · two seller IDs, and the Coupang fields (vendorId · accessKey ·
-// secretKey) for every other platform as before.
+// FEATURE_2610_13 / D5 · FEATURE_2610_26 / D4 · D5 · D40 · FEATURE_2610_24 / D4 · D57: each marketplace has its own
+// credential fields — 11st 「API 키」 alone, ESM the master ID · secret key · two seller IDs, LotteON 「인증키」 alone
+// (sent as apiKey), and the Coupang fields (vendorId · accessKey · secretKey) for every other platform as before.
 const ELEVENST = 'ELEVENST';
 const ESM = 'ESM';
+const LOTTEON = 'LOTTEON';
 const API_KEY_REQUIRED_MESSAGE = '11번가 API 키를 입력하세요.';
+const LOTTEON_KEY_REQUIRED_MESSAGE = '롯데ON 인증키를 입력하세요.';
 const ESM_MASTER_ID_REQUIRED_MESSAGE = 'ESM+ 마스터 ID 를 입력하세요.';
 const ESM_SECRET_KEY_REQUIRED_MESSAGE = '비밀키를 입력하세요.';
 const ESM_SELLER_IDS_REQUIRED_MESSAGE = 'G마켓 판매자 ID 와 옥션 판매자 ID 를 모두 입력하세요';
@@ -85,6 +87,12 @@ export const createMarketplaceAccountSchema = z
       addEsmIssues(data, ctx, true);
       return;
     }
+    if (data.platform === LOTTEON) {
+      if (!data.apiKey?.trim()) {
+        ctx.addIssue({ code: 'custom', path: ['apiKey'], message: LOTTEON_KEY_REQUIRED_MESSAGE });
+      }
+      return;
+    }
     if (!data.vendorId?.trim()) {
       ctx.addIssue({ code: 'custom', path: ['vendorId'], message: '판매자(벤더) ID를 입력하세요' });
     }
@@ -141,7 +149,7 @@ export const updateMarketplaceAccountSchema = z
     detailTemplateId: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.platform === ELEVENST) return;
+    if (data.platform === ELEVENST || data.platform === LOTTEON) return;
     if (data.platform === ESM) {
       addEsmIssues(data, ctx, false);
       return;

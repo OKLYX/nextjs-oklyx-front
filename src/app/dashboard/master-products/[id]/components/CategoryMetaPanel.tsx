@@ -15,6 +15,8 @@ import { useElevenstNoticePreview } from '@/presentation/hooks/useElevenstNotice
 import { elevenstOwnNotices } from '@/domain/entities/ElevenstNotice';
 import { useEsmNoticePreview } from '@/presentation/hooks/useEsmNoticePreview';
 import { esmOwnNotices } from '@/domain/entities/EsmNotice';
+import { useLotteonNoticePreview } from '@/presentation/hooks/useLotteonNoticePreview';
+import { lotteonOwnNotices } from '@/domain/entities/LotteonNotice';
 
 // 선택 그룹의 마스터 소유 고시가 전부 비었으면 "전체 상품 상세페이지 참조" 로 채운다(기본 체크).
 const withNoticeRefDefault = (
@@ -36,6 +38,8 @@ interface CategoryMetaPanelProps {
   elevenstActive?: boolean;
   /** FEATURE_2610_26 / D45: a switched-on Gmarket · Auction channel exists → the 「G마켓 · 옥션」 tab too. */
   esmActive?: boolean;
+  /** FEATURE_2610_24 / D38: a switched-on LotteON channel exists → the 「롯데ON」 tab too. */
+  lotteonActive?: boolean;
 }
 
 /**
@@ -61,6 +65,7 @@ export function CategoryMetaPanel({
   onSaved,
   elevenstActive = false,
   esmActive = false,
+  lotteonActive = false,
 }: CategoryMetaPanelProps) {
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   // COUPANG owns the persisted per-master values; other platforms are schema-only (read-only).
@@ -92,6 +97,14 @@ export function CategoryMetaPanel({
   );
   // FEATURE_2610_26 / D56: the Gmarket · Auction view of the same values.
   const esmPreview = useEsmNoticePreview(useCase, esmActive && !readOnly, effectiveGroup, groupNotices, noticeValues);
+  // FEATURE_2610_24 / D56: the LotteON view of the same values.
+  const lotteonPreview = useLotteonNoticePreview(
+    useCase,
+    lotteonActive && !readOnly,
+    effectiveGroup,
+    groupNotices,
+    noticeValues,
+  );
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -171,12 +184,13 @@ export function CategoryMetaPanel({
       const group = submitNoticeGroup(notices, noticeValues, noticeGroup);
       await useCase.setCategoryAttributes(masterId, {
         attributes: attrValues,
-        // FEATURE_2610_13 / D101 and FEATURE_2610_26 / D17: the 11st-only and Gmarket · Auction-only values ride along
-        // under their ELEVENST:{code} and ESM:{code} keys.
+        // FEATURE_2610_13 / D101, FEATURE_2610_26 / D17 and FEATURE_2610_24 / D68: the 11st-only, Gmarket · Auction-only
+        // and LotteON-only values ride along under their ELEVENST:{code}, ESM:{code} and LOTTEON:{item} keys.
         notices: {
           ...noticesToSubmit(notices, noticeValues, group),
           ...elevenstOwnNotices(noticeValues),
           ...esmOwnNotices(noticeValues),
+          ...lotteonOwnNotices(noticeValues),
         },
         noticeGroup: group,
       });
@@ -223,6 +237,7 @@ export function CategoryMetaPanel({
         onNoticeGroupChange={handleNoticeGroupChange}
         elevenstPreview={elevenstActive && !readOnly ? elevenstPreview : undefined}
         esmPreview={esmActive && !readOnly ? esmPreview : undefined}
+        lotteonPreview={lotteonActive && !readOnly ? lotteonPreview : undefined}
       />
 
       {readOnly ? (

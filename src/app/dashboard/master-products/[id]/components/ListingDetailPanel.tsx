@@ -16,14 +16,18 @@ import { MarketOptionLinkModal } from './MarketOptionLinkModal';
 
 const CHANNEL_ONLY_REASON = '마스터 옵션이 없는 채널 전용 옵션입니다';
 const OPTION_LINK_UNKNOWN_REASON = '채널별 옵션을 불러오지 못해 연결된 마스터 옵션을 알 수 없습니다';
-/** FEATURE_2610_13 / D128 · D130 and FEATURE_2610_26 / D41: platforms whose [마켓 옵션 연결] is disabled, and why. */
+/**
+ * FEATURE_2610_13 / D128 · D130, FEATURE_2610_26 / D41 and FEATURE_2610_24 / D32: platforms whose [마켓 옵션 연결] is
+ * disabled, and why.
+ */
 const OPTION_LINK_UNSUPPORTED_REASONS: Record<string, string> = {
   ELEVENST: '11번가 옵션 연결은 아직 지원하지 않습니다',
   ESM: 'G마켓 · 옥션 옵션 연결은 아직 지원하지 않습니다',
+  LOTTEON: '롯데ON 옵션 연결은 아직 지원하지 않습니다',
 };
 const OPTION_ID_PENDING_HINT = '승인 후 부여';
-/** FEATURE_2611_11 / D19: platforms whose listing has no 「등록상품명」 line. */
-const NO_REGISTRATION_NAME_PLATFORMS = new Set(['ELEVENST', 'ESM']);
+/** FEATURE_2611_11 / D19 · FEATURE_2610_24 / D53: platforms whose listing has no 「등록상품명」 line. */
+const NO_REGISTRATION_NAME_PLATFORMS = new Set(['ELEVENST', 'ESM', 'LOTTEON']);
 
 /**
  * 마켓에 이미 올라간 옵션은 끌 수 없는 이유(사용자 결정 2026-08-29). 승인된 마켓 옵션은 물리적으로
