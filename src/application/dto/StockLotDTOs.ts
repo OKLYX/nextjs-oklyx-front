@@ -1,6 +1,9 @@
 import type { ReceiptLineRequest } from './PurchaseReceiptDTOs';
 
-/** Request bodies of FEATURE_2610_19 (intake work · cash settlement) and FEATURE_2611_01 (seller without a receipt). */
+/**
+ * Request bodies of FEATURE_2610_19 (intake work · cash settlement), FEATURE_2611_01 (seller without a receipt) and
+ * FEATURE_2611_16 (「매입가 넣기」).
+ */
 
 /** 「입고 작업」 reasons (FEATURE_2611_01 D1): 「매입」 · 「기초재고」. */
 export type IntakeReason = 'PURCHASE' | 'OPENING';
@@ -29,6 +32,16 @@ export interface SellerChangeRequest {
   sellerId: number;
   movementIds: number[];
   shareRecordIds: number[];
+}
+
+/**
+ * 「매입가 넣기」 (FEATURE_2611_16 D2 · D3 · D7 · D12): the JSON part next to the optional photo. A line without
+ * totalAmount and unitPrice keeps its amount (D7); send at most one of them. cardId = the new receipt's card (D12) —
+ * omitted = 「카드로 알 수 없음」 or no new receipt.
+ */
+export interface PurchasePriceRequest {
+  cardId?: number;
+  lines: { recordId: number; totalAmount?: number; unitPrice?: number; reflectToBasePrice: boolean }[];
 }
 
 /** 「돈으로 정리」 (D90 · D99 ①). */

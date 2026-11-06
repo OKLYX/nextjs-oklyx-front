@@ -2,6 +2,7 @@ import type { StockLotRepository } from '@/domain/repositories/StockLotRepositor
 import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
 import type {
   IntakeRequest,
+  PurchasePriceRequest,
   ReceiptlessAssignRequest,
   SellerChangeRequest,
   SettlementRequest,
@@ -9,8 +10,8 @@ import type {
 import type { CreateReceiptRequest } from '@/application/dto/PurchaseReceiptDTOs';
 
 /**
- * Intake work, daily in/out and seller debts (FEATURE_2610_19) + the seller without a receipt (FEATURE_2611_01). Thin
- * delegation to the repository.
+ * Intake work, daily in/out and seller debts (FEATURE_2610_19) + the seller without a receipt (FEATURE_2611_01) +
+ * 「매입가 넣기」 (FEATURE_2611_16). Thin delegation to the repository.
  */
 export class StockLotUseCase {
   constructor(private repository: StockLotRepository) {}
@@ -37,6 +38,10 @@ export class StockLotUseCase {
 
   changeSeller(request: SellerChangeRequest): Promise<void> {
     return this.repository.changeSeller(request);
+  }
+
+  retypePrices(movedOn: string, photo: File | null, request: PurchasePriceRequest): Promise<void> {
+    return this.repository.retypePrices(movedOn, photo, request);
   }
 
   debtPairs(): Promise<SellerDebtPair[]> {
