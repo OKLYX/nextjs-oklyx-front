@@ -10,6 +10,7 @@ import {
 } from '@/domain/entities/ShippingEntity';
 import type { ElevenstShippingConfig, ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import type { EsmChoice, EsmShippingConfig, EsmShippingMap } from '@/domain/entities/EsmShipping';
+import type { LotteonChoice, LotteonShippingConfig, LotteonShippingMap } from '@/domain/entities/LotteonShipping';
 
 // Base path matches backend 72 ShippingConfigController
 // (@RequestMapping("/api/admin/marketplace-account/{id}")).
@@ -70,6 +71,21 @@ export class ShippingRepositoryImpl implements ShippingRepository {
 
   async listEsmDeliveryCompanies(accountId: number): Promise<EsmChoice[]> {
     const response = await axiosInstance.get(`${base(accountId)}/esm-shipping/delivery-companies`);
+    return response.data.data;
+  }
+
+  async getLotteonConfig(accountId: number): Promise<LotteonShippingConfig> {
+    const response = await axiosInstance.get(`${base(accountId)}/lotteon-shipping-config`);
+    return response.data.data;
+  }
+
+  async upsertLotteonConfig(accountId: number, settings: LotteonShippingMap): Promise<LotteonShippingConfig> {
+    const response = await axiosInstance.put(`${base(accountId)}/lotteon-shipping-config`, { settings });
+    return response.data.data;
+  }
+
+  async listLotteonFeePolicies(accountId: number): Promise<LotteonChoice[]> {
+    const response = await axiosInstance.get(`${base(accountId)}/lotteon-shipping/fee-policies`);
     return response.data.data;
   }
 }

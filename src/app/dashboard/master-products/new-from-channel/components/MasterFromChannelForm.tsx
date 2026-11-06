@@ -36,7 +36,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * Supported platforms: Coupang and 11st (D17 · UX D64 · FEATURE_2611_12 D26: a new platform adds one line here).
+ * Supported platforms: Coupang, 11st and LotteON (D17 · UX D64 · FEATURE_2611_12 D26: a new platform adds one line
+ * here · FEATURE_2610_24 R13: the LotteON product ID is not digits-only).
  * ⚠️ 화면 JSX 에 플랫폼 이름을 직접 쓰지 말 것 — 플랫폼이 늘 때 고칠 자리가 흩어진다.
  */
 type PlatformOption = {
@@ -51,6 +52,7 @@ type PlatformOption = {
 const PLATFORMS: PlatformOption[] = [
   { value: 'COUPANG', label: platformName('COUPANG'), idLabel: '쿠팡 상품 ID', idNumeric: true },
   { value: 'ELEVENST', label: platformName('ELEVENST'), idLabel: '11번가 상품 ID', idNumeric: true },
+  { value: 'LOTTEON', label: platformName('LOTTEON'), idLabel: '롯데ON 상품 ID', idNumeric: false },
 ];
 
 /** 상품명에서 물품 후보를 찾을 때 쓰는 낱말 수 · 보여 줄 후보 수 · 검색 한 번의 크기(UX D79). */

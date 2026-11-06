@@ -51,6 +51,7 @@ import type {
 import type { ShippingConfig } from '@/domain/entities/ShippingEntity';
 import type { ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import type { EsmShippingMap } from '@/domain/entities/EsmShipping';
+import type { LotteonShippingMap } from '@/domain/entities/LotteonShipping';
 import type {
   DetailPreviewResponse,
   DetailHtmlOverrideRequest,
@@ -174,6 +175,11 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async getInheritedEsmShipping(listingId: number): Promise<EsmShippingMap> {
     const response = await axiosInstance.get(`${listingBase}/${listingId}/esm-shipping-inherited`);
+    return response.data.data ?? {};
+  }
+
+  async getInheritedLotteonShipping(listingId: number): Promise<LotteonShippingMap> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/lotteon-shipping-inherited`);
     return response.data.data ?? {};
   }
 

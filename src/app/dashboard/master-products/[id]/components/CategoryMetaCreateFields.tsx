@@ -13,6 +13,7 @@ import { noticeGroupName } from './noticeTemplates';
 import { isOptionNotice } from './optionMetaFields';
 import { useElevenstNoticePreview } from '@/presentation/hooks/useElevenstNoticePreview';
 import { useEsmNoticePreview } from '@/presentation/hooks/useEsmNoticePreview';
+import { useLotteonNoticePreview } from '@/presentation/hooks/useLotteonNoticePreview';
 
 // Per-platform controlled value held by the parent create modal (metaByPlatform[platform]).
 export interface CategoryMetaCreateValue {
@@ -43,6 +44,8 @@ interface CategoryMetaCreateFieldsProps {
   elevenstActive?: boolean;
   /** FEATURE_2610_26 / D45: a switched-on Gmarket · Auction channel exists → the 「G마켓 · 옥션」 tab too (COUPANG only). */
   esmActive?: boolean;
+  /** FEATURE_2610_24 / D38: a switched-on LotteON channel exists → the 「롯데ON」 tab too (COUPANG only). */
+  lotteonActive?: boolean;
 }
 
 /**
@@ -66,6 +69,7 @@ export function CategoryMetaCreateFields({
   hideCategoryAttrs = false,
   elevenstActive = false,
   esmActive = false,
+  lotteonActive = false,
 }: CategoryMetaCreateFieldsProps) {
   const useCase = useMemo(() => new MasterProductUseCase(new MasterProductRepositoryImpl()), []);
   const savedLater = platform !== 'COUPANG';
@@ -93,6 +97,15 @@ export function CategoryMetaCreateFields({
   const esmPreview = useEsmNoticePreview(
     useCase,
     esmTabbed && categoryId != null,
+    effectiveGroup,
+    groupNotices,
+    value.noticeValues,
+  );
+  // FEATURE_2610_24 / D56: the LotteON view of the same values, for the COUPANG values only.
+  const lotteonTabbed = lotteonActive && !savedLater;
+  const lotteonPreview = useLotteonNoticePreview(
+    useCase,
+    lotteonTabbed && categoryId != null,
     effectiveGroup,
     groupNotices,
     value.noticeValues,
@@ -187,6 +200,7 @@ export function CategoryMetaCreateFields({
         onNoticeGroupChange={(group) => onChange({ ...value, noticeGroup: group })}
         elevenstPreview={tabbed ? elevenstPreview : undefined}
         esmPreview={esmTabbed ? esmPreview : undefined}
+        lotteonPreview={lotteonTabbed ? lotteonPreview : undefined}
       />
 
       {savedLater && (

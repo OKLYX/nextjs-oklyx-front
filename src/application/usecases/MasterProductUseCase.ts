@@ -27,6 +27,7 @@ import type {
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 import type { ElevenstNoticePreviewRequest, ElevenstNotification } from '@/domain/entities/ElevenstNotice';
 import type { EsmNoticePreviewRequest, EsmNotification } from '@/domain/entities/EsmNotice';
+import type { LotteonNoticePreviewRequest, LotteonNotification } from '@/domain/entities/LotteonNotice';
 
 export class MasterProductUseCase {
   constructor(private repository: MasterProductRepository) {}
@@ -133,6 +134,10 @@ export class MasterProductUseCase {
 
   previewEsmNotice(data: EsmNoticePreviewRequest): Promise<EsmNotification> {
     return this.repository.previewEsmNotice(data);
+  }
+
+  previewLotteonNotice(data: LotteonNoticePreviewRequest): Promise<LotteonNotification> {
+    return this.repository.previewLotteonNotice(data);
   }
 
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse> {

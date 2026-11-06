@@ -476,7 +476,7 @@ export interface MasterFromChannelPreview {
  * cannot be calculated; `reason` then says why.
  */
 export interface SiteMargin {
-  /** 'COUPANG' · 'ELEVENST' · 'GMARKET' · 'AUCTION' (FEATURE_2610_28 / D21). */
+  /** 'COUPANG' · 'ELEVENST' · 'GMARKET' · 'AUCTION' (FEATURE_2610_28 / D21) · 'LOTTEON' (FEATURE_2610_24). */
   site: string;
   /** KST wall clock 'yyyy-MM-ddTHH:mm:ss…' (D32); null = never confirmed, and always null on a preview. */
   marketPriceAt: string | null;

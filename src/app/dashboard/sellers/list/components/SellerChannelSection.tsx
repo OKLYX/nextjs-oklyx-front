@@ -216,6 +216,9 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
             {channel.elevenstKeyRenewalNeeded && (
               <p className="text-xs text-amber-800">11번가 키가 곧 멈춥니다 — 셀러오피스 API 관리에서 갱신하세요</p>
             )}
+            {channel.lotteonKeyRenewalNeeded && (
+              <p className="text-xs text-amber-800">롯데ON 키 만료가 다가옵니다 — 판매자센터에서 새 키를 받아 넣으세요</p>
+            )}
           </div>
         }
         extraFields={[{ label: 'Access Key', value: channel.accessKey || '-' }]}
@@ -286,6 +289,11 @@ export function SellerChannelSection({ sellerId, sellerName }: SellerChannelSect
                     {channel.elevenstKeyRenewalNeeded && (
                       <p className="mt-1 text-xs text-amber-700">
                         11번가 키가 곧 멈춥니다 — 셀러오피스 API 관리에서 갱신하세요
+                      </p>
+                    )}
+                    {channel.lotteonKeyRenewalNeeded && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        롯데ON 키 만료가 다가옵니다 — 판매자센터에서 새 키를 받아 넣으세요
                       </p>
                     )}
                   </td>
