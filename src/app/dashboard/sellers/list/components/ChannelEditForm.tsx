@@ -32,6 +32,8 @@ import { ShippingOverrideFields } from '@/presentation/components/ShippingOverri
 import { ElevenstShippingFields } from '@/presentation/components/ElevenstShippingFields';
 import { EsmShippingFields } from '@/presentation/components/EsmShippingFields';
 import { cleanEsmMap, type EsmChoice, type EsmShippingMap } from '@/domain/entities/EsmShipping';
+import { LotteonShippingFields } from '@/presentation/components/LotteonShippingFields';
+import { cleanLotteonMap, type LotteonShippingMap } from '@/domain/entities/LotteonShipping';
 import { Spinner } from '@/presentation/components/Spinner';
 import {
   ChannelFixedCostFields,
@@ -55,7 +57,8 @@ export const CHANNEL_EDIT_FORM_ID = 'channel-edit-form';
 export type ChannelShippingChange =
   | { kind: 'coupang'; config: ShippingConfigRequest }
   | { kind: 'elevenst'; settings: ElevenstShippingMap }
-  | { kind: 'esm'; settings: EsmShippingMap };
+  | { kind: 'esm'; settings: EsmShippingMap }
+  | { kind: 'lotteon'; settings: LotteonShippingMap };
 
 /** True when both objects hold the same value under every key (a missing key counts as null). */
 function sameValues(a: object, b: object): boolean {
@@ -67,7 +70,8 @@ function sameValues(a: object, b: object): boolean {
 interface ChannelEditFormProps {
   channel: MarketplaceAccount;
   isLoading?: boolean;
-  // Channel PATCH → platform defaults PUT (Coupang = suffix, 11st = notices, ESM = none — FEATURE_2610_26 / D57)
+  // Channel PATCH → platform defaults PUT (Coupang = suffix, 11st = notices, ESM · LotteON = none — FEATURE_2610_26 /
+  // D57 · FEATURE_2610_24 / D55)
   // → fixed-cost PUT → shipping PUT run sequentially in the parent (FEATURE_2610_16 / D22).
   // Any failure throws here → inline banner + retry, modal stays open (see EditChannelModal).
   // 🔴 fixedCostItems = null means the fixed-cost section is not ready (loading or load failure), so it is not
@@ -144,9 +148,11 @@ export function ChannelEditForm({
   const [coupangShippingDraft, setCoupangShippingDraft] = useState<ShippingConfigRequest | null>(null);
   const [elevenstShippingDraft, setElevenstShippingDraft] = useState<ElevenstShippingMap | null>(null);
   const [esmShippingDraft, setEsmShippingDraft] = useState<EsmShippingMap | null>(null);
+  const [lotteonShippingDraft, setLotteonShippingDraft] = useState<LotteonShippingMap | null>(null);
   const coupangShipping = coupangShippingDraft ?? shipping?.coupang ?? EMPTY_FORM;
   const elevenstShipping = elevenstShippingDraft ?? shipping?.elevenst ?? {};
   const esmShipping = esmShippingDraft ?? cleanEsmMap(shipping?.esm);
+  const lotteonShipping = lotteonShippingDraft ?? cleanLotteonMap(shipping?.lotteon);
 
   const fixedCostReady = !fixedCostsLoading && fixedCostsError === '';
 
@@ -202,6 +208,7 @@ export function ChannelEditForm({
   const isCoupang = channel.platform === 'COUPANG';
   const isElevenst = channel.platform === 'ELEVENST';
   const isEsm = channel.platform === 'ESM';
+  const isLotteon = channel.platform === 'LOTTEON';
 
   // FEATURE_2610_16 / D22: shipping is sent only when the tab was loaded and now differs from the loaded value.
   const shippingChange = (): ChannelShippingChange | null => {
@@ -216,6 +223,12 @@ export function ChannelEditForm({
       if (esmShippingDraft === null) return null;
       const settings = cleanEsmMap(esmShippingDraft);
       return sameValues(settings, cleanEsmMap(shipping.esm)) ? null : { kind: 'esm', settings };
+    }
+    if (isLotteon) {
+      // FEATURE_2610_24 / D65: only the three input keys are sent — the server writes the policy fee keys itself.
+      if (lotteonShippingDraft === null) return null;
+      const settings = cleanLotteonMap(lotteonShippingDraft);
+      return sameValues(settings, cleanLotteonMap(shipping.lotteon)) ? null : { kind: 'lotteon', settings };
     }
     if (coupangShippingDraft === null || sameValues(coupangShippingDraft, shipping.coupang)) return null;
     return { kind: 'coupang', config: coupangShippingDraft };
@@ -304,8 +317,9 @@ export function ChannelEditForm({
           )}
         </div>
 
-        {/* FEATURE_2610_13 / D5 · FEATURE_2610_26 / D40: each platform shows its own credential fields — Coupang the
-            four below, 11st 「API 키」 alone, ESM the four ESM fields. */}
+        {/* FEATURE_2610_13 / D5 · FEATURE_2610_26 / D40 · FEATURE_2610_24 / D57: each platform shows its own
+            credential fields — Coupang the four below, 11st 「API 키」 alone, ESM the four ESM fields, LotteON
+            「인증키」 alone. */}
         {isCoupang && (
           <>
             <div>
@@ -382,6 +396,26 @@ export function ChannelEditForm({
           <div>
             <label htmlFor="apiKey" className="block text-sm font-medium mb-1">
               API 키
+            </label>
+            <input
+              {...register('apiKey')}
+              id="apiKey"
+              type="password"
+              placeholder="변경 시에만 입력하세요 (비워두면 기존 값 유지)"
+              disabled={isLoading}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {formState.errors.apiKey && (
+              <p className="mt-1 text-sm text-red-600">{formState.errors.apiKey.message}</p>
+            )}
+          </div>
+        )}
+
+        {/* FEATURE_2610_24 / D57: LotteON's one key, sent as apiKey (blank = keep). */}
+        {isLotteon && (
+          <div>
+            <label htmlFor="apiKey" className="block text-sm font-medium mb-1">
+              인증키
             </label>
             <input
               {...register('apiKey')}
@@ -522,9 +556,11 @@ export function ChannelEditForm({
 
       <div role="tabpanel" hidden={activeTab !== 'platform'} className="space-y-4">
         {/* FEATURE_2610_16 / D3 · D4: only this channel's platform fields — Coupang = the suffix, 11st = the two
-            notices, ESM = a one-line note (FEATURE_2610_26 / D57). */}
+            notices, ESM · LotteON = a one-line note (FEATURE_2610_26 / D57 · FEATURE_2610_24 / D55). */}
         {isEsm ? (
           <p className="text-sm text-gray-500">G마켓 · 옥션은 따로 정할 플랫폼 기본값이 없습니다</p>
+        ) : isLotteon ? (
+          <p className="text-sm text-gray-500">롯데ON 은 따로 정할 플랫폼 기본값이 없습니다</p>
         ) : isElevenst ? (
           NOTICE_TEXT_FIELDS.map((f) => (
             <div key={f.key}>
@@ -600,6 +636,16 @@ export function ChannelEditForm({
             dispatches={shipping.esmDispatches}
             companies={shipping.esmCompanies}
             loadBundles={loadEsmBundles}
+            disabled={isLoading}
+          />
+        ) : isLotteon ? (
+          <LotteonShippingFields
+            level="account"
+            value={lotteonShipping}
+            onChange={setLotteonShippingDraft}
+            outbound={shipping.outbound}
+            returns={shipping.returns}
+            policies={shipping.lotteonPolicies}
             disabled={isLoading}
           />
         ) : (

@@ -10,6 +10,7 @@ import { EMPTY_SHIPPING_OVERRIDE, type ShippingOverride } from '@/domain/entitie
 import { tierError, type ElevenstShippingMap } from '@/domain/entities/ElevenstShipping';
 import { elevenstOwnNotices } from '@/domain/entities/ElevenstNotice';
 import { esmOwnNotices } from '@/domain/entities/EsmNotice';
+import { lotteonOwnNotices } from '@/domain/entities/LotteonNotice';
 import {
   NOTICE_TEXT_FIELDS,
   NOTICE_TEXT_KEYS,
@@ -1178,8 +1179,9 @@ export function MasterProductCreateForm({
         return;
       }
       // Category required-attributes/notices: the COUPANG meta map, which also carries the 11st-only
-      // ELEVENST:{code} and the Gmarket · Auction-only ESM:{code} notice values (FEATURE_2610_13 / D101 · FEATURE_2610_26 /
-      // D17). Other platforms' attributes are follow-up.
+      // ELEVENST:{code}, the Gmarket · Auction-only ESM:{code} and the LotteON-only LOTTEON:{item} notice values
+      // (FEATURE_2610_13 / D101 · FEATURE_2610_26 / D17 · FEATURE_2610_24 / D68). Other platforms' attributes are
+      // follow-up.
       const coupangMeta = metaByPlatform['COUPANG'];
       if (coupangMeta) {
         try {
@@ -1191,13 +1193,14 @@ export function MasterProductCreateForm({
           );
           await useCase.setCategoryAttributes(created.id, {
             attributes: coupangMeta.attrValues,
-            // Send only the selected notice group's notices (user picks one group) + the 11st-only and
-            // Gmarket · Auction-only values under their ELEVENST:{code} and ESM:{code} keys (FEATURE_2610_13 / D101 ·
-            // FEATURE_2610_26 / D17).
+            // Send only the selected notice group's notices (user picks one group) + the 11st-only, Gmarket ·
+            // Auction-only and LotteON-only values under their ELEVENST:{code}, ESM:{code} and LOTTEON:{item} keys
+            // (FEATURE_2610_13 / D101 · FEATURE_2610_26 / D17 · FEATURE_2610_24 / D68).
             notices: {
               ...noticesToSubmit(coupangMeta.notices, coupangMeta.noticeValues, group),
               ...elevenstOwnNotices(coupangMeta.noticeValues),
               ...esmOwnNotices(coupangMeta.noticeValues),
+              ...lotteonOwnNotices(coupangMeta.noticeValues),
             },
             noticeGroup: group,
           });
@@ -1687,10 +1690,12 @@ export function MasterProductCreateForm({
               <label className="mb-1 block text-xs font-medium text-gray-600">
                 필수속성 / 상품정보제공고시
               </label>
-              {/* FEATURE_2610_13 / D109 (a) · FEATURE_2610_26 / D45: with a switched-on 11st or Gmarket · Auction
-                  channel the fields bring their own 「통합」 · 「쿠팡」 · platform tabs, so the single-platform tab bar
-                  is left out. */}
-              {activePlatforms.includes('ELEVENST') || activePlatforms.includes('ESM') ? (
+              {/* FEATURE_2610_13 / D109 (a) · FEATURE_2610_26 / D45 · FEATURE_2610_24 / D38: with a switched-on 11st,
+                  Gmarket · Auction or LotteON channel the fields bring their own 「통합」 · 「쿠팡」 · platform tabs, so the
+                  single-platform tab bar is left out. */}
+              {activePlatforms.includes('ELEVENST') ||
+              activePlatforms.includes('ESM') ||
+              activePlatforms.includes('LOTTEON') ? (
                 <CategoryMetaCreateFields
                   categoryId={selectedCategoryId === '' ? null : selectedCategoryId}
                   platform="COUPANG"
@@ -1700,6 +1705,7 @@ export function MasterProductCreateForm({
                   onSchemaLoad={(attrs, notices) => handleMetaSchemaLoad('COUPANG', attrs, notices)}
                   elevenstActive={activePlatforms.includes('ELEVENST')}
                   esmActive={activePlatforms.includes('ESM')}
+                  lotteonActive={activePlatforms.includes('LOTTEON')}
                 />
               ) : (
                 <MetaPlatformTabs>

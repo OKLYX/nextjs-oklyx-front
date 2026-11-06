@@ -115,6 +115,7 @@ import { Button } from '@/presentation/components/ui/Button';
 import { platformDisplayName, platformName } from '@/config/platforms';
 import { ELEVENST_KEYS } from '@/domain/entities/ElevenstShipping';
 import { esmShippingUnset } from '@/domain/entities/EsmShipping';
+import { lotteonShippingUnset } from '@/domain/entities/LotteonShipping';
 
 interface CoverageMatrixProps {
   id: string;
@@ -127,8 +128,9 @@ interface CoverageMatrixProps {
  *
  * Channels (seller × platform) are defined on the sales-channel screen → not picked again here.
  * The matrix rows are the tenant's whole channel list (registered flag). Unregistered rows are registered by checking
- * them in a batch or with the per-row one-click [등록] (Coupang, 11st and ESM accounts take [마켓에 올리기] — create the
- * line, then the option picker confirm, 2609_77/D43 · FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2).
+ * them in a batch or with the per-row one-click [등록] (Coupang, 11st, ESM and LotteON accounts take [마켓에 올리기] —
+ * create the line, then the option picker confirm, 2609_77/D43 · FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2 ·
+ * FEATURE_2610_24).
  * On channel add every option is copied (15); the options to upload are picked in the one `ListingOptionPickerDialog`
  * window (2609_77/D57).
  *
@@ -137,13 +139,17 @@ interface CoverageMatrixProps {
  */
 /**
  * Why a channel cannot be made for a seller without outbound/return places (user decision 2026-08-28) — the same
- * text for an ESM account with one of its six shipping values unset (FEATURE_2610_26 / D36). Every channel of such a
+ * text for an ESM account with one of its six shipping values unset (FEATURE_2610_26 / D36) and a LotteON account with
+ * one of its three unset (FEATURE_2610_24 / D42). Every channel of such a
  * seller would carry no shipping info, so creation itself is blocked and the seller's shipping settings come first.
  */
-/** Platforms whose account header offers [마켓에 올리기] (2609_77/D43 · FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2). */
-const UPLOAD_PLATFORMS = ['COUPANG', 'ELEVENST', 'ESM'];
-/** Platforms whose row shows [마켓 상품 추가하기] (FEATURE_2611_12 R11 — ESM is excluded, D40). */
-const IMPORT_PLATFORMS = ['COUPANG', 'ELEVENST'];
+/**
+ * Platforms whose account header offers [마켓에 올리기] (2609_77/D43 · FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2 ·
+ * FEATURE_2610_24).
+ */
+const UPLOAD_PLATFORMS = ['COUPANG', 'ELEVENST', 'ESM', 'LOTTEON'];
+/** Platforms whose row shows [마켓 상품 추가하기] (FEATURE_2611_12 R11 — ESM is excluded, D40 · LotteON FEATURE_2610_24). */
+const IMPORT_PLATFORMS = ['COUPANG', 'ELEVENST', 'LOTTEON'];
 
 const SHIPPING_BLOCK_REASON =
   '이 판매자의 출고지·반품지가 지정되지 않아 채널을 만들 수 없습니다. 판매채널 [수정] > 「배송」 탭에서 출고지·반품지를 먼저 지정하세요.';
@@ -321,10 +327,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [genLoading, setGenLoading] = useState(false);
 
   // Accounts whose outbound/return places are unset (an ESM account: one of its six shipping values —
-  // FEATURE_2610_26 / D36), keyed by accountId. Channel creation is BLOCKED for them (user decision 2026-08-28):
+  // FEATURE_2610_26 / D36 · a LotteON account: one of its three — FEATURE_2610_24 / D42), keyed by accountId. Channel creation is BLOCKED for them (user decision 2026-08-28):
   // every channel of such a seller would carry no shipping info at all, so the seller's shipping settings have to
   // come first. Missing key = unknown (fetch failed) → never blocks, so a lookup outage can't dead-end the screen.
-  // ⚠️ This checks the outbound/return places only (the six values on an ESM account); the authority on *market*
+  // ⚠️ This checks the outbound/return places only (the six values on an ESM account, the three on a LotteON one); the
+  // authority on *market*
   // registerability stays the backend `shippingReady` (78 guard on the cell). Do not grow this into a client-side
   // ShippingReadiness mirror.
   const [placesUnset, setPlacesUnset] = useState<Record<number, boolean>>({});
@@ -393,8 +400,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const [syncPreview, setSyncPreview] = useState<ChannelSyncPreview | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // 2609_77/D43: the listing line just created by [마켓에 올리기] of a Coupang, 11st or ESM account header. null =
-  // closed.
+  // 2609_77/D43: the listing line just created by [마켓에 올리기] of a Coupang, 11st, ESM or LotteON account header.
+  // null = closed.
   const [uploadTarget, setUploadTarget] = useState<{
     listingId: number;
     channelLabel: string;
@@ -465,7 +472,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     [listingUseCase],
   );
 
-  // Per-account outbound/return place presence (an ESM account: its six shipping values) for rows with no cell yet (a
+  // Per-account outbound/return place presence (an ESM account: its six shipping values, a LotteON account: its three)
+  // for rows with no cell yet (a
   // not-yet-created channel has no override, so places resolve to the account default alone). Registered rows already carry the
   // backend's shippingReady, so they are skipped. Fire-and-forget; each failure is simply unknown.
   const fetchPlaces = useCallback(
@@ -485,6 +493,11 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
             if (platform === 'ESM') {
               const { settings } = await shippingUseCase.getEsmConfig(accountId);
               return [accountId, esmShippingUnset(settings)] as const;
+            }
+            // FEATURE_2610_24 / D42: a LotteON account is unset while one of its three shipping values is empty.
+            if (platform === 'LOTTEON') {
+              const { settings } = await shippingUseCase.getLotteonConfig(accountId);
+              return [accountId, lotteonShippingUnset(settings)] as const;
             }
             const cfg = await shippingUseCase.getConfig(accountId);
             const unset =
@@ -901,12 +914,13 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
   const shippingOverrideCount = Object.keys(master?.shippingOverride ?? {}).length;
   const shippingSummary =
     shippingOverrideCount > 0 ? `${shippingOverrideCount}개 항목 지정` : '기본값 사용';
-  // A seller without outbound/return places (an ESM account: one of its six shipping values) = no channel creation.
+  // A seller without outbound/return places (an ESM account: one of its six shipping values, a LotteON account: one of
+  // its three) = no channel creation.
   // Strict true → an unknown (failed lookup) never blocks.
   const isShippingBlocked = (accountId: number) => placesUnset[accountId] === true;
   // FEATURE_2610_11 / D19·D24 · 2610_12 / D41: no mapping row and no own row for that platform → its upload
-  // buttons are hidden. Only Coupang · 11st · ESM (D20 · FEATURE_2610_26 / D45) and only with a standard category
-  // (D18 (f)); unknown mappings or own rows never block.
+  // buttons are hidden. Only Coupang · 11st · ESM · LotteON (D20 · FEATURE_2610_26 / D45 · FEATURE_2610_24) and only
+  // with a standard category (D18 (f)); unknown mappings or own rows never block.
   const isCategoryBlocked = (platform: string) => {
     const lookup = asLookupPlatform(platform);
     return (
@@ -1020,8 +1034,8 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
     }
   };
 
-  // 2609_77/D43: [마켓에 올리기] of a Coupang, 11st or ESM account = create the listing line (prices calculated) →
-  // open the option picker confirm. 🔴 Nothing is sent to the market at this step — the confirm's [올리기] sends it (D29).
+  // 2609_77/D43: [마켓에 올리기] of a Coupang, 11st, ESM or LotteON account = create the listing line (prices
+  // calculated) → open the option picker confirm. 🔴 Nothing is sent to the market at this step — the confirm's [올리기] sends it (D29).
   const handleRowUpload = async (
     accountId: number,
     sellerId: number,
@@ -1583,9 +1597,9 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                         </span>
                       )}
                       {isAdmin && canRegister && !categoryBlocked && UPLOAD_PLATFORMS.includes(row.platform) && (
-                        // 2609_77/D43 · FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2: Coupang, 11st and ESM merge [등록] +
-                        // [마켓 등록] — create the line, then open the option picker confirm. 🔴 Unregistered accounts only
-                        // (one cell per account, 409).
+                        // 2609_77/D43 · FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2 · FEATURE_2610_24: Coupang, 11st,
+                        // ESM and LotteON merge [등록] + [마켓 등록] — create the line, then open the option picker
+                        // confirm. 🔴 Unregistered accounts only (one cell per account, 409).
                         <button
                           type="button"
                           onClick={() =>
@@ -1786,6 +1800,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             onSaved={() => setMetaVersion((v) => v + 1)}
                             elevenstActive={activeLookupPlatforms.includes('ELEVENST')}
                             esmActive={activeLookupPlatforms.includes('ESM')}
+                            lotteonActive={activeLookupPlatforms.includes('LOTTEON')}
                           />
                         </StackedBlock>
                         <div className="space-y-2 p-4">

@@ -17,6 +17,7 @@ import { ChannelOptionNameModal } from './ChannelOptionNameModal';
 import { ChannelShippingOverrideModal } from './ChannelShippingOverrideModal';
 import { ElevenstChannelShippingModal } from './ElevenstChannelShippingModal';
 import { EsmChannelShippingModal } from './EsmChannelShippingModal';
+import { LotteonChannelShippingModal } from './LotteonChannelShippingModal';
 import { ListingOptionPickerDialog, SHIPPING_BLOCKED_REASON } from './ListingOptionPickerDialog';
 import { asLookupPlatform, categoryBlockReason } from '../../components/platformCategory';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
@@ -119,8 +120,8 @@ type Busy =
  * Actions of one listing (cell) row = **one primary button + ⋯ menu**.
  * File: src/app/dashboard/master-products/[id]/components/CellActions.tsx
  *
- * - Primary: unsent (DRAFT) = Coupang · 11st · ESM [마켓에 올리기] (option picker confirm, 2609_77/D43 ·
- *   FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2) · other platforms [마켓 등록] · unsynced changes (`needsMarketSync`) = [수정 요청] · otherwise none. An unsent
+ * - Primary: unsent (DRAFT) = Coupang · 11st · ESM · LotteON [마켓에 올리기] (option picker confirm, 2609_77/D43 ·
+ *   FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2 · FEATURE_2610_24) · other platforms [마켓 등록] · unsynced changes (`needsMarketSync`) = [수정 요청] · otherwise none. An unsent
  *   row whose category the server could not resolve (`categoryBlocked`) shows no primary button — the
  *   category notice + [카테고리 선택하기] take its place (FEATURE_2610_11 / D24).
  * - ⋯ menu: 「편집」 (field values · detail · price · stock · option names · shipping · options to upload) /
@@ -360,12 +361,12 @@ export function CellActions({
   // Guard the register action only (77). Strict false — undefined/null means "not judged" → allow.
   const shippingBlocked = shippingReady === false;
 
-  // **One** primary button by state: unsent = Coupang, 11st and ESM take [마켓에 올리기] (2609_77/D43 ·
-  // FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2), other platforms [마켓 등록] · unsynced changes = [수정 요청] ·
+  // **One** primary button by state: unsent = Coupang, 11st, ESM and LotteON take [마켓에 올리기] (2609_77/D43 ·
+  // FEATURE_2610_13 / D9 ③ · FEATURE_2610_26 / D2 · FEATURE_2610_24), other platforms [마켓 등록] · unsynced changes = [수정 요청] ·
   // otherwise none. Every other action is in ⋯.
   const primary: 'upload' | 'register' | 'update' | null =
     status === 'DRAFT'
-      ? platform === 'COUPANG' || platform === 'ELEVENST' || platform === 'ESM'
+      ? platform === 'COUPANG' || platform === 'ELEVENST' || platform === 'ESM' || platform === 'LOTTEON'
         ? 'upload'
         : 'register'
       : needsMarketSync
@@ -466,7 +467,7 @@ export function CellActions({
     !!pushedBanner ||
     !!statusResult ||
     !!error;
-  // Label source for the category notice. `categoryBlocked` is only ever true for Coupang · 11st · ESM.
+  // Label source for the category notice. `categoryBlocked` is only ever true for Coupang · 11st · ESM · LotteON.
   const lookupPlatform = asLookupPlatform(platform);
 
   return (
@@ -658,6 +659,18 @@ export function CellActions({
         ) : platform === 'ESM' ? (
           // FEATURE_2610_26 / D36: an ESM listing edits only the six esm.* keys.
           <EsmChannelShippingModal
+            listingId={listing.id}
+            accountId={accountId}
+            channelLabel={channelLabel}
+            initialOverride={shippingOverride}
+            shippingUseCase={shippingUseCase}
+            listingUseCase={useCase}
+            onSaved={onShippingSaved}
+            onClose={() => setShowShipping(false)}
+          />
+        ) : platform === 'LOTTEON' ? (
+          // FEATURE_2610_24 / D42: a LotteON listing edits only the three lotteon.* keys.
+          <LotteonChannelShippingModal
             listingId={listing.id}
             accountId={accountId}
             channelLabel={channelLabel}

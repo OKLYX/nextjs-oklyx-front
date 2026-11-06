@@ -22,8 +22,9 @@ import { platformName } from '@/config/platforms';
  * Coupang row: 「총 수량 안 보냄」 + [기억 지우기] when that Coupang category remembers to leave 총 수량 out
  * (FEATURE_2610_34 / D7 · D19 — confirmed through `ConfirmDialog` first).
  *
- * ⚠️ Lookup platforms = Coupang, 11st and ESM (11st browses the imported 11st list — FEATURE_2610_10 / D21 ③ · ESM
- *    the imported ESM list — FEATURE_2610_26 / D11 · D12).
+ * ⚠️ Lookup platforms = Coupang, 11st, ESM and LotteON (11st browses the imported 11st list — FEATURE_2610_10 / D21 ③
+ *    · ESM the imported ESM list — FEATURE_2610_26 / D11 · D12 · LotteON the imported LotteON standard categories —
+ *    FEATURE_2610_24 / D9).
  *    Naver is a backend seam only (later) — no [조회 매핑] for it.
  */
 interface CategoryMappingModalProps {
@@ -36,12 +37,13 @@ interface CategoryMappingModalProps {
   onClose: () => void;
 }
 
-// Platforms the lookup picker can open for (Coupang, 11st, ESM — FEATURE_2610_26 / D11). Naver is a backend seam
-// only → later.
-const LOOKUP_PLATFORMS: { platform: 'COUPANG' | 'ELEVENST' | 'ESM'; label: string }[] = [
+// Platforms the lookup picker can open for (Coupang, 11st, ESM — FEATURE_2610_26 / D11, LotteON — FEATURE_2610_24 /
+// D9). Naver is a backend seam only → later.
+const LOOKUP_PLATFORMS: { platform: 'COUPANG' | 'ELEVENST' | 'ESM' | 'LOTTEON'; label: string }[] = [
   { platform: 'COUPANG', label: platformName('COUPANG') },
   { platform: 'ELEVENST', label: platformName('ELEVENST') },
   { platform: 'ESM', label: platformName('ESM') },
+  { platform: 'LOTTEON', label: platformName('LOTTEON') },
 ];
 
 export function CategoryMappingModal({
@@ -55,7 +57,9 @@ export function CategoryMappingModal({
 }: CategoryMappingModalProps) {
   const [error, setError] = useState('');
   const [busyPlatform, setBusyPlatform] = useState<string | null>(null);
-  const [pickerPlatform, setPickerPlatform] = useState<'COUPANG' | 'NAVER' | 'ELEVENST' | 'ESM' | null>(null);
+  const [pickerPlatform, setPickerPlatform] = useState<'COUPANG' | 'NAVER' | 'ELEVENST' | 'ESM' | 'LOTTEON' | null>(
+    null,
+  );
   // FEATURE_2610_34 / D19: the Coupang code whose memory the confirm dialog is about to clear.
   const [clearCode, setClearCode] = useState<string | null>(null);
 

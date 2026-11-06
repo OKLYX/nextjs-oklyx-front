@@ -16,6 +16,12 @@ import {
   type ElevenstShippingMap,
 } from '@/domain/entities/ElevenstShipping';
 import { ESM_KEYS, ESM_LABELS, type EsmChoice, type EsmShippingMap } from '@/domain/entities/EsmShipping';
+import {
+  LOTTEON_KEYS,
+  LOTTEON_LABELS,
+  type LotteonChoice,
+  type LotteonShippingMap,
+} from '@/domain/entities/LotteonShipping';
 import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 import {
   DELIVERY_CHARGE_TYPES,
@@ -28,7 +34,7 @@ import { EMPTY_FORM, toForm } from '@/domain/entities/CoupangShipping';
 
 /** What the sales channel info and edit modals load for the 「배송」 tab (FEATURE_2610_16 / D22 · D28). */
 export interface ChannelShippingData {
-  /** Coupang channel default as the edit form shape (`EMPTY_FORM` on an 11st or ESM channel). */
+  /** Coupang channel default as the edit form shape (`EMPTY_FORM` on an 11st, ESM or LotteON channel). */
   coupang: ShippingConfigRequest;
   /** 11st channel default settings (`{}` on any other channel). */
   elevenst: ElevenstShippingMap;
@@ -38,13 +44,18 @@ export interface ChannelShippingData {
   esmDispatches: EsmChoice[];
   esmCompanies: EsmChoice[];
   esmBundles: EsmChoice[];
+  /** FEATURE_2610_24 / D42: LotteON channel layer settings (`{}` on any other channel). */
+  lotteon: LotteonShippingMap;
+  /** FEATURE_2610_24 / D43: LotteON shipping fee policies (`[]` on any other channel). */
+  lotteonPolicies: LotteonChoice[];
   outbound: OutboundPlace[];
   returns: ReturnCenter[];
 }
 
 /**
  * Loads the channel's stored shipping default (the one of its platform) and its outbound / return lists in
- * parallel — on an ESM channel also its dispatch policies, couriers and the stored place's bundle-fee policies.
+ * parallel — on an ESM channel also its dispatch policies, couriers and the stored place's bundle-fee policies, on a
+ * LotteON channel also its shipping fee policies.
  * Throws when the stored default cannot be read (FEATURE_2610_16 / D22 · D28); a failed list degrades to an empty
  * list.
  */
@@ -54,25 +65,44 @@ export async function loadChannelShipping(
 ): Promise<ChannelShippingData> {
   const isElevenst = account.platform === 'ELEVENST';
   const isEsm = account.platform === 'ESM';
-  const [coupang, elevenst, esm, esmDispatches, esmCompanies, outbound, returns] = await Promise.all([
-    isElevenst || isEsm ? Promise.resolve(EMPTY_FORM) : useCase.getConfig(account.id).then(toForm),
-    isElevenst
-      ? useCase.getElevenstConfig(account.id).then((config) => config.settings ?? {})
-      : Promise.resolve<ElevenstShippingMap>({}),
-    isEsm
-      ? useCase.getEsmConfig(account.id).then((config) => config.settings ?? {})
-      : Promise.resolve<EsmShippingMap>({}),
-    isEsm ? useCase.listEsmDispatchPolicies(account.id).catch(() => [] as EsmChoice[]) : Promise.resolve([]),
-    isEsm ? useCase.listEsmDeliveryCompanies(account.id).catch(() => [] as EsmChoice[]) : Promise.resolve([]),
-    useCase.listOutbound(account.id).catch(() => [] as OutboundPlace[]),
-    useCase.listReturn(account.id).catch(() => [] as ReturnCenter[]),
-  ]);
+  const isLotteon = account.platform === 'LOTTEON';
+  const [coupang, elevenst, esm, esmDispatches, esmCompanies, lotteon, lotteonPolicies, outbound, returns] =
+    await Promise.all([
+      isElevenst || isEsm || isLotteon ? Promise.resolve(EMPTY_FORM) : useCase.getConfig(account.id).then(toForm),
+      isElevenst
+        ? useCase.getElevenstConfig(account.id).then((config) => config.settings ?? {})
+        : Promise.resolve<ElevenstShippingMap>({}),
+      isEsm
+        ? useCase.getEsmConfig(account.id).then((config) => config.settings ?? {})
+        : Promise.resolve<EsmShippingMap>({}),
+      isEsm ? useCase.listEsmDispatchPolicies(account.id).catch(() => [] as EsmChoice[]) : Promise.resolve([]),
+      isEsm ? useCase.listEsmDeliveryCompanies(account.id).catch(() => [] as EsmChoice[]) : Promise.resolve([]),
+      isLotteon
+        ? useCase.getLotteonConfig(account.id).then((config) => config.settings ?? {})
+        : Promise.resolve<LotteonShippingMap>({}),
+      isLotteon
+        ? useCase.listLotteonFeePolicies(account.id).catch(() => [] as LotteonChoice[])
+        : Promise.resolve<LotteonChoice[]>([]),
+      useCase.listOutbound(account.id).catch(() => [] as OutboundPlace[]),
+      useCase.listReturn(account.id).catch(() => [] as ReturnCenter[]),
+    ]);
   const placeNo = esm[ESM_KEYS.placeNo];
   const esmBundles =
     isEsm && placeNo
       ? await useCase.listEsmBundlePolicies(account.id, placeNo).catch(() => [] as EsmChoice[])
       : [];
-  return { coupang, elevenst, esm, esmDispatches, esmCompanies, esmBundles, outbound, returns };
+  return {
+    coupang,
+    elevenst,
+    esm,
+    esmDispatches,
+    esmCompanies,
+    esmBundles,
+    lotteon,
+    lotteonPolicies,
+    outbound,
+    returns,
+  };
 }
 
 interface SummaryRow {
@@ -106,7 +136,8 @@ interface ChannelShippingSummaryProps {
 
 /**
  * Read-only 「배송」 tab of the sales channel info modal (FEATURE_2610_16 / D21 · D27): the fields the edit tab
- * shows (`ShippingOverrideFields` / `ElevenstShippingFields` / `EsmShippingFields`, level="account"), in the same
+ * shows (`ShippingOverrideFields` / `ElevenstShippingFields` / `EsmShippingFields` / `LotteonShippingFields`,
+ * level="account"), in the same
  * order with the same labels, as 「label / value」 rows. A choice shows its option label, an amount `1,000원`, a blank
  * value `-`.
  */
@@ -122,7 +153,13 @@ export function ChannelShippingSummary({ platform, data }: ChannelShippingSummar
   const rows: SummaryRow[] = [];
   const add = (label: string, value: string) => rows.push({ label, lines: [value] });
 
-  if (platform === 'ESM') {
+  if (platform === 'LOTTEON') {
+    // FEATURE_2610_24 / D42: the three LotteON values in the edit tab's order; a picked value shows its list name.
+    const map = data.lotteon;
+    add(LOTTEON_LABELS[LOTTEON_KEYS.owhpNo], placeName(data.outbound, map[LOTTEON_KEYS.owhpNo]));
+    add(LOTTEON_LABELS[LOTTEON_KEYS.rtrpNo], placeName(data.returns, map[LOTTEON_KEYS.rtrpNo]));
+    add(LOTTEON_LABELS[LOTTEON_KEYS.dvCstPolNo], placeName(data.lotteonPolicies, map[LOTTEON_KEYS.dvCstPolNo]));
+  } else if (platform === 'ESM') {
     // FEATURE_2610_26 / D36: the six ESM values in the edit tab's order; a picked value shows its list name.
     const map = data.esm;
     add(ESM_LABELS[ESM_KEYS.placeNo], placeName(data.outbound, map[ESM_KEYS.placeNo]));

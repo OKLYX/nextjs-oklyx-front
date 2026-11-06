@@ -26,6 +26,7 @@ import type {
 import type { OptionCheckSuffixRequest } from '@/domain/entities/OptionCheckSuffix';
 import type { ElevenstNoticePreviewRequest, ElevenstNotification } from '@/domain/entities/ElevenstNotice';
 import type { EsmNoticePreviewRequest, EsmNotification } from '@/domain/entities/EsmNotice';
+import type { LotteonNoticePreviewRequest, LotteonNotification } from '@/domain/entities/LotteonNotice';
 
 export interface MasterProductRepository {
   list(params: MasterProductListParams): Promise<MasterProductPageResponse>;
@@ -66,6 +67,8 @@ export interface MasterProductRepository {
   previewElevenstNotice(data: ElevenstNoticePreviewRequest): Promise<ElevenstNotification>;
   // FEATURE_2610_26 / D56: the Gmarket · Auction view of the notice values on screen (pure conversion, nothing saved).
   previewEsmNotice(data: EsmNoticePreviewRequest): Promise<EsmNotification>;
+  // FEATURE_2610_24 / D56: the LotteON view of the notice values on screen (pure conversion, nothing saved).
+  previewLotteonNotice(data: LotteonNoticePreviewRequest): Promise<LotteonNotification>;
   updateTags(id: number, data: TagsUpdateRequest): Promise<MasterProductResponse>;
   updateRegistrationNameSuffix(id: number, data: OptionCheckSuffixRequest): Promise<void>;
   updateShippingOverride(id: number, data: ShippingOverrideUpdateRequest): Promise<MasterProductResponse>;

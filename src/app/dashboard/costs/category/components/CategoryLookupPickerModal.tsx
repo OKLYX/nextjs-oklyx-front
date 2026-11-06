@@ -17,12 +17,12 @@ import { platformDisplayName } from '@/config/platforms';
  * The tree is the shared `CategoryTreeColumns` (same left→right columns as the standard category tree), keyed by
  * the marketplace code the lookup returns. The search box reads the imported list on the server (no account).
  * A lookup failure (no active account / 500) shows inside the tree column or under the search box.
- * 11st (ELEVENST) and ESM have no product-name prediction (FEATURE_2610_10 / D21 ③ · FEATURE_2610_26 / D12) — their
- * predict tab is not rendered.
+ * 11st (ELEVENST), ESM and LotteON have no product-name prediction (FEATURE_2610_10 / D21 ③ · FEATURE_2610_26 / D12 ·
+ * FEATURE_2610_24 / D9) — their predict tab is not rendered.
  */
 interface CategoryLookupPickerModalProps {
   open: boolean;
-  platform: 'COUPANG' | 'NAVER' | 'ELEVENST' | 'ESM';
+  platform: 'COUPANG' | 'NAVER' | 'ELEVENST' | 'ESM' | 'LOTTEON';
   lookupUseCase: CategoryLookupUseCase;
   onSelect: (sel: { platformCategoryId: string; name: string; namePath: string }) => void;
   onClose: () => void;
@@ -131,7 +131,7 @@ export function CategoryLookupPickerModal({
           >
             카테고리 찾기
           </button>
-          {platform !== 'ELEVENST' && platform !== 'ESM' && (
+          {platform !== 'ELEVENST' && platform !== 'ESM' && platform !== 'LOTTEON' && (
             <button
               onClick={() => setTab('predict')}
               className={`flex-1 px-4 py-2 text-sm font-medium ${

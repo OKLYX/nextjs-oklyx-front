@@ -59,9 +59,9 @@ interface EditChannelModalProps {
  * list, or the master detail [배송 설정하기] lookup, FEATURE_2610_16 / D29) and saves every tab
  * with one [저장] (FEATURE_2610_16 / D22): channel PATCH → platform defaults PUT → fixed-cost PUT → shipping
  * PUT (only when changed). The body mounts on open, so the fixed-cost links and the shipping settings are
- * loaded fresh every time. When an 11st or ESM shipping save could not re-price some listings, a one-button notice
- * (「배송 설정 저장」) comes first and closing it closes this modal (D22 · FEATURE_2610_13 / D124 · FEATURE_2610_26 /
- * D65).
+ * loaded fresh every time. When an 11st, ESM or LotteON shipping save could not re-price some listings, a one-button
+ * notice (「배송 설정 저장」) comes first and closing it closes this modal (D22 · FEATURE_2610_13 / D124 ·
+ * FEATURE_2610_26 / D65 · FEATURE_2610_24 / D66).
  */
 export function EditChannelModal(props: EditChannelModalProps) {
   if (!props.isOpen || !props.channel) {
@@ -182,12 +182,13 @@ function EditChannelModalContent({
         detailTemplateId: data.detailTemplateId ? Number(data.detailTemplateId) : undefined,
       });
       // The platform defaults join the same sequential save (FEATURE_2610_16 / D3 · D7): Coupang sends the
-      // suffix, 11st sends the two notices and never the suffix, ESM sends nothing (FEATURE_2610_26 / D57). On
+      // suffix, 11st sends the two notices and never the suffix, ESM and LotteON send nothing (FEATURE_2610_26 / D57 ·
+      // FEATURE_2610_24 / D55). On
       // partial failure (an earlier step saved, this one failed) this throws → ChannelEditForm shows a banner and
       // the modal stays open; retry re-runs every step in the same order (each PUT is a replace).
       if (channel.platform === 'ELEVENST') {
         await useCase.updateElevenstNotices(channel.id, notices);
-      } else if (channel.platform !== 'ESM') {
+      } else if (channel.platform !== 'ESM' && channel.platform !== 'LOTTEON') {
         await useCase.updateRegistrationNameSuffix(channel.id, {
           enabled: suffixConfig.optionCheckSuffixEnabled,
           suffix: suffixConfig.optionCheckSuffix,
@@ -198,14 +199,17 @@ function EditChannelModalContent({
       if (fixedCostItems !== null) {
         await fixedCostUseCase.setForAccount(channel.id, fixedCostItems);
       }
-      // FEATURE_2610_16 / D22: shipping goes last and only when the 「배송」 tab changed. An 11st or ESM save
-      // re-prices the listings (FEATURE_2610_26 / D65).
+      // FEATURE_2610_16 / D22: shipping goes last and only when the 「배송」 tab changed. An 11st, ESM or LotteON
+      // save re-prices the listings (FEATURE_2610_26 / D65 · FEATURE_2610_24 / D66).
       let recalcFailedCount = 0;
       if (shippingChange?.kind === 'elevenst') {
         const saved = await shippingUseCase.upsertElevenstConfig(channel.id, shippingChange.settings);
         recalcFailedCount = saved.priceRecalcFailedCount ?? 0;
       } else if (shippingChange?.kind === 'esm') {
         const saved = await shippingUseCase.upsertEsmConfig(channel.id, shippingChange.settings);
+        recalcFailedCount = saved.priceRecalcFailedCount ?? 0;
+      } else if (shippingChange?.kind === 'lotteon') {
+        const saved = await shippingUseCase.upsertLotteonConfig(channel.id, shippingChange.settings);
         recalcFailedCount = saved.priceRecalcFailedCount ?? 0;
       } else if (shippingChange?.kind === 'coupang') {
         await shippingUseCase.upsertConfig(channel.id, shippingChange.config);

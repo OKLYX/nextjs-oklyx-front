@@ -25,6 +25,7 @@ import {
 import { isOptionField, isOptionNotice } from './optionMetaFields';
 import { ELEVENST_NOTICE_PREFIX } from '@/domain/entities/ElevenstNotice';
 import { ESM_NOTICE_PREFIX } from '@/domain/entities/EsmNotice';
+import { LOTTEON_NOTICE_PREFIX } from '@/domain/entities/LotteonNotice';
 
 /**
  * True when any MASTER-owned required field is still missing. Excludes the option-owned
@@ -103,7 +104,8 @@ export function noticesToSubmit(
  * entered under an old group or an old item name stays hidden on screen and is dropped on every market upload
  * (2026-10-19, master 1705). A schema without groups keeps every option-owned notice.
  * With no schema yet (`notices` empty) there is nothing to judge by, so the map is kept as is — nothing is removed.
- * `ELEVENST:*` and `ESM:*` values are outside the Coupang schema and are always kept (FEATURE_2610_26 / D17).
+ * `ELEVENST:*`, `ESM:*` and `LOTTEON:*` values are outside the Coupang schema and are always kept (FEATURE_2610_26 /
+ * D17 · FEATURE_2610_24 / D68).
  */
 export function optionNoticesToSubmit(
   notices: CategoryNotice[],
@@ -118,7 +120,14 @@ export function optionNoticesToSubmit(
   );
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(optNoticeValues)) {
-    if (allowed.has(k) || k.startsWith(ELEVENST_NOTICE_PREFIX) || k.startsWith(ESM_NOTICE_PREFIX)) out[k] = v;
+    if (
+      allowed.has(k) ||
+      k.startsWith(ELEVENST_NOTICE_PREFIX) ||
+      k.startsWith(ESM_NOTICE_PREFIX) ||
+      k.startsWith(LOTTEON_NOTICE_PREFIX)
+    ) {
+      out[k] = v;
+    }
   }
   return out;
 }
