@@ -3,6 +3,7 @@ import type { StockLotRepository } from '@/domain/repositories/StockLotRepositor
 import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
 import type {
   IntakeRequest,
+  PurchasePriceRequest,
   ReceiptlessAssignRequest,
   SellerChangeRequest,
   SettlementRequest,
@@ -41,6 +42,17 @@ export class StockLotRepositoryImpl implements StockLotRepository {
 
   async changeSeller(request: SellerChangeRequest): Promise<void> {
     await axiosInstance.post('/api/admin/stock/daily/change-seller', request);
+  }
+
+  async retypePrices(movedOn: string, photo: File | null, request: PurchasePriceRequest): Promise<void> {
+    const formData = new FormData();
+    if (photo) formData.append('photo', photo);
+    // The server reads this part as JSON (@RequestPart) — it needs the application/json type.
+    formData.append('request', new Blob([JSON.stringify(request)], { type: 'application/json' }));
+    await axiosInstance.post('/api/admin/stock/daily/purchase-price', formData, {
+      params: { movedOn },
+      headers: { 'Content-Type': undefined },
+    });
   }
 
   async debtPairs(): Promise<SellerDebtPair[]> {
