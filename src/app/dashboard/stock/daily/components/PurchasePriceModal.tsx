@@ -44,7 +44,7 @@ interface LineState {
 
 interface PurchasePriceModalProps {
   isOpen: boolean;
-  /** The screen day — the server retypes that day's records only. */
+  /** The screen day — the purchase day of the new receipt a photo creates (D15); the server refuses a photo for lines bought on another day. */
   date: string;
   /** The checked targets in table order — memoized by the caller (the fields reset whenever this array changes). */
   targets: PurchasePriceTarget[];
