@@ -43,7 +43,7 @@ import { StockProductThumb } from '@/app/dashboard/stock/components/StockProduct
  *
  * - One day (today first): every ledger row moved that day, record order, quantity + purchase-price amount
  *   (null = 「미기입」). No selling price, no totals (D122 · D123 ③).
- * - Undecided intake rows show their owners 「○○ 4」 and 「영수증 미등록 N개 남음」 (D130 · D121 ⑤); outbound rows show
+ * - Undecided intake rows show their owners 「○○」 and 「영수증 미등록 N개 남음」 (D130 · D121 ⑤); outbound rows show
  *   the order seller and 「{seller} 재고 사용」 · 「영수증 미등록 재고 사용」 (D124 · D128).
  * - The top line 「영수증 미등록 N건」 (D147) with [영수증 올리기] opens the assignment popup for that day (D118 · D121);
  *   [영수증 없이 판매자 정하기] next to it opens the same popup without a photo (FEATURE_2611_01 D2 · D4).
