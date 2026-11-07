@@ -1,4 +1,5 @@
 import type { StockBalance, StockMovementType, StockReason } from './StockEntity';
+import type { ReceiptSummary } from './PurchaseReceiptEntity';
 
 /**
  * Lots, the daily in/out view and the seller debt screen (FEATURE_2610_19).
@@ -51,6 +52,21 @@ export interface StockDailyRow {
   receiptId: number | null;
   /** Undecided intake only: every assigned share, each a line of its own (D8). */
   shares: StockDailyShare[];
+  /**
+   * The unit prices behind `amount`, one per price with its count, first appearance order (FEATURE_2611_17 D1 · D16);
+   * null when `amount` is null (「미기입」).
+   */
+  unitPrices: UnitCount[] | null;
+  /** A part of `amount` has a unit price filled from the registered price — show 「미기입」 next to it (D22). */
+  priceFromBase: boolean;
+  /** An opening-stock row the row popup may price (FEATURE_2611_17 D5 · D17). */
+  openingPriceEditable: boolean;
+}
+
+/** One unit price of a row and how many pieces carry it (FEATURE_2611_17 D16). */
+export interface UnitCount {
+  unitPrice: number;
+  quantity: number;
 }
 
 /** Which receipt a purchase is a line of (FEATURE_2611_16 D8 · D13 · D18). */
@@ -68,6 +84,10 @@ export interface StockDailyShare {
   receiptId: number | null;
   /** A 「영수증 없음」 share — a 「판매자 바꾸기」 target (FEATURE_2611_01 D15). */
   sellerChangeable: boolean;
+  /** The share's unit price; null = 「미기입」 (FEATURE_2611_17 D2). */
+  unitPrice: number | null;
+  /** The unit price was filled from the registered price — show 「미기입」 (D22). */
+  priceFromBase: boolean;
 }
 
 /** The share-line words (D8): 「영수증 없음」 · 「영수증 나중에」 · 「영수증」. */
@@ -82,9 +102,178 @@ export function formatShareAmount(amount: number | null): string {
   return amount === null ? '미기입' : `${Math.round(amount).toLocaleString('ko-KR')}원`;
 }
 
-/** The share line of the daily table (D8): 「└ ○○ 3개 · 영수증 없음 · 12,000원」. */
+/**
+ * The share line of the daily table (D8 · FEATURE_2611_17 D2 · D22): 「└ ○○ 3개 · 영수증 없음 · 12,000원 · 단가 4,000원」,
+ * then 「 · 미기입」 when the unit price was filled from the registered price.
+ */
 export function shareLineText(share: StockDailyShare): string {
-  return `└ ${share.sellerName} ${share.quantity}개 · ${RECEIPT_KIND_LABELS[share.receiptKind]} · ${formatShareAmount(share.amount)}`;
+  const base = `└ ${share.sellerName} ${share.quantity}개 · ${RECEIPT_KIND_LABELS[share.receiptKind]} · ${formatShareAmount(share.amount)} · 단가 ${formatShareAmount(share.unitPrice)}`;
+  return share.priceFromBase ? `${base} · ${PRICE_FROM_BASE_LABEL}` : base;
+}
+
+/** The mark next to a unit price and amount filled from the registered price (FEATURE_2611_17 D22). */
+export const PRICE_FROM_BASE_LABEL = '미기입';
+
+/**
+ * The 「단가」 cell (FEATURE_2611_17 D1 · D16): one price 「4,000원」 · several 「4,000원×3 · 5,000원×2」 · null 「미기입」.
+ * Each price is written as a share amount (rounded won with thousands separators).
+ */
+export function unitPriceText(unitPrices: UnitCount[] | null): string {
+  if (unitPrices === null || unitPrices.length === 0) return '미기입';
+  if (unitPrices.length === 1) return formatShareAmount(unitPrices[0].unitPrice);
+  return unitPrices.map((u) => `${formatShareAmount(u.unitPrice)}×${u.quantity}`).join(' · ');
+}
+
+/** The column title of the outbound tags (FEATURE_2611_17 D3). */
+export const OTHER_STOCK_COLUMN_LABEL = '타출처 재고 사용';
+
+/** The chips of the daily table (FEATURE_2611_17 D4), in screen order. */
+export type DailyChip = 'ALL' | 'IN' | 'OUT';
+export const DAILY_CHIPS: { key: DailyChip; label: string }[] = [
+  { key: 'ALL', label: '전체' },
+  { key: 'IN', label: '입고' },
+  { key: 'OUT', label: '출고' },
+];
+
+/** The two check boxes next to the chips (FEATURE_2611_17 D24 · D29). */
+export const UNDECIDED_BOX_LABEL = '판매자 미정 상품';
+export const RECEIPT_PENDING_BOX_LABEL = '영수증 미등록 상품';
+
+/** The table message when rows exist but none passes the chip and boxes (FEATURE_2611_17 D28). */
+export const NO_MATCH_MESSAGE = '조건에 맞는 줄이 없습니다.';
+
+/** One row of the table with the shares shown under it (FEATURE_2611_17 D11 · D30). */
+export interface VisibleDailyRow {
+  row: StockDailyRow;
+  shares: StockDailyShare[];
+}
+
+/** D29: a purchase with a decided seller and no receipt with its photo — 「영수증 없음」 or 「영수증 나중에」. */
+const isReceiptPending = (kind: ReceiptKind | null) => kind === 'NO_RECEIPT' || kind === 'RECEIPT_LATER';
+
+/**
+ * The rows the table shows (FEATURE_2611_17 D4 · D11 · D24 · D28 · D29 · D30), in record order:
+ * - chip 「입고」 = movementType STOCK_IN · 「출고」 = STOCK_OUT · 「전체」 = every row; a share follows its row.
+ * - no box on → every row with all its shares.
+ * - 「판매자 미정 상품」 on → an undecided intake row with a quantity left, with all its shares.
+ * - 「영수증 미등록 상품」 on → a decided purchase row (`recordId`) whose receipt kind is 「영수증 없음」 or 「영수증 나중에」;
+ *   and an undecided row with such shares, showing only those shares (all of them when the row is in by the first box).
+ * - both on → a row in by either box (D30).
+ */
+export function visibleDailyRows(
+  rows: StockDailyRow[],
+  chip: DailyChip,
+  undecidedBox: boolean,
+  receiptBox: boolean
+): VisibleDailyRow[] {
+  const result: VisibleDailyRow[] = [];
+  for (const row of rows) {
+    if (chip === 'IN' && row.movementType !== 'STOCK_IN') continue;
+    if (chip === 'OUT' && row.movementType !== 'STOCK_OUT') continue;
+    if (!undecidedBox && !receiptBox) {
+      result.push({ row, shares: row.shares });
+      continue;
+    }
+    if (undecidedBox && (row.undecidedLeft ?? 0) > 0) {
+      result.push({ row, shares: row.shares });
+      continue;
+    }
+    if (!receiptBox) continue;
+    const shares = row.shares.filter((share) => isReceiptPending(share.receiptKind));
+    if (shares.length > 0) {
+      result.push({ row, shares });
+    } else if (row.recordId !== null && isReceiptPending(row.receiptKind)) {
+      result.push({ row, shares: [] });
+    }
+  }
+  return result;
+}
+
+/**
+ * What the row popup can change for one row or share (FEATURE_2611_17 D5 · D10 · D12 · D17 ~ D20 · D24):
+ * - `sellerEditable` = a 「판매자 바꾸기」 target (row `sellerChangeable` · share `sellerChangeable`).
+ * - `price` = PURCHASE (a 「매입가 넣기」 target — total or unit price + 「상품 기준가에 반영」) · OPENING (an
+ *   opening-stock row — total or unit price only, D18) · null (no price field).
+ * - `receipt` = PICK (「영수증 없음」 purchase — a receipt of that day or a new photo, D6 · D23) · LATER_PHOTO
+ *   (「영수증 나중에」 — a photo for that receipt, D19) · FIXED (a receipt with its photo — shown as text, D19) · null
+ *   (not a purchase — no receipt field, D20).
+ */
+export interface RowEditTarget {
+  movementId: number | null;
+  shareRecordId: number | null;
+  productName: string;
+  quantity: number;
+  sellerId: number;
+  sellerName: string;
+  /** 「지금 금액」; null = 「미기입」. */
+  amount: number | null;
+  sellerEditable: boolean;
+  price: 'PURCHASE' | 'OPENING' | null;
+  receipt: 'PICK' | 'LATER_PHOTO' | 'FIXED' | null;
+  receiptId: number | null;
+}
+
+const RECEIPT_FIELD: Record<ReceiptKind, 'PICK' | 'LATER_PHOTO' | 'FIXED'> = {
+  NO_RECEIPT: 'PICK',
+  RECEIPT_LATER: 'LATER_PHOTO',
+  RECEIPT: 'FIXED',
+};
+
+/** The popup target of a row, or null when the row opens nothing (D12 · D24 — an undecided row never opens). */
+export function rowEditTarget(row: StockDailyRow): RowEditTarget | null {
+  if (row.undecidedLeft !== null || row.sellerId === null || row.sellerName === null) return null;
+  const price = row.recordId !== null ? 'PURCHASE' : row.openingPriceEditable ? 'OPENING' : null;
+  if (!row.sellerChangeable && price === null) return null;
+  return {
+    movementId: row.movementId,
+    shareRecordId: null,
+    productName: row.productName,
+    quantity: row.quantity,
+    sellerId: row.sellerId,
+    sellerName: row.sellerName,
+    amount: row.amount,
+    sellerEditable: row.sellerChangeable,
+    price,
+    receipt: row.recordId !== null && row.receiptKind !== null ? RECEIPT_FIELD[row.receiptKind] : null,
+    receiptId: row.receiptId,
+  };
+}
+
+/** The popup target of a share of `row` (D10 — every share is a 「매입가 넣기」 target). */
+export function shareEditTarget(row: StockDailyRow, share: StockDailyShare): RowEditTarget {
+  return {
+    movementId: null,
+    shareRecordId: share.recordId,
+    productName: row.productName,
+    quantity: share.quantity,
+    sellerId: share.sellerId,
+    sellerName: share.sellerName,
+    amount: share.amount,
+    sellerEditable: share.sellerChangeable,
+    price: 'PURCHASE',
+    receipt: RECEIPT_FIELD[share.receiptKind],
+    receiptId: share.receiptId,
+  };
+}
+
+/**
+ * The receipts the popup offers (FEATURE_2611_17 D23): that day's receipts with their photo — the given seller's
+ * first, then the other sellers', each group in the order received.
+ */
+export function dayReceiptChoices(receipts: ReceiptSummary[], sellerId: number): ReceiptSummary[] {
+  const withPhoto = receipts.filter((r) => r.hasPhoto);
+  return [...withPhoto.filter((r) => r.payerSellerId === sellerId), ...withPhoto.filter((r) => r.payerSellerId !== sellerId)];
+}
+
+/** One receipt choice (D23): 「{결제 판매자} · {첫 상품} 외 N개 · {카드 별칭 | 카드 없음}」. */
+export function receiptChoiceLabel(receipt: ReceiptSummary): string {
+  const more = receipt.productCount > 1 ? ` 외 ${receipt.productCount - 1}개` : '';
+  return `${receipt.payerSellerName} · ${receipt.firstProductName ?? '상품 없음'}${more} · ${receipt.cardAlias ?? '카드 없음'}`;
+}
+
+/** The notice before a receipt of another payer is picked (D23). */
+export function sellerSwitchMessage(fromSeller: string, toSeller: string): string {
+  return `판매자가 ${fromSeller} → ${toSeller} 로 바뀝니다.`;
 }
 
 /** One checked 「매입가 넣기」 target — a decided row's purchase record or a share (FEATURE_2611_16 D7). */

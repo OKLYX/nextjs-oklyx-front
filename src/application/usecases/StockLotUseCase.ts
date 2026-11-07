@@ -1,6 +1,7 @@
 import type { StockLotRepository } from '@/domain/repositories/StockLotRepository';
 import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
 import type {
+  DailyRowEditRequest,
   IntakeRequest,
   PurchasePriceRequest,
   ReceiptlessAssignRequest,
@@ -42,6 +43,10 @@ export class StockLotUseCase {
 
   retypePrices(movedOn: string, photo: File | null, request: PurchasePriceRequest): Promise<void> {
     return this.repository.retypePrices(movedOn, photo, request);
+  }
+
+  editRow(movedOn: string, photo: File | null, request: DailyRowEditRequest): Promise<void> {
+    return this.repository.editRow(movedOn, photo, request);
   }
 
   debtPairs(): Promise<SellerDebtPair[]> {
