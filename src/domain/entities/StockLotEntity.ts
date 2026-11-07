@@ -30,7 +30,7 @@ export interface StockDailyRow {
   sellerId: number | null;
   /** Outbound = the order seller. null on an undecided intake row (its owners are in `owners`). */
   sellerName: string | null;
-  /** Undecided intake only: 「{seller} {qty}」. */
+  /** Undecided intake only: 「{seller}」 — the name only, each seller once (FEATURE_2611_18 D1 · D3). */
   owners: string[];
   /** Undecided intake only: what no receipt took yet. */
   undecidedLeft: number | null;
