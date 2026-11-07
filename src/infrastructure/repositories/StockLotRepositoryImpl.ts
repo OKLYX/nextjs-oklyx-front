@@ -2,6 +2,7 @@ import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { StockLotRepository } from '@/domain/repositories/StockLotRepository';
 import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
 import type {
+  DailyRowEditRequest,
   IntakeRequest,
   PurchasePriceRequest,
   ReceiptlessAssignRequest,
@@ -50,6 +51,17 @@ export class StockLotRepositoryImpl implements StockLotRepository {
     // The server reads this part as JSON (@RequestPart) — it needs the application/json type.
     formData.append('request', new Blob([JSON.stringify(request)], { type: 'application/json' }));
     await axiosInstance.post('/api/admin/stock/daily/purchase-price', formData, {
+      params: { movedOn },
+      headers: { 'Content-Type': undefined },
+    });
+  }
+
+  async editRow(movedOn: string, photo: File | null, request: DailyRowEditRequest): Promise<void> {
+    const formData = new FormData();
+    if (photo) formData.append('photo', photo);
+    // The server reads this part as JSON (@RequestPart) — it needs the application/json type.
+    formData.append('request', new Blob([JSON.stringify(request)], { type: 'application/json' }));
+    await axiosInstance.post('/api/admin/stock/daily/row-edit', formData, {
       params: { movedOn },
       headers: { 'Content-Type': undefined },
     });
