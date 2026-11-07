@@ -1,8 +1,8 @@
 import type { ReceiptLineRequest } from './PurchaseReceiptDTOs';
 
 /**
- * Request bodies of FEATURE_2610_19 (intake work · cash settlement), FEATURE_2611_01 (seller without a receipt) and
- * FEATURE_2611_16 (「매입가 넣기」).
+ * Request bodies of FEATURE_2610_19 (intake work · cash settlement), FEATURE_2611_01 (seller without a receipt),
+ * FEATURE_2611_16 (「매입가 넣기」) and FEATURE_2611_17 (the daily row popup).
  */
 
 /** 「입고 작업」 reasons (FEATURE_2611_01 D1): 「매입」 · 「기초재고」. */
@@ -42,6 +42,23 @@ export interface SellerChangeRequest {
 export interface PurchasePriceRequest {
   cardId?: number;
   lines: { recordId: number; totalAmount?: number; unitPrice?: number; reflectToBasePrice: boolean }[];
+}
+
+/**
+ * The daily row popup's one save (FEATURE_2611_17 D5): the JSON part next to the optional photo. Exactly one of
+ * movementId / shareRecordId. sellerId omitted = the seller stays · totalAmount / unitPrice omitted = the price stays
+ * (send at most one) · reflectToBasePrice is read for a purchase only · receiptId = a receipt of that day to add the
+ * purchase to (D23) · cardId = the card of a new receipt from the photo (omitted = 「카드로 알 수 없음」).
+ */
+export interface DailyRowEditRequest {
+  movementId?: number;
+  shareRecordId?: number;
+  sellerId?: number;
+  totalAmount?: number;
+  unitPrice?: number;
+  reflectToBasePrice?: boolean;
+  receiptId?: number;
+  cardId?: number;
 }
 
 /** 「돈으로 정리」 (D90 · D99 ①). */

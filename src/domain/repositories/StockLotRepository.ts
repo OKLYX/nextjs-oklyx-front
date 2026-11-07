@@ -1,5 +1,6 @@
 import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
 import type {
+  DailyRowEditRequest,
   IntakeRequest,
   PurchasePriceRequest,
   ReceiptlessAssignRequest,
@@ -21,6 +22,8 @@ export interface StockLotRepository {
   changeSeller(request: SellerChangeRequest): Promise<void>;
   /** 「매입가 넣기」 of the day on the screen (FEATURE_2611_16 D2 · D7); photo null = amounts only. */
   retypePrices(movedOn: string, photo: File | null, request: PurchasePriceRequest): Promise<void>;
+  /** The row popup's one save of the day on the screen (FEATURE_2611_17 D5); photo null = none. */
+  editRow(movedOn: string, photo: File | null, request: DailyRowEditRequest): Promise<void>;
   debtPairs(): Promise<SellerDebtPair[]>;
   debtEntries(sellerAId: number, sellerBId: number): Promise<SellerDebtEntry[]>;
   settle(request: SettlementRequest): Promise<void>;

@@ -11,11 +11,23 @@ import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerReposi
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { STOCK_MOVEMENT_TYPE_LABELS, STOCK_REASON_LABELS } from '@/domain/entities/StockEntity';
 import {
+  DAILY_CHIPS,
+  NO_MATCH_MESSAGE,
+  OTHER_STOCK_COLUMN_LABEL,
+  PRICE_FROM_BASE_LABEL,
+  RECEIPT_PENDING_BOX_LABEL,
+  UNDECIDED_BOX_LABEL,
   UNDECIDED_SELLER_LABEL,
   formatWonOrUnknown,
+  rowEditTarget,
   rowPriceTarget,
+  shareEditTarget,
   sharePriceTarget,
   shareLineText,
+  unitPriceText,
+  visibleDailyRows,
+  type DailyChip,
+  type RowEditTarget,
   type StockDaily,
   type StockDailyRow,
 } from '@/domain/entities/StockLotEntity';
@@ -23,6 +35,7 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ReceiptAssignModal } from './ReceiptAssignModal';
 import { SellerChangeModal } from './SellerChangeModal';
 import { PurchasePriceModal } from './PurchasePriceModal';
+import { RowEditModal } from './RowEditModal';
 import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
 
 /**
@@ -40,7 +53,11 @@ import { StockProductThumb } from '@/app/dashboard/stock/components/StockProduct
  *   quantity · [판매자 바꾸기] (D7 · D15) is on when every checked row and share is seller-changeable · nothing
  *   checked → the receipt buttons open with every product of the day at 0, [판매자 바꾸기] is off.
  * - [매입가 넣기] (FEATURE_2611_16 D7 · D8) is on when every checked row and share is a purchase-price target; it opens
- *   the popup with those targets in table order. Each share line reads 「└ {seller} {N}개 · {kind} · {amount}」.
+ *   the popup with those targets in table order. Each share line reads `shareLineText` (FEATURE_2611_17 D2).
+ * - Chips 「전체」「입고」「출고」 and the boxes 「판매자 미정 상품」 · 「영수증 미등록 상품」 filter on the client through
+ *   `visibleDailyRows` (FEATURE_2611_17 D4 · D11 · D28 ~ D30); they survive a date change and clear the checks.
+ * - Clicking a row opens the row popup for `rowEditTarget(row)` (null = nothing opens, D24) and a share line for
+ *   `shareEditTarget`; the check cell only toggles its check (D7).
  */
 
 type AssignMode = 'RECEIPT' | 'WITHOUT_RECEIPT';
@@ -84,6 +101,10 @@ export function DailyContainer() {
   const [isChangeOpen, setIsChangeOpen] = useState(false);
   const [isPriceOpen, setIsPriceOpen] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [chip, setChip] = useState<DailyChip>('ALL');
+  const [undecidedBox, setUndecidedBox] = useState(false);
+  const [receiptBox, setReceiptBox] = useState(false);
+  const [editTarget, setEditTarget] = useState<RowEditTarget | null>(null);
 
   const load = useCallback(
     async (day: string) => {
@@ -116,6 +137,10 @@ export function DailyContainer() {
   }, [sellerUseCase]);
 
   const rows = daily?.rows ?? [];
+  const visible = useMemo(
+    () => visibleDailyRows(daily?.rows ?? [], chip, undecidedBox, receiptBox),
+    [daily, chip, undecidedBox, receiptBox]
+  );
 
   // D14: the popup gets the checked products only (every product when nothing is checked). Memoized — the popup
   // resets its fields whenever this array changes.
@@ -148,10 +173,16 @@ export function DailyContainer() {
       return next;
     });
 
-  // Header [전체 선택]: every checkable row and share on the day; a second click clears them.
-  const checkableKeys = rows.flatMap((row) => [
+  // FEATURE_2611_17 D4: changing a chip or a box clears the checks.
+  const changeFilter = (apply: () => void) => {
+    apply();
+    setChecked(new Set());
+  };
+
+  // Header [전체 선택]: every checkable row and share shown; a second click clears them.
+  const checkableKeys = visible.flatMap(({ row, shares }) => [
     ...((row.undecidedLeft ?? 0) > 0 || row.sellerChangeable || row.recordId !== null ? [rowKey(row)] : []),
-    ...row.shares.map((share) => shareKey(share.recordId)),
+    ...shares.map((share) => shareKey(share.recordId)),
   ]);
   const allChecked = checkableKeys.length > 0 && checkableKeys.every((key) => checked.has(key));
   const toggleAll = () => setChecked(allChecked ? new Set() : new Set(checkableKeys));
@@ -179,6 +210,7 @@ export function DailyContainer() {
     setAssignMode(null);
     setIsChangeOpen(false);
     setIsPriceOpen(false);
+    setEditTarget(null);
     await load(date);
   };
 
@@ -217,7 +249,49 @@ export function DailyContainer() {
         </div>
       </div>
 
-      <TableCard isLoading={isLoading} error={error} isEmpty={rows.length === 0} emptyMessage="그날 입출고가 없습니다.">
+      <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          {DAILY_CHIPS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => changeFilter(() => setChip(key))}
+              className={`px-4 py-2 text-sm font-medium rounded-full border transition-colors ${
+                chip === key
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={undecidedBox}
+            onChange={(e) => changeFilter(() => setUndecidedBox(e.target.checked))}
+            className="h-4 w-4 accent-blue-600"
+          />
+          {UNDECIDED_BOX_LABEL}
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={receiptBox}
+            onChange={(e) => changeFilter(() => setReceiptBox(e.target.checked))}
+            className="h-4 w-4 accent-blue-600"
+          />
+          {RECEIPT_PENDING_BOX_LABEL}
+        </label>
+      </div>
+
+      <TableCard
+        isLoading={isLoading}
+        error={error}
+        isEmpty={visible.length === 0}
+        emptyMessage={rows.length === 0 ? '그날 입출고가 없습니다.' : NO_MATCH_MESSAGE}
+      >
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
             <tr className="text-left text-gray-500">
@@ -237,54 +311,83 @@ export function DailyContainer() {
               <th className="px-4 py-2 text-right">개수</th>
               <th className="px-4 py-2">판매자</th>
               <th className="px-4 py-2">주문번호</th>
-              <th className="px-4 py-2">표시</th>
+              <th className="px-4 py-2">{OTHER_STOCK_COLUMN_LABEL}</th>
+              <th className="px-4 py-2 text-right">단가</th>
               <th className="px-4 py-2 text-right">매입가 금액</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {rows.map((row) => (
-              <Fragment key={row.movementId}>
-                <tr>
-                  <td className="px-4 py-2">
-                    {((row.undecidedLeft ?? 0) > 0 || row.sellerChangeable || row.recordId !== null) && (
-                      <input
-                        type="checkbox"
-                        checked={checked.has(rowKey(row))}
-                        onChange={() => toggle(rowKey(row))}
-                        className="h-4 w-4 accent-blue-600"
-                      />
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-gray-700">{kindLabel(row)}</td>
-                  <td className="px-4 py-2 text-gray-900">
-                    <div className="flex items-center gap-2">
-                      <StockProductThumb imageUrl={row.imageUrl} productId={row.productId} alt={row.productName} />
-                      <span>{row.productName}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-right text-gray-900">{row.quantity}</td>
-                  <td className="px-4 py-2 text-gray-700">{sellerCell(row)}</td>
-                  <td className="px-4 py-2 text-gray-700">{row.orderNumber ?? '-'}</td>
-                  <td className="px-4 py-2 text-amber-800">{row.tags.join(' · ')}</td>
-                  <td className="px-4 py-2 text-right text-gray-900">{formatWonOrUnknown(row.amount)}</td>
-                </tr>
-                {row.shares.map((share) => (
-                  <tr key={shareKey(share.recordId)} className="bg-gray-50">
-                    <td className="px-4 py-2">
-                      <input
-                        type="checkbox"
-                        checked={checked.has(shareKey(share.recordId))}
-                        onChange={() => toggle(shareKey(share.recordId))}
-                        className="h-4 w-4 accent-blue-600"
-                      />
+            {visible.map(({ row, shares }) => {
+              const target = rowEditTarget(row);
+              return (
+                <Fragment key={row.movementId}>
+                  <tr
+                    onClick={target ? () => setEditTarget(target) : undefined}
+                    className={target ? 'cursor-pointer hover:bg-blue-50' : undefined}
+                  >
+                    {/* D7: the check cell only toggles its check — it never opens the popup. */}
+                    <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                      {((row.undecidedLeft ?? 0) > 0 || row.sellerChangeable || row.recordId !== null) && (
+                        <input
+                          type="checkbox"
+                          checked={checked.has(rowKey(row))}
+                          onChange={() => toggle(rowKey(row))}
+                          className="h-4 w-4 accent-blue-600"
+                        />
+                      )}
                     </td>
-                    <td colSpan={7} className="px-4 py-2 text-gray-700">
-                      {shareLineText(share)}
+                    <td className="px-4 py-2 text-gray-700">{kindLabel(row)}</td>
+                    <td className="px-4 py-2 text-gray-900">
+                      <div className="flex items-center gap-2">
+                        <StockProductThumb imageUrl={row.imageUrl} productId={row.productId} alt={row.productName} />
+                        <span>{row.productName}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-right text-gray-900">{row.quantity}</td>
+                    <td className="px-4 py-2 text-gray-700">{sellerCell(row)}</td>
+                    <td className="px-4 py-2 text-gray-700">{row.orderNumber ?? '-'}</td>
+                    <td className="px-4 py-2 text-amber-800">{row.tags.join(' · ')}</td>
+                    <td className="px-4 py-2 text-right text-gray-900">
+                      {unitPriceText(row.unitPrices)}
+                      {row.priceFromBase && (
+                        <>
+                          {' '}
+                          <span className="text-xs text-orange-600">{PRICE_FROM_BASE_LABEL}</span>
+                        </>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right text-gray-900">
+                      {formatWonOrUnknown(row.amount)}
+                      {row.priceFromBase && (
+                        <>
+                          {' '}
+                          <span className="text-xs text-orange-600">{PRICE_FROM_BASE_LABEL}</span>
+                        </>
+                      )}
                     </td>
                   </tr>
-                ))}
-              </Fragment>
-            ))}
+                  {shares.map((share) => (
+                    <tr
+                      key={shareKey(share.recordId)}
+                      onClick={() => setEditTarget(shareEditTarget(row, share))}
+                      className="bg-gray-50 cursor-pointer hover:bg-blue-50"
+                    >
+                      <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={checked.has(shareKey(share.recordId))}
+                          onChange={() => toggle(shareKey(share.recordId))}
+                          className="h-4 w-4 accent-blue-600"
+                        />
+                      </td>
+                      <td colSpan={8} className="px-4 py-2 text-gray-700">
+                        {shareLineText(share)}
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </TableCard>
@@ -315,6 +418,14 @@ export function DailyContainer() {
         date={date}
         targets={priceTargets}
         onClose={() => setIsPriceOpen(false)}
+        onSaved={afterSave}
+      />
+
+      <RowEditModal
+        target={editTarget}
+        date={date}
+        sellers={sellers}
+        onClose={() => setEditTarget(null)}
         onSaved={afterSave}
       />
     </PageContainer>
