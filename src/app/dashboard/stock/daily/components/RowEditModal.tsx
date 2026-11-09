@@ -11,8 +11,10 @@ import type { SellerCard } from '@/domain/entities/SellerCardEntity';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { ReceiptSummary } from '@/domain/entities/PurchaseReceiptEntity';
 import {
+  RECEIPT_ROW_DATE_MESSAGE,
   dayReceiptChoices,
   formatWonOrUnknown,
+  movedMessage,
   receiptChoiceLabel,
   sellerSwitchMessage,
   type RowEditTarget,
@@ -23,6 +25,7 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
+import { DateEditHistory } from './DateEditHistory';
 
 /**
  * The row popup of 「일별 입출고 내역」 (FEATURE_2611_17 D5 · D6 · D17 ~ D23) — one row or share, one save.
@@ -35,6 +38,9 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
  *   text · null = no receipt field (D20).
  * - Picking a receipt paid by another seller asks first (nested `ConfirmDialog`) and moves the seller to that payer;
  *   changing the seller clears the card and drops a picked receipt of another payer (D21).
+ * - 「날짜」 on top (FEATURE_2611_21 D9, `target.dateField`): starts at the screen day and travels as `newMovedOn` only
+ *   when changed; LOCKED = off with `RECEIPT_ROW_DATE_MESSAGE`; a share has none. A moved day shows
+ *   「○월 ○일로 옮겼습니다.」 instead of 「저장했습니다.」. The row's day corrections are listed last (D24).
  */
 
 const FORM_ID = 'row-edit-form';
@@ -63,6 +69,7 @@ export function RowEditModal({ target, date, sellers, onClose, onSaved }: RowEdi
   const receiptUseCase = useMemo(() => new PurchaseReceiptUseCase(new PurchaseReceiptRepositoryImpl()), []);
 
   const [sellerId, setSellerId] = useState(0);
+  const [movedOn, setMovedOn] = useState(date);
   const [amountMode, setAmountMode] = useState<'TOTAL' | 'UNIT'>('TOTAL');
   const [amount, setAmount] = useState('');
   const [reflectToBasePrice, setReflectToBasePrice] = useState(true);
@@ -76,12 +83,14 @@ export function RowEditModal({ target, date, sellers, onClose, onSaved }: RowEdi
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Every opening starts from the target (its seller · total · blank amount · base price on · no receipt) and reloads
+  // Every opening starts from the target (its seller · the screen day · total · blank amount · base price on · no
+  // receipt) and reloads
   // the cards and that day's receipts. Inline async IIFE defers setState past the sync effect body (set-state-in-effect lint).
   useEffect(() => {
     if (!target) return;
     void (async () => {
       setSellerId(target.sellerId);
+      setMovedOn(date);
       setAmountMode('TOTAL');
       setAmount('');
       setReflectToBasePrice(true);
@@ -159,7 +168,8 @@ export function RowEditModal({ target, date, sellers, onClose, onSaved }: RowEdi
     const sendPhoto = isNewReceipt || target.receipt === 'LATER_PHOTO' ? photo : null;
     const sellerChanged = target.sellerEditable && sellerId !== target.sellerId;
     const receiptPicked = target.receipt === 'PICK' && pickedReceipt !== null;
-    if (!sellerChanged && typed === '' && sendPhoto === null && !receiptPicked) {
+    const dateChanged = target.dateField === 'EDIT' && movedOn !== date;
+    if (!sellerChanged && typed === '' && sendPhoto === null && !receiptPicked && !dateChanged) {
       setError('바꿀 내용이 없습니다.');
       return;
     }
@@ -174,11 +184,12 @@ export function RowEditModal({ target, date, sellers, onClose, onSaved }: RowEdi
       ...(target.price === 'PURCHASE' ? { reflectToBasePrice } : {}),
       ...(receiptPicked && pickedReceipt ? { receiptId: pickedReceipt.id } : {}),
       ...(isNewReceipt && cardChoice !== UNKNOWN_CARD ? { cardId: Number(cardChoice) } : {}),
+      ...(dateChanged ? { newMovedOn: movedOn } : {}),
     };
     setIsSubmitting(true);
     try {
       await lotUseCase.editRow(date, sendPhoto, request);
-      toast.success('저장했습니다.');
+      toast.success(dateChanged ? movedMessage(movedOn) : '저장했습니다.');
       await onSaved();
     } catch (err) {
       setError(extractErrorMessage(err, '저장하지 못했습니다.'));
@@ -196,6 +207,7 @@ export function RowEditModal({ target, date, sellers, onClose, onSaved }: RowEdi
         disableClose={isSubmitting}
         // The fields live in component state, not in a DOM form value — tell the modal directly.
         isDirty={
+          movedOn !== date ||
           sellerId !== target.sellerId ||
           amount !== '' ||
           amountMode === 'UNIT' ||
@@ -217,6 +229,24 @@ export function RowEditModal({ target, date, sellers, onClose, onSaved }: RowEdi
       >
         <form id={FORM_ID} onSubmit={(e) => void submit(e)} className="space-y-4">
           {error && <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
+
+          {target.dateField !== null && (
+            <div>
+              <label className={LABEL_CLASS}>날짜</label>
+              <input
+                type="date"
+                value={movedOn}
+                onChange={(e) => {
+                  if (e.target.value) setMovedOn(e.target.value);
+                }}
+                disabled={isSubmitting || target.dateField === 'LOCKED'}
+                className={INPUT_CLASS}
+              />
+              {target.dateField === 'LOCKED' && (
+                <p className="text-xs text-gray-500 mt-1">{RECEIPT_ROW_DATE_MESSAGE}</p>
+              )}
+            </div>
+          )}
 
           <p className="text-sm text-gray-900">
             {target.productName} {target.quantity}개{' '}
@@ -362,6 +392,8 @@ export function RowEditModal({ target, date, sellers, onClose, onSaved }: RowEdi
               </p>
             </div>
           )}
+
+          <DateEditHistory edits={target.dateEdits} />
         </form>
       </Modal>
 

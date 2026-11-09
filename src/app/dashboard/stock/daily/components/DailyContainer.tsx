@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Button } from '@/presentation/components/ui/Button';
 import { TableCard } from '@/presentation/components/ui/TableCard';
@@ -12,6 +12,7 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import { STOCK_MOVEMENT_TYPE_LABELS, STOCK_REASON_LABELS } from '@/domain/entities/StockEntity';
 import {
   DAILY_CHIPS,
+  DATE_EDITED_LABEL,
   NO_MATCH_MESSAGE,
   OTHER_STOCK_COLUMN_LABEL,
   PRICE_FROM_BASE_LABEL,
@@ -36,6 +37,7 @@ import { ReceiptAssignModal } from './ReceiptAssignModal';
 import { SellerChangeModal } from './SellerChangeModal';
 import { PurchasePriceModal } from './PurchasePriceModal';
 import { RowEditModal } from './RowEditModal';
+import { DateMoveModal } from './DateMoveModal';
 import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
 
 /**
@@ -55,14 +57,20 @@ import { StockProductThumb } from '@/app/dashboard/stock/components/StockProduct
  * - [매입가 넣기] (FEATURE_2611_16 D7 · D8) is on when every checked row and share is a purchase-price target; it opens
  *   the popup with those targets in table order. Each share line reads `shareLineText` (FEATURE_2611_17 D2).
  * - Chips 「전체」「입고」「출고」 and the boxes 「판매자 미정 상품」 · 「영수증 미등록 상품」 filter on the client through
- *   `visibleDailyRows` (FEATURE_2611_17 D4 · D11 · D28 ~ D30); they survive a date change and clear the checks.
- * - Clicking a row opens the row popup for `rowEditTarget(row)` (null = nothing opens, D24) and a share line for
- *   `shareEditTarget`; the check cell only toggles its check (D7).
+ *   `visibleDailyRows` (FEATURE_2611_17 D4 · D11 · D28 ~ D30); they survive a date change (「입고로 이동」 resets them,
+ *   FEATURE_2611_21 D19) and clear the checks.
+ * - Clicking a row opens the row popup for `rowEditTarget(row)` and a share line for `shareEditTarget`; the check cell
+ *   only toggles its check (D7). A row without a popup (null) opens the 「날짜 바꾸기」 window (FEATURE_2611_21 D9).
+ * - FEATURE_2611_21: a row whose day was corrected shows 「날짜 고침」 (D24) · 「○월 ○일 입고로 이동」 (D19) shows every row
+ *   (chip 「전체」, boxes off), loads the lot's day and opens the lot's popup, or highlights the lot and its share
+ *   lines for 2 seconds when it has none.
  */
 
 type AssignMode = 'RECEIPT' | 'WITHOUT_RECEIPT';
 
 const rowKey = (row: StockDailyRow) => `row-${row.movementId}`;
+// FEATURE_2611_21 D19: how long an arrived lot without a popup stays highlighted.
+const HIGHLIGHT_MS = 2000;
 const shareKey = (recordId: number) => `share-${recordId}`;
 
 // Local calendar day (YYYY-MM-DD) — toISOString (UTC) can be a day off in KST.
@@ -105,6 +113,10 @@ export function DailyContainer() {
   const [undecidedBox, setUndecidedBox] = useState(false);
   const [receiptBox, setReceiptBox] = useState(false);
   const [editTarget, setEditTarget] = useState<RowEditTarget | null>(null);
+  const [dateTarget, setDateTarget] = useState<StockDailyRow | null>(null);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+  // The lot 「입고로 이동」 asked for — read once by the next load (D19).
+  const focusRef = useRef<number | null>(null);
 
   const load = useCallback(
     async (day: string) => {
@@ -112,7 +124,21 @@ export function DailyContainer() {
       setError('');
       setChecked(new Set());
       try {
-        setDaily(await lotUseCase.daily(day));
+        const loaded = await lotUseCase.daily(day);
+        setDaily(loaded);
+        // FEATURE_2611_21 D19: the lot 「입고로 이동」 arrived at opens its popup, or is highlighted without one.
+        const focusId = focusRef.current;
+        focusRef.current = null;
+        const arrived = loaded.rows.find((row) => row.movementId === focusId);
+        if (arrived) {
+          const target = rowEditTarget(arrived);
+          if (target) {
+            setEditTarget(target);
+          } else {
+            setHighlightId(arrived.movementId);
+            window.setTimeout(() => setHighlightId(null), HIGHLIGHT_MS);
+          }
+        }
       } catch (err) {
         setError(extractErrorMessage(err, '일별 입출고 내역을 불러오지 못했습니다.'));
       } finally {
@@ -211,7 +237,22 @@ export function DailyContainer() {
     setIsChangeOpen(false);
     setIsPriceOpen(false);
     setEditTarget(null);
+    setDateTarget(null);
     await load(date);
+  };
+
+  // FEATURE_2611_21 D19: every row shows, then the lot's day loads (the same day loads again) and the load finds it.
+  const goToIntake = (movementId: number, day: string) => {
+    setDateTarget(null);
+    setChip('ALL');
+    setUndecidedBox(false);
+    setReceiptBox(false);
+    focusRef.current = movementId;
+    if (day === date) {
+      void load(day);
+    } else {
+      setDate(day);
+    }
   };
 
   return (
@@ -319,11 +360,14 @@ export function DailyContainer() {
           <tbody className="divide-y divide-gray-200">
             {visible.map(({ row, shares }) => {
               const target = rowEditTarget(row);
+              const highlighted = highlightId === row.movementId;
               return (
                 <Fragment key={row.movementId}>
                   <tr
-                    onClick={target ? () => setEditTarget(target) : undefined}
-                    className={target ? 'cursor-pointer hover:bg-blue-50' : undefined}
+                    onClick={() => (target ? setEditTarget(target) : setDateTarget(row))}
+                    className={
+                      highlighted ? 'cursor-pointer bg-amber-50 hover:bg-blue-50' : 'cursor-pointer hover:bg-blue-50'
+                    }
                   >
                     {/* D7: the check cell only toggles its check — it never opens the popup. */}
                     <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
@@ -336,7 +380,15 @@ export function DailyContainer() {
                         />
                       )}
                     </td>
-                    <td className="px-4 py-2 text-gray-700">{kindLabel(row)}</td>
+                    <td className="px-4 py-2 text-gray-700">
+                      {kindLabel(row)}
+                      {row.dateEdits.length > 0 && (
+                        <>
+                          {' '}
+                          <span className="text-xs text-blue-600">{DATE_EDITED_LABEL}</span>
+                        </>
+                      )}
+                    </td>
                     <td className="px-4 py-2 text-gray-900">
                       <div className="flex items-center gap-2">
                         <StockProductThumb imageUrl={row.imageUrl} productId={row.productId} alt={row.productName} />
@@ -370,7 +422,11 @@ export function DailyContainer() {
                     <tr
                       key={shareKey(share.recordId)}
                       onClick={() => setEditTarget(shareEditTarget(row, share))}
-                      className="bg-gray-50 cursor-pointer hover:bg-blue-50"
+                      className={
+                        highlighted
+                          ? 'bg-amber-50 cursor-pointer hover:bg-blue-50'
+                          : 'bg-gray-50 cursor-pointer hover:bg-blue-50'
+                      }
                     >
                       <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                         <input
@@ -427,6 +483,14 @@ export function DailyContainer() {
         sellers={sellers}
         onClose={() => setEditTarget(null)}
         onSaved={afterSave}
+      />
+
+      <DateMoveModal
+        row={dateTarget}
+        date={date}
+        onClose={() => setDateTarget(null)}
+        onSaved={afterSave}
+        onGoToIntake={goToIntake}
       />
     </PageContainer>
   );

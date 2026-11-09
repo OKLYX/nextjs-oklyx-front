@@ -2,6 +2,7 @@ import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { StockLotRepository } from '@/domain/repositories/StockLotRepository';
 import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
 import type {
+  DailyDateMoveRequest,
   DailyRowEditRequest,
   IntakeRequest,
   PurchasePriceRequest,
@@ -65,6 +66,10 @@ export class StockLotRepositoryImpl implements StockLotRepository {
       params: { movedOn },
       headers: { 'Content-Type': undefined },
     });
+  }
+
+  async moveDate(request: DailyDateMoveRequest): Promise<void> {
+    await axiosInstance.post('/api/admin/stock/daily/move-date', request);
   }
 
   async debtPairs(): Promise<SellerDebtPair[]> {
