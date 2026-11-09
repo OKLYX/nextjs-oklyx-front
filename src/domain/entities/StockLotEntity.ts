@@ -61,6 +61,23 @@ export interface StockDailyRow {
   priceFromBase: boolean;
   /** An opening-stock row the row popup may price (FEATURE_2611_17 D5 · D17). */
   openingPriceEditable: boolean;
+  /** Outgoing rows only: the lot it came from (FEATURE_2611_21 D18 · D22); null = no lot or not an outgoing row. */
+  sourceMovementId: number | null;
+  /** The day of that lot (YYYY-MM-DD); null with `sourceMovementId`. */
+  sourceMovedOn: string | null;
+  /** That lot has a value to fix — otherwise 「이 입고는 값을 고칠 수 없습니다.」 (FEATURE_2611_21 D20). */
+  sourcePriceEditable: boolean;
+  /** The day corrections of this row, newest first (FEATURE_2611_21 D24); empty = never corrected. */
+  dateEdits: StockDateEdit[];
+}
+
+/** One day correction of a daily row (FEATURE_2611_21 D7 · D24). `editedAt` = KST wall clock as stored. */
+export interface StockDateEdit {
+  editedAt: string;
+  /** The login email of the admin; null = written outside a request. */
+  editedBy: string | null;
+  oldMovedOn: string;
+  newMovedOn: string;
 }
 
 /** One unit price of a row and how many pieces carry it (FEATURE_2611_17 D16). */
@@ -122,6 +139,31 @@ export function unitPriceText(unitPrices: UnitCount[] | null): string {
   if (unitPrices === null || unitPrices.length === 0) return '미기입';
   if (unitPrices.length === 1) return formatShareAmount(unitPrices[0].unitPrice);
   return unitPrices.map((u) => `${formatShareAmount(u.unitPrice)}×${u.quantity}`).join(' · ');
+}
+
+/** The mark of a row whose day was corrected (FEATURE_2611_21 D24). */
+export const DATE_EDITED_LABEL = '날짜 고침';
+
+/** The fixed texts of the day correction (FEATURE_2611_21 D9 · D13 · D20) — the server sends the same refusals. */
+export const RECEIPT_ROW_DATE_MESSAGE = '영수증에 묶인 입고는 날짜를 옮길 수 없습니다.';
+export const RECEIPT_SHARE_DATE_MESSAGE = '영수증에 묶인 몫이 있어 날짜를 옮길 수 없습니다.';
+export const NO_SOURCE_MESSAGE = '어느 입고에서 나갔는지 기록이 없어 값을 고칠 곳이 없습니다.';
+export const SOURCE_FIXED_MESSAGE = '이 입고는 값을 고칠 수 없습니다.';
+
+/** 「11월 3일」 of a YYYY-MM-DD day (FEATURE_2611_21 D9 · D17 · D34 「○월 ○일」). */
+export function monthDayText(day: string): string {
+  const [, month, date] = day.split('-');
+  return `${Number(month)}월 ${Number(date)}일`;
+}
+
+/** The notice after a day was moved (FEATURE_2611_21 D9): 「11월 3일로 옮겼습니다.」. */
+export function movedMessage(day: string): string {
+  return `${monthDayText(day)}로 옮겼습니다.`;
+}
+
+/** The button of an outgoing row with a lot (FEATURE_2611_21 D17 · D21): 「11월 3일 입고로 이동」. */
+export function goToIntakeLabel(day: string): string {
+  return `${monthDayText(day)} 입고로 이동`;
 }
 
 /** The column title of the outbound tags (FEATURE_2611_17 D3). */
@@ -197,6 +239,9 @@ export function visibleDailyRows(
  * - `receipt` = PICK (「영수증 없음」 purchase — a receipt of that day or a new photo, D6 · D23) · LATER_PHOTO
  *   (「영수증 나중에」 — a photo for that receipt, D19) · FIXED (a receipt with its photo — shown as text, D19) · null
  *   (not a purchase — no receipt field, D20).
+ * - `dateField` (FEATURE_2611_21 D9) = EDIT (a row — the 「날짜」 field on top) · LOCKED (a purchase on a receipt with its
+ *   photo — the field is off with `RECEIPT_ROW_DATE_MESSAGE`) · null (a share — no day of its own, D13).
+ * - `dateEdits` = the row's day corrections (D24); empty for a share.
  */
 export interface RowEditTarget {
   movementId: number | null;
@@ -211,6 +256,8 @@ export interface RowEditTarget {
   price: 'PURCHASE' | 'OPENING' | null;
   receipt: 'PICK' | 'LATER_PHOTO' | 'FIXED' | null;
   receiptId: number | null;
+  dateField: 'EDIT' | 'LOCKED' | null;
+  dateEdits: StockDateEdit[];
 }
 
 const RECEIPT_FIELD: Record<ReceiptKind, 'PICK' | 'LATER_PHOTO' | 'FIXED'> = {
@@ -219,7 +266,10 @@ const RECEIPT_FIELD: Record<ReceiptKind, 'PICK' | 'LATER_PHOTO' | 'FIXED'> = {
   RECEIPT: 'FIXED',
 };
 
-/** The popup target of a row, or null when the row opens nothing (D12 · D24 — an undecided row never opens). */
+/**
+ * The popup target of a row, or null when the row has no popup (D12 · D24 — an undecided row has none); a row without
+ * one opens the 「날짜 바꾸기」 window instead (FEATURE_2611_21 D9).
+ */
 export function rowEditTarget(row: StockDailyRow): RowEditTarget | null {
   if (row.undecidedLeft !== null || row.sellerId === null || row.sellerName === null) return null;
   const price = row.recordId !== null ? 'PURCHASE' : row.openingPriceEditable ? 'OPENING' : null;
@@ -236,6 +286,8 @@ export function rowEditTarget(row: StockDailyRow): RowEditTarget | null {
     price,
     receipt: row.recordId !== null && row.receiptKind !== null ? RECEIPT_FIELD[row.receiptKind] : null,
     receiptId: row.receiptId,
+    dateField: row.recordId !== null && row.receiptKind === 'RECEIPT' ? 'LOCKED' : 'EDIT',
+    dateEdits: row.dateEdits,
   };
 }
 
@@ -253,6 +305,8 @@ export function shareEditTarget(row: StockDailyRow, share: StockDailyShare): Row
     price: 'PURCHASE',
     receipt: RECEIPT_FIELD[share.receiptKind],
     receiptId: share.receiptId,
+    dateField: null,
+    dateEdits: [],
   };
 }
 
