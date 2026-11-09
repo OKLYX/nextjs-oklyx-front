@@ -146,7 +146,10 @@ function ReceiptEditForm({
     >
       <form id={FORM_ID} onSubmit={submit} className="space-y-4">
         {submitError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>
+          // FEATURE_2611_21 D31: a refused day lists one blocked product per line.
+          <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm whitespace-pre-line">
+            {submitError}
+          </div>
         )}
 
         {detail.photoUrl == null && (

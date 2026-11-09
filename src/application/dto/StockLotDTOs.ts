@@ -2,7 +2,7 @@ import type { ReceiptLineRequest } from './PurchaseReceiptDTOs';
 
 /**
  * Request bodies of FEATURE_2610_19 (intake work · cash settlement), FEATURE_2611_01 (seller without a receipt),
- * FEATURE_2611_16 (「매입가 넣기」) and FEATURE_2611_17 (the daily row popup).
+ * FEATURE_2611_16 (「매입가 넣기」), FEATURE_2611_17 (the daily row popup) and FEATURE_2611_21 (the day correction).
  */
 
 /** 「입고 작업」 reasons (FEATURE_2611_01 D1): 「매입」 · 「기초재고」. */
@@ -48,7 +48,8 @@ export interface PurchasePriceRequest {
  * The daily row popup's one save (FEATURE_2611_17 D5): the JSON part next to the optional photo. Exactly one of
  * movementId / shareRecordId. sellerId omitted = the seller stays · totalAmount / unitPrice omitted = the price stays
  * (send at most one) · reflectToBasePrice is read for a purchase only · receiptId = a receipt of that day to add the
- * purchase to (D23) · cardId = the card of a new receipt from the photo (omitted = 「카드로 알 수 없음」).
+ * purchase to (D23) · cardId = the card of a new receipt from the photo (omitted = 「카드로 알 수 없음」) · newMovedOn = the
+ * row's new day, YYYY-MM-DD (FEATURE_2611_21 D9 — omitted = the day stays; never for a share).
  */
 export interface DailyRowEditRequest {
   movementId?: number;
@@ -59,6 +60,16 @@ export interface DailyRowEditRequest {
   reflectToBasePrice?: boolean;
   receiptId?: number;
   cardId?: number;
+  newMovedOn?: string;
+}
+
+/**
+ * The 「날짜 바꾸기」 window (FEATURE_2611_21 D9): one row and its new day (YYYY-MM-DD) — an order outbound row moves
+ * with every row of that order on that day (D4).
+ */
+export interface DailyDateMoveRequest {
+  movementId: number;
+  newMovedOn: string;
 }
 
 /** 「돈으로 정리」 (D90 · D99 ①). */
