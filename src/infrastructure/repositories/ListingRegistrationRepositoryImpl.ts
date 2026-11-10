@@ -27,6 +27,7 @@ import type {
   OptionStocksRequest,
   OptionPricesRequest,
   ChannelPriceUpdateResponse,
+  ChannelStockUpdateResponse,
   OptionNamesRequest,
   ApplyOptionNamesResponse,
   ImportPreviewRequest,
@@ -252,7 +253,7 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
   async setOptionStocks(
     listingId: number,
     data: OptionStocksRequest,
-  ): Promise<ListingOptionsResponse> {
+  ): Promise<ChannelStockUpdateResponse> {
     const response = await axiosInstance.put(`${listingBase}/${listingId}/options/stock`, data);
     return response.data.data;
   }

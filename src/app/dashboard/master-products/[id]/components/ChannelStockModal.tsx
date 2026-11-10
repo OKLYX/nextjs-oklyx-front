@@ -5,7 +5,10 @@ import { Spinner } from '@/presentation/components/Spinner';
 import { ListingRegistrationUseCase } from '@/application/usecases/ListingRegistrationUseCase';
 import { ListingRegistrationRepositoryImpl } from '@/infrastructure/repositories/ListingRegistrationRepositoryImpl';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
-import type { ListingOptionSummary } from '@/domain/entities/ListingRegistrationEntity';
+import type {
+  ChannelStockUpdateResponse,
+  ListingOptionSummary,
+} from '@/domain/entities/ListingRegistrationEntity';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
 
@@ -49,6 +52,7 @@ export function ChannelStockModal({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [result, setResult] = useState<ChannelStockUpdateResponse | null>(null);
 
   // Hide inactive options and reseed the input buffer from the server values.
   // ⚠️ `?? ''` only — `0`(품절) must stay `0`, never collapse into '' with `||`.
@@ -91,6 +95,7 @@ export function ChannelStockModal({
     }
     setIsSaving(true);
     setError('');
+    setResult(null);
     try {
       const res = await useCase.setOptionStocks(listingId, {
         stocks: dirty.map((r) => ({
@@ -98,15 +103,21 @@ export function ChannelStockModal({
           stockQuantity: draft[r.optionId] === '' ? null : Number(draft[r.optionId]),
         })),
       });
-      // 이미 등록된 셀은 재고 변경만으로 마켓에 반영되지 않는다. 자동 전송하지 않고 안내만 한다.
-      if (res.needsResync) {
+      // FEATURE_2611_19 / D7 · D8: a Coupang, LotteON, 11st or ESM listing sends the saved stock to
+      // the market right away and answers needsResync = false. For other platforms needsResync keeps
+      // its old rule (not DRAFT) and the notice asks for [수정 요청].
+      if (res.listing.needsResync) {
         setNotice('등록된 셀입니다 — 마켓 반영은 [수정 요청]이 필요합니다.');
-        applyOptions(res.options);
+        applyOptions(res.listing.options);
         onSaved();
         return;
       }
+      // Nothing saved-only or failed → close. Otherwise keep the modal open with the lines (a failed
+      // line = saved, the market refused).
+      applyOptions(res.listing.options);
+      setResult(res);
       onSaved();
-      onClose();
+      if (res.skipped.length === 0 && res.failed.length === 0) onClose();
     } catch (e: unknown) {
       // 백엔드 400 문구(상한 초과·소속 아님 등)를 그대로 노출한다.
       setError(extractErrorMessage(e, '재고 저장에 실패했습니다.'));
@@ -126,6 +137,28 @@ export function ChannelStockModal({
       {error && <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {notice && (
         <p className="mb-4 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">{notice}</p>
+      )}
+
+      {result && (
+        <div className="mb-4 space-y-1">
+          {result.pushed > 0 && (
+            <p className="rounded bg-green-50 px-3 py-2 text-sm text-green-700">
+              마켓에 {result.pushed}건 반영했습니다.
+            </p>
+          )}
+          {result.skipped.length > 0 && (
+            <p className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
+              아직 마켓에 없는 옵션은 저장만 했습니다: {result.skipped.join(', ')}. [마켓에 올리기] 시
+              이 재고로 올라갑니다.
+            </p>
+          )}
+          {result.failed.map((f) => (
+            <p key={f.optionName} className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+              마켓 반영 실패(저장은 됨): {f.optionName} — {f.message}. 다음 [수정 요청] 때 이 재고로
+              나갑니다.
+            </p>
+          ))}
+        </div>
       )}
 
       {isLoading ? (

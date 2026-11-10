@@ -37,6 +37,19 @@ export interface MasterOptionResponse {
   // 102/D5: how many channel overrides the backend clamped down to this option's new stock
   // on the last save. Only ever > 0 on an update response; create always returns 0.
   clampedChannels?: number;
+  // FEATURE_2611_19 / D28: update response only — one line per channel option whose market stock this save changed
+  // (empty = nothing sent). null / absent on every other response.
+  stockPushResults?: MasterStockPushResult[] | null;
+}
+
+// FEATURE_2611_19 / D28: what happened to one channel option's stock on its way to the market.
+export interface MasterStockPushResult {
+  productListingId: number;
+  platform: string;
+  sellerName: string | null;
+  optionName: string;
+  result: 'PUSHED' | 'SKIPPED' | 'FAILED'; // 「반영」 · 「저장만」 · 「실패」 (the stock stays saved)
+  message: string | null; // the market's own text when FAILED
 }
 
 export interface MasterProductResponse {

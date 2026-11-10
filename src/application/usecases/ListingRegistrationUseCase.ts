@@ -24,6 +24,7 @@ import type {
   OptionStocksRequest,
   OptionPricesRequest,
   ChannelPriceUpdateResponse,
+  ChannelStockUpdateResponse,
   OptionNamesRequest,
   ApplyOptionNamesResponse,
   ImportPreviewRequest,
@@ -199,7 +200,7 @@ export class ListingRegistrationUseCase {
     return this.repository.setActiveOptions(listingId, data);
   }
 
-  setOptionStocks(listingId: number, data: OptionStocksRequest): Promise<ListingOptionsResponse> {
+  setOptionStocks(listingId: number, data: OptionStocksRequest): Promise<ChannelStockUpdateResponse> {
     return this.repository.setOptionStocks(listingId, data);
   }
 
