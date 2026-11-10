@@ -13,7 +13,9 @@ import type {
   MasterComponent,
   CategoryAttribute,
   CategoryNotice,
+  MasterStockPushResult,
 } from '@/domain/entities/MasterProductEntity';
+import { platformDisplayName } from '@/config/platforms';
 import type { CarrierRate } from '@/domain/entities/CarrierRateEntity';
 import type { Package } from '@/domain/entities/PackageEntity';
 import type { MeasurePair } from '../[id]/components/measureAttributes';
@@ -38,6 +40,10 @@ import {
 } from '../[id]/components/categoryMetaValidation';
 
 const formatWon = (v: number) => `${v.toLocaleString('ko-KR')}원`;
+
+// FEATURE_2611_19 / D28: 「{판매자} · {마켓} · {옵션명}」 — the seller part is left out when the listing has none.
+const stockPushLabel = (r: MasterStockPushResult) =>
+  [r.sellerName, platformDisplayName(r.platform), r.optionName].filter(Boolean).join(' · ');
 
 // 옵션 잠금 안내 문구 (85). 잠금 판정은 백엔드 플래그(marketRegistered) 하나만 쓴다.
 const LOCKED_ROW_TITLE = '마켓에 등록돼 판매 중 — 삭제할 수 없습니다 (이름·구성 수량은 수정 가능)';
@@ -358,9 +364,11 @@ export function MasterOptionEditor({
   // 목록 레벨 에러(삭제 실패 등). formError 는 {showForm && ...} 안에서만 렌더되므로 폼이 닫힌
   // 상태에서 일어나는 목록 액션 에러는 반드시 이 채널로 보여준다.
   const [listError, setListError] = useState('');
-  // 102/D6: 마스터 재고를 낮춰 채널 override 가 함께 내려간 경우의 안내(실패가 아니므로 formError
-  // 와 분리). 폼이 닫힌 뒤에도 보여야 해서 목록 레벨에서 렌더한다.
+  // 102/D6 · FEATURE_2611_19 / D28: the clamp notice and the market stock lines of the last save
+  // (not failures, so kept apart from formError). Rendered at list level so they stay after the
+  // form closes.
   const [clampNotice, setClampNotice] = useState('');
+  const [stockPushResults, setStockPushResults] = useState<MasterStockPushResult[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [busyOptionId, setBusyOptionId] = useState<number | null>(null);
   // 2609_61: 밖에서 지목한 옵션 줄을 한 번 켰다 끄는 강조. `fading` = 꺼지는 중(2초 전환).
@@ -673,6 +681,7 @@ export function MasterOptionEditor({
     // 안내 초기화는 closeForm 이 아니라 **다음 저장 시작 시** 한다 — closeForm 에서 비우면
     // 저장 직후 폼이 닫히며 방금 띄운 clamp 안내가 같이 사라진다.
     setClampNotice('');
+    setStockPushResults([]);
     if (!optName.trim()) {
       setFormError('옵션 이름을 입력하세요.');
       return;
@@ -733,13 +742,14 @@ export function MasterOptionEditor({
           editingKey == null
             ? await useCase!.addOption(master!.id, payload)
             : await useCase!.updateOption(master!.id, editingKey, payload);
-        // 102/D6: 마스터 재고를 낮추면 그보다 큰 채널 override 가 백엔드에서 함께 내려간다.
-        // 마켓 반영은 사용자가 [수정 요청]을 눌러야 한다 — 여기서 자동 전송하지 않는다.
+        // 102/D6: lowering the master stock pulls the channel overrides above it down on the server.
+        // FEATURE_2611_19 / D10 · D28: the server then sends each changed stock of an active option of
+        // a Coupang, LotteON, 11st or ESM listing to the market and returns one line per option. Other
+        // platforms get no line.
         if (res?.clampedChannels) {
-          setClampNotice(
-            `채널 ${res.clampedChannels}곳의 재고가 마스터 값으로 낮춰졌습니다. 마켓 반영은 [수정 요청]이 필요합니다.`,
-          );
+          setClampNotice(`채널 ${res.clampedChannels}곳의 재고가 마스터 값으로 낮춰졌습니다.`);
         }
+        setStockPushResults(res?.stockPushResults ?? []);
         await onChanged?.();
         closeForm();
       } catch (e: unknown) {
@@ -904,6 +914,32 @@ export function MasterOptionEditor({
         {clampNotice && (
           <p className="mb-2 rounded bg-green-50 px-3 py-1.5 text-sm text-green-700">{clampNotice}</p>
         )}
+        {stockPushResults.some((r) => r.result === 'PUSHED') && (
+          <p className="mb-2 rounded bg-green-50 px-3 py-1.5 text-sm text-green-700">
+            마켓에 {stockPushResults.filter((r) => r.result === 'PUSHED').length}건 반영했습니다.
+          </p>
+        )}
+        {stockPushResults.some((r) => r.result === 'SKIPPED') && (
+          <p className="mb-2 rounded bg-gray-50 px-3 py-1.5 text-sm text-gray-600">
+            아직 마켓에 없는 옵션은 저장만 했습니다:{' '}
+            {stockPushResults
+              .filter((r) => r.result === 'SKIPPED')
+              .map(stockPushLabel)
+              .join(', ')}
+            . [마켓에 올리기] 시 이 재고로 올라갑니다.
+          </p>
+        )}
+        {stockPushResults
+          .filter((r) => r.result === 'FAILED')
+          .map((r) => (
+            <p
+              key={`${r.productListingId}-${r.optionName}`}
+              className="mb-2 rounded bg-red-50 px-3 py-1.5 text-sm text-red-700"
+            >
+              마켓 반영 실패(저장은 됨): {stockPushLabel(r)} — {r.message}. 다음 [수정 요청] 때 이 재고로
+              나갑니다.
+            </p>
+          ))}
 
         {rows.length === 0 ? (
           <p className="mb-3 text-sm text-gray-500">등록된 옵션이 없습니다.</p>
