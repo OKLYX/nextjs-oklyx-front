@@ -23,6 +23,7 @@ import type {
   OptionStocksRequest,
   OptionPricesRequest,
   ChannelPriceUpdateResponse,
+  ChannelStockUpdateResponse,
   OptionNamesRequest,
   ApplyOptionNamesResponse,
   ImportPreviewRequest,
@@ -118,8 +119,9 @@ export interface ListingRegistrationRepository {
   // active flags) and save the active subset. Only active options are market-pushed.
   getListingOptions(listingId: number): Promise<ListingOptionsResponse>;
   setActiveOptions(listingId: number, data: ActiveOptionsRequest): Promise<ListingOptionsResponse>;
-  // Per-channel option stock (102): partial bulk save of the cell's stock overrides.
-  setOptionStocks(listingId: number, data: OptionStocksRequest): Promise<ListingOptionsResponse>;
+  // Per-channel option stock (102): partial bulk save of the cell's stock overrides, then sent to the market when the
+  // platform takes a stock push (FEATURE_2611_19 / D7).
+  setOptionStocks(listingId: number, data: OptionStocksRequest): Promise<ChannelStockUpdateResponse>;
   /** 채널 옵션 판매가 저장 + 마켓 즉시 반영(2609_19). null = 자동계산가 복귀. */
   setOptionPrices(listingId: number, data: OptionPricesRequest): Promise<ChannelPriceUpdateResponse>;
   /** 2609_22/D3: 채널 옵션명 변경. optionName 을 비우면 마스터 옵션명으로 복귀(AUTO). */

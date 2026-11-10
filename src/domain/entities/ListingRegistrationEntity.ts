@@ -292,8 +292,9 @@ export interface ListingOptionsResponse {
   productListingId: number;
   status: ListingStatus;
   options: ListingOptionSummary[];
-  // PUT response only: true when the active set changed on an already-pushed cell
-  // (SUBMITTED/SELLING) -> a re-register is needed to reflect it on the market.
+  // true on the set-active, name and stock PUT responses when the listing is already pushed (not DRAFT) -> the change
+  // needs [수정 요청]; false on GET and the price PUT, and on the stock PUT of a Coupang, LotteON, 11st or ESM listing
+  // (that stock is sent right away — FEATURE_2611_19 / D7).
   needsResync?: boolean;
   // PUT response only (67/68): registration name recomputed from the new active option
   // set. Used to patch just this cell's registrationName without a full matrix reload.
@@ -322,8 +323,20 @@ export interface OptionPricesRequest {
 export interface ChannelPriceUpdateResponse {
   listing: ListingOptionsResponse;
   pushed: number; // 마켓에 실제 반영된 옵션 수
-  skipped: string[]; // 마켓 식별자 없음(미승인/DRAFT) — 로컬만 저장된 옵션명
+  // Saved locally, not sent: no market number yet (unapproved / DRAFT), a whole-product market (11st · ESM) still
+  // missing a market number on an active option, or a switched-off option (FEATURE_2611_19 / D18 · D25).
+  skipped: string[];
   failed: { optionName: string; message: string }[]; // 마켓 실패 → 저장되지 않은 옵션
+}
+
+// FEATURE_2611_19 / D7: the channel stock save — the same shape as `ChannelPriceUpdateResponse`, but `failed` means the
+// stock IS saved and the market refused it (the next [수정 요청] sends it again). On a platform without a stock push all
+// three are empty / 0 and `listing.needsResync` keeps its old meaning.
+export interface ChannelStockUpdateResponse {
+  listing: ListingOptionsResponse;
+  pushed: number; // options the market took
+  skipped: string[]; // saved, not sent — no market number yet (this option, or another active option of an ESM listing), or switched off
+  failed: { optionName: string; message: string }[]; // market refused — the stock stays saved
 }
 
 // ── 쿠팡 상품 가져오기 (2609_22) ─────────────────────────────────────────────
