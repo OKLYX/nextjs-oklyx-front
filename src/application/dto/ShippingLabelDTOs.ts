@@ -122,6 +122,8 @@ export interface ReservedShipmentRow {
   invoiceNumber: string | null;
   result: ReservedItemResult;
   failureReason: string | null;
+  /** Market `Platform` name of the row's shipment (e.g. COUPANG · ELEVENST) — null when the shipment has no lines (FEATURE_2611_23 / D64). */
+  platform: string | null;
 }
 
 /** 「내부 상품준비중」 접수시트 미리보기 (GET /api/admin/shipping-labels/v2/preview/internal, D26). */

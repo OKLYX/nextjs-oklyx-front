@@ -35,7 +35,7 @@ interface ReservedShipmentPanelProps {
  */
 export function ReservedShipmentPanel({ useCase, reloadKey, onChanged }: ReservedShipmentPanelProps) {
   const [rows, setRows] = useState<ReservedShipmentRow[]>([]);
-  const [carrierOptions, setCarrierOptions] = useState<CarrierOption[]>([]);
+  const [carrierOptionsByPlatform, setCarrierOptionsByPlatform] = useState<Record<string, CarrierOption[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [tick, setTick] = useState(0);
@@ -61,19 +61,31 @@ export function ReservedShipmentPanel({ useCase, reloadKey, onChanged }: Reserve
     return () => { alive = false; };
   }, [useCase, reloadKey, tick]);
 
-  // [송장 수정] 택배사 목록 — 실패하면 빈 목록(버튼이 숨는다).
+  // Markets of every received row (chips do not matter) — sorted, distinct, joined by ',' (FEATURE_2611_23 / D64 ③).
+  const platformsKey = Array.from(
+    new Set(rows.map((row) => row.platform).filter((platform): platform is string => platform != null)),
+  )
+    .sort()
+    .join(',');
+
+  // [송장 수정] carrier list per market — a failed market gets an empty list (its rows hide the button).
   useEffect(() => {
+    if (platformsKey === '') return;
     let alive = true;
     void (async () => {
-      try {
-        const options = await useCase.getCarrierOptions('COUPANG');
-        if (alive) setCarrierOptions(options);
-      } catch {
-        if (alive) setCarrierOptions([]);
-      }
+      const entries = await Promise.all(
+        platformsKey.split(',').map(async (platform): Promise<[string, CarrierOption[]]> => {
+          try {
+            return [platform, await useCase.getCarrierOptions(platform)];
+          } catch {
+            return [platform, []];
+          }
+        }),
+      );
+      if (alive) setCarrierOptionsByPlatform(Object.fromEntries(entries));
     })();
     return () => { alive = false; };
-  }, [useCase]);
+  }, [useCase, platformsKey]);
 
   const completed = rows.filter((row) => row.result === 'SUCCEEDED' || row.result === 'EXTERNAL').length;
   const failed = rows.filter((row) => row.result === 'FAILED').length;
@@ -134,7 +146,7 @@ export function ReservedShipmentPanel({ useCase, reloadKey, onChanged }: Reserve
             <ReservedShipmentRows
               rows={shownRows}
               useCase={useCase}
-              carrierOptions={carrierOptions}
+              carrierOptionsByPlatform={carrierOptionsByPlatform}
               onChanged={() => {
                 setTick((t) => t + 1);
                 onChanged();
