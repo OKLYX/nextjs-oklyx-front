@@ -381,7 +381,8 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   const isEmpty = hasLoaded && rows.length === 0;
   const isCoupang = order.platform === 'COUPANG';
   // FEATURE_2610_17 / D28: order confirmation, single invoice and the sheet are open to 11st as well, and the seller
-  // cancel opens as 11st sale refusal (D61); refresh · internal stage · reservation stay Coupang only (D12).
+  // cancel opens as 11st sale refusal (D61); refresh stays Coupang only (D12). Internal stage · reservation are open to
+  // 11st too (FEATURE_2611_23 / D51).
   const isElevenst = order.platform === 'ELEVENST';
   const isMarketOrder = isCoupang || isElevenst;
   // Coupang safe numbers die 48h after delivery; the ordersheet then returns an empty phone.
@@ -423,8 +424,9 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   const canAcknowledge = isAdmin && isMarketOrder && order.status === 'PAID' && !fullyCanceled && !order.reservedSale;
   const canStockConfirm = isAdmin && isElevenst && order.reservedSale && order.status === 'PAID' && !fullyCanceled;
   const stockConfirmed = stockSent || order.stockConfirmSent;
-  // [Internal acknowledge] = Coupang [발주처리] targets without an internal stage (D1·D13 · FEATURE_2610_17 / D12).
-  const canMarkInternal = canAcknowledge && isCoupang && order.internalStage == null;
+  // [Internal acknowledge] = Coupang · 11st [발주처리] targets without an internal stage, 11st visit pickup excluded
+  // (D1·D13 · FEATURE_2610_17 / D12 · FEATURE_2611_23 / D51 · D53).
+  const canMarkInternal = canAcknowledge && (isCoupang || (isElevenst && !order.visitPickup)) && order.internalStage == null;
   // 시트는 쿠팡 전용이 아니다 — 버튼만 비활성되고 안내가 붙으므로 ADMIN 이면 탭을 연다.
   const canSheet = isAdmin;
   const canShip = isAdmin && isMarketOrder && !fullyCanceled;
@@ -789,7 +791,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
 
           {/* 송장(FEATURE_2609_75 / D18 🔁) — 내부 단계 동안 언제나 배송 묶음별 택배사·송장번호를 고친다.
               택배사 목록은 이 모달이 이미 불러온 `carrierOptions` 를 넘긴다(새로 부르지 않는다). */}
-          {isAdmin && isCoupang && shownStage != null && (
+          {isAdmin && (isCoupang || isElevenst) && shownStage != null && (
             <div className="mt-6 border-t border-gray-200 pt-6">
               <StoredInvoiceEditor
                 useCase={useCase}
@@ -801,7 +803,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
           )}
 
           {/* 예약 발송 기록(FEATURE_2609_75 / D30) — 이 주문의 예정·실행 시각과 결과 + 행 작업. 기록이 없으면 그리지 않는다. */}
-          {isAdmin && isCoupang && (
+          {isAdmin && (isCoupang || isElevenst) && (
             <ReservedShipmentHistory
               useCase={useCase}
               externalOrderId={order.externalOrderId}
@@ -1437,7 +1439,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
           isOpen={ackConfirmOpen}
           nested
           title="예약된 주문 포함"
-          message="예약된 주문입니다. 쿠팡에 지금 발주처리하면 해당 주문의 내부 발주·예약 발송이 해제됩니다. 계속할까요?"
+          message="예약된 주문입니다. 마켓에 지금 발주처리하면 해당 주문의 내부 발주·예약 발송이 해제됩니다. 계속할까요?"
           confirmText="발주처리"
           isDangerous
           onConfirm={() => { setAckConfirmOpen(false); void runAcknowledge(); }}

@@ -146,8 +146,8 @@ export function ShipmentContainer() {
   const [confirmKey, setConfirmKey] = useState(0);
   // 발송처리 모달의 저장된 송장 모드 대상(D18 🔁). null = 파일 모드.
   const [storedConfirmIds, setStoredConfirmIds] = useState<number[] | null>(null);
-  // 내부 단계 주문 줄의 [송장 수정] 대상 주문번호(D18 🔁). null = 닫힘.
-  const [invoiceOrderId, setInvoiceOrderId] = useState<string | null>(null);
+  // The order line whose [송장 수정] is open — its order number and its market (D18 🔁 · FEATURE_2611_23 / D64 ②). null = closed.
+  const [invoiceOrder, setInvoiceOrder] = useState<OrderItem | null>(null);
   // 예약 발송 현황 재조회 신호(업로드·예약 취소 뒤).
   const [panelReloadKey, setPanelReloadKey] = useState(0);
   // 페이지 크기는 판매상품 마스터와 같은 25/50/100 (PLAN 2609_17 D16).
@@ -371,8 +371,8 @@ export function ShipmentContainer() {
    *
    * 🔴 Do not use the confirmation whitelist (`isAcknowledgeTarget`) for the checkbox — then an order stuck in
    * preparing has no checkbox and [주문 상태 갱신] stays disabled forever. Unsticking those is why 2609_50 exists,
-   * so the decision is split per action. [주문 상태 갱신] · internal stage stay Coupang only (D12) — their id
-   * lists narrow the selection again below.
+   * so the decision is split per action. [주문 상태 갱신] stays Coupang only (D12) and internal stage is Coupang ·
+   * 11st (FEATURE_2611_23 / D51) — their id lists narrow the selection again below.
    *
    * Confirmation is the narrow one (an irreversible write) — the server filters non-paid lines into `skipped`
    * and reports them (`OrderAcknowledgeServiceImpl`'s `STATUS_PAID` check), so a mixed selection never reaches
@@ -399,10 +399,10 @@ export function ShipmentContainer() {
     return (['COUPANG', 'ELEVENST'] as const).filter((platform) => present.has(platform));
   }, [orders, selectedIds, isAcknowledgeTarget]);
 
-  // Internal-acknowledge targets = Coupang confirmation targets without an internal stage yet (D1 · FEATURE_2610_17 /
-  // D12). The server judges again (PLAN §4-6).
+  // Internal-acknowledge targets = Coupang · 11st confirmation targets without an internal stage yet, 11st visit
+  // pickup excluded (D1 · FEATURE_2610_17 / D12 · FEATURE_2611_23 / D51 · D53). The server judges again (PLAN §4-6).
   const isInternalTarget = useCallback(
-    (o: OrderItem) => isAcknowledgeTarget(o) && o.platform === 'COUPANG' && o.internalStage == null,
+    (o: OrderItem) => isAcknowledgeTarget(o) && (o.platform === 'COUPANG' || (o.platform === 'ELEVENST' && !o.visitPickup)) && o.internalStage == null,
     [isAcknowledgeTarget]);
   // [주문 상태 갱신] sends only the selected Coupang orders (FEATURE_2610_17 / D12).
   const refreshTargetIds = useMemo(
@@ -761,7 +761,7 @@ export function ShipmentContainer() {
           totalPages={totalPages}
           onPageChange={setCurrentPage}
           // 내부 단계 주문 줄의 [송장 수정](D18 🔁) — ADMIN 만. 모달은 아래 `StoredInvoiceModal`.
-          onEditInvoice={isAdmin ? (order) => setInvoiceOrderId(order.externalOrderId) : undefined}
+          onEditInvoice={isAdmin ? (order) => setInvoiceOrder(order) : undefined}
           // 비-ADMIN 에게는 선택 열 자체를 만들지 않는다(서버가 403 인 체크박스를 그리지 않는다).
           selection={isAdmin
             ? { selectedIds, isSelectable, onToggle: toggleOne, onTogglePage: togglePage, isPageAllSelected }
@@ -809,11 +809,12 @@ export function ShipmentContainer() {
 
       {isAdmin && (
         <StoredInvoiceModal
-          key={invoiceOrderId ?? 'none'}
-          externalOrderId={invoiceOrderId}
+          key={invoiceOrder?.externalOrderId ?? 'none'}
+          externalOrderId={invoiceOrder?.externalOrderId ?? null}
+          platform={invoiceOrder?.platform ?? null}
           useCase={shippingLabelUseCase}
           onClose={(didChange) => {
-            setInvoiceOrderId(null);
+            setInvoiceOrder(null);
             // 송장이 바뀌면 현황 카드의 송장 칸도 바뀐다(발송대기중 주문).
             if (didChange) setPanelReloadKey((k) => k + 1);
           }}
@@ -844,7 +845,7 @@ export function ShipmentContainer() {
       <ConfirmDialog
         isOpen={confirmKind === 'acknowledge'}
         title="예약된 주문 포함"
-        message="예약된 주문입니다. 쿠팡에 지금 발주처리하면 해당 주문의 내부 발주·예약 발송이 해제됩니다. 계속할까요?"
+        message="예약된 주문입니다. 마켓에 지금 발주처리하면 해당 주문의 내부 발주·예약 발송이 해제됩니다. 계속할까요?"
         confirmText="발주처리"
         isDangerous
         onConfirm={() => { setConfirmKind(null); void runAcknowledge(ackTargetIds); }}
