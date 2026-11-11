@@ -54,7 +54,7 @@ export function ShippingLabelPreviewModal({
   const [exportError, setExportError] = useState('');
   const [invalidRowKey, setInvalidRowKey] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
-  // 내부 시트에서 쿠팡 결제완료 목록에 없던 주문 수(D26) — 기존 시트에서는 늘 0.
+  // Orders on the internal sheet that were missing from the market's paid list (D26) — always 0 on the regular sheet.
   const [notAcceptedCount, setNotAcceptedCount] = useState(0);
 
   // On open: fetch preview rows on demand. Full rows go into state; the table renders a subset.
@@ -157,7 +157,7 @@ export function ShippingLabelPreviewModal({
     >
       {source === 'internal' && notAcceptedCount > 0 && (
         <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
-          쿠팡에서 결제완료 상태가 아님 {notAcceptedCount}건
+          마켓에서 결제완료 상태가 아님 {notAcceptedCount}건
         </div>
       )}
       {isPreviewing ? (

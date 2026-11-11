@@ -43,8 +43,11 @@ const isInvoiceEditable = (row: ReservedShipmentRow) => isOpen(row) && row.statu
 interface ReservedShipmentRowsProps {
   rows: ReservedShipmentRow[];
   useCase: ShippingLabelUseCase;
-  /** [송장 수정] 택배사 드롭다운. 빈 배열이면 [송장 수정]을 그리지 않는다(주문 상세의 기록 표가 그렇게 쓴다). */
-  carrierOptions: CarrierOption[];
+  /**
+   * [송장 수정] carrier dropdown per market — key = `row.platform` (FEATURE_2611_23 / D64 ③). A row whose market list is
+   * missing or empty does not draw [송장 수정] (the order detail history passes `{}` for that).
+   */
+  carrierOptionsByPlatform: Record<string, CarrierOption[]>;
   /** 작업이 성공하면 부른다 — 부모가 행을 다시 불러온다. */
   onChanged: () => void;
   /**
@@ -68,7 +71,7 @@ interface ReservedShipmentRowsProps {
 export function ReservedShipmentRows({
   rows,
   useCase,
-  carrierOptions,
+  carrierOptionsByPlatform,
   onChanged,
   cardPlacement = 'page',
 }: ReservedShipmentRowsProps) {
@@ -78,6 +81,10 @@ export function ReservedShipmentRows({
   const [timeValue, setTimeValue] = useState('');
   const [carrierValue, setCarrierValue] = useState('');
   const [invoiceValue, setInvoiceValue] = useState('');
+
+  // The row's own market carrier list (FEATURE_2611_23 / D64 ③) — no market = no list.
+  const carrierOptionsOf = (row: ReservedShipmentRow): CarrierOption[] =>
+    row.platform == null ? [] : carrierOptionsByPlatform[row.platform] ?? [];
 
   const act = async (row: ReservedShipmentRow, action: Action) => {
     try {
@@ -119,7 +126,7 @@ export function ReservedShipmentRows({
           시각 변경
         </Button>
       )}
-      {isInvoiceEditable(row) && carrierOptions.length > 0 && (
+      {isInvoiceEditable(row) && carrierOptionsOf(row).length > 0 && (
         <Button size="sm" variant="secondary" onClick={() => openInvoice(row)} disabled={busy !== null}>
           송장 수정
         </Button>
@@ -163,7 +170,7 @@ export function ReservedShipmentRows({
           aria-label="택배사"
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
         >
-          {carrierOptions.map((option) => (
+          {carrierOptionsOf(row).map((option) => (
             <option key={option.deliveryCompanyCode} value={option.deliveryCompanyCode}>
               {option.carrierName}
             </option>

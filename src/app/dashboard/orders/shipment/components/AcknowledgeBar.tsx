@@ -190,10 +190,10 @@ export function AcknowledgeBar({
         </p>
       )}
 
-      {/* 내부 발주처리는 쿠팡에 보내지 않는다 — 쿠팡에는 결제완료로 남는다(D1). */}
+      {/* Internal acknowledge is not sent to the market — the market keeps the order as paid (D1 · FEATURE_2611_23 / D54). */}
       {canAcknowledge && internalCount > 0 && (
         <p className="text-xs text-gray-500">
-          내부 발주처리는 쿠팡에 보내지 않습니다. 쿠팡에는 결제완료로 남고 오클릭스에만 「내부 상품준비중」으로 표시됩니다.
+          내부 발주처리는 마켓에 보내지 않습니다. 마켓에는 결제완료로 남고 오클릭스에만 「내부 상품준비중」으로 표시됩니다.
         </p>
       )}
 
