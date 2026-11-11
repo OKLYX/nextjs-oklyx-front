@@ -3,12 +3,13 @@ import type { PurchaseReceiptRepository } from '@/domain/repositories/PurchaseRe
 import type { ReceiptDetail, ReceiptSummary } from '@/domain/entities/PurchaseReceiptEntity';
 import type {
   CreateReceiptRequest,
+  ReceiptCreateResult,
   ReceiptListParams,
   UpdateReceiptRequest,
 } from '@/application/dto/PurchaseReceiptDTOs';
 
 export class PurchaseReceiptRepositoryImpl implements PurchaseReceiptRepository {
-  async create(photo: File, request: CreateReceiptRequest): Promise<number> {
+  async create(photo: File, request: CreateReceiptRequest): Promise<ReceiptCreateResult> {
     const formData = new FormData();
     formData.append('photo', photo);
     // The server reads this part as JSON (@RequestPart) — it needs the application/json type.
@@ -16,7 +17,7 @@ export class PurchaseReceiptRepositoryImpl implements PurchaseReceiptRepository 
     const response = await axiosInstance.post('/api/admin/purchase-receipts', formData, {
       headers: { 'Content-Type': undefined },
     });
-    return response.data.data.receiptId;
+    return response.data.data;
   }
 
   async search(params: ReceiptListParams): Promise<ReceiptSummary[]> {

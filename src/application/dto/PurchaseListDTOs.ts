@@ -22,11 +22,13 @@ export interface RecordPurchaseRequest {
 
 /**
  * Result of one check-in. stockRecorded=false → no stock written: a negative correction (PLAN 2609_29 D17) or the
- * stock link setting is off (FEATURE_2610_09 D65).
+ * stock link setting is off (FEATURE_2610_09 D65). lotId = the stock row written (the 「채울까요?」 window asks for it,
+ * FEATURE_2611_22 D3 ①); null with stockRecorded=false.
  */
 export interface PurchaseRecordResult {
   purchaseRecordId: number;
   stockRecorded: boolean;
+  lotId: number | null;
 }
 
 /** Manual line add — the seller is required (FEATURE_2610_09 D11). */

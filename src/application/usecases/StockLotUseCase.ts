@@ -1,5 +1,12 @@
 import type { StockLotRepository } from '@/domain/repositories/StockLotRepository';
-import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
+import type {
+  FillCandidate,
+  FillLot,
+  IntakeBarcode,
+  SellerDebtEntry,
+  SellerDebtPair,
+  StockDaily,
+} from '@/domain/entities/StockLotEntity';
 import type {
   DailyDateMoveRequest,
   DailyRowEditRequest,
@@ -8,6 +15,7 @@ import type {
   ReceiptlessAssignRequest,
   SellerChangeRequest,
   SettlementRequest,
+  StockFillRequest,
 } from '@/application/dto/StockLotDTOs';
 import type { CreateReceiptRequest } from '@/application/dto/PurchaseReceiptDTOs';
 
@@ -26,7 +34,7 @@ export class StockLotUseCase {
     return this.repository.barcode(value);
   }
 
-  intake(request: IntakeRequest): Promise<void> {
+  intake(request: IntakeRequest): Promise<number[]> {
     return this.repository.intake(request);
   }
 
@@ -52,6 +60,18 @@ export class StockLotUseCase {
 
   moveDate(request: DailyDateMoveRequest): Promise<void> {
     return this.repository.moveDate(request);
+  }
+
+  fillCandidates(lotIds: number[]): Promise<FillCandidate[]> {
+    return this.repository.fillCandidates(lotIds);
+  }
+
+  fillLots(movementId: number): Promise<FillLot[]> {
+    return this.repository.fillLots(movementId);
+  }
+
+  fill(request: StockFillRequest): Promise<void> {
+    return this.repository.fill(request);
   }
 
   debtPairs(): Promise<SellerDebtPair[]> {

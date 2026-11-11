@@ -1,6 +1,13 @@
 import { axiosInstance } from '@/infrastructure/api/axiosInstance';
 import type { StockLotRepository } from '@/domain/repositories/StockLotRepository';
-import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
+import type {
+  FillCandidate,
+  FillLot,
+  IntakeBarcode,
+  SellerDebtEntry,
+  SellerDebtPair,
+  StockDaily,
+} from '@/domain/entities/StockLotEntity';
 import type {
   DailyDateMoveRequest,
   DailyRowEditRequest,
@@ -9,6 +16,7 @@ import type {
   ReceiptlessAssignRequest,
   SellerChangeRequest,
   SettlementRequest,
+  StockFillRequest,
 } from '@/application/dto/StockLotDTOs';
 import type { CreateReceiptRequest } from '@/application/dto/PurchaseReceiptDTOs';
 
@@ -23,8 +31,9 @@ export class StockLotRepositoryImpl implements StockLotRepository {
     return response.data.data;
   }
 
-  async intake(request: IntakeRequest): Promise<void> {
-    await axiosInstance.post('/api/admin/stock/intake', request);
+  async intake(request: IntakeRequest): Promise<number[]> {
+    const response = await axiosInstance.post('/api/admin/stock/intake', request);
+    return response.data.data.lotIds;
   }
 
   async assign(movedOn: string, photo: File, request: CreateReceiptRequest): Promise<void> {
@@ -70,6 +79,23 @@ export class StockLotRepositoryImpl implements StockLotRepository {
 
   async moveDate(request: DailyDateMoveRequest): Promise<void> {
     await axiosInstance.post('/api/admin/stock/daily/move-date', request);
+  }
+
+  async fillCandidates(lotIds: number[]): Promise<FillCandidate[]> {
+    // One comma-separated value — the server reads it as a list (FEATURE_2611_22 PLAN §3).
+    const response = await axiosInstance.get('/api/admin/stock/fill/candidates', {
+      params: { lotIds: lotIds.join(',') },
+    });
+    return response.data.data;
+  }
+
+  async fillLots(movementId: number): Promise<FillLot[]> {
+    const response = await axiosInstance.get('/api/admin/stock/fill/lots', { params: { movementId } });
+    return response.data.data;
+  }
+
+  async fill(request: StockFillRequest): Promise<void> {
+    await axiosInstance.post('/api/admin/stock/fill', request);
   }
 
   async debtPairs(): Promise<SellerDebtPair[]> {

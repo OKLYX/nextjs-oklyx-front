@@ -14,6 +14,7 @@ import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerReposi
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { IntakeReason } from '@/application/dto/StockLotDTOs';
 import { toast } from '@/infrastructure/stores/toastStore';
+import { openFillFlow } from '@/infrastructure/stores/fillFlowStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ScanInput } from '../../packing/components/ScanInput';
 import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
@@ -262,7 +263,7 @@ export function IntakeContainer() {
     setIsSaving(true);
     setMessage('');
     try {
-      await lotUseCase.intake({
+      const lotIds = await lotUseCase.intake({
         movedOn,
         lines: cart.map((line) => ({
           productId: line.productId,
@@ -273,6 +274,7 @@ export function IntakeContainer() {
       });
       toast.success('입고를 저장했습니다.');
       setCart([]);
+      openFillFlow(lotIds);                          // FEATURE_2611_22 D3 ① · D31
     } catch (err) {
       setMessage(extractErrorMessage(err, '입고를 저장하지 못했습니다.'));
     } finally {

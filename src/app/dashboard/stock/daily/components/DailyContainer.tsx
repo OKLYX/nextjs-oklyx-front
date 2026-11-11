@@ -18,6 +18,7 @@ import {
   PRICE_FROM_BASE_LABEL,
   RECEIPT_PENDING_BOX_LABEL,
   UNDECIDED_BOX_LABEL,
+  filledLaterLabel,
   UNDECIDED_SELLER_LABEL,
   formatWonOrUnknown,
   rowEditTarget,
@@ -38,6 +39,7 @@ import { SellerChangeModal } from './SellerChangeModal';
 import { PurchasePriceModal } from './PurchasePriceModal';
 import { RowEditModal } from './RowEditModal';
 import { DateMoveModal } from './DateMoveModal';
+import { RowFillModal } from './RowFillModal';
 import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
 
 /**
@@ -64,6 +66,8 @@ import { StockProductThumb } from '@/app/dashboard/stock/components/StockProduct
  * - FEATURE_2611_21: a row whose day was corrected shows 「날짜 고침」 (D24) · 「○월 ○일 입고로 이동」 (D19) shows every row
  *   (chip 「전체」, boxes off), loads the lot's day and opens the lot's popup, or highlights the lot and its share
  *   lines for 2 seconds when it has none.
+ * - FEATURE_2611_22: a row that got its lot later shows `filledLaterLabel` (D9) · [입고로 채우기] of the 「날짜 바꾸기」
+ *   window opens `RowFillModal` (D3 ②).
  */
 
 type AssignMode = 'RECEIPT' | 'WITHOUT_RECEIPT';
@@ -114,6 +118,7 @@ export function DailyContainer() {
   const [receiptBox, setReceiptBox] = useState(false);
   const [editTarget, setEditTarget] = useState<RowEditTarget | null>(null);
   const [dateTarget, setDateTarget] = useState<StockDailyRow | null>(null);
+  const [fillTarget, setFillTarget] = useState<StockDailyRow | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   // The lot 「입고로 이동」 asked for — read once by the next load (D19).
   const focusRef = useRef<number | null>(null);
@@ -238,6 +243,7 @@ export function DailyContainer() {
     setIsPriceOpen(false);
     setEditTarget(null);
     setDateTarget(null);
+    setFillTarget(null);
     await load(date);
   };
 
@@ -388,6 +394,12 @@ export function DailyContainer() {
                           <span className="text-xs text-blue-600">{DATE_EDITED_LABEL}</span>
                         </>
                       )}
+                      {row.filledLater && row.sourceMovedOn !== null && (
+                        <>
+                          {' '}
+                          <span className="text-xs text-blue-600">{filledLaterLabel(row.sourceMovedOn)}</span>
+                        </>
+                      )}
                     </td>
                     <td className="px-4 py-2 text-gray-900">
                       <div className="flex items-center gap-2">
@@ -491,7 +503,13 @@ export function DailyContainer() {
         onClose={() => setDateTarget(null)}
         onSaved={afterSave}
         onGoToIntake={goToIntake}
+        onFill={(row) => {
+          setDateTarget(null);
+          setFillTarget(row);
+        }}
       />
+
+      <RowFillModal row={fillTarget} onClose={() => setFillTarget(null)} onSaved={afterSave} />
     </PageContainer>
   );
 }
