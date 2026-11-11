@@ -1,4 +1,11 @@
-import type { IntakeBarcode, SellerDebtEntry, SellerDebtPair, StockDaily } from '@/domain/entities/StockLotEntity';
+import type {
+  FillCandidate,
+  FillLot,
+  IntakeBarcode,
+  SellerDebtEntry,
+  SellerDebtPair,
+  StockDaily,
+} from '@/domain/entities/StockLotEntity';
 import type {
   DailyDateMoveRequest,
   DailyRowEditRequest,
@@ -7,6 +14,7 @@ import type {
   ReceiptlessAssignRequest,
   SellerChangeRequest,
   SettlementRequest,
+  StockFillRequest,
 } from '@/application/dto/StockLotDTOs';
 import type { CreateReceiptRequest } from '@/application/dto/PurchaseReceiptDTOs';
 
@@ -14,7 +22,8 @@ import type { CreateReceiptRequest } from '@/application/dto/PurchaseReceiptDTOs
 export interface StockLotRepository {
   daily(date: string): Promise<StockDaily>;
   barcode(value: string): Promise<IntakeBarcode>;
-  intake(request: IntakeRequest): Promise<void>;
+  /** 「입고 작업」 [입고 저장]: the stock rows written, in line order (FEATURE_2611_22 D3 ①). */
+  intake(request: IntakeRequest): Promise<number[]>;
   /** Receipt assignment of the day on the screen (D118 · D121). */
   assign(movedOn: string, photo: File, request: CreateReceiptRequest): Promise<void>;
   /** 「영수증 없이 판매자 정하기」 of the day on the screen (FEATURE_2611_01 D2 · D4). */
@@ -27,6 +36,12 @@ export interface StockLotRepository {
   editRow(movedOn: string, photo: File | null, request: DailyRowEditRequest): Promise<void>;
   /** The 「날짜 바꾸기」 window (FEATURE_2611_21 D9). */
   moveDate(request: DailyDateMoveRequest): Promise<void>;
+  /** The 「채울까요?」 window of the given saved lots (FEATURE_2611_22 D3 ① · D31); empty = no window. */
+  fillCandidates(lotIds: number[]): Promise<FillCandidate[]>;
+  /** The lots [입고로 채우기] offers for one row (FEATURE_2611_22 D15). */
+  fillLots(movementId: number): Promise<FillLot[]>;
+  /** [채우기] (FEATURE_2611_22 D3). */
+  fill(request: StockFillRequest): Promise<void>;
   debtPairs(): Promise<SellerDebtPair[]>;
   debtEntries(sellerAId: number, sellerBId: number): Promise<SellerDebtEntry[]>;
   settle(request: SettlementRequest): Promise<void>;

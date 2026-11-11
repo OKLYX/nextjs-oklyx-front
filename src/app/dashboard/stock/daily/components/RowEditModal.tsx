@@ -32,7 +32,7 @@ import { DateEditHistory } from './DateEditHistory';
  *
  * - 「판매자」: a select when the target is seller-changeable, otherwise the seller's name as text.
  * - Price (`target.price` not null): 「금액 기준」 total/unit and the amount (blank = keep); 「상품 기준가에 반영」 for a
- *   purchase only (an opening-stock row has none, D18).
+ *   purchase only (an opening-stock or 「기타」 intake row has none, D18 · FEATURE_2611_22 D38).
  * - Receipt (`target.receipt`): PICK = 「영수증 없음」 · a receipt of that day (`dayReceiptChoices`, D23) · a new photo
  *   with its card · LATER_PHOTO = a photo for the 「영수증 나중에」 receipt, no card (D19) · FIXED = the receipt as
  *   text · null = no receipt field (D20).

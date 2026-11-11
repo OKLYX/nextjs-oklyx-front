@@ -23,6 +23,15 @@ export interface CreateReceiptRequest {
 }
 
 /**
+ * Result of a receipt check-in: the new receipt and the stock rows its lines wrote, in line order (the 「채울까요?」
+ * window asks for them, FEATURE_2611_22 D3 ①).
+ */
+export interface ReceiptCreateResult {
+  receiptId: number;
+  lotIds: number[];
+}
+
+/**
  * Receipt header edit (D100) — same card rule as CreateReceiptRequest: cardId set → the card owner pays (payerSellerId
  * omitted); cardId omitted (「카드로 알 수 없음」) → payerSellerId is required. The lines never change; a missing photo is
  * added by attachPhoto before this edit (FEATURE_2611_01 D4), a saved photo never changes.

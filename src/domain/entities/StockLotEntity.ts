@@ -59,7 +59,7 @@ export interface StockDailyRow {
   unitPrices: UnitCount[] | null;
   /** A part of `amount` has a unit price filled from the registered price — show 「미기입」 next to it (D22). */
   priceFromBase: boolean;
-  /** An opening-stock row the row popup may price (FEATURE_2611_17 D5 · D17). */
+  /** An opening-stock or 「기타」 intake row the row popup may price (FEATURE_2611_17 D5 · D17 · FEATURE_2611_22 D38). */
   openingPriceEditable: boolean;
   /** Outgoing rows only: the lot it came from (FEATURE_2611_21 D18 · D22); null = no lot or not an outgoing row. */
   sourceMovementId: number | null;
@@ -69,6 +69,10 @@ export interface StockDailyRow {
   sourcePriceEditable: boolean;
   /** The day corrections of this row, newest first (FEATURE_2611_21 D24); empty = never corrected. */
   dateEdits: StockDateEdit[];
+  /** An order outbound row without a lot that [입고로 채우기] may fill (FEATURE_2611_22 D3 ② · D11 · D28). */
+  fillable: boolean;
+  /** The row got its lot later — `filledLaterLabel(sourceMovedOn)` (FEATURE_2611_22 D9). */
+  filledLater: boolean;
 }
 
 /** One day correction of a daily row (FEATURE_2611_21 D7 · D24). `editedAt` = KST wall clock as stored. */
@@ -166,6 +170,61 @@ export function goToIntakeLabel(day: string): string {
   return `${monthDayText(day)} 입고로 이동`;
 }
 
+/** The mark of a row that got its lot later (FEATURE_2611_22 D9 · D27): 「11월 7일 입고로 나중에 채움」. */
+export function filledLaterLabel(day: string): string {
+  return `${monthDayText(day)} 입고로 나중에 채움`;
+}
+
+/** The fixed texts of filling a row later (FEATURE_2611_22 D27) — the server sends the same refusals. */
+export const FILL_BUTTON_LABEL = '입고로 채우기';
+export const NO_FILL_LOT_MESSAGE = '채울 수 있는 입고가 없습니다.';
+
+/** The head of the 「채울까요?」 window (D27 · D30): 「입고 기록 없이 나간 출고 2건(5개)이 있습니다. 이 입고로 채울까요?」. */
+export function fillWindowHead(rowCount: number, emptyQuantity: number): string {
+  return `입고 기록 없이 나간 출고 ${rowCount}건(${emptyQuantity}개)이 있습니다. 이 입고로 채울까요?`;
+}
+
+/** A lot's label in both windows (D15 · D19): 「11월 7일 입고 · A상사 · 4개」, an undecided lot 「… · 영수증 미등록 · …」. */
+export function fillLotLabel(movedOn: string, sellerName: string | null, quantity: number): string {
+  return `${monthDayText(movedOn)} 입고 · ${sellerName ?? '영수증 미등록'} · ${quantity}개`;
+}
+
+/** One row of the 「채울까요?」 window (FEATURE_2611_22 D19 · D23); `checkedQuantity` 0 = not checked at first. */
+export interface FillRow {
+  movementId: number;
+  orderNumber: string;
+  movedOn: string;
+  sellerName: string;
+  emptyQuantity: number;
+  checkedQuantity: number;
+}
+
+/** One saved lot of a window, with every row in D17 order (D32). `sellerName` null = 「영수증 미등록」. */
+export interface FillCandidateLot {
+  lotId: number;
+  movedOn: string;
+  sellerName: string | null;
+  quantity: number;
+  rows: FillRow[];
+}
+
+/** One product's 「채울까요?」 window (D30 · D31): N = `rowCount`, M = `emptyQuantity`. */
+export interface FillCandidate {
+  productId: number;
+  productName: string;
+  rowCount: number;
+  emptyQuantity: number;
+  lots: FillCandidateLot[];
+}
+
+/** One lot [입고로 채우기] offers (D15). `sellerName` null = 「영수증 미등록」. */
+export interface FillLot {
+  lotId: number;
+  movedOn: string;
+  sellerName: string | null;
+  quantity: number;
+}
+
 /** The column title of the outbound tags (FEATURE_2611_17 D3). */
 export const OTHER_STOCK_COLUMN_LABEL = '타출처 재고 사용';
 
@@ -235,7 +294,7 @@ export function visibleDailyRows(
  * What the row popup can change for one row or share (FEATURE_2611_17 D5 · D10 · D12 · D17 ~ D20 · D24):
  * - `sellerEditable` = a 「판매자 바꾸기」 target (row `sellerChangeable` · share `sellerChangeable`).
  * - `price` = PURCHASE (a 「매입가 넣기」 target — total or unit price + 「상품 기준가에 반영」) · OPENING (an
- *   opening-stock row — total or unit price only, D18) · null (no price field).
+ *   opening-stock or 「기타」 intake row — total or unit price only, D18 · FEATURE_2611_22 D38) · null (no price field).
  * - `receipt` = PICK (「영수증 없음」 purchase — a receipt of that day or a new photo, D6 · D23) · LATER_PHOTO
  *   (「영수증 나중에」 — a photo for that receipt, D19) · FIXED (a receipt with its photo — shown as text, D19) · null
  *   (not a purchase — no receipt field, D20).

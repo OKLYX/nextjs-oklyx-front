@@ -17,6 +17,7 @@ import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { openFillFlow } from '@/infrastructure/stores/fillFlowStore';
 import { ShareActionCell, TargetMetTag, type ShareActions } from './purchaseShareUi';
 import { ReceiptDetailModal } from '../../receipts/components/ReceiptDetailModal';
 import { platformName } from '@/config/platforms';
@@ -285,6 +286,8 @@ export function PurchaseGroupDetail({
             '재고는 반영되지 않았습니다 — 실물이 줄었다면 재고 화면에서 조정하세요'
           );
         }
+        // FEATURE_2611_22 D3 ①: the 「채울까요?」 window of the stock row just written.
+        if (result.lotId !== null) openFillFlow([result.lotId]);
         form.reset(checkInDefaults(defaultSellerId));
         // 방금 넣은 건이 안 보이면 이상하다 — 이력 캐시를 버린다.
         setRecords(null);
