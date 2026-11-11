@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment } from 'react';
-import { componentQuantitiesLabel, getCustomerName } from '@/domain/entities/OrderEntity';
+import { componentQuantitiesLabel, getCustomerName, salesChannelLabel } from '@/domain/entities/OrderEntity';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { InternalStageBadge } from './InternalStageBadge';
@@ -52,6 +52,8 @@ interface Column {
 
 const COLUMNS: Column[] = [
   { key: 'externalOrderId', label: '주문번호', align: 'left' },
+  { key: 'sellerName', label: '판매자', align: 'left' },
+  { key: 'accountAlias', label: '판매처', align: 'left' },
   { key: 'receiverName', label: '고객명', align: 'left' },
   { key: 'itemName', label: '상품명', align: 'left' },
   { key: 'orderCount', label: '주문수량', align: 'right' },
@@ -95,7 +97,8 @@ export function OrderTable({
   }
 
   // Narrow-screen cards (FEATURE_2610_31 D13 · D14 · D31 · D34): the app's order card — the row checkbox
-  // (「출고관리」 acknowledgement), the photo (tap = zoom), bold order number with the stage · reserved badges and [송장 수정], 「고객 …」,
+  // (「출고관리」 acknowledgement), the photo (tap = zoom), bold order number with the stage · reserved badges and [송장 수정],
+  // 「판매자 … · 판매처 …」 (FEATURE_2611_24 / D5 · D17), 「고객 …」,
   // the product, 「주문수량 N · 취소 N」, 「실제 상품 수량 …」 (FEATURE_2611_15 / D17) and 「결제일 …」. A tap opens the order like a row tap. 「전체 선택」 and the
   // sort select with the direction button sit above the cards.
   const renderCards = () =>
@@ -151,6 +154,10 @@ export function OrderTable({
           }
           body={
             <div className="space-y-1.5">
+              <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                <span>판매자 {order.sellerName ?? '-'}</span>
+                <span>판매처 {salesChannelLabel(order.platform, order.accountAlias)}</span>
+              </p>
               <p className="truncate text-[13px] text-gray-500">고객 {getCustomerName(order)}</p>
               <p className="text-[13px] text-gray-900">{order.itemName ?? '-'}</p>
               <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
@@ -281,6 +288,8 @@ export function OrderTable({
                   </button>
                 )}
               </td>
+              <td className="px-6 py-3 text-sm text-gray-700">{order.sellerName ?? '-'}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">{salesChannelLabel(order.platform, order.accountAlias)}</td>
               <td className="px-6 py-3 text-sm text-gray-700">{getCustomerName(order)}</td>
               <td className="px-6 py-3 text-sm text-gray-700">
                 <div className="flex items-center gap-2">

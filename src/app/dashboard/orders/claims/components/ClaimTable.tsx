@@ -2,6 +2,7 @@
 
 import { CLAIM_STATUS_LABEL, faultTypeText } from '@/domain/entities/ClaimEntity';
 import type { Claim, ClaimType } from '@/domain/entities/ClaimEntity';
+import { salesChannelLabel } from '@/domain/entities/OrderEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { DataCard } from '@/presentation/components/DataCard';
 import { Button } from '@/presentation/components/ui/Button';
@@ -25,11 +26,13 @@ interface ClaimTableProps {
   emptyMessage: string;
 }
 
-// Headers are a static list: 사유 and 귀책 are derived values, not one field of Claim,
-// so a `keyof Claim` column array (like OrderTable's) cannot describe them.
+// Headers are a static list: 사유, 귀책 and 판매처 are derived values, not one field of Claim,
+// so a `keyof Claim` column array (like OrderTable's) cannot describe them. Only 접수일 sorts (FEATURE_2611_24 / D16).
 const HEADERS: { label: string; align: 'left' | 'right'; sortable?: boolean }[] = [
   { label: '접수일', align: 'left', sortable: true },
   { label: '주문번호', align: 'left' },
+  { label: '판매자', align: 'left' },
+  { label: '판매처', align: 'left' },
   { label: '상품', align: 'left' },
   { label: '수량', align: 'right' },
   { label: '사유', align: 'left' },
@@ -77,7 +80,8 @@ export function ClaimTable({
   }
 
   // Narrow-screen cards (FEATURE_2610_31 D14 · D31 · D37): the app's claim card — bold order number with the
-  // 「주문 미연결」 · 「우리 기록」 · status badges on the right, the product (two lines), 「수량 N · 사유 …」 and
+  // 「주문 미연결」 · 「우리 기록」 · status badges on the right,
+  // 「판매자 … · 판매처 …」 (FEATURE_2611_24 / D14 · D17), the product (two lines), 「수량 N · 사유 …」 and
   // 「접수일 …」; the table's 「귀책」 · 「회수송장」 · 「재발송송장」 (exchange tab only) at the bottom. A tap opens
   // the claim like a row tap; the 「접수일」 sort sits above the cards.
   const renderCards = () =>
@@ -101,6 +105,10 @@ export function ClaimTable({
         }
         body={
           <div className="space-y-1.5">
+            <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+              <span>판매자 {claim.sellerName ?? '-'}</span>
+              <span>판매처 {salesChannelLabel(claim.platform, claim.accountAlias)}</span>
+            </p>
             <p className="line-clamp-2 text-[13px] text-gray-900">{claim.itemName ?? '-'}</p>
             <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
               <span>수량 {claim.quantity}</span>
@@ -172,6 +180,8 @@ export function ClaimTable({
                   </span>
                 )}
               </td>
+              <td className="px-6 py-3 text-sm text-gray-700">{claim.sellerName ?? '-'}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">{salesChannelLabel(claim.platform, claim.accountAlias)}</td>
               <td className="px-6 py-3 text-sm text-gray-700">{claim.itemName ?? '-'}</td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">{claim.quantity}</td>
               <td className="px-6 py-3 text-sm text-gray-700">

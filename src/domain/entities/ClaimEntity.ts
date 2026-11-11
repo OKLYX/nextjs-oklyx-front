@@ -47,6 +47,7 @@ export interface Claim {
   receivedAt: string;            // ISO
   sellerId: number | null;
   sellerName: string | null;
+  accountAlias: string | null;   // sales channel alias — material for the 「판매처」 text (FEATURE_2611_24 / D13)
   orderItemId: number | null;
   linked: boolean;               // false = not linked to an order line (D12)
   availableActions: ClaimAction[];   // server-decided; empty for non-ADMIN, unsupported platforms
