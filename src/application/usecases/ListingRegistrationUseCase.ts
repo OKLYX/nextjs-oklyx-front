@@ -41,6 +41,8 @@ import type {
   ListingMarginResponse,
   MarginPreviewRequest,
   SiteMargin,
+  ListingUpdatePreview,
+  ListingUpdateSelectionRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -72,8 +74,12 @@ export class ListingRegistrationUseCase {
     return this.repository.register(listingId);
   }
 
-  updateRequest(listingId: number): Promise<ListingRegisterResponse> {
-    return this.repository.updateRequest(listingId);
+  updateRequest(listingId: number, data?: ListingUpdateSelectionRequest): Promise<ListingRegisterResponse> {
+    return this.repository.updateRequest(listingId, data);
+  }
+
+  getUpdatePreview(listingId: number): Promise<ListingUpdatePreview> {
+    return this.repository.getUpdatePreview(listingId);
   }
 
   fetchStatus(listingId: number): Promise<ListingStatusResponse> {
