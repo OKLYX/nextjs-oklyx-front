@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StockLotUseCase } from '@/application/usecases/StockLotUseCase';
 import { StockLotRepositoryImpl } from '@/infrastructure/repositories/StockLotRepositoryImpl';
 import {
+  FILL_BUTTON_LABEL,
   NO_SOURCE_MESSAGE,
   RECEIPT_SHARE_DATE_MESSAGE,
   SOURCE_FIXED_MESSAGE,
@@ -27,7 +28,8 @@ import { DateEditHistory } from './DateEditHistory';
  *   day; [저장] with the same day closes the window without a request.
  * - An undecided row with a share on a receipt with its photo: the field is off with `RECEIPT_SHARE_DATE_MESSAGE` (D13).
  * - An outgoing row: with a lot → 「○월 ○일 입고로 이동」 (`onGoToIntake`), plus `SOURCE_FIXED_MESSAGE` when that lot has no
- *   value to fix · without a lot → `NO_SOURCE_MESSAGE` (D20).
+ *   value to fix · without a lot → `NO_SOURCE_MESSAGE` (D20), with [입고로 채우기] (`onFill`) next to it when the row is
+ *   `fillable` (FEATURE_2611_22 D3 ② · D27).
  * - The row's day corrections below (D24).
  */
 
@@ -43,9 +45,11 @@ interface DateMoveModalProps {
   onSaved: () => void | Promise<void>;
   /** 「○월 ○일 입고로 이동」 (D19): the lot and its day. */
   onGoToIntake: (movementId: number, day: string) => void;
+  /** [입고로 채우기] (FEATURE_2611_22 D3 ②): the row to fill. */
+  onFill: (row: StockDailyRow) => void;
 }
 
-export function DateMoveModal({ row, date, onClose, onSaved, onGoToIntake }: DateMoveModalProps) {
+export function DateMoveModal({ row, date, onClose, onSaved, onGoToIntake, onFill }: DateMoveModalProps) {
   const lotUseCase = useMemo(() => new StockLotUseCase(new StockLotRepositoryImpl()), []);
   const [movedOn, setMovedOn] = useState(date);
   const [error, setError] = useState('');
@@ -161,7 +165,14 @@ export function DateMoveModal({ row, date, onClose, onSaved, onGoToIntake }: Dat
                 )}
               </>
             ) : (
-              <p className="text-xs text-gray-500">{NO_SOURCE_MESSAGE}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs text-gray-500">{NO_SOURCE_MESSAGE}</p>
+                {row.fillable && (
+                  <Button size="sm" variant="secondary" disabled={isSubmitting} onClick={() => onFill(row)}>
+                    {FILL_BUTTON_LABEL}
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         )}

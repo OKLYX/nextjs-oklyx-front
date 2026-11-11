@@ -17,6 +17,7 @@ import {
 } from '@/domain/entities/StockEntity';
 import { ProductPicker } from '@/presentation/components/ProductPicker';
 import { usePurchaseSettingStore } from '@/infrastructure/stores/purchaseSettingStore';
+import { openFillFlow } from '@/infrastructure/stores/fillFlowStore';
 
 /**
  * 후보 목록(입고 대기 · 반품 대기)이 폼을 채울 때 쓰는 값.
@@ -182,6 +183,8 @@ export function StockInOutForm({ sellers, prefill, onRecorded }: StockInOutFormP
         `${STOCK_MOVEMENT_TYPE_LABELS[movement.movementType]} ${movement.quantity} 기록됨 — ${movement.productName} / ${movement.sellerName}`
       );
       form.reset({ ...defaults(), movedOn: data.movedOn });
+      // FEATURE_2611_22 D3 ①: the server answers an empty window for a row that is not a lot (disposal, return …).
+      openFillFlow([movement.id]);
       await onRecorded();
     } catch (err) {
       // 조합 규칙(사유·단가·참조)의 주인은 서버다 — 메시지를 번역하지 않고 원문 그대로 보여준다.

@@ -8,6 +8,7 @@ import { Navbar } from './components/Navbar';
 import { ToolRail } from './components/ToolRail';
 import { ToolPanel } from './components/ToolPanel';
 import { ToastViewport } from '@/presentation/components/ToastViewport';
+import { FillFlowHost } from '@/presentation/components/FillFlowHost';
 import { useNavigationStore } from '@/infrastructure/stores/navigationStore';
 import { useToolPanelStore } from '@/infrastructure/stores/toolPanelStore';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
@@ -216,6 +217,8 @@ export default function DashboardLayout({
       <ToolRail />
       {/* 웹 공용 잠깐 알림(FEATURE_2609_77). 🔴 이 한 곳에서만 마운트한다. */}
       <ToastViewport />
+      {/* The 「채울까요?」 windows after an intake save (FEATURE_2611_22 D3 ①). 🔴 Mounted here only. */}
+      <FillFlowHost />
     </div>
   );
 }

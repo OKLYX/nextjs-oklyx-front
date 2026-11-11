@@ -13,6 +13,7 @@ import type { SellerCard } from '@/domain/entities/SellerCardEntity';
 import type { CreateReceiptRequest } from '@/application/dto/PurchaseReceiptDTOs';
 import { toast } from '@/infrastructure/stores/toastStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
+import { openFillFlow } from '@/infrastructure/stores/fillFlowStore';
 import { Button } from '@/presentation/components/ui/Button';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { ProductPicker } from '@/presentation/components/ProductPicker';
@@ -184,8 +185,9 @@ export function ReceiptIntakeModal({ isOpen, sellers, onClose, onSaved }: Receip
     };
     setIsSubmitting(true);
     try {
-      await receiptUseCase.create(photo, request);
+      const created = await receiptUseCase.create(photo, request);
       toast.success('영수증 입고를 저장했습니다.');
+      openFillFlow(created.lotIds);                  // FEATURE_2611_22 D3 ① · D31
       await onSaved();
     } catch (err) {
       setSubmitError(extractErrorMessage(err, '영수증 입고를 저장하지 못했습니다.'));

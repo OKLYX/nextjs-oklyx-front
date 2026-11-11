@@ -2,6 +2,7 @@ import type { PurchaseReceiptRepository } from '@/domain/repositories/PurchaseRe
 import type { ReceiptDetail, ReceiptSummary } from '@/domain/entities/PurchaseReceiptEntity';
 import type {
   CreateReceiptRequest,
+  ReceiptCreateResult,
   ReceiptListParams,
   UpdateReceiptRequest,
 } from '@/application/dto/PurchaseReceiptDTOs';
@@ -9,7 +10,7 @@ import type {
 export class PurchaseReceiptUseCase {
   constructor(private repository: PurchaseReceiptRepository) {}
 
-  async create(photo: File, request: CreateReceiptRequest): Promise<number> {
+  async create(photo: File, request: CreateReceiptRequest): Promise<ReceiptCreateResult> {
     return this.repository.create(photo, request);
   }
 

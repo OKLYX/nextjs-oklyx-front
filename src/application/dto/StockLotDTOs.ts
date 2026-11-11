@@ -72,6 +72,14 @@ export interface DailyDateMoveRequest {
   newMovedOn: string;
 }
 
+/**
+ * [채우기] of the 「채울까요?」 window and of [입고로 채우기] (FEATURE_2611_22 D3 · D15 · D23 · D32): per lot, the
+ * order outbound rows without a lot it fills and how many pieces each (1 or more), in the order they are applied.
+ */
+export interface StockFillRequest {
+  fills: { lotId: number; lines: { movementId: number; quantity: number }[] }[];
+}
+
 /** 「돈으로 정리」 (D90 · D99 ①). */
 export interface SettlementRequest {
   payerSellerId: number;
