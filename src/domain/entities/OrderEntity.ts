@@ -33,6 +33,9 @@ export interface OrderItem {
   id: number;
   marketplaceAccountId: number;
   platform: string;
+  // Seller name and sales channel alias the server puts on every line; absent from older servers (FEATURE_2611_24 / D8 · D10).
+  sellerName: string | null;
+  accountAlias: string | null;
   externalOrderId: string;
   externalBoxId: string | null;
   externalItemId: string;
@@ -170,13 +173,24 @@ export const parcelChipLabel = (parcel: Pick<OrderDetailParcel, 'invoiceNumber' 
   `${parcel.invoiceNumber} · ${PARCEL_STATUS_LABELS[parcel.status]}`;
 
 /**
- * 「판매처」 text of the order detail (D35): 「{channel} · {alias}」, or only 「{channel}」 when the alias is blank.
+ * 「판매처」 text (D35) — the one source for the order detail, the order list (`OrderTable`) and the claim list (`ClaimTable`) (FEATURE_2611_24 / D15).
+ * 「{channel} · {alias}」, or only 「{channel}」 when the alias is blank.
  * ⚠️ Not the packing screen's channel text (alias alone) — that one stays as it is (D35).
  */
 export const salesChannelLabel = (platform: string | null, accountAlias: string | null): string => {
   const channel = platformName(platform ?? '') || '-';
   const alias = accountAlias?.trim();
   return alias ? `${channel} · ${alias}` : channel;
+};
+
+/**
+ * Compare value for sorting the order list — the 판매자 and 판매처 columns compare by their on-screen text
+ * (FEATURE_2611_24 / D6); every other column compares by the raw field.
+ */
+export const orderSortValue = (order: OrderItem, key: keyof OrderItem): OrderItem[keyof OrderItem] => {
+  if (key === 'sellerName') return order.sellerName ?? '-';
+  if (key === 'accountAlias') return salesChannelLabel(order.platform, order.accountAlias);
+  return order[key];
 };
 
 // The reserved-sale label next to the status (FEATURE_2610_17 / D67) — one source for the list and the detail.
