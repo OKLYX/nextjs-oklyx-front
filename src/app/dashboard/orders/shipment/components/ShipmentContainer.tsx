@@ -10,7 +10,7 @@ import { ShippingLabelRepositoryImpl } from '@/infrastructure/repositories/Shipp
 import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import type { OrderItem, OrderSearchField } from '@/domain/entities/OrderEntity';
-import { SHIPMENT_STATUSES, matchesOrderSearch } from '@/domain/entities/OrderEntity';
+import { SHIPMENT_STATUSES, matchesOrderSearch, orderSortValue } from '@/domain/entities/OrderEntity';
 import type {
   InternalStageResult, OrderAcknowledgeResult, OrderRefreshResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
@@ -335,8 +335,8 @@ export function ShipmentContainer() {
     if (sortKey == null) return visible;
     const copy = [...visible];
     copy.sort((a, b) => {
-      const aValue = a[sortKey];
-      const bValue = b[sortKey];
+      const aValue = orderSortValue(a, sortKey);
+      const bValue = orderSortValue(b, sortKey);
       // Null values always go last regardless of direction
       if (aValue == null && bValue == null) return 0;
       if (aValue == null) return 1;

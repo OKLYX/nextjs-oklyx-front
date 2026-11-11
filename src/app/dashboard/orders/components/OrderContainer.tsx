@@ -9,7 +9,7 @@ import { ShippingLabelRepositoryImpl } from '@/infrastructure/repositories/Shipp
 import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import type { OrderItem } from '@/domain/entities/OrderEntity';
-import { CANCELED_FILTER, matchesOrderSearch } from '@/domain/entities/OrderEntity';
+import { CANCELED_FILTER, matchesOrderSearch, orderSortValue } from '@/domain/entities/OrderEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import {
   RECENT_PERIOD, buildPeriodOptions, isMonthPeriod, toPeriodRange,
@@ -259,8 +259,8 @@ export function OrderContainer() {
     if (sortKey == null) return filteredOrders;
     const copy = [...filteredOrders];
     copy.sort((a, b) => {
-      const aValue = a[sortKey];
-      const bValue = b[sortKey];
+      const aValue = orderSortValue(a, sortKey);
+      const bValue = orderSortValue(b, sortKey);
       // Null values always go last regardless of direction
       if (aValue == null && bValue == null) return 0;
       if (aValue == null) return 1;
