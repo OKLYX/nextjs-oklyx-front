@@ -19,6 +19,7 @@ import { ElevenstChannelShippingModal } from './ElevenstChannelShippingModal';
 import { EsmChannelShippingModal } from './EsmChannelShippingModal';
 import { LotteonChannelShippingModal } from './LotteonChannelShippingModal';
 import { ListingOptionPickerDialog, SHIPPING_BLOCKED_REASON } from './ListingOptionPickerDialog';
+import { CoupangUpdateRequestModal } from './CoupangUpdateRequestModal';
 import { asLookupPlatform, categoryBlockReason } from '../../components/platformCategory';
 import type { MasterOptionResponse } from '@/domain/entities/MasterProductEntity';
 import type {
@@ -131,7 +132,7 @@ type Busy =
  *   the parent row must be flex-wrap.
  *
  * Market calls are async (they return at once) — approval is checked later with [승인 새로고침].
- * [수정 요청](109): force re-push of a registered cell's (not DRAFT) current values → re-review (SUBMITTED).
+ * [수정 요청](109): force re-push of a registered cell's (not DRAFT) current values → re-review (SUBMITTED). Coupang opens `CoupangUpdateRequestModal` (FEATURE_2611_25 / D12)
  * ⚠️ Behaviour (handlers · confirms · modals) is the same as in the button-row days — only the placement
  *    and grouping changed.
  */
@@ -182,6 +183,8 @@ export function CellActions({
   const [showApplyNames, setShowApplyNames] = useState(false);
   // 2609_77/S10: [수정 요청] 확인창(공용 ConfirmDialog — 예전엔 브라우저 기본 확인창이었다).
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
+  // FEATURE_2611_25 / D12: Coupang [수정 요청] = item comparison window instead of the confirm.
+  const [showCoupangUpdate, setShowCoupangUpdate] = useState(false);
   // 2609_63: boolean 이 아니라 **대상 셀**을 담는다 — 한 계정에 셀이 여럿일 수 있어(D10-1)
   // "열려 있다"만으로는 어느 셀을 떼는지 알 수 없다.
   const [unlinkTarget, setUnlinkTarget] = useState<CellRef | null>(null);
@@ -246,6 +249,17 @@ export function CellActions({
     } finally {
       setBusy(null);
     }
+  };
+
+  // FEATURE_2611_25 / D12: Coupang → comparison window · other markets → the existing confirm.
+  const openUpdateRequest = () => (platform === 'COUPANG' ? setShowCoupangUpdate(true) : setShowUpdateConfirm(true));
+
+  // Same three effects as the handleUpdateRequest success branch.
+  const handleCoupangUpdateDone = () => {
+    setShowCoupangUpdate(false);
+    setPushedBanner('승인 대기중으로 전환됨');
+    setStatusResult(null); // the previous fetch-status result is stale now
+    onReload();
   };
 
   // 채널 카테고리 → 마스터 카테고리(2609_45/D13). handleUpdateRequest 와 같은 이유로 run() 을 타지
@@ -403,7 +417,7 @@ export function CellActions({
       label: '동기화',
       items: [
         ...(status !== 'DRAFT' && primary !== 'update'
-          ? [{ key: 'update', label: '수정 요청', onClick: () => setShowUpdateConfirm(true) }]
+          ? [{ key: 'update', label: '수정 요청', onClick: openUpdateRequest }]
           : []),
         // ⚠️ 반려는 막다른 길이 아니라 재확인이 가능해야 한다 → REJECTED 에도 노출.
         ...(status === 'SUBMITTED' || status === 'SELLING' || status === 'REJECTED'
@@ -500,7 +514,7 @@ export function CellActions({
         {primary === 'update' && (
           <button
             type="button"
-            onClick={() => setShowUpdateConfirm(true)}
+            onClick={openUpdateRequest}
             disabled={busy !== null}
             className="flex items-center gap-1 rounded border border-amber-300 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
           >
@@ -711,6 +725,14 @@ export function CellActions({
           platform={platform}
           onSaved={() => onReload()}
           onClose={() => setShowPrice(false)}
+        />
+      )}
+
+      {showCoupangUpdate && (
+        <CoupangUpdateRequestModal
+          listingId={listing.id}
+          onClose={() => setShowCoupangUpdate(false)}
+          onDone={handleCoupangUpdateDone}
         />
       )}
 

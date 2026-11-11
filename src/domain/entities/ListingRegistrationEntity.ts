@@ -115,6 +115,62 @@ export interface ListingRegisterResponse {
   grandTotalNotice?: string | null;
 }
 
+// FEATURE_2611_25 / D21: Coupang update-request item keys (one per comparable item).
+export type ListingUpdateItemKey =
+  | 'REGISTRATION_NAME'
+  | 'DISPLAY_NAME'
+  | 'CATEGORY'
+  | 'OPTION_NAME'
+  | 'PRICE'
+  | 'STOCK'
+  | 'IMAGES'
+  | 'DETAIL'
+  | 'SEARCH_TAGS'
+  | 'ATTRIBUTES'
+  | 'NOTICES'
+  | 'SHIPPING';
+
+// FEATURE_2611_25 / D3: one differing option of an option-level item.
+export interface ListingUpdatePreviewOption {
+  productListingOptionId: number;
+  optionName: string;
+  coupangValue: string;
+  oclyxValue: string;
+}
+
+// FEATURE_2611_25 / D3 · D15: one item whose Coupang value differs from the oclyx value.
+export interface ListingUpdatePreviewLine {
+  key: ListingUpdateItemKey;
+  label: string;
+  selectable: boolean;
+  unavailableReason: string | null;
+  coupangValue: string | null;
+  oclyxValue: string | null;
+  options: ListingUpdatePreviewOption[];
+}
+
+// FEATURE_2611_25 / D24 · D29 · D31: one option row shown in the update window.
+export interface ListingUpdateOptionLine {
+  productListingOptionId: number;
+  optionName: string;
+  checked: boolean;
+}
+
+// FEATURE_2611_25: GET /product-listings/{id}/update-request/preview
+export interface ListingUpdatePreview {
+  productListingId: number;
+  items: ListingUpdatePreviewLine[];
+  approvalPending: boolean;
+  mixedBundle: boolean;
+  optionLines: ListingUpdateOptionLine[];
+}
+
+// FEATURE_2611_25 / D21 · D31: POST /product-listings/{id}/update-request body.
+export interface ListingUpdateSelectionRequest {
+  overwrite: ListingUpdateItemKey[];
+  addOptions: number[];
+}
+
 // Approval refresh (fetch-status)
 export interface ListingStatusOption {
   optionId: number;

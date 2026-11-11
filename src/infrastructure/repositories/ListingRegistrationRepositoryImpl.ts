@@ -44,6 +44,8 @@ import type {
   ListingMarginResponse,
   MarginPreviewRequest,
   SiteMargin,
+  ListingUpdatePreview,
+  ListingUpdateSelectionRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -83,8 +85,18 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
     return response.data.data;
   }
 
-  async updateRequest(listingId: number): Promise<ListingRegisterResponse> {
-    const response = await axiosInstance.post(`${listingBase}/${listingId}/update-request`);
+  async updateRequest(
+    listingId: number,
+    data?: ListingUpdateSelectionRequest,
+  ): Promise<ListingRegisterResponse> {
+    const response = data
+      ? await axiosInstance.post(`${listingBase}/${listingId}/update-request`, data)
+      : await axiosInstance.post(`${listingBase}/${listingId}/update-request`);
+    return response.data.data;
+  }
+
+  async getUpdatePreview(listingId: number): Promise<ListingUpdatePreview> {
+    const response = await axiosInstance.get(`${listingBase}/${listingId}/update-request/preview`);
     return response.data.data;
   }
 

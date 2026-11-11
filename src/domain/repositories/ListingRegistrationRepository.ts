@@ -40,6 +40,8 @@ import type {
   ListingMarginResponse,
   MarginPreviewRequest,
   SiteMargin,
+  ListingUpdatePreview,
+  ListingUpdateSelectionRequest,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -60,8 +62,10 @@ export interface ListingRegistrationRepository {
   addChannel(masterId: number, data: ChannelAddRequest): Promise<ChannelAddResponse>;
   addChannelsBatch(masterId: number, data: BatchChannelAddRequest): Promise<BatchChannelAddResponse>;
   register(listingId: number): Promise<ListingRegisterResponse>;
-  // Update request (109): forced re-push of an already-registered cell -> re-review (SUBMITTED).
-  updateRequest(listingId: number): Promise<ListingRegisterResponse>;
+  // Update request (109): forced re-push of an already-registered cell -> re-review (SUBMITTED). Coupang: optional body = picked items (FEATURE_2611_25 / D21)
+  updateRequest(listingId: number, data?: ListingUpdateSelectionRequest): Promise<ListingRegisterResponse>;
+  // FEATURE_2611_25 / D3 · D21: items whose current Coupang value differs from the oclyx value.
+  getUpdatePreview(listingId: number): Promise<ListingUpdatePreview>;
   fetchStatus(listingId: number): Promise<ListingStatusResponse>;
   // FEATURE_2610_38 / D2 · D9: the picked listings of one master, refreshed one by one on the server.
   fetchMasterStatus(
