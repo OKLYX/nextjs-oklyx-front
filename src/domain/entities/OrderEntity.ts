@@ -184,7 +184,7 @@ export const salesChannelLabel = (platform: string | null, accountAlias: string 
 };
 
 /**
- * Compare value for sorting the order list — the 판매자 and 판매처 columns compare by their on-screen text
+ * Compare value for sorting the order list — the 「판매자」 and 「판매처」 columns compare by their on-screen text
  * (FEATURE_2611_24 / D6); every other column compares by the raw field.
  */
 export const orderSortValue = (order: OrderItem, key: keyof OrderItem): OrderItem[keyof OrderItem] => {

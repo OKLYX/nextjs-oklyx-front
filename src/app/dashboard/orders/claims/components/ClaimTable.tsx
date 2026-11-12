@@ -26,8 +26,8 @@ interface ClaimTableProps {
   emptyMessage: string;
 }
 
-// Headers are a static list: 사유, 귀책 and 판매처 are derived values, not one field of Claim,
-// so a `keyof Claim` column array (like OrderTable's) cannot describe them. Only 접수일 sorts (FEATURE_2611_24 / D16).
+// Headers are a static list: 「사유」, 「귀책」 and 「판매처」 are derived values, not one field of Claim,
+// so a `keyof Claim` column array (like OrderTable's) cannot describe them. Only 「접수일」 sorts (FEATURE_2611_24 / D16).
 const HEADERS: { label: string; align: 'left' | 'right'; sortable?: boolean }[] = [
   { label: '접수일', align: 'left', sortable: true },
   { label: '주문번호', align: 'left' },
