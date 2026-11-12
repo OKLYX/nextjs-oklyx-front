@@ -359,27 +359,28 @@ export function ShipmentContainer() {
     [sorted, currentPage, pageSize]
   );
 
-  // Paid + Coupang or 11st + a box (11st: delivery number) = order-confirmation target (PLAN 2609_17 D2·D10 ·
-  // FEATURE_2610_17 / D20), minus an 11st reserved sale still waiting for [입고완료 처리] (D67). This is the only
+  // Paid + Coupang, 11st or LotteON + a box (11st: delivery number) = order-confirmation target (PLAN 2609_17 D2·D10 ·
+  // FEATURE_2610_17 / D20 · FEATURE_2611_23 / D16), minus an 11st reserved sale still waiting for [입고완료 처리] (D67). This is the only
   // place that decides it.
   const isAcknowledgeTarget = useCallback((o: OrderItem) =>
-    o.status === 'PAID' && (o.platform === 'COUPANG' || o.platform === 'ELEVENST') && Boolean(o.externalBoxId)
+    o.status === 'PAID' && (o.platform === 'COUPANG' || o.platform === 'ELEVENST' || o.platform === 'LOTTEON') && Boolean(o.externalBoxId)
       && !o.reservedSale, []);
 
   /**
-   * Whether to draw the checkbox = **a Coupang or 11st order, whatever its status** (FEATURE_2610_17 / D28).
+   * Whether to draw the checkbox = **a Coupang, 11st or LotteON order, whatever its status** (FEATURE_2610_17 / D28 ·
+   * FEATURE_2611_23 / D16).
    *
    * 🔴 Do not use the confirmation whitelist (`isAcknowledgeTarget`) for the checkbox — then an order stuck in
    * preparing has no checkbox and [주문 상태 갱신] stays disabled forever. Unsticking those is why 2609_50 exists,
    * so the decision is split per action. [주문 상태 갱신] stays Coupang only (D12) and internal stage is Coupang ·
-   * 11st (FEATURE_2611_23 / D51) — their id lists narrow the selection again below.
+   * 11st · LotteON (FEATURE_2611_23 / D51 · R50) — their id lists narrow the selection again below.
    *
    * Confirmation is the narrow one (an irreversible write) — the server filters non-paid lines into `skipped`
    * and reports them (`OrderAcknowledgeServiceImpl`'s `STATUS_PAID` check), so a mixed selection never reaches
    * the marketplace.
    */
   const isSelectable = useCallback(
-    (o: OrderItem) => o.platform === 'COUPANG' || o.platform === 'ELEVENST', []);
+    (o: OrderItem) => o.platform === 'COUPANG' || o.platform === 'ELEVENST' || o.platform === 'LOTTEON', []);
 
   /**
    * 선택한 것 중 실제로 발주처리되는 라인 id.
@@ -392,17 +393,18 @@ export function ShipmentContainer() {
     () => orders.filter((o) => selectedIds.has(o.id) && isAcknowledgeTarget(o)).map((o) => o.id),
     [orders, selectedIds, isAcknowledgeTarget]
   );
-  // Marketplaces among the confirmation targets, Coupang → 11st — one notice line each (FEATURE_2610_17 / D56).
+  // Marketplaces among the confirmation targets, Coupang → 11st → LotteON — one notice line each (FEATURE_2610_17 / D56 ·
+  // FEATURE_2611_23 / D17).
   const ackPlatforms = useMemo(() => {
     const present = new Set(
       orders.filter((o) => selectedIds.has(o.id) && isAcknowledgeTarget(o)).map((o) => o.platform));
-    return (['COUPANG', 'ELEVENST'] as const).filter((platform) => present.has(platform));
+    return (['COUPANG', 'ELEVENST', 'LOTTEON'] as const).filter((platform) => present.has(platform));
   }, [orders, selectedIds, isAcknowledgeTarget]);
 
-  // Internal-acknowledge targets = Coupang · 11st confirmation targets without an internal stage yet, 11st visit
-  // pickup excluded (D1 · FEATURE_2610_17 / D12 · FEATURE_2611_23 / D51 · D53). The server judges again (PLAN §4-6).
+  // Internal-acknowledge targets = Coupang · 11st · LotteON confirmation targets without an internal stage yet, 11st visit
+  // pickup excluded (D1 · FEATURE_2610_17 / D12 · FEATURE_2611_23 / D51 · D53 · R50). The server judges again (PLAN §4-6).
   const isInternalTarget = useCallback(
-    (o: OrderItem) => isAcknowledgeTarget(o) && (o.platform === 'COUPANG' || (o.platform === 'ELEVENST' && !o.visitPickup)) && o.internalStage == null,
+    (o: OrderItem) => isAcknowledgeTarget(o) && (o.platform === 'COUPANG' || o.platform === 'LOTTEON' || (o.platform === 'ELEVENST' && !o.visitPickup)) && o.internalStage == null,
     [isAcknowledgeTarget]);
   // [주문 상태 갱신] sends only the selected Coupang orders (FEATURE_2610_17 / D12).
   const refreshTargetIds = useMemo(

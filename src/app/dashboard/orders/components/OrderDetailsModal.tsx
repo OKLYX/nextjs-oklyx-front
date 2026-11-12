@@ -15,6 +15,7 @@ import type {
   CancelReasonOption,
   ElevenstChoices,
   InternalStageResult,
+  LotteonChoices,
   OrderAcknowledgeResult,
   OrderCancelResult,
   OrderRefreshResult,
@@ -41,6 +42,10 @@ import { ElevenstDeliveryDelayForm } from './ElevenstDeliveryDelayForm';
 import { ElevenstSplitShipmentForm } from './ElevenstSplitShipmentForm';
 import type { ElevenstSplitSubmit } from './ElevenstSplitShipmentForm';
 import { ElevenstVisitPickupForm } from './ElevenstVisitPickupForm';
+import { LotteonCancelRequests } from './LotteonCancelRequests';
+import { LotteonSellerCancelForm } from './LotteonSellerCancelForm';
+import { LotteonDeliveryAppointmentForm } from './LotteonDeliveryAppointmentForm';
+import { LotteonInvoiceEditModal } from './LotteonInvoiceEditModal';
 import { OrderDetailSummary, formatDate } from './OrderDetailSummary';
 import type { OrderDetailField } from './OrderDetailSummary';
 import { platformName } from '@/config/platforms';
@@ -53,7 +58,7 @@ import { platformName } from '@/config/platforms';
  * Both modes read the order from the server (`getOrderDetail` / `getParcelOrderDetail`, D18 · D30); the body is
  * `OrderDetailSummary`.
  *
- * Line mode — read-only info + (ADMIN · Coupang / 11st) single-order label sheet lookup and download.
+ * Line mode — read-only info + (ADMIN · Coupang / 11st / LotteON) single-order label sheet lookup and download.
  * 11st orders also get their cancel requests and the seller return request (FEATURE_2610_17 / D19 · D35), and the
  * 11st seller actions — sale refusal in the cancel tab, delay notice · partial / split shipment · visit pickup in
  * the shipment tab, and [입고완료 처리] in place of [발주처리] for a reserved sale (D61 ~ D67).
@@ -268,6 +273,11 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   // FEATURE_2610_17 / D61 · D62 · D63: the 11st reason lists, loaded once for an 11st order (server-owned).
   const [elevenstChoices, setElevenstChoices] = useState<ElevenstChoices | null>(null);
   const [elevenstChoicesFailed, setElevenstChoicesFailed] = useState(false);
+  // FEATURE_2611_23 / D58: the LotteON reason lists, loaded once for a LotteON order (server-owned).
+  const [lotteonChoices, setLotteonChoices] = useState<LotteonChoices | null>(null);
+  const [lotteonChoicesFailed, setLotteonChoicesFailed] = useState(false);
+  // D19 ⑥: the LotteON invoice edit window — rendered only while open, so a reopen starts fresh (R52).
+  const [isLotteonEditOpen, setIsLotteonEditOpen] = useState(false);
   // D64: how an 11st single invoice is sent — the whole delivery (default), chosen lines, or one line split.
   const [elevenstMode, setElevenstMode] = useState<'ALL' | 'PARTIAL' | 'SPLIT'>('ALL');
   // D67: [입고완료 처리] of a reserved-sale line.
@@ -304,12 +314,12 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
 
   // Carrier list load — the platform's code table (Coupang has no carrier-list API; 11st uses the same catalog),
   // served from our own backend, not a marketplace call, so it runs on open without a button. The guard mirrors
-  // the sections' render gate (Coupang · 11st, FEATURE_2610_17 / D2): hooks run even when the section is hidden,
+  // the sections' render gate (Coupang · 11st · LotteON, FEATURE_2610_17 / D2 · FEATURE_2611_23 / D64): hooks run even when the section is hidden,
   // so without it a USER account would hammer an ADMIN-only endpoint for 403s.
   // Deps are the platform *string* and isAdmin — passing the order object refetches every render.
   useEffect(() => {
     const platform = order?.platform;
-    if (!isAdmin || (platform !== 'COUPANG' && platform !== 'ELEVENST')) return;
+    if (!isAdmin || (platform !== 'COUPANG' && platform !== 'ELEVENST' && platform !== 'LOTTEON')) return;
     let alive = true;
     void (async () => {
       setIsLoadingCarriers(true);
@@ -376,15 +386,34 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
     return () => { alive = false; };
   }, [isAdmin, order?.platform, orderUseCase]);
 
+  // LotteON reason lists (FEATURE_2611_23 / D58) — our own backend, same guard style as the 11st load above.
+  useEffect(() => {
+    if (!isAdmin || order?.platform !== 'LOTTEON') return;
+    let alive = true;
+    void (async () => {
+      try {
+        const choices = await orderUseCase.getLotteonChoices();
+        if (alive) {
+          setLotteonChoices(choices);
+          setLotteonChoicesFailed(false);
+        }
+      } catch {
+        if (alive) setLotteonChoicesFailed(true);
+      }
+    })();
+    return () => { alive = false; };
+  }, [isAdmin, order?.platform, orderUseCase]);
+
   if (order == null) return null;
 
   const isEmpty = hasLoaded && rows.length === 0;
   const isCoupang = order.platform === 'COUPANG';
   // FEATURE_2610_17 / D28: order confirmation, single invoice and the sheet are open to 11st as well, and the seller
   // cancel opens as 11st sale refusal (D61); refresh stays Coupang only (D12). Internal stage · reservation are open to
-  // 11st too (FEATURE_2611_23 / D51).
+  // 11st too (FEATURE_2611_23 / D51) and to LotteON, which also gets confirmation · shipment · sheet (D16 · D18 · D49).
   const isElevenst = order.platform === 'ELEVENST';
-  const isMarketOrder = isCoupang || isElevenst;
+  const isLotteon = order.platform === 'LOTTEON';
+  const isMarketOrder = isCoupang || isElevenst || isLotteon;
   // Coupang safe numbers die 48h after delivery; the ordersheet then returns an empty phone.
   // The sheet table never renders the phone (PII), so this flag is the only signal the user gets.
   // `receiverPhone` is a non-nullable string in the DTO — "" is the only "no value" form.
@@ -424,19 +453,19 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   const canAcknowledge = isAdmin && isMarketOrder && order.status === 'PAID' && !fullyCanceled && !order.reservedSale;
   const canStockConfirm = isAdmin && isElevenst && order.reservedSale && order.status === 'PAID' && !fullyCanceled;
   const stockConfirmed = stockSent || order.stockConfirmSent;
-  // [Internal acknowledge] = Coupang · 11st [발주처리] targets without an internal stage, 11st visit pickup excluded
-  // (D1·D13 · FEATURE_2610_17 / D12 · FEATURE_2611_23 / D51 · D53).
-  const canMarkInternal = canAcknowledge && (isCoupang || (isElevenst && !order.visitPickup)) && order.internalStage == null;
+  // [Internal acknowledge] = Coupang · 11st · LotteON [발주처리] targets without an internal stage, 11st visit pickup
+  // excluded (D1·D13 · FEATURE_2610_17 / D12 · FEATURE_2611_23 / D51 · D53 · R50).
+  const canMarkInternal = canAcknowledge && (isCoupang || isLotteon || (isElevenst && !order.visitPickup)) && order.internalStage == null;
   // 시트는 쿠팡 전용이 아니다 — 버튼만 비활성되고 안내가 붙으므로 ADMIN 이면 탭을 연다.
   const canSheet = isAdmin;
   const canShip = isAdmin && isMarketOrder && !fullyCanceled;
-  // 11st sale refusal (D61) also needs a line that is not fully cancelled.
-  const canCancel = isAdmin && (isCoupang || (isElevenst && !fullyCanceled))
+  // 11st sale refusal (D61) and the LotteON seller cancel (FEATURE_2611_23 / D25) also need a line that is not fully cancelled.
+  const canCancel = isAdmin && (isCoupang || ((isElevenst || isLotteon) && !fullyCanceled))
     && (order.status === 'PAID' || order.status === 'PREPARING');
   // D66: a visit-pickup 11st order gets [방문수령 완료] instead of the invoice form, from paid on.
   const showVisitPickup = isElevenst && order.visitPickup && (order.status === 'PAID' || order.status === 'PREPARING');
-  // D63: [발송지연 안내] under the shipment tab for a paid / preparing 11st order.
-  const showDeliveryDelay = isElevenst && (order.status === 'PAID' || order.status === 'PREPARING');
+  // D63 · FEATURE_2611_23 / D26: [발송지연 안내] (11st) or [발송 약정일 안내] (LotteON) under the shipment tab for a paid / preparing order.
+  const showDeliveryDelay = (isElevenst || isLotteon) && (order.status === 'PAID' || order.status === 'PREPARING');
   const tabAvailability: Record<ActionTab, boolean> = { sheet: canSheet, shipment: canShip, cancel: canCancel };
   // 고른 탭을 쓸 수 없으면 왼쪽부터 첫 번째로 쓸 수 있는 탭을 보여준다
   // (하나도 없으면 탭 영역 자체가 안 그려진다).
@@ -779,6 +808,15 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
               onChanged={() => setReservationChanged(true)}
             />
           )}
+          {isLotteon && (
+            <LotteonCancelRequests
+              orderItemId={order.id}
+              isAdmin={isAdmin}
+              orderUseCase={orderUseCase}
+              rejectReasons={lotteonChoices?.cancelRejectReasons ?? []}
+              onChanged={() => setReservationChanged(true)}
+            />
+          )}
           {isElevenst && isAdmin && !fullyCanceled
             && (order.status === 'SHIPPED' || order.status === 'DELIVERING' || order.status === 'DELIVERED') && (
             <ElevenstSellerReturnForm
@@ -791,7 +829,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
 
           {/* 송장(FEATURE_2609_75 / D18 🔁) — 내부 단계 동안 언제나 배송 묶음별 택배사·송장번호를 고친다.
               택배사 목록은 이 모달이 이미 불러온 `carrierOptions` 를 넘긴다(새로 부르지 않는다). */}
-          {isAdmin && (isCoupang || isElevenst) && shownStage != null && (
+          {isAdmin && (isCoupang || isElevenst || isLotteon) && shownStage != null && (
             <div className="mt-6 border-t border-gray-200 pt-6">
               <StoredInvoiceEditor
                 useCase={useCase}
@@ -803,7 +841,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
           )}
 
           {/* 예약 발송 기록(FEATURE_2609_75 / D30) — 이 주문의 예정·실행 시각과 결과 + 행 작업. 기록이 없으면 그리지 않는다. */}
-          {isAdmin && (isCoupang || isElevenst) && (
+          {isAdmin && (isCoupang || isElevenst || isLotteon) && (
             <ReservedShipmentHistory
               useCase={useCase}
               externalOrderId={order.externalOrderId}
@@ -989,6 +1027,12 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                     : '11번가는 송장 수정을 지원하지 않습니다. 11번가 셀러오피스에서 고쳐 주세요.'}
                 </div>
               )}
+              {/* FEATURE_2611_23 / D96 · R51 — a paid LotteON order needs [발주처리] first: the notice instead of the form. */}
+              {activeTab === 'shipment' && canShip && isLotteon && shownStage == null && order.status === 'PAID' && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
+                  롯데ON 주문은 [발주처리] 뒤에 송장을 등록할 수 있습니다.
+                </div>
+              )}
               {/* FEATURE_2610_17 / D64 — an 11st invoice of a preparing order picks how it goes; the choice
                   locks with the inputs. The 11st forms stay mounted and only hide on another tab, so their inputs
                   survive a tab switch like the parent-held inputs below. */}
@@ -1026,7 +1070,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                 </div>
               )}
               {activeTab === 'shipment' && canShip && shownStage == null && !showVisitPickup
-                && !(isElevenst && (order.status === 'PAID' || isShipped)) && (
+                && !(isElevenst && (order.status === 'PAID' || isShipped)) && !(isLotteon && order.status === 'PAID') && (
                 <div className="mt-4">
                   {elevenstMode === 'ALL' && (
                     <p className="mt-1 text-sm text-gray-500">
@@ -1046,7 +1090,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                   {!isFormOpen && (
                     <div className="mt-4">
                       <button
-                        onClick={() => setIsEditingInvoice(true)}
+                        onClick={() => (isLotteon ? setIsLotteonEditOpen(true) : setIsEditingInvoice(true))}
                         disabled={isLocked}
                         className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
                       >
@@ -1187,15 +1231,25 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                 </div>
               )}
 
-              {/* FEATURE_2610_17 / D63 — [발송지연 안내] under the shipment tab, paid / preparing 11st orders. */}
+              {/* FEATURE_2610_17 / D63 · FEATURE_2611_23 / D26 — [발송지연 안내] (11st) or [발송 약정일 안내] (LotteON) under the shipment tab, paid / preparing orders. */}
               {canShip && showDeliveryDelay && (
                 <div className={activeTab === 'shipment' ? undefined : 'hidden'}>
-                  <ElevenstDeliveryDelayForm
-                    orderItemId={order.id}
-                    reasons={elevenstChoices?.delayReasons ?? []}
-                    reasonsFailed={elevenstChoicesFailed}
-                    orderUseCase={orderUseCase}
-                  />
+                  {isLotteon ? (
+                    <LotteonDeliveryAppointmentForm
+                      orderItemId={order.id}
+                      reasons={lotteonChoices?.appointmentReasons ?? []}
+                      detailReasons={lotteonChoices?.appointmentDetailReasons ?? []}
+                      reasonsFailed={lotteonChoicesFailed}
+                      orderUseCase={orderUseCase}
+                    />
+                  ) : (
+                    <ElevenstDeliveryDelayForm
+                      orderItemId={order.id}
+                      reasons={elevenstChoices?.delayReasons ?? []}
+                      reasonsFailed={elevenstChoicesFailed}
+                      orderUseCase={orderUseCase}
+                    />
+                  )}
                 </div>
               )}
 
@@ -1208,6 +1262,20 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                     purchasableQty={order.purchasableQty}
                     reasons={elevenstChoices?.cancelReasons ?? []}
                     reasonsFailed={elevenstChoicesFailed}
+                    orderUseCase={orderUseCase}
+                    onSent={() => setReservationChanged(true)}
+                  />
+                </div>
+              )}
+              {/* LotteON order cancel = seller cancel of the whole line (FEATURE_2611_23 / D25). */}
+              {canCancel && isLotteon && (
+                <div className={activeTab === 'cancel' ? undefined : 'hidden'}>
+                  <LotteonSellerCancelForm
+                    orderItemId={order.id}
+                    quantity={order.orderCount}
+                    purchasableQty={order.purchasableQty}
+                    reasons={lotteonChoices?.cancelReasons ?? []}
+                    reasonsFailed={lotteonChoicesFailed}
                     orderUseCase={orderUseCase}
                     onSent={() => setReservationChanged(true)}
                   />
@@ -1406,10 +1474,12 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                           {isMarkingInternal ? <Spinner label="처리 중..." /> : '내부 발주처리'}
                         </Button>
                       ))}
-                    {/* FEATURE_2610_17 / D52: 11st confirms this product only — its notice has no box number. */}
+                    {/* FEATURE_2610_17 / D52 · FEATURE_2611_23 / D17: 11st and LotteON confirm this product only — their notice has no box number. */}
                     <span className="hidden text-sm text-gray-500 sm:inline">
                       {isElevenst
                         ? '이 상품(주문 줄)이 발주확인 처리되어 배송준비중으로 바뀝니다. 되돌릴 수 없습니다.'
+                        : isLotteon
+                        ? '이 상품(주문 줄)이 발주확인 처리되어 상품준비중으로 바뀝니다. 되돌릴 수 없습니다.'
                         : `박스 ${order.externalBoxId ?? '-'} 전체가 상품준비중으로 전환됩니다. 되돌릴 수 없습니다.`}
                     </span>
                   </>
@@ -1455,6 +1525,17 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
           onConfirm={() => void handleStockConfirm()}
           onCancel={() => setStockConfirmOpen(false)}
         />
+        {isLotteonEditOpen && (
+          <LotteonInvoiceEditModal
+            orderItemId={order.id}
+            externalOrderId={order.externalOrderId}
+            carrierOptions={carrierOptions}
+            useCase={useCase}
+            orderUseCase={orderUseCase}
+            onChanged={() => setReservationChanged(true)}
+            onClose={() => setIsLotteonEditOpen(false)}
+          />
+        )}
     </Modal>
   );
 }
