@@ -3,7 +3,8 @@ import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
   CancelReasonOption, ElevenstCancelFaultRejectPayload, ElevenstCancelRejectPayload, ElevenstCancelRequest,
   ElevenstChoices, ElevenstDeliveryDelayPayload, ElevenstDeliveryLine, ElevenstSellerReturnPayload,
-  InternalStageResult, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
+  InternalStageResult, LotteonCancelRejectPayload, LotteonCancelRequest, LotteonChoices,
+  LotteonDeliveryAppointmentPayload, LotteonInvoiceRecords, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
   OrderMonth, OrderRefreshResult, OrderSetting, OrderSyncResponse, OrderSyncResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
@@ -34,6 +35,14 @@ export interface OrderRepository {
   sendElevenstDeliveryDelay(orderItemId: number, payload: ElevenstDeliveryDelayPayload): Promise<void>;
   completeElevenstVisitPickup(orderItemId: number, certCode: string): Promise<void>;
   confirmElevenstStock(orderItemId: number): Promise<void>;
+  getLotteonChoices(): Promise<LotteonChoices>;
+  getLotteonCancelRequests(orderItemId: number): Promise<LotteonCancelRequest[]>;
+  approveLotteonCancel(requestId: number): Promise<void>;
+  rejectLotteonCancel(requestId: number, payload: LotteonCancelRejectPayload): Promise<void>;
+  sendLotteonDeliveryAppointment(orderItemId: number, payload: LotteonDeliveryAppointmentPayload): Promise<void>;
+  cancelLotteonLine(orderItemId: number, quantity: number, reasonCode: string, reasonText: string):
+    Promise<OrderCancelResult>;
+  getLotteonInvoiceRecords(orderItemId: number): Promise<LotteonInvoiceRecords[]>;
   /** The shared order detail of the order this line belongs to (FEATURE_2611_07 / D17 · D18 · D30) */
   getOrderDetail(orderLineId: number): Promise<OrderDetail>;
   /** The shared order detail of the order this parcel belongs to — ADMIN only (FEATURE_2611_07 / D17 · D30) */

@@ -52,6 +52,8 @@ export interface Claim {
   linked: boolean;               // false = not linked to an order line (D12)
   availableActions: ClaimAction[];   // server-decided; empty for non-ADMIN, unsupported platforms
                                      // and claims with nothing to do (never null)
+  // marketplace-neutral status side note — LotteON 「보류 중」, else null (FEATURE_2611_23 / D79). Shown as given, never derived here.
+  statusNote?: string | null;
 }
 
 // --- Processing actions (FEATURE_2609_21) ---
@@ -67,7 +69,9 @@ export type ClaimActionCode =
   | 'EXCHANGE_RECEIVE_CONFIRM' | 'EXCHANGE_REJECT'
   | 'EXCHANGE_RESHIP_INVOICE' | 'EXCHANGE_COLLECT_INVOICE'
   // 11st only (FEATURE_2610_17 / D23 · D34): return reject · return hold · return-completion hold.
-  | 'RETURN_REJECT' | 'RETURN_HOLD' | 'RETURN_COMPLETE_HOLD';
+  | 'RETURN_REJECT' | 'RETURN_HOLD' | 'RETURN_COMPLETE_HOLD'
+  // LotteON only (FEATURE_2611_23 / D45 · D46 · D47): hold release · exchange hold · exchange pickup confirm.
+  | 'RETURN_HOLD_RELEASE' | 'EXCHANGE_HOLD' | 'EXCHANGE_HOLD_RELEASE' | 'EXCHANGE_COLLECT_CONFIRM';
 
 /**
  * Extra input the action needs. ⚠️ An unknown value must hide the button — the screen cannot build
@@ -76,7 +80,9 @@ export type ClaimActionCode =
  */
 export type ClaimActionRequires = 'NONE' | 'INVOICE' | 'REJECT_CODE'
   // Reason code (from `choices`) + reason text, both required (FEATURE_2610_17 / D34 · D39 ①).
-  | 'REASON';
+  | 'REASON'
+  // Reason text only, 1~200 characters, no reason code (FEATURE_2611_23 / D78).
+  | 'REASON_TEXT';
 
 /** A value choice for actions that require one (D19) — 반품 3액션은 항상 빈 배열. */
 export interface ActionChoice {
@@ -109,7 +115,7 @@ export interface ClaimActionPayload {
   invoiceNumber?: string;
   regNumber?: string;
   rejectCode?: string;         // 06 에서 사용
-  reasonText?: string;         // requires 'REASON' only — 1~200 characters (FEATURE_2610_17 / D39 ①)
+  reasonText?: string;         // requires 'REASON' or 'REASON_TEXT' — 1~200 characters (FEATURE_2610_17 / D39 ① · FEATURE_2611_23 / D78)
 }
 
 /**

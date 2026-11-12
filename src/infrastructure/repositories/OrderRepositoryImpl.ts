@@ -7,7 +7,8 @@ import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
   CancelReasonOption, ElevenstCancelFaultRejectPayload, ElevenstCancelRejectPayload, ElevenstCancelRequest,
   ElevenstChoices, ElevenstDeliveryDelayPayload, ElevenstDeliveryLine, ElevenstSellerReturnPayload,
-  InternalStageResult, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
+  InternalStageResult, LotteonCancelRejectPayload, LotteonCancelRequest, LotteonChoices,
+  LotteonDeliveryAppointmentPayload, LotteonInvoiceRecords, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
   OrderMonth, OrderRefreshResult, OrderSetting, OrderSyncResponse, OrderSyncResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
@@ -161,6 +162,46 @@ export class OrderRepositoryImpl implements OrderRepository {
 
   async confirmElevenstStock(orderItemId: number): Promise<void> {
     await axiosInstance.post(`/api/admin/orders/${orderItemId}/elevenst-stock-confirm`);
+  }
+
+  // FEATURE_2611_23 / D58 — the LotteON reason lists come from the server; never copy them into the screen.
+  async getLotteonChoices(): Promise<LotteonChoices> {
+    const response = await axiosInstance.get('/api/orders/lotteon-choices');
+    return response.data.data;
+  }
+
+  async getLotteonCancelRequests(orderItemId: number): Promise<LotteonCancelRequest[]> {
+    const response = await axiosInstance.get(`/api/orders/${orderItemId}/lotteon-cancel-requests`);
+    return response.data.data;
+  }
+
+  async approveLotteonCancel(requestId: number): Promise<void> {
+    await axiosInstance.post(`/api/admin/lotteon-cancel-requests/${requestId}/approve`);
+  }
+
+  async rejectLotteonCancel(requestId: number, payload: LotteonCancelRejectPayload): Promise<void> {
+    await axiosInstance.post(`/api/admin/lotteon-cancel-requests/${requestId}/reject`, payload);
+  }
+
+  async sendLotteonDeliveryAppointment(orderItemId: number, payload: LotteonDeliveryAppointmentPayload):
+    Promise<void> {
+    await axiosInstance.post(`/api/admin/orders/${orderItemId}/lotteon-delivery-appointment`, payload);
+  }
+
+  // FEATURE_2611_23 / D25 — the same cancel endpoint as Coupang and 11st; a LotteON line is cancelled whole.
+  async cancelLotteonLine(orderItemId: number, quantity: number, reasonCode: string, reasonText: string):
+    Promise<OrderCancelResult> {
+    const response = await axiosInstance.post('/api/admin/orders/cancel', {
+      lines: [{ orderItemId, quantity }],
+      reasonCode,
+      reasonText,
+    });
+    return response.data.data;
+  }
+
+  async getLotteonInvoiceRecords(orderItemId: number): Promise<LotteonInvoiceRecords[]> {
+    const response = await axiosInstance.get(`/api/orders/${orderItemId}/lotteon-invoice-records`);
+    return response.data.data;
   }
 
   // FEATURE_2611_07 / D30 ①: any logged-in user, same as the order list.

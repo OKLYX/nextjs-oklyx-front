@@ -4,7 +4,8 @@ import type { OrderPeriodRange } from '@/domain/entities/OrderPeriod';
 import type {
   CancelReasonOption, ElevenstCancelFaultRejectPayload, ElevenstCancelRejectPayload, ElevenstCancelRequest,
   ElevenstChoices, ElevenstDeliveryDelayPayload, ElevenstDeliveryLine, ElevenstSellerReturnPayload,
-  InternalStageResult, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
+  InternalStageResult, LotteonCancelRejectPayload, LotteonCancelRequest, LotteonChoices,
+  LotteonDeliveryAppointmentPayload, LotteonInvoiceRecords, OrderAcknowledgeResult, OrderCancelLine, OrderCancelResult,
   OrderMonth, OrderRefreshResult, OrderSetting, OrderSyncResponse, OrderSyncResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
 
@@ -112,6 +113,36 @@ export class OrderUseCase {
 
   async confirmElevenstStock(orderItemId: number): Promise<void> {
     return this.repository.confirmElevenstStock(orderItemId);
+  }
+
+  async getLotteonChoices(): Promise<LotteonChoices> {
+    return this.repository.getLotteonChoices();
+  }
+
+  async getLotteonCancelRequests(orderItemId: number): Promise<LotteonCancelRequest[]> {
+    return this.repository.getLotteonCancelRequests(orderItemId);
+  }
+
+  async approveLotteonCancel(requestId: number): Promise<void> {
+    return this.repository.approveLotteonCancel(requestId);
+  }
+
+  async rejectLotteonCancel(requestId: number, payload: LotteonCancelRejectPayload): Promise<void> {
+    return this.repository.rejectLotteonCancel(requestId, payload);
+  }
+
+  async sendLotteonDeliveryAppointment(orderItemId: number, payload: LotteonDeliveryAppointmentPayload):
+    Promise<void> {
+    return this.repository.sendLotteonDeliveryAppointment(orderItemId, payload);
+  }
+
+  async cancelLotteonLine(orderItemId: number, quantity: number, reasonCode: string, reasonText: string):
+    Promise<OrderCancelResult> {
+    return this.repository.cancelLotteonLine(orderItemId, quantity, reasonCode, reasonText);
+  }
+
+  async getLotteonInvoiceRecords(orderItemId: number): Promise<LotteonInvoiceRecords[]> {
+    return this.repository.getLotteonInvoiceRecords(orderItemId);
   }
 
   async getOrderDetail(orderLineId: number): Promise<OrderDetail> {
