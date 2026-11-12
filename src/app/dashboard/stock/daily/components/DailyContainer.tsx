@@ -78,11 +78,17 @@ const HIGHLIGHT_MS = 2000;
 const shareKey = (recordId: number) => `share-${recordId}`;
 
 // Local calendar day (YYYY-MM-DD) — toISOString (UTC) can be a day off in KST.
-const today = () => {
-  const d = new Date();
+const formatDay = (d: Date) => {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${m}-${day}`;
+};
+const today = () => formatDay(new Date());
+
+// Shift a YYYY-MM-DD day by `delta` calendar days (local time, so month/year rollover is handled by Date).
+const shiftDay = (day: string, delta: number) => {
+  const [y, m, d] = day.split('-').map(Number);
+  return formatDay(new Date(y, m - 1, d + delta));
 };
 
 function kindLabel(row: StockDailyRow): string {
@@ -266,12 +272,30 @@ export function DailyContainer() {
       <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">날짜</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="이전 날짜"
+              onClick={() => setDate((d) => shiftDay(d, -1))}
+              className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50"
+            >
+              &lt;
+            </button>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              aria-label="다음 날짜"
+              onClick={() => setDate((d) => shiftDay(d, 1))}
+              className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50"
+            >
+              &gt;
+            </button>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 ml-auto">
           {daily && daily.unregisteredProductCount > 0 && (
