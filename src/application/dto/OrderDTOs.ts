@@ -49,7 +49,7 @@ export interface SyncTarget {
  * same types — writing the shape again would make two copies that silently drift from the server.
  * Failure reasons are shown as the marketplace's original text (PLAN 2609_17 D8·D15 · FEATURE_2610_17 / D54).
  * `byPlatform` = the same send split per marketplace, only marketplaces that had something to send, order
- * COUPANG → ELEVENST (FEATURE_2610_17 / D57); the fields above stay the sum of both.
+ * COUPANG → ELEVENST → LOTTEON (FEATURE_2610_17 / D57 · FEATURE_2611_23 / D17); the fields above stay the sum of all of them.
  */
 export interface OrderAcknowledgeResult {
   requestedLines: number;
@@ -63,8 +63,8 @@ export interface OrderAcknowledgeResult {
 
 /** One marketplace's share of an order-confirmation send (FEATURE_2610_17 / D57). */
 export interface OrderAcknowledgePlatformResult {
-  platform: 'COUPANG' | 'ELEVENST';
-  /** Succeeded units — a Coupang box or an 11st (delivery number, product number) group (D54). */
+  platform: 'COUPANG' | 'ELEVENST' | 'LOTTEON';
+  /** Succeeded units — a Coupang box or an 11st (delivery number, product number) group (D54) or a LotteON order line (FEATURE_2611_23 / D16). */
   succeeded: number;
   failed: FailedBox[];
 }
@@ -251,4 +251,62 @@ export interface ElevenstSellerReturnPayload {
   deliveryCompanyCode?: string;
   invoiceNumber?: string;
   completeNow: boolean;
+}
+
+/**
+ * One open LotteON cancel request of an order line (GET /api/orders/{orderItemId}/lotteon-cancel-requests,
+ * FEATURE_2611_23 / D24 · D71). `reason` is the server-made 「사유 이름 — 사유 글」 — show it as is.
+ * `requestedAt` is a KST wall-clock string.
+ */
+export interface LotteonCancelRequest {
+  id: number;
+  quantity: number;
+  reason: string;
+  requestedAt: string | null;
+}
+
+/**
+ * Code lists of the LotteON order-detail actions (GET /api/orders/lotteon-choices, FEATURE_2611_23 / D58).
+ * The labels are LotteON's own names — show them as given, never keep a code→label map here.
+ */
+export interface LotteonChoices {
+  cancelReasons: CancelReasonOption[];
+  cancelRejectReasons: CancelReasonOption[];
+  appointmentReasons: CancelReasonOption[];
+  appointmentDetailReasons: CancelReasonOption[];
+  holdReasons: CancelReasonOption[];
+}
+
+/** LotteON [취소 거부] body (D24): one of `cancelRejectReasons` + the optional reason text (up to 200). */
+export interface LotteonCancelRejectPayload {
+  reasonCode: string;
+  reasonText: string;
+}
+
+/**
+ * LotteON [발송 약정일 안내] body (D26): `appointmentDate` = 'yyyy-MM-dd' · reason code · detail code (needed only
+ * when the reason is the making delay, else null).
+ */
+export interface LotteonDeliveryAppointmentPayload {
+  appointmentDate: string;
+  reasonCode: string;
+  detailCode: string | null;
+}
+
+/** One product of a LotteON delivery and its shipping records (GET /api/orders/{orderItemId}/lotteon-invoice-records, D19). */
+export interface LotteonInvoiceRecords {
+  orderItemId: number;
+  productName: string;
+  records: LotteonInvoiceRecord[];
+}
+
+/** One LotteON shipping record. `statusAt` is a KST wall-clock string — never turn it into a Date. */
+export interface LotteonInvoiceRecord {
+  procSeq: string;
+  invoiceNumber: string | null;
+  carrierCode: string | null;
+  carrierName: string | null;
+  statusCode: string;
+  statusName: string;
+  statusAt: string | null;
 }

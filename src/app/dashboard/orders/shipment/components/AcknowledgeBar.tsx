@@ -20,19 +20,21 @@ const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 const MAX_SELECTION = 500;
 /**
  * What [발주처리] covers, per marketplace (FEATURE_2610_17 / D56): Coupang confirms the whole box of a chosen option
- * (PLAN 2609_17 D1); 11st confirms the chosen product with the same product's lines of that delivery (D48).
+ * (PLAN 2609_17 D1); 11st confirms the chosen product with the same product's lines of that delivery (D48); LotteON
+ * confirms the chosen product only (FEATURE_2611_23 / D17).
  */
-const ACK_NOTICE_BY_PLATFORM: Record<'COUPANG' | 'ELEVENST', string> = {
+const ACK_NOTICE_BY_PLATFORM: Record<'COUPANG' | 'ELEVENST' | 'LOTTEON', string> = {
   COUPANG: '쿠팡: 선택한 옵션이 속한 배송건(박스) 전체가 함께 발주처리됩니다.',
   ELEVENST: '11번가: 선택한 상품(같은 배송건의 같은 상품 옵션 포함)만 발주확인됩니다.',
+  LOTTEON: '롯데ON: 선택한 상품만 발주확인됩니다.',
 };
 
 interface AcknowledgeBarProps {
   selectedCount: number;
   /** 선택 중 실제로 발주처리되는 건수. 체크박스는 상태 무관이라 `selectedCount` 보다 작을 수 있다. */
   acknowledgeableCount: number;
-  /** Marketplaces among the confirmation targets, order Coupang → 11st (FEATURE_2610_17 / D56). */
-  acknowledgePlatforms: readonly ('COUPANG' | 'ELEVENST')[];
+  /** Marketplaces among the confirmation targets, order Coupang → 11st → LotteON (FEATURE_2610_17 / D56 · FEATURE_2611_23 / D17). */
+  acknowledgePlatforms: readonly ('COUPANG' | 'ELEVENST' | 'LOTTEON')[];
   onAcknowledge: () => void;
   isSubmitting: boolean;
   canAcknowledge: boolean;      // = isAdmin

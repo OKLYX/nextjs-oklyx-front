@@ -10,6 +10,7 @@ import { useCarrierOptions } from '@/presentation/hooks/useCarrierOptions';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ClaimRejectForm } from './ClaimRejectForm';
 import { ClaimReasonForm } from './ClaimReasonForm';
+import { ClaimReasonTextForm } from './ClaimReasonTextForm';
 import type {
   Claim,
   ClaimAction,
@@ -22,6 +23,7 @@ import type {
  *
  * **용도**: 서버가 `claim.availableActions` 로 내려준 액션만 버튼으로 그리고, 실행 결과를 그 자리에
  * 반영한다. 반품·교환 공용이다 — 종류 분기는 하지 않는다(서버가 종류에 맞는 액션만 준다).
+ * Exception (FEATURE_2611_23 / R56): only the two-step confirm wording reads `claim.claimType` — an exchange gets the D47 text.
  *
  * **파일**: `src/app/dashboard/orders/claims/components/ClaimActionPanel.tsx`
  *
@@ -50,9 +52,10 @@ interface ClaimActionPanelProps {
 /**
  * The `requires` values the screen can build a form for. `REJECT_CODE` (exchange reject, 06) and `REASON`
  * (11st reject / hold, FEATURE_2610_17 / D34) get their choices from the server's `choices` — the front end
- * needs to know neither the values nor the labels.
+ * needs to know neither the values nor the labels. `REASON_TEXT` (LotteON hold release, FEATURE_2611_23 / D78) needs
+ * no choice — a text box only.
  */
-const SUPPORTED_REQUIRES: ClaimAction['requires'][] = ['NONE', 'INVOICE', 'REJECT_CODE', 'REASON'];
+const SUPPORTED_REQUIRES: ClaimAction['requires'][] = ['NONE', 'INVOICE', 'REJECT_CODE', 'REASON', 'REASON_TEXT'];
 
 /**
  * 송장 폼의 보조 문구. 교환에는 송장 액션이 **둘**(회수·재발송)이고 라벨만으로는 어느 쪽에 넣는지
@@ -162,7 +165,8 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
 
   /**
    * `rejectCode` comes only from actions with `requires: 'REJECT_CODE'` or `'REASON'`, and `reasonText` only from
-   * `'REASON'` (FEATURE_2610_17 / D34) — once, after the form finished its own confirm.
+   * `'REASON'` (FEATURE_2610_17 / D34) or `'REASON_TEXT'` (FEATURE_2611_23 / D78, no `rejectCode`) — once, after the
+   * form finished its own confirm.
    */
   const handleSubmit = async (option: ClaimAction, rejectCode?: string, reasonText?: string) => {
     const payload: ClaimActionPayload =
@@ -176,7 +180,9 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
           ? { action: option.action, rejectCode }
           : option.requires === 'REASON'
             ? { action: option.action, rejectCode, reasonText }
-            : { action: option.action };
+            : option.requires === 'REASON_TEXT'
+              ? { action: option.action, reasonText }
+              : { action: option.action };
 
     try {
       setIsSending(true);
@@ -258,7 +264,16 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
       {/* 인라인 확장 — 모달 위에 모달을 띄우면 무엇에 대해 입력하는지 안 보인다. */}
       {openAction && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-          {openAction.requires === 'REASON' ? (
+          {openAction.requires === 'REASON_TEXT' ? (
+            /* FEATURE_2611_23 / D78: text-only form, no two-step confirm. */
+            <ClaimReasonTextForm
+              key={openAction.action}
+              action={openAction}
+              isSending={isSending}
+              onSubmit={(text) => void handleSubmit(openAction, undefined, text)}
+              onCancel={() => setOpenAction(null)}
+            />
+          ) : openAction.requires === 'REASON' ? (
             /* FEATURE_2610_17 / D34: code + text form; it owns its confirm like ClaimRejectForm. */
             <ClaimReasonForm
               key={openAction.action}
@@ -331,7 +346,8 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
             )}
 
             {/* Two-step confirm (D10) — "are you sure?" stops nothing; name what gets settled. NONE = return approve
-                (refund); INVOICE = the 11st exchange approve with the re-shipping invoice (FEATURE_2610_17 / D24). */}
+                (refund) or, for an exchange, the LotteON exchange pickup confirm (FEATURE_2611_23 / D47); INVOICE = the
+                11st exchange approve with the re-shipping invoice (FEATURE_2610_17 / D24). */}
             {openAction.irreversible && (
               <div className="mt-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
                 <p className="font-medium">
@@ -342,7 +358,9 @@ export function ClaimActionPanel({ claim, onActionDone }: ClaimActionPanelProps)
                 <p className="mt-1">
                   {openAction.requires === 'INVOICE'
                     ? '이 교환을 승인하면 재발송 송장이 등록되며 되돌릴 수 없습니다.'
-                    : '이 반품을 승인하면 환불이 확정되며 되돌릴 수 없습니다.'}
+                    : claim.claimType === 'EXCHANGE'
+                      ? '이 교환의 회수 물건을 확정합니다. 롯데ON 에서 교환이 다음 단계로 넘어가며 되돌릴 수 없습니다.'
+                      : '이 반품을 승인하면 환불이 확정되며 되돌릴 수 없습니다.'}
                 </p>
               </div>
             )}

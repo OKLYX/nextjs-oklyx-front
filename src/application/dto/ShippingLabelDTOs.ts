@@ -69,6 +69,8 @@ export interface ManualShipmentRequest {
   mode?: 'ALL' | 'PARTIAL' | 'SPLIT';
   orderItemIds?: number[];
   splits?: ManualShipmentSplit[];
+  // LotteON invoice edit only (FEATURE_2611_23 / D19): the chosen records; other orders and the first send omit it.
+  records?: ManualShipmentRecordChoice[];
 }
 
 /** One invoice of an 11st 'SPLIT' send — its quantities add up to the line's order quantity (D64). */
@@ -87,6 +89,23 @@ export interface ManualShipmentResult {
   succeeded: number;
   failed: FailedBox[];
   resultStatus: OrderStatus | null;
+  // LotteON invoice edit: one outcome per chosen record, in request order. Absent on an older server — read with `?? []`.
+  records?: ManualShipmentRecordOutcome[];
+}
+
+/** One chosen LotteON record of an invoice edit — (product line, process number) (FEATURE_2611_23 / D19). */
+export interface ManualShipmentRecordChoice {
+  orderItemId: number;
+  procSeq: string;
+}
+
+/** Outcome of one chosen LotteON record. `message` = LotteON's own text on failure, null on success. */
+export interface ManualShipmentRecordOutcome {
+  orderItemId: number;
+  procSeq: string;
+  oldInvoiceNumber: string | null;
+  succeeded: boolean;
+  message: string | null;
 }
 
 // --- Reserved shipment (FEATURE_2609_75) ---

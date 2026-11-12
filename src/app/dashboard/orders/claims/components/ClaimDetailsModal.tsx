@@ -105,6 +105,7 @@ export function ClaimDetailsModal({ claim, onClose, onActionDone }: ClaimDetails
             value={
               <>
                 {CLAIM_STATUS_LABEL[claim.status]}
+                {claim.statusNote && ` · ${claim.statusNote}`}
                 {claim.platformStatus && (
                   <span className="ml-2 text-xs text-gray-400">{claim.platformStatus}</span>
                 )}
