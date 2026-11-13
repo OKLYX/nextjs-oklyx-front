@@ -7,6 +7,7 @@ import {
   formatProfit,
 } from '@/domain/entities/SalesSummary';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 
 /**
  * 채널 하나의 <b>기간 매출 내역</b> — 그 채널에서 무엇이 얼마나 팔렸는지 (FEATURE_2609_34).
@@ -52,9 +53,9 @@ export function ChannelSalesLines({ rows, isLoading, error }: ChannelSalesLinesP
         key={`${row.masterProductId ?? 'uncategorized'}-${row.accountId ?? 'all'}`}
         body={
           <div>
-            <p className="line-clamp-2 break-words text-[13px] text-gray-900">
-              {row.masterProductName}
-              {row.uncategorized && <span className="text-gray-300"> (상품 미연결)</span>}
+            <p className="flex items-start gap-1 text-[13px] text-gray-900">
+              <NameText kind="product" name={row.masterProductName} expandable />
+              {row.uncategorized && <span className="shrink-0 text-gray-300"> (상품 미연결)</span>}
             </p>
             <p className="text-xs text-gray-500" title={row.costBasisReady ? undefined : PROFIT_PENDING_HINT}>
               판매 {row.netQty.toLocaleString('ko-KR')} · 매출 {formatMoney(row.grossSales)} · 할인{' '}
@@ -94,11 +95,11 @@ export function ChannelSalesLines({ rows, isLoading, error }: ChannelSalesLinesP
             className="align-top"
           >
             <td className="px-2 py-1 text-gray-700">
-              <span className="line-clamp-2 break-words" title={row.masterProductName}>
-                {row.masterProductName}
+              <span className="flex items-start gap-1">
+                <NameText kind="product" name={row.masterProductName} inTable expandable />
                 {row.uncategorized && (
                   <span
-                    className="ml-1 text-gray-400"
+                    className="shrink-0 text-gray-400"
                     title="채널 옵션에 연결되지 않은 주문입니다. 매출에는 포함됩니다"
                   >
                     (상품 미연결)
