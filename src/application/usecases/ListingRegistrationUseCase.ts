@@ -43,6 +43,7 @@ import type {
   SiteMargin,
   ListingUpdatePreview,
   ListingUpdateSelectionRequest,
+  ListingMarketValueGroup,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -262,6 +263,11 @@ export class ListingRegistrationUseCase {
   /** 2609_45/D13: 이 셀을 마스터 카테고리로 되돌린다(마켓 반영은 다음 [수정 요청] 때). */
   setCategorySource(listingId: number, useMasterCategory: boolean): Promise<void> {
     return this.repository.setCategorySource(listingId, useMasterCategory);
+  }
+
+  /** FEATURE_2611_27 / D20: this group goes back to the master values (market update at the next [수정 요청]). */
+  useMasterValues(listingId: number, group: ListingMarketValueGroup): Promise<void> {
+    return this.repository.useMasterValues(listingId, group);
   }
 
   masterFromChannelPreview(

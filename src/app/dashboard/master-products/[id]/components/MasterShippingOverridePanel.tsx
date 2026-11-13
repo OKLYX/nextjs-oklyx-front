@@ -34,6 +34,8 @@ export interface ForceApplyChannel {
   // The channel's own shipping override (81). undefined = not loaded / fetch failed → excluded from
   // the "이 저장이 닿지 않는 채널" hint so it never over-reports.
   override?: Record<string, string> | null;
+  // FEATURE_2611_27 / D37 — true = this channel's shipping uses the market values: listed apart, starts unchecked.
+  usesMarketShipping: boolean;
 }
 
 interface MasterShippingOverridePanelProps {
@@ -62,10 +64,13 @@ interface MasterShippingOverridePanelProps {
  * platform's keys.
  * ⚠️ The overwrite erases values a channel set itself and cannot be undone, so it runs on **channels picked** in the
  * dialog.
- * [저장] reaches only channels **without** their own settings (inheritance). So when, right after a save, some
- * channels hold their own settings, the banner 「N개 채널이 개별 배송 설정을 갖고 있어 이 변경이 반영되지 않습니다」 +
- * [해당 채널에 적용] (81) opens the force-apply dialog with only those channels picked. Judged by
- * `channelDivergesFromMaster` (hint only, the backend is the truth).
+ * [저장] reaches only channels without their own settings that do not use the market shipping values. Right after
+ * a save the lines 「배송 설정을 저장했습니다. N개 채널에 반영되었습니다.」 and
+ * 「N개 채널은 반영되지 않았습니다 — 따로 정한 값 a개 · 마켓 값 사용 b개」 + [해당 채널에 적용] (FEATURE_2611_27 / D38)
+ * open the force-apply dialog with only the 「따로 정한 값」 channels picked. Judged by `channelDivergesFromMaster`
+ * (hint only, the backend is the truth); a channel whose override is not loaded is counted nowhere.
+ * FEATURE_2611_27 / D37 · D40: channels using the market shipping values are listed apart, start unchecked and stay
+ * outside 「전체 선택」.
  *
  * ⚠️ Force-apply reads the **saved** master override → with unsaved edits it **saves first** and then applies
  * (otherwise the on-screen values would be ignored and old values written to the channels). An empty master
@@ -100,11 +105,15 @@ export function MasterShippingOverridePanel({
   const [isApplying, setIsApplying] = useState(false);
   const [confirmApply, setConfirmApply] = useState(false);
   const [applyBanner, setApplyBanner] = useState('');
-  // Channels selected in the confirm dialog (79). Seeded to "all" each time the dialog opens.
+  // Channels selected in the confirm dialog (79). Seeded each time the dialog opens with the channels not using the market shipping values (FEATURE_2611_27 / D37).
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [pickerError, setPickerError] = useState('');
-  // Channels that hold their own settings and so did NOT receive the last save (81).
+  // Channels with their own settings (not using the market values) that did NOT receive the last save (81 · D38).
   const [staleIds, setStaleIds] = useState<number[]>([]);
+  // FEATURE_2611_27 / D38 — channels using the market shipping values, not reached by the last save.
+  const [marketStaleCount, setMarketStaleCount] = useState(0);
+  // FEATURE_2611_27 / D38 — channels the last save reached.
+  const [reflectedCount, setReflectedCount] = useState(0);
   // Whether the open dialog was seeded from that hint (affects the dialog's lead line only).
   const [pickerFromHint, setPickerFromHint] = useState(false);
 
@@ -167,10 +176,16 @@ export function MasterShippingOverridePanel({
       // A channel that owns these keys keeps its own values — the save does not reach it (81).
       // Surface that here, where the user just pressed 저장 and would otherwise see only success.
       const savedMap = masterShippingMapOf(override, elevenst);
+      // FEATURE_2611_27 / D38: a channel whose override is not loaded is counted nowhere.
+      const counted = channels.filter((c) => c.override !== undefined);
       setStaleIds(
-        channels
-          .filter((c) => channelDivergesFromMaster(c.override, savedMap))
+        counted
+          .filter((c) => !c.usesMarketShipping && channelDivergesFromMaster(c.override, savedMap))
           .map((c) => c.listingId),
+      );
+      setMarketStaleCount(counted.filter((c) => c.usesMarketShipping).length);
+      setReflectedCount(
+        counted.filter((c) => !c.usesMarketShipping && !channelDivergesFromMaster(c.override, savedMap)).length,
       );
       // Transient confirmation — auto-dismiss (project has no toast system).
       setTimeout(() => setSaved(false), 2500);
@@ -183,9 +198,10 @@ export function MasterShippingOverridePanel({
   };
 
   const openPicker = (preselect?: number[]) => {
-    // Default to every channel; the user unchecks the ones to leave alone. When opened from the
-    // "이 저장이 닿지 않는 채널" hint, only those channels start checked (81).
-    setSelectedIds(new Set(preselect ?? channels.map((c) => c.listingId)));
+    // Default to every channel not using the market shipping values; opened from the hint, only the
+    // 「따로 정한 값」 channels start checked. A market-value channel is never pre-checked (FEATURE_2611_27 / D37).
+    const ownIds = new Set(ownChannels.map((c) => c.listingId));
+    setSelectedIds(new Set((preselect ?? channels.map((c) => c.listingId)).filter((id) => ownIds.has(id))));
     setPickerFromHint(preselect != null);
     setPickerError('');
     setApplyBanner('');
@@ -203,10 +219,39 @@ export function MasterShippingOverridePanel({
     setPickerError('');
   };
 
-  const allSelected = channels.length > 0 && selectedIds.size === channels.length;
+  // FEATURE_2611_27 / D37 · D40: the two groups of the picker, both in `channels` order.
+  const ownChannels = channels.filter((c) => !c.usesMarketShipping);
+  const marketChannels = channels.filter((c) => c.usesMarketShipping);
+  const ownSelectedCount = ownChannels.filter((c) => selectedIds.has(c.listingId)).length;
+  const marketSelectedCount = marketChannels.filter((c) => selectedIds.has(c.listingId)).length;
+  const allSelected = ownChannels.length > 0 && ownSelectedCount === ownChannels.length;
 
+  // FEATURE_2611_27 / D38: the two lines shown right after a save.
+  const savedLine =
+    channels.length === 0
+      ? '배송 설정을 저장했습니다.'
+      : reflectedCount > 0
+        ? `배송 설정을 저장했습니다. ${reflectedCount}개 채널에 반영되었습니다.`
+        : '배송 설정을 저장했습니다. 반영된 채널이 없습니다.';
+  const staleLine =
+    `${staleIds.length + marketStaleCount}개 채널은 반영되지 않았습니다 — ` +
+    [
+      staleIds.length > 0 ? `따로 정한 값 ${staleIds.length}개` : '',
+      marketStaleCount > 0 ? `마켓 값 사용 ${marketStaleCount}개` : '',
+    ]
+      .filter((t) => t !== '')
+      .join(' · ');
+
+  // Market-value channels stay as they are — 「전체 선택」 covers only the own group (D40).
   const toggleAll = () => {
-    setSelectedIds(allSelected ? new Set() : new Set(channels.map((c) => c.listingId)));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const c of ownChannels) {
+        if (allSelected) next.delete(c.listingId);
+        else next.add(c.listingId);
+      }
+      return next;
+    });
     setPickerError('');
   };
 
@@ -253,6 +298,7 @@ export function MasterShippingOverridePanel({
         ),
       );
       setStaleIds([]); // those channels now match the master (or were deliberately left out)
+      setMarketStaleCount(0);
       onSaved();
     } catch (err) {
       setError(extractErrorMessage(err, '강제 적용에 실패했습니다.'));
@@ -299,16 +345,14 @@ export function MasterShippingOverridePanel({
 
           {saved && !error && (
             <p className="text-sm text-green-700">
-              {withRecalcNote('배송 설정을 저장했습니다.', recalcFailed)}
+              {withRecalcNote(savedLine, recalcFailed)}
             </p>
           )}
           {applyBanner && !error && <p className="text-sm text-green-700">{applyBanner}</p>}
 
-          {staleIds.length > 0 && (
+          {staleIds.length + marketStaleCount > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded bg-blue-50 px-3 py-2">
-              <p className="text-sm text-blue-700">
-                {staleIds.length}개 채널이 개별 배송 설정을 갖고 있어 이 변경이 반영되지 않습니다.
-              </p>
+              <p className="text-sm text-blue-700">{staleLine}</p>
               <button
                 type="button"
                 onClick={() => openPicker(staleIds)}
@@ -378,13 +422,19 @@ export function MasterShippingOverridePanel({
               </p>
             )}
 
-            <label className="flex items-center gap-2 border-b pb-2 text-sm font-medium text-gray-700">
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-              전체 선택 ({selectedIds.size}/{channels.length})
-            </label>
+            {marketSelectedCount > 0 && (
+              <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-700">마켓 값을 쓰던 {marketSelectedCount}개 채널도 이 마스터 설정으로 덮어쓰고, 마켓 값 사용을 끕니다.</p>
+            )}
+
+            {ownChannels.length > 0 && (
+              <label className="flex items-center gap-2 border-b pb-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                전체 선택 ({ownSelectedCount}/{ownChannels.length})
+              </label>
+            )}
 
             <div className="max-h-64 space-y-1 overflow-y-auto">
-              {channels.map((c) => (
+              {ownChannels.map((c) => (
                 <label key={c.listingId} className="flex items-center gap-2 text-sm text-gray-700">
                   <input
                     type="checkbox"
@@ -392,6 +442,19 @@ export function MasterShippingOverridePanel({
                     onChange={() => toggleChannel(c.listingId)}
                   />
                   {c.label}
+                </label>
+              ))}
+              {marketChannels.length > 0 && (
+                <p className="pt-2 text-xs font-medium text-gray-500">마켓 값 사용 중 — 직접 체크하면 마스터 설정으로 덮어씁니다</p>
+              )}
+              {marketChannels.map((c) => (
+                <label key={c.listingId} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(c.listingId)}
+                    onChange={() => toggleChannel(c.listingId)}
+                  />
+                  {c.label} <span className="text-xs text-gray-500">· 마켓 값 사용 중</span>
                 </label>
               ))}
             </div>
