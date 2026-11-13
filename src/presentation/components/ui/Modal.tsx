@@ -24,6 +24,12 @@
  * - 세로 = **내용만큼** 늘어나고, 화면 높이에서 상하 마진을 뺀 값에서 멈춘 뒤 본문만 스크롤된다.
  * - ⚠️ 마진은 **네 변이 같은 값**(`--modal-margin`, `PageContainer` 의 `p-4 md:p-6` 과 같은 축)이다.
  *   팝업은 화면보다 커지지 않는다.
+ * - `fullScreenOnNarrow` = 768px 미만에서만 패널을 화면 가득(위 · 왼쪽 0 · `100vw` × `100dvh` · 모서리 ·
+ *   그림자 없음, `globals.css` 「.modal-fullscreen-narrow」)으로 펴고, 제목 왼쪽에 [뒤로] 를 그린다
+ *   (✕ 와 같은 닫기 경로, 그 폭에서 ✕ 는 숨김). 768px 이상은 지금 모양 그대로다.
+ *   쓰는 곳 = `OrderDetailsModal` 두 모드뿐(FEATURE_2611_29 / D20).
+ *   ⚠️ 이것은 폭 손잡이가 아니다 — 폭 손잡이는 여전히 없다.
+ *   ❌ 다른 팝업에 켜지 않는다(주문 상세만 화면 가득으로 연다).
  *
  * **닫기 — 기본은 ✕ 와 ESC 뿐이다.**
  * - 바깥 음영 클릭은 **기본 비활성**. 필요하면 `closeOnOverlayClick` 로 켠다. 실수로 날리는
@@ -59,6 +65,9 @@
  *
  * // 다른 모달 위에 뜨는 팝업
  * <Modal isOpen={isOpen} onClose={close} title="이미지 선택" nested>…</Modal>
+ *
+ * // 좁은 화면이면 화면 가득 + [뒤로] (주문 상세 전용)
+ * <Modal isOpen={isOpen} onClose={close} title="주문 상세" fullHeight fullScreenOnNarrow>…</Modal>
  * ```
  *
  * ⚠️ 확인/취소 성격의 팝업은 이 컴포넌트를 직접 쓰지 말고 `ConfirmDialog` 를 쓴다.
@@ -74,7 +83,7 @@
 
 import { CSSProperties, ReactNode, useCallback, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 
 export type ModalVariant = 'content' | 'alert';
 
@@ -102,6 +111,8 @@ export interface ModalProps {
   nested?: boolean;
   /** 내용에 따라 높이가 출렁이면 안 되는 팝업이면 `true` → 패널을 최대 높이로 고정 */
   fullHeight?: boolean;
+  /** 768px 미만이면 화면 가득 + 제목 줄 [뒤로] (✕ 숨김). 주문 상세 전용 */
+  fullScreenOnNarrow?: boolean;
   children: ReactNode;
 }
 
@@ -151,6 +162,7 @@ export function Modal({
   disableClose = false,
   nested = false,
   fullHeight = false,
+  fullScreenOnNarrow = false,
   children,
 }: ModalProps) {
   const [confirmingClose, setConfirmingClose] = useState(false);
@@ -233,7 +245,7 @@ export function Modal({
             ref={attachPanel}
             aria-describedby={undefined}
             style={panelStyle(variant, fullHeight)}
-            className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${z} flex flex-col rounded-lg bg-white shadow-lg`}
+            className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${z} flex flex-col rounded-lg bg-white shadow-lg${fullScreenOnNarrow ? ' modal-fullscreen-narrow' : ''}`}
             onEscapeKeyDown={(e) => {
               // 확인 다이얼로그가 떠 있으면 그쪽이 ESC 를 받는다.
               if (disableClose || confirmingClose) e.preventDefault();
@@ -247,13 +259,29 @@ export function Modal({
           >
             {/* 헤더 — 항상 보인다 */}
             <div className="flex shrink-0 items-start justify-between gap-4 p-6 pb-4">
-              <Dialog.Title className="text-lg font-semibold text-gray-900">{title}</Dialog.Title>
+              {fullScreenOnNarrow ? (
+                <div className="flex min-w-0 items-center gap-2">
+                  {!disableClose && (
+                    <button
+                      type="button"
+                      onClick={requestClose}
+                      aria-label="뒤로"
+                      className="-m-1 shrink-0 rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 md:hidden"
+                    >
+                      <ArrowLeft size={18} />
+                    </button>
+                  )}
+                  <Dialog.Title className="text-lg font-semibold text-gray-900">{title}</Dialog.Title>
+                </div>
+              ) : (
+                <Dialog.Title className="text-lg font-semibold text-gray-900">{title}</Dialog.Title>
+              )}
               {!disableClose && (
                 <button
                   type="button"
                   onClick={requestClose}
                   aria-label="닫기"
-                  className="-m-1 shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  className={`-m-1 shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600${fullScreenOnNarrow ? ' hidden md:block' : ''}`}
                 >
                   <X size={18} />
                 </button>

@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import axios from 'axios';
 import { Spinner } from '@/presentation/components/Spinner';
+import { Lock } from 'lucide-react';
 import { addressHead } from '@/infrastructure/utils/address';
-import type { OrderDetail, OrderDetailParcel, OrderItem } from '@/domain/entities/OrderEntity';
-import {
-  ELEVENST_RESERVED_LABEL, getOrderStatusLabel, isAlreadyShipped, salesChannelLabel,
-} from '@/domain/entities/OrderEntity';
+import type { OrderDetail, OrderDetailParcel, OrderItem, OrderStatus } from '@/domain/entities/OrderEntity';
+import { getOrderStatusLabel, isAlreadyShipped, orderNetAmount } from '@/domain/entities/OrderEntity';
 import type { InternalStage } from '@/domain/entities/OrderEntity';
 import type { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import type { OrderUseCase } from '@/application/usecases/OrderUseCase';
@@ -32,7 +31,6 @@ import { Button } from '@/presentation/components/ui/Button';
 import { ConfirmDialog } from '@/presentation/components/ui/ConfirmDialog';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { QuantityStepper } from '@/presentation/components/QuantityStepper';
-import { InternalStageBadge } from './InternalStageBadge';
 import { ReservedShipmentHistory } from './ReservedShipmentHistory';
 import { StoredInvoiceEditor } from './StoredInvoiceEditor';
 import { ElevenstCancelRequests } from './ElevenstCancelRequests';
@@ -46,27 +44,31 @@ import { LotteonCancelRequests } from './LotteonCancelRequests';
 import { LotteonSellerCancelForm } from './LotteonSellerCancelForm';
 import { LotteonDeliveryAppointmentForm } from './LotteonDeliveryAppointmentForm';
 import { LotteonInvoiceEditModal } from './LotteonInvoiceEditModal';
-import { OrderDetailSummary, formatDate } from './OrderDetailSummary';
-import type { OrderDetailField } from './OrderDetailSummary';
+import { OrderDetailSummary } from './OrderDetailSummary';
+import { OrderDetailHeader, OrderRefreshButton } from './OrderDetailHeader';
+import { OrderProgress } from './OrderProgress';
+import { OrderNextStepCard } from './OrderNextStepCard';
 import { platformName } from '@/config/platforms';
 
 /**
  * The shared order detail modal (FEATURE_2611_07 / D4 · D21) — one modal, two entries:
  * - line mode (props `order` …): 「주문내역」 · 「출고관리」 open it by the clicked order line.
- * - packing mode (props `parcelId` …): 「포장 작업」 「오늘 완료」 opens it by the clicked parcel — fields, 「상품 목록」 ·
- *   「송장 목록」 and [상자 변경] only, none of the actions below (D13 · D14).
- * Both modes read the order from the server (`getOrderDetail` / `getParcelOrderDetail`, D18 · D30); the body is
- * `OrderDetailSummary`.
+ * - packing mode (props `parcelId` …): 「포장 작업」 「오늘 완료」 opens it by the clicked parcel — the header without status,
+ *   the product, order info, customer and invoice groups and [상자 변경] only, none of the actions below
+ *   (D13 · D14 · FEATURE_2611_29 / D19 ① · R17).
+ * Both modes read the order from the server (`getOrderDetail` / `getParcelOrderDetail`, D18 · D30); the header is
+ * `OrderDetailHeader`, pinned above the scrolling band (FEATURE_2611_29 / D33), and the body is `OrderDetailSummary`.
  *
  * Line mode — read-only info + (ADMIN · Coupang / 11st / LotteON) single-order label sheet lookup and download.
  * 11st orders also get their cancel requests and the seller return request (FEATURE_2610_17 / D19 · D35), and the
  * 11st seller actions — sale refusal in the cancel tab, delay notice · partial / split shipment · visit pickup in
  * the shipment tab, and [입고완료 처리] in place of [발주처리] for a reserved sale (D61 ~ D67).
  *
- * Action layout — order confirmation sits at the **left of the pinned foot bar**, the rest in the body's **tabs**
- * (from the left: label sheet · shipment · order cancel; shipment is selected by default). Confirmation is the step
- * before the others, so it is not mixed into the tabs; the three tabs are an exclusive choice, so they are not
- * stacked. The Excel download button shows in the foot bar only on the sheet tab, where the table is visible.
+ * Action layout (FEATURE_2611_29 / D2 · D5 · D6 · D7) — header → progress → next step card → marketplace requests →
+ * tabs → body, with only the close button in the foot bar. Order confirmation lives in the next step card under the
+ * progress strip; the rest is in the **tabs** (from the left: label sheet · shipment · order cancel; shipment is
+ * selected first, a fully canceled order opens on the cancel tab). Locked tabs stay visible with a lock icon and a
+ * reason. The Excel download button sits next to the sheet lookup button inside the sheet tab (D19 ③).
  * The sheet section expands this modal inline instead of a new popup. The table editing UI looks like the existing
  * `ShippingLabelPreviewModal` (whole order list) but is **not extracted into a shared component** — the user decision
  * (PLAN D5) keeps the regression risk of the already-verified order-list download at 0.
@@ -109,15 +111,27 @@ type OrderDetailsModalProps = LineModeProps | PackingModeProps;
 
 const PARCEL_MIN_MESSAGE = '택배수량은 1 이상이어야 합니다.';
 
-// 주문 상세 액션 탭. 왼쪽부터 송장시트 조회 → 발송처리 → 주문취소 순이고, **기본 선택은 발송처리**다 —
-// 주문 대부분이 발송으로 끝나고, 취소는 되돌릴 수 없어 한 번 더 누르게 두는 편이 안전하다.
-const ACTION_TABS = [
-  { key: 'sheet', label: '송장시트' },
-  { key: 'shipment', label: '발송처리' },
-  { key: 'cancel', label: '주문 취소' },
-] as const;
+// Order detail action tabs, left to right: label sheet → shipment → order cancel. Shipment is selected first, a fully
+// canceled order opens on the cancel tab (FEATURE_2611_29 / D6 · R10). Tab names come from `tabLabel`.
+const ACTION_TABS = [{ key: 'sheet' }, { key: 'shipment' }, { key: 'cancel' }] as const;
 
 type ActionTab = (typeof ACTION_TABS)[number]['key'];
+
+// Quantity text of a fully canceled order — the hold count only when there is one (FEATURE_2611_29 / D15 supplement).
+function cancelQtyText(cancel: number, hold: number): string {
+  return hold > 0 ? `취소 수량 ${cancel}개 · 보류 ${hold}개` : `취소 수량 ${cancel}개`;
+}
+
+// The next step card per shown status (FEATURE_2611_29 / D15 · R8); paid uses the confirmation card, preparing has none.
+const NEXT_STEP_BY_STATUS: Partial<Record<OrderStatus, { title: string; body: string }>> = {
+  SHIPPED: { title: '택배 집하 대기', body: '택배사가 집하하면 배송중으로 바뀝니다. 송장 수정 탭에서 송장을 고칠 수 있습니다.' },
+  DELIVERING: { title: '배송 중', body: '고객에게 가는 중입니다.' },
+  DELIVERED: { title: '배송 완료', body: '처리할 작업이 없습니다.' },
+};
+
+// Lock reasons of the tabs (FEATURE_2611_29 / D5 · R9) — every other locked tab has no reason.
+const TAB_LOCK_CANCELED = '취소된 주문';
+const TAB_LOCK_SHIPPED = '발송 후에는 취소할 수 없습니다(반품으로 처리)';
 
 // 취소 접수 유형 라벨 — 쿠팡 `receiptType`(CANCEL=즉시취소 / STOP_SHIPMENT=출고중지) 표시 전용.
 // 이 모달 안에서만 쓰므로 엔티티·DTO 로 빼지 않는다. 모르는 코드는 원문 그대로 보여준다(PLAN 2609_25 D16).
@@ -125,14 +139,6 @@ const RECEIPT_TYPE_LABELS: Record<string, string> = {
   CANCEL: '즉시취소',
   STOP_SHIPMENT: '출고중지 접수',
 };
-
-// 주문 시점 금액 스냅샷 표시(PLAN 2609_26 D9·D10).
-// ⚠️ null 은 0 원이 아니라 "모른다"다 — 과거 주문은 백필된 만큼만 값이 있다.
-// 0 으로 그리면 무료 주문과 구분되지 않으므로 '—' 로 가른다.
-function formatAmount(value: number | null): string {
-  if (value == null) return '—';
-  return `${value.toLocaleString('ko-KR')}원`;
-}
 
 /** Load state of the order detail — 「불러오는 중...」 only before the first response; a failure shows its text (D18). */
 function DetailLoadState({ loaded, error }: { loaded: boolean; error: string }) {
@@ -175,24 +181,31 @@ function PackingOrderDetailsModal({ parcelId, orderUseCase, reloadKey, onClose, 
     return () => { alive = false; };
   }, [parcelId, orderUseCase, reloadKey]);
 
-  // Packing mode fields (PLAN R17) — no line fields, amounts or quantities (D13).
-  const fields: OrderDetailField[] = detail == null ? [] : [
-    { label: '주문번호', value: detail.externalOrderId },
-    { label: '판매자', value: detail.sellerName ?? '-' },
-    { label: '판매처', value: salesChannelLabel(detail.platform, detail.accountAlias) },
-    { label: '주문자', value: detail.ordererName ?? '-' },
-    { label: '수취인', value: detail.receiverName ?? '-' },
-    { label: '결제일', value: formatDate(detail.paidAt) },
-  ];
-
   return (
-    <Modal isOpen onClose={onClose} title="주문 상세" fullHeight>
-      <div className="flex-1 min-h-0 overflow-y-auto">
+    <Modal isOpen onClose={onClose} title="주문 상세" fullHeight fullScreenOnNarrow>
+      {/* The header stays pinned above the scrolling band (FEATURE_2611_29 / D33 · 2609_50 D12). */}
+      <div className="shrink-0 pb-3 border-b border-gray-200">
+        {detail && (
+          <OrderDetailHeader
+            detail={detail}
+            status={null}
+            reservedSale={false}
+            stage={null}
+            amount={null}
+            onRefresh={null}
+            isRefreshing={false}
+          />
+        )}
         <DetailLoadState loaded={detail != null} error={detailError} />
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {detail && (
           <OrderDetailSummary
             detail={detail}
-            fields={fields}
+            line={null}
+            quantities={null}
+            fullyCanceled={false}
             highlightLineId={null}
             openParcelId={openChipOf(detail, openParcelId)}
             onSelectParcel={setOpenParcelId}
@@ -201,7 +214,7 @@ function PackingOrderDetailsModal({ parcelId, orderUseCase, reloadKey, onClose, 
         )}
       </div>
 
-      <div className="shrink-0 border-t border-gray-200">
+      <div className="shrink-0 border-t border-gray-200 hidden md:block">
         <div className="flex justify-end pt-6">
           <button
             onClick={onClose}
@@ -228,9 +241,6 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   const [carrierOptions, setCarrierOptions] = useState<CarrierOption[]>([]);
   const [carrierCode, setCarrierCode] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
-  // 이미 발송처리된 주문은 입력칸을 감춰 둔다 — [송장 수정하기] 를 눌러야 열린다.
-  // 실수로 정상 송장을 덮어쓰는 경로를 한 번 막는 것이 목적이라 미발송 주문에는 영향이 없다.
-  const [isEditingInvoice, setIsEditingInvoice] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [result, setResult] = useState<ManualShipmentResult | null>(null);
@@ -267,9 +277,11 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   const [cancelResult, setCancelResult] = useState<OrderCancelResult | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
-  // 발송처리·주문취소 탭. 기본은 왼쪽(발송처리). 상태 때문에 못 쓰는 탭이 골라져 있으면
-  // 아래 `activeTab` 이 파생값으로 되돌린다 — effect 로 고쳐 쓰지 않는다.
-  const [actionTab, setActionTab] = useState<ActionTab>('shipment');
+  // Label sheet / shipment / cancel tabs. First pick = cancel when `order.cancelled`, otherwise shipment (FEATURE_2611_29 / D6 · R10);
+  // if the picked tab is locked, `activeTab` below falls back to the first open tab as a derived value — no effect.
+  const [actionTab, setActionTab] = useState<ActionTab>(order?.cancelled ? 'cancel' : 'shipment');
+  // Narrow screens: the reason of the locked tab just pressed, one grey line under the tab row (FEATURE_2611_29 / R9).
+  const [lockedNotice, setLockedNotice] = useState('');
   // FEATURE_2610_17 / D61 · D62 · D63: the 11st reason lists, loaded once for an 11st order (server-owned).
   const [elevenstChoices, setElevenstChoices] = useState<ElevenstChoices | null>(null);
   const [elevenstChoicesFailed, setElevenstChoicesFailed] = useState(false);
@@ -426,8 +438,6 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   const isLocked = isSubmitting || result != null;                  // D14 — only after a 200
   const isInputDisabled = isLocked || carrierOptions.length === 0;  // load failure lands here too (empty list)
   const isSubmitDisabled = isInputDisabled || carrierCode === '' || invoiceNumber.trim() === '';
-  // 미발송이면 늘 열려 있고, 발송된 건은 [송장 수정하기] 를 누른 뒤에만 열린다.
-  const isFormOpen = !isShipped || isEditingInvoice;
   const ackSucceeded = ackResult != null && ackResult.succeeded > 0;
   const internalMarked = internalResult != null && internalResult.changedShipments > 0;
   // 배지 = 방금 한 동작의 결과가 우선. 발주처리 성공이면 서버가 내부 단계를 지웠다(D14).
@@ -448,20 +458,23 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   // 빈칸은 Number('') === 0 이라 0·NaN 도 범위 밖으로 취급해 버튼만 막는다 — 입력 중 값을 되돌리지 않는다.
   const isCancelQtyValid = Number.isInteger(cancelQty) && cancelQty >= 1 && cancelQty <= order.purchasableQty;
   const isCancelInputDisabled = isCancelling || cancelSucceeded || cancelReasons.length === 0;
-  // Action gates — order confirmation goes to the pinned foot bar, the other two (shipment · cancel) split into
-  // tabs. An 11st reserved sale (raw 201) is not confirmed yet — [입고완료 처리] takes the slot instead (D67).
+  // Action gates — order confirmation goes to the next step card under the progress strip, the other two (shipment ·
+  // cancel) split into tabs (FEATURE_2611_29 / D7). An 11st reserved sale (raw 201) is not confirmed yet —
+  // [입고완료 처리] takes the slot instead (D67).
   const canAcknowledge = isAdmin && isMarketOrder && order.status === 'PAID' && !fullyCanceled && !order.reservedSale;
   const canStockConfirm = isAdmin && isElevenst && order.reservedSale && order.status === 'PAID' && !fullyCanceled;
   const stockConfirmed = stockSent || order.stockConfirmSent;
   // [Internal acknowledge] = Coupang · 11st · LotteON [발주처리] targets without an internal stage, 11st visit pickup
   // excluded (D1·D13 · FEATURE_2610_17 / D12 · FEATURE_2611_23 / D51 · D53 · R50).
   const canMarkInternal = canAcknowledge && (isCoupang || isLotteon || (isElevenst && !order.visitPickup)) && order.internalStage == null;
-  // 시트는 쿠팡 전용이 아니다 — 버튼만 비활성되고 안내가 붙으므로 ADMIN 이면 탭을 연다.
-  const canSheet = isAdmin;
+  // The sheet is not Coupang only (the button disables with a notice), so an ADMIN gets the tab — locked for a fully
+  // canceled order (FEATURE_2611_29 / R10).
+  const canSheet = isAdmin && !fullyCanceled;
   const canShip = isAdmin && isMarketOrder && !fullyCanceled;
   // 11st sale refusal (D61) and the LotteON seller cancel (FEATURE_2611_23 / D25) also need a line that is not fully cancelled.
-  const canCancel = isAdmin && (isCoupang || ((isElevenst || isLotteon) && !fullyCanceled))
-    && (order.status === 'PAID' || order.status === 'PREPARING');
+  // An order canceled before opening keeps the cancel tab open with one line of text, no form (FEATURE_2611_29 / R10).
+  const canCancel = isAdmin && (order.cancelled || ((isCoupang || ((isElevenst || isLotteon) && !fullyCanceled))
+    && (order.status === 'PAID' || order.status === 'PREPARING')));
   // D66: a visit-pickup 11st order gets [방문수령 완료] instead of the invoice form, from paid on.
   const showVisitPickup = isElevenst && order.visitPickup && (order.status === 'PAID' || order.status === 'PREPARING');
   // D63 · FEATURE_2611_23 / D26: [발송지연 안내] (11st) or [발송 약정일 안내] (LotteON) under the shipment tab for a paid / preparing order.
@@ -472,6 +485,23 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   const activeTab: ActionTab = tabAvailability[actionTab]
     ? actionTab
     : ACTION_TABS.find((tab) => tabAvailability[tab.key])?.key ?? actionTab;
+  const tabLabel = (tab: ActionTab): ReactNode => {
+    if (tab === 'sheet') return '송장시트';
+    if (tab === 'shipment') return isShipped ? '송장 수정' : '발송처리';
+    if (isCoupang && order.status === 'PREPARING') return '출고중지';
+    return (
+      <>
+        <span className="hidden md:inline">주문 취소</span>
+        <span className="md:hidden">취소</span>
+      </>
+    );
+  };
+  const lockReason = (tab: ActionTab): string => {
+    if (tabAvailability[tab]) return '';
+    if ((tab === 'sheet' || tab === 'shipment') && fullyCanceled) return TAB_LOCK_CANCELED;
+    if (tab === 'cancel' && isShipped) return TAB_LOCK_SHIPPED;
+    return '';
+  };
 
   const registeredOptions = carrierOptions.filter((option) => option.registered);
   const otherOptions = carrierOptions.filter((option) => !option.registered);
@@ -624,7 +654,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
         setRefreshBanner('이미 최신입니다.');
       }
       await onRefreshed?.();
-      // The fields come from the server response, so the order detail is read again (R12).
+      // The header and body come from the server response, so the order detail is read again (R12).
       setDetailReloadTick((tick) => tick + 1);
     } catch (err) {
       setRefreshBanner(extractErrorMessage(err, '주문 상태 갱신에 실패했습니다. 다시 시도해주세요.'));
@@ -722,79 +752,187 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
     }
   };
 
-  // Line mode fields (PLAN R17 · D40): order fields from the response, the rest from the clicked line in the response
-  // (`order` until it is there). 「플랫폼」 · 「박스 ID」 · 「상품명」 · 「마켓 계정 ID」 are gone (D16 · D32).
+  // The clicked line in the response (`order` until it is there, PLAN R17 · D40) — the source of the shown status, the
+  // quantities and the body's line groups (FEATURE_2611_29 / D8).
   const line = detail?.lines.find((candidate) => candidate.id === order.id) ?? order;
-  const fields: OrderDetailField[] = detail == null ? [] : [
-    { label: '주문번호', value: detail.externalOrderId },
-    { label: '판매자', value: detail.sellerName ?? '-' },
-    { label: '판매처', value: salesChannelLabel(detail.platform, detail.accountAlias) },
-    { label: '아이템 ID', value: line.externalItemId },
-    { label: '주문자', value: detail.ordererName ?? '-' },
-    { label: '수취인', value: detail.receiverName ?? '-' },
-    { label: '주문수량', value: line.orderCount },
-    // 취소 성공 라인은 서버가 준 결과값으로 덮어쓴다(PLAN 2609_25 D14) — 즉시취소는 취소수량이,
-    // 출고중지는 보류수량이 는다(D7). 주문수량은 그대로다(쿠팡도 원 주문수량은 바꾸지 않는다).
-    { label: '취소수량', value: cancelledLine?.resultCancelCount ?? line.cancelCount },
-    { label: '보류수량', value: cancelledLine?.resultHoldCount ?? line.holdCount },
-    { label: '구매가능수량', value: cancelledLine?.resultPurchasableQty ?? line.purchasableQty },
-    // 금액은 주문 시점 스냅샷이라 취소·동기화로 바뀌지 않는다. 배송비는 박스 단위라 여기 없다.
-    { label: '단가', value: formatAmount(line.unitPrice) },
-    { label: '주문금액', value: formatAmount(line.lineAmount) },
-    { label: '할인금액', value: formatAmount(line.discountAmount) },
-    { label: '플랫폼 부담 할인', value: formatAmount(line.platformDiscountAmount) },
-    // A successful CREATE writes 「발송처리」 back server-side; show it straight from the result (D4).
-    // ⚠️ The shipment result comes first — reversing the order hides 「발송처리」 from a user who confirmed and then
-    // shipped in one modal. The cancel is the last step, so the cancel result wins — a full cancel comes back as
-    // 'CANCELLED' from the server (D14).
-    // FEATURE_2610_17 / D67: a reserved-sale line shows the 11st label beside its status.
-    { label: '상태', value: getOrderStatusLabel(
-        cancelledLine?.resultStatus ?? result?.resultStatus ?? (ackSucceeded ? 'PREPARING' : line.status))
-        + (line.reservedSale ? ` · ${ELEVENST_RESERVED_LABEL}` : '') },
-    { label: '결제일', value: formatDate(detail.paidAt) },
-  ];
+  // Shown status (FEATURE_2611_29 / R7) — header badge, progress and next step card read this one value.
+  // A successful CREATE writes 「발송처리」 back server-side; show it straight from the result (D4).
+  // ⚠️ The shipment result comes first — reversing the order hides 「발송처리」 from a user who confirmed and then
+  // shipped in one modal. The cancel is the last step, so the cancel result wins — a full cancel comes back as
+  // 'CANCELLED' from the server (D14).
+  const shownStatus = cancelledLine?.resultStatus ?? result?.resultStatus ?? (ackSucceeded ? 'PREPARING' : line.status);
+  // A successful cancel line is overwritten with the server's result (PLAN 2609_25 D14) — an instant cancel raises the
+  // cancel count, a shipment stop the hold count (D7). The order count stays (Coupang keeps the original count too).
+  const quantities = {
+    order: line.orderCount,
+    cancel: cancelledLine?.resultCancelCount ?? line.cancelCount,
+    hold: cancelledLine?.resultHoldCount ?? line.holdCount,
+    purchasable: cancelledLine?.resultPurchasableQty ?? line.purchasableQty,
+  };
+  const nextStep = NEXT_STEP_BY_STATUS[shownStatus];
 
-  // 기하 고정(D1) — 시트를 펼쳐도 모달 크기가 변하지 않는다. `fullHeight` 가 그 역할을 승계한다.
+  // Fixed geometry (D1) — opening the sheet does not resize the modal; `fullHeight` carries that role.
+  const renderTab = (tab: (typeof ACTION_TABS)[number]) => {
+    const isAvailable = tabAvailability[tab.key];
+    const isActive = activeTab === tab.key;
+    // The cancel tab text is always red, locked or not (FEATURE_2611_29 / D1 · R19); locks show as an icon.
+    const tone = tab.key === 'cancel'
+      ? `text-red-700 ${isActive ? 'border-red-700' : 'border-transparent'}${isAvailable ? '' : ' cursor-not-allowed'}`
+      : !isAvailable
+        ? 'border-transparent text-gray-400 cursor-not-allowed'
+        : isActive
+          ? 'border-blue-600 text-blue-700'
+          : 'border-transparent text-gray-500 hover:text-gray-700';
+    return (
+      <button
+        key={tab.key}
+        type="button"
+        onClick={() => {
+          if (!isAvailable) {
+            setLockedNotice(lockReason(tab.key));
+            return;
+          }
+          setActionTab(tab.key);
+          setLockedNotice('');
+        }}
+        aria-disabled={!isAvailable}
+        title={lockReason(tab.key) || undefined}
+        className={`-mb-px inline-flex items-center justify-center gap-1 border-b-2 px-4 py-2 text-sm font-medium max-md:flex-1 ${tone}`}
+      >
+        {!isAvailable && <Lock size={13} aria-hidden />}
+        {tabLabel(tab.key)}
+      </button>
+    );
+  };
+
   return (
-    <Modal isOpen onClose={handleClose} title="주문 상세" fullHeight>
+    <Modal isOpen onClose={handleClose} title="주문 상세" fullHeight fullScreenOnNarrow>
 
-        {/* 쿠팡에서 이 주문을 다시 읽어 상태를 맞춘다 — 읽기라서 탭(쓰기 작업) 밖에 둔다(PLAN 2609_50 D12).
-            쿠팡 주문에만 보인다(D17) — isAdmin 은 걸지 않는다(읽기다).
-            스크롤 밴드 앞에 둬야 길게 내려도 버튼이 남는다. 공용 Modal 의 title 은 string 이라 제목줄에
-            버튼을 끼울 수 없고, 앱 전체가 쓰는 공용 컴포넌트를 고치지 않는다. */}
-        {isCoupang && (
-          <div className="flex items-center justify-between gap-2 pb-3 border-b border-gray-200">
-            <span className="text-xs text-gray-500">
-              주문번호 {order.externalOrderId}
-              <InternalStageBadge stage={shownStage} />
-            </span>
-            <button
-              type="button"
-              onClick={() => void handleRefresh()}
-              disabled={isRefreshing}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isRefreshing ? <Spinner label="확인 중..." /> : '주문 상태 갱신'}
-            </button>
-          </div>
-        )}
-
-        {refreshBanner && (
-          <p className="pt-2 text-sm text-gray-800">{refreshBanner}</p>
-        )}
+        {/* The header stays pinned above the scrolling band (FEATURE_2611_29 / D33 · 2609_50 D12). */}
+        <div className="shrink-0 pb-3 border-b border-gray-200">
+          {detail != null ? (
+            <>
+              <OrderDetailHeader
+                detail={detail}
+                status={shownStatus}
+                stage={shownStage}
+                reservedSale={line.reservedSale}
+                amount={orderNetAmount(line.lineAmount, line.discountAmount)}
+                isRefreshing={isRefreshing}
+                onRefresh={isCoupang ? () => void handleRefresh() : null}
+              />
+              {detailError && <DetailLoadState loaded error={detailError} />}
+            </>
+          ) : (
+            // No detail yet (loading or failed): a Coupang order keeps its refresh button beside the text (D4).
+            <div className="flex items-start justify-between gap-2">
+              <DetailLoadState loaded={false} error={detailError} />
+              {isCoupang && <OrderRefreshButton onRefresh={() => void handleRefresh()} isRefreshing={isRefreshing} />}
+            </div>
+          )}
+          {refreshBanner && (
+            <p className="pt-2 text-sm text-gray-800">{refreshBanner}</p>
+          )}
+        </div>
 
         {/* Only this middle band scrolls — the table keeps no scroller of its own (D2). */}
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <DetailLoadState loaded={detail != null} error={detailError} />
           {detail && (
-            <OrderDetailSummary
-              detail={detail}
-              fields={fields}
-              highlightLineId={order.id}
-              openParcelId={openChipOf(detail, pickedParcelId)}
-              onSelectParcel={setPickedParcelId}
-            />
+            <div className="pt-4">
+              <OrderProgress status={shownStatus} paidAt={detail.paidAt} />
+            </div>
           )}
+
+          {/* Next step card (FEATURE_2611_29 / D7 · D15 · R8) — order confirmation first, then a full cancel, then the
+              card of the shown status. Results and errors of the confirmation stay inside the card. */}
+          <div className="mt-4">
+            {canAcknowledge || canStockConfirm ? (
+              <OrderNextStepCard
+                title="다음 단계 · 발주 확인"
+                body={canAcknowledge && !ackSucceeded ? (
+                  // FEATURE_2610_17 / D52 · FEATURE_2611_23 / D17: 11st and LotteON confirm this product only — their notice has no box number.
+                  <span className="text-sm text-gray-500">
+                    {isElevenst
+                      ? '이 상품(주문 줄)이 발주확인 처리되어 배송준비중으로 바뀝니다. 되돌릴 수 없습니다.'
+                      : isLotteon
+                      ? '이 상품(주문 줄)이 발주확인 처리되어 상품준비중으로 바뀝니다. 되돌릴 수 없습니다.'
+                      : `박스 ${order.externalBoxId ?? '-'} 전체가 상품준비중으로 전환됩니다. 되돌릴 수 없습니다.`}
+                  </span>
+                ) : undefined}
+                messages={
+                  <>
+                    {ackError && (
+                      <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                        {ackError}
+                      </div>
+                    )}
+                    {ackResult != null && ackResult.failed.length > 0 && (
+                      <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                        {ackResult.failed.map((box) => (
+                          <p key={box.shipmentBoxId}>{box.resultCode}: {box.message}</p>
+                        ))}
+                      </div>
+                    )}
+                    {ackResult != null && !ackSucceeded && ackResult.failed.length === 0 && (
+                      <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
+                        발주처리 대상이 아닙니다. 목록을 새로고침해 상태를 확인해주세요.
+                      </div>
+                    )}
+                    {internalError && (
+                      <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                        {internalError}
+                      </div>
+                    )}
+                    {stockError && (
+                      <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                        {stockError}
+                      </div>
+                    )}
+                  </>
+                }
+              >
+                {/* FEATURE_2610_17 / D67 — a reserved sale takes [입고완료 처리] in the [발주처리] slot. */}
+                {canStockConfirm &&
+                  (stockConfirmed ? (
+                    <span className="text-sm font-medium text-green-700">입고완료 보냄</span>
+                  ) : (
+                    <Button variant="primary" onClick={() => setStockConfirmOpen(true)} disabled={isConfirmingStock}>
+                      {isConfirmingStock ? <Spinner label="전송 중..." /> : '입고완료 처리'}
+                    </Button>
+                  ))}
+                {canAcknowledge &&
+                  (ackSucceeded ? (
+                    <span className="text-sm font-medium text-green-700">발주처리 완료</span>
+                  ) : (
+                    <>
+                      {canMarkInternal &&
+                        (internalMarked ? (
+                          <span className="text-sm font-medium text-green-700">내부 발주 완료</span>
+                        ) : (
+                          <Button
+                            variant="confirm"
+                            onClick={() => void handleMarkInternal()}
+                            disabled={isAcknowledging || isMarkingInternal}
+                          >
+                            {isMarkingInternal ? <Spinner label="처리 중..." /> : '내부 발주처리'}
+                          </Button>
+                        ))}
+                      <button
+                        onClick={handleAcknowledge}
+                        disabled={isAcknowledging || isMarkingInternal}
+                        className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                      >
+                        {isAcknowledging ? <Spinner label="전송 중..." /> : '발주처리'}
+                      </button>
+                    </>
+                  ))}
+              </OrderNextStepCard>
+            ) : fullyCanceled ? (
+              <OrderNextStepCard title="주문이 취소되었습니다" body={cancelQtyText(quantities.cancel, quantities.hold)} />
+            ) : nextStep ? (
+              <OrderNextStepCard title={nextStep.title} body={nextStep.body} />
+            ) : null}
+          </div>
 
           {/* FEATURE_2610_17 / D19 · D35 — 11st only: the buyer's open cancel requests, and the seller return
               request for a shipped line that is not fully cancelled (D39 ⑤). */}
@@ -827,64 +965,27 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
             />
           )}
 
-          {/* 송장(FEATURE_2609_75 / D18 🔁) — 내부 단계 동안 언제나 배송 묶음별 택배사·송장번호를 고친다.
-              택배사 목록은 이 모달이 이미 불러온 `carrierOptions` 를 넘긴다(새로 부르지 않는다). */}
-          {isAdmin && (isCoupang || isElevenst || isLotteon) && shownStage != null && (
-            <div className="mt-6 border-t border-gray-200 pt-6">
-              <StoredInvoiceEditor
-                useCase={useCase}
-                externalOrderId={order.externalOrderId}
-                carrierOptions={carrierOptions}
-                onChanged={() => setReservationChanged(true)}
-              />
-            </div>
-          )}
-
-          {/* 예약 발송 기록(FEATURE_2609_75 / D30) — 이 주문의 예정·실행 시각과 결과 + 행 작업. 기록이 없으면 그리지 않는다. */}
-          {isAdmin && (isCoupang || isElevenst || isLotteon) && (
-            <ReservedShipmentHistory
-              useCase={useCase}
-              externalOrderId={order.externalOrderId}
-              onChanged={() => setReservationChanged(true)}
-            />
-          )}
-
-          {/* 송장시트 · 발송처리 · 주문 취소 — 좌우 탭(기본 선택은 발송처리).
-              세로로 쌓으면 모달이 길어져 뒤 액션이 스크롤 밖으로 밀린다. 어차피 한 번에 하나만
-              쓰는 배타적 선택이라 탭이 맞다. 쓸 수 없는 탭은 지우지 않고 비활성으로 남긴다 —
-              지우면 "왜 안 보이지" 를 사용자가 알 수 없다.
-              ⚠️ 입력값(택배사·송장번호·사유·수량)은 이 컴포넌트의 state 라 탭을 오가도 남는다.
-              패널 안으로 state 를 내리면 탭 전환마다 입력이 날아간다. */}
+          {/* Label sheet · shipment · order cancel — exclusive tabs (FEATURE_2611_29 / D5 · D6). Locked tabs stay with a
+              lock icon and a hover reason; on narrow screens a press shows the reason under the tab row (R9).
+              ⚠️ The inputs (carrier, invoice, reason, quantity) are this component's state, so they survive tab
+              switches — pushing state down into the panels would drop the input on every switch. */}
           {(canSheet || canShip || canCancel) && (
             <div className="mt-6 border-t border-gray-200 pt-6">
-              {/* 탭 모양은 ClaimTypeTabs 와 같은 관용구(밑줄) — 모달 안이라 컴포넌트로 빼지 않는다. */}
-              <div className="flex gap-1 border-b border-gray-200 max-md:flex-wrap">
-                {ACTION_TABS.map((tab) => {
-                  const isAvailable = tabAvailability[tab.key];
-                  const isActive = activeTab === tab.key;
-                  return (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setActionTab(tab.key)}
-                      disabled={!isAvailable}
-                      className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed ${
-                        isActive
-                          ? 'border-blue-600 text-blue-700'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 disabled:text-gray-300 disabled:hover:text-gray-300'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
+              {/* Underline tabs, the ClaimTypeTabs idiom — kept inline inside the modal. */}
+              <div className="flex items-center gap-1 border-b border-gray-200">
+                {ACTION_TABS.slice(0, 2).map(renderTab)}
+                <span className="flex-1 max-md:hidden" aria-hidden />
+                <span className="mx-1 w-px h-5 bg-gray-300 max-md:hidden" aria-hidden />
+                {renderTab(ACTION_TABS[2])}
               </div>
+              {lockedNotice && <p className="mt-2 text-sm text-gray-500 md:hidden">{lockedNotice}</p>}
 
               {/* Label sheet — the lookup is a live marketplace call, so opening the tab does not run it.
                   It runs on the button, and the loaded table stays in this tab (kept across tab switches). */}
               {activeTab === 'sheet' && canSheet && (
                 <div className="mt-4">
-                  <div className="flex items-center gap-3">
+                  <p className="text-sm text-gray-500">송장시트에서 여러 주문의 송장을 한 번에 등록·조회할 수 있습니다.</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
                     <button
                       onClick={handlePreview}
                       disabled={!isMarketOrder || isPreviewing}
@@ -892,8 +993,25 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                     >
                       {isPreviewing ? <Spinner label="불러오는 중..." /> : '송장시트 조회'}
                     </button>
+                    {/* The download sits next to the lookup once the table is loaded (FEATURE_2611_29 / D19 ③ · R13). */}
+                    {hasLoaded && (
+                      <button
+                        onClick={handleExport}
+                        disabled={isPreviewing || isExporting || isEmpty || !!previewError}
+                        className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                      >
+                        {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
+                      </button>
+                    )}
                     {!isMarketOrder && <span className="text-sm text-gray-500">쿠팡 · 11번가 주문만 지원합니다.</span>}
                   </div>
+
+                  {/* A download failure shows right under the button that caused it. */}
+                  {exportError && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
+                      {exportError}
+                    </div>
+                  )}
 
                   {previewError && (
                     <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
@@ -1078,19 +1196,18 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                     </p>
                   )}
 
-                  {isShipped && (
+                  {isShipped && !isLotteon && (
                     <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-sm">
-                      {isFormOpen
-                        ? '이미 발송처리된 주문입니다. 입력한 운송장으로 송장 수정을 요청합니다.'
-                        : '이미 발송처리된 주문입니다. 운송장을 고치려면 [송장 수정하기] 를 누르세요.'}
+                      이미 발송처리된 주문입니다. 입력한 운송장으로 송장 수정을 요청합니다.
                     </div>
                   )}
 
-                  {/* 발송된 건은 입력칸을 감춰 둔다 — 실수로 정상 송장을 덮어쓰지 않게 한 번 막는다. */}
-                  {!isFormOpen && (
+                  {/* A shipped LotteON order edits its invoice in a separate window, so only the button shows; every
+                      other order keeps the inputs open (FEATURE_2611_29 / D19 ⑥ · R14). */}
+                  {isShipped && isLotteon && (
                     <div className="mt-4">
                       <button
-                        onClick={() => (isLotteon ? setIsLotteonEditOpen(true) : setIsEditingInvoice(true))}
+                        onClick={() => setIsLotteonEditOpen(true)}
                         disabled={isLocked}
                         className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:text-gray-400 disabled:hover:bg-white disabled:cursor-not-allowed"
                       >
@@ -1099,7 +1216,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                     </div>
                   )}
 
-                  {isFormOpen && elevenstMode === 'ALL' && (
+                  {!(isShipped && isLotteon) && elevenstMode === 'ALL' && (
                   <div className="mt-4 flex flex-wrap items-center gap-3">
                     {/* 값은 마켓 코드 자체다 — 쿠팡은 택배사 목록 API 가 없고 문서 코드표가 SSOT 라
                         로컬에 등록한 택배사는 [등록 택배사] 그룹으로 맨 위에만 올린다. */}
@@ -1253,8 +1370,35 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                 </div>
               )}
 
+              {/* Stored invoice (FEATURE_2609_75 / D18) — while in an internal stage, the carrier and invoice of every
+                  delivery bundle can be edited; the carrier list is the one this modal already loaded. Then the reserved
+                  shipment history (D30) — planned and run times, results and row actions, nothing when there is no
+                  record. Both live in the shipment tab and only hide on another tab (FEATURE_2611_29 / D16 · R12). */}
+              {isAdmin && (isCoupang || isElevenst || isLotteon) && (
+                <div className={activeTab === 'shipment' ? undefined : 'hidden'}>
+                  {shownStage != null && (
+                    <div className="mt-6 border-t border-gray-200 pt-6">
+                      <StoredInvoiceEditor
+                        useCase={useCase}
+                        externalOrderId={order.externalOrderId}
+                        carrierOptions={carrierOptions}
+                        onChanged={() => setReservationChanged(true)}
+                      />
+                    </div>
+                  )}
+                  <ReservedShipmentHistory
+                    useCase={useCase}
+                    externalOrderId={order.externalOrderId}
+                    onChanged={() => setReservationChanged(true)}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'cancel' && order.cancelled && (
+                <p className="mt-4 text-sm text-gray-500">이미 취소된 주문입니다 · {cancelQtyText(quantities.cancel, quantities.hold)}</p>
+              )}
               {/* 11st order cancel = sale refusal of the whole line (FEATURE_2610_17 / D61). */}
-              {canCancel && isElevenst && (
+              {!order.cancelled && canCancel && isElevenst && (
                 <div className={activeTab === 'cancel' ? undefined : 'hidden'}>
                   <ElevenstSaleRefusalForm
                     orderItemId={order.id}
@@ -1268,7 +1412,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                 </div>
               )}
               {/* LotteON order cancel = seller cancel of the whole line (FEATURE_2611_23 / D25). */}
-              {canCancel && isLotteon && (
+              {!order.cancelled && canCancel && isLotteon && (
                 <div className={activeTab === 'cancel' ? undefined : 'hidden'}>
                   <LotteonSellerCancelForm
                     orderItemId={order.id}
@@ -1286,7 +1430,7 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
                   (PLAN 2609_25 D6·D7). Shown in two steps: ① the section gate reads only `order.status`, so the
                   result stays after a success, and ② an order with nothing left to cancel gets a one-line notice
                   inside the section. */}
-              {activeTab === 'cancel' && canCancel && isCoupang && (
+              {!order.cancelled && activeTab === 'cancel' && canCancel && isCoupang && (
                 <div className="mt-4">
                   {order.purchasableQty === 0 ? (
                     <p className="mt-1 text-sm text-gray-500">취소 가능한 수량이 없습니다 (이미 취소된 주문)</p>
@@ -1389,120 +1533,31 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
             </div>
           )}
 
+          {detail && (
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <OrderDetailSummary
+                detail={detail}
+                line={line}
+                quantities={quantities}
+                fullyCanceled={fullyCanceled}
+                highlightLineId={order.id}
+                openParcelId={openChipOf(detail, pickedParcelId)}
+                onSelectParcel={setPickedParcelId}
+              />
+            </div>
+          )}
+
         </div>
 
-        {/* Pinned foot band. exportError lives here, not in the body: a download failure must be
-            visible right where the button that caused it is, even when the table is scrolled away.
-            border-t marks where the scrolling body ends — without it the body scrolls under the
-            buttons with no visible boundary. */}
-        <div className="shrink-0 border-t border-gray-200">
-          {exportError && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-              {exportError}
-            </div>
-          )}
-
-          {/* 발주처리 결과·오류도 이 띠에 둔다 — 버튼이 하단 고정이라 본문이 스크롤돼 있어도
-              누른 결과가 눈앞에 남아야 한다. 실패 사유는 쿠팡 원문 그대로(D15). */}
-          {ackError && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-              {ackError}
-            </div>
-          )}
-
-          {ackResult != null && ackResult.failed.length > 0 && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-              {ackResult.failed.map((box) => (
-                <p key={box.shipmentBoxId}>{box.resultCode}: {box.message}</p>
-              ))}
-            </div>
-          )}
-
-          {ackResult != null && !ackSucceeded && ackResult.failed.length === 0 && (
-            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900 text-sm">
-              발주처리 대상이 아닙니다. 목록을 새로고침해 상태를 확인해주세요.
-            </div>
-          )}
-
-          {internalError && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-              {internalError}
-            </div>
-          )}
-
-          {stockError && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-              {stockError}
-            </div>
-          )}
-
-          {/* 왼쪽 = 발주처리 하나만. 발주는 발송·취소와 달리 배타적 선택이 아니라 앞 단계라
-              탭에 넣지 않고 항상 보이는 자리에 둔다(PLAN 2609_17 D14).
-              대상이 아니면 왼쪽 칸은 빈 채로 두고 오른쪽 버튼 자리는 그대로 유지한다. */}
-          <div className="flex items-center justify-between gap-3 pt-6 max-md:flex-wrap">
-            <div className="flex items-center gap-3 max-md:flex-wrap">
-              {/* FEATURE_2610_17 / D67 — a reserved sale takes [입고완료 처리] in the [발주처리] slot. */}
-              {canStockConfirm &&
-                (stockConfirmed ? (
-                  <span className="text-sm font-medium text-green-700">입고완료 보냄</span>
-                ) : (
-                  <Button variant="primary" onClick={() => setStockConfirmOpen(true)} disabled={isConfirmingStock}>
-                    {isConfirmingStock ? <Spinner label="전송 중..." /> : '입고완료 처리'}
-                  </Button>
-                ))}
-              {canAcknowledge &&
-                (ackSucceeded ? (
-                  <span className="text-sm font-medium text-green-700">발주처리 완료</span>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleAcknowledge}
-                      disabled={isAcknowledging || isMarkingInternal}
-                      className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
-                    >
-                      {isAcknowledging ? <Spinner label="전송 중..." /> : '발주처리'}
-                    </button>
-                    {canMarkInternal &&
-                      (internalMarked ? (
-                        <span className="text-sm font-medium text-green-700">내부 발주 완료</span>
-                      ) : (
-                        <Button
-                          variant="confirm"
-                          onClick={() => void handleMarkInternal()}
-                          disabled={isAcknowledging || isMarkingInternal}
-                        >
-                          {isMarkingInternal ? <Spinner label="처리 중..." /> : '내부 발주처리'}
-                        </Button>
-                      ))}
-                    {/* FEATURE_2610_17 / D52 · FEATURE_2611_23 / D17: 11st and LotteON confirm this product only — their notice has no box number. */}
-                    <span className="hidden text-sm text-gray-500 sm:inline">
-                      {isElevenst
-                        ? '이 상품(주문 줄)이 발주확인 처리되어 배송준비중으로 바뀝니다. 되돌릴 수 없습니다.'
-                        : isLotteon
-                        ? '이 상품(주문 줄)이 발주확인 처리되어 상품준비중으로 바뀝니다. 되돌릴 수 없습니다.'
-                        : `박스 ${order.externalBoxId ?? '-'} 전체가 상품준비중으로 전환됩니다. 되돌릴 수 없습니다.`}
-                    </span>
-                  </>
-                ))}
-            </div>
-
-            <div className="flex shrink-0 gap-2 max-md:flex-wrap">
-              <button
-                onClick={handleClose}
-                className="px-4 py-2 bg-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-400 transition-colors"
-              >
-                닫기
-              </button>
-              {activeTab === 'sheet' && hasLoaded && (
-                <button
-                  onClick={handleExport}
-                  disabled={isPreviewing || isExporting || isEmpty || !!previewError}
-                  className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
-                >
-                  {isExporting ? <Spinner label="다운로드 중..." /> : '엑셀 다운로드'}
-                </button>
-              )}
-            </div>
+        {/* Pinned foot band — only [닫기] on wide screens; narrow screens close with the back button (FEATURE_2611_29 / D7 · R20). */}
+        <div className="shrink-0 border-t border-gray-200 hidden md:block">
+          <div className="flex justify-end pt-6">
+            <button
+              onClick={handleClose}
+              className="px-4 py-2 bg-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-400 transition-colors"
+            >
+              닫기
+            </button>
           </div>
         </div>
         <ConfirmDialog
