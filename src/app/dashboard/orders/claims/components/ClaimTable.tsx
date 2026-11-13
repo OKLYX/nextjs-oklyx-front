@@ -6,6 +6,7 @@ import { salesChannelLabel } from '@/domain/entities/OrderEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { DataCard } from '@/presentation/components/DataCard';
 import { Button } from '@/presentation/components/ui/Button';
+import { NameText } from '@/presentation/components/NameText';
 import { LocalRecordBadge } from './LocalRecordBadge';
 
 interface ClaimTableProps {
@@ -109,7 +110,7 @@ export function ClaimTable({
               <span>판매자 {claim.sellerName ?? '-'}</span>
               <span>판매처 {salesChannelLabel(claim.platform, claim.accountAlias)}</span>
             </p>
-            <p className="line-clamp-2 text-[13px] text-gray-900">{claim.itemName ?? '-'}</p>
+            <NameText kind="product" name={claim.itemName} className="text-[13px] text-gray-900" />
             <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
               <span>수량 {claim.quantity}</span>
               <span>사유 {claim.reasonText ?? claim.reasonCode ?? '-'}</span>
@@ -182,7 +183,9 @@ export function ClaimTable({
               </td>
               <td className="px-6 py-3 text-sm text-gray-700">{claim.sellerName ?? '-'}</td>
               <td className="px-6 py-3 text-sm text-gray-700">{salesChannelLabel(claim.platform, claim.accountAlias)}</td>
-              <td className="px-6 py-3 text-sm text-gray-700">{claim.itemName ?? '-'}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                <NameText kind="product" name={claim.itemName} inTable />
+              </td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">{claim.quantity}</td>
               <td className="px-6 py-3 text-sm text-gray-700">
                 {claim.reasonText ?? claim.reasonCode ?? '-'}

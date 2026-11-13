@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { Button } from '@/presentation/components/ui/Button';
 import { TableCard } from '@/presentation/components/ui/TableCard';
+import { NameText } from '@/presentation/components/NameText';
 import { StockLotUseCase } from '@/application/usecases/StockLotUseCase';
 import { StockLotRepositoryImpl } from '@/infrastructure/repositories/StockLotRepositoryImpl';
 import { SellerUseCase } from '@/application/usecases/SellerUseCase';
@@ -428,7 +429,7 @@ export function DailyContainer() {
                     <td className="px-4 py-2 text-gray-900">
                       <div className="flex items-center gap-2">
                         <StockProductThumb imageUrl={row.imageUrl} productId={row.productId} alt={row.productName} />
-                        <span>{row.productName}</span>
+                        <NameText kind="product" name={row.productName} inTable />
                       </div>
                     </td>
                     <td className="px-4 py-2 text-right text-gray-900">{row.quantity}</td>

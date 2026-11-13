@@ -7,6 +7,7 @@ import { ROUTES } from '@/config/routes';
 import type { ProductListing } from '@/domain/entities/ProductListingEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 import { platformName } from '@/config/platforms';
 
 // Narrow-screen option grid (FEATURE_2610_31 D14) — the app's option rows: 「옵션명」 3 · 「판매가」 2 · 「마진」 2 · 「마진율」 2.
@@ -117,7 +118,7 @@ export function ProductListingTable({
       <DataCard
         key={listing.id}
         onClick={() => handleRowNavigate(listing.id)}
-        title={<span className="line-clamp-1">{listing.name}</span>}
+        title={<NameText kind="product" name={listing.name} />}
         trailing={
           <button
             onClick={(e) => {
@@ -222,7 +223,7 @@ export function ProductListingTable({
                   onClick={() => handleRowNavigate(listing.id)}
                   className="px-6 py-3 text-sm text-gray-700 cursor-pointer"
                 >
-                  {listing.name}
+                  <NameText kind="product" name={listing.name} inTable />
                 </td>
                 <td
                   onClick={() => handleRowNavigate(listing.id)}
