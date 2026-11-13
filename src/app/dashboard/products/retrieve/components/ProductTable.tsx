@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/config/routes';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { ZoomableThumb } from '@/presentation/components/ZoomableThumb';
+import { NameText } from '@/presentation/components/NameText';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 import { detailHrefWithReturn } from '@/infrastructure/utils/listReturn';
 import { formatKrw } from '@/infrastructure/utils/money';
@@ -142,7 +143,7 @@ export function ProductTable({
             }
           />
         }
-        title={<span className="line-clamp-1">{product.productName}</span>}
+        title={<NameText kind="product" name={product.productName} />}
         body={
           <div className="space-y-1 text-xs text-gray-900">
             {product.brand && <p className="truncate">브랜드: {product.brand}</p>}
@@ -232,7 +233,9 @@ export function ProductTable({
                 <td className="px-4 py-3 text-sm text-gray-900">{currentPage * pageSize + index + 1}</td>
                 <td className="px-4 py-3 text-sm">{productId(product)}</td>
                 <td className="px-4 py-3">{thumbnail(product)}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{product.productName}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">
+                  <NameText kind="product" name={product.productName} inTable />
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-900">{barcode(product)}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{product.brand}</td>
                 <td className="px-4 py-3 text-sm text-gray-900">{formatKrw(product.price)}</td>

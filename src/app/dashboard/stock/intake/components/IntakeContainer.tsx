@@ -18,6 +18,7 @@ import { openFillFlow } from '@/infrastructure/stores/fillFlowStore';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ScanInput } from '../../packing/components/ScanInput';
 import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
+import { NameText } from '@/presentation/components/NameText';
 
 /**
  * 「재고관리 > 입고 작업」 (FEATURE_2610_19 D113 · D117).
@@ -370,9 +371,9 @@ export function IntakeContainer() {
                 <td className="py-2 text-gray-900">
                   <div className="flex items-center gap-2">
                     <StockProductThumb imageUrl={line.imageUrl} productId={line.productId} alt={line.productName} />
-                    <span>
-                      {line.productName}
-                      {line.custom && <span className="ml-2 text-xs text-amber-700">따로 정함</span>}
+                    <span className="flex items-start gap-2">
+                      <NameText kind="product" name={line.productName} inTable expandable />
+                      {line.custom && <span className="shrink-0 text-xs text-amber-700">따로 정함</span>}
                     </span>
                   </div>
                 </td>

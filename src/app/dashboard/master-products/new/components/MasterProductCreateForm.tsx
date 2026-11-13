@@ -76,6 +76,7 @@ import {
 import { Input } from '@/presentation/components/ui/Input';
 import { Card } from '@/presentation/components/ui/Card';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 import { useShowCards } from '@/presentation/hooks/useShowCards';
 import { Modal } from '@/presentation/components/ui/Modal';
 import { Button } from '@/presentation/components/ui/Button';
@@ -1424,7 +1425,7 @@ export function MasterProductCreateForm({
                         onClick={() => setDetailProduct(p)}
                         className="text-left font-semibold text-blue-600 hover:underline"
                       >
-                        {p.productName}
+                        <NameText kind="product" name={p.productName} />
                       </button>
                     }
                     body={
@@ -1475,7 +1476,7 @@ export function MasterProductCreateForm({
                             onClick={() => setDetailProduct(p)}
                             className="text-left text-blue-600 hover:underline"
                           >
-                            {p.productName}
+                            <NameText kind="product" name={p.productName} inTable />
                           </button>
                         </td>
                         <td className="px-2 py-1.5 text-gray-600">{p.brand || '—'}</td>

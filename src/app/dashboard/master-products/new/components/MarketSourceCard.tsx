@@ -3,6 +3,7 @@
 import { Card } from '@/presentation/components/ui/Card';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { useShowCards } from '@/presentation/hooks/useShowCards';
+import { NameText } from '@/presentation/components/NameText';
 import type { MarketSource } from './marketSource';
 import { platformName } from '@/config/platforms';
 
@@ -53,7 +54,7 @@ export function MarketSourceCard({ market }: { market: MarketSource }) {
           preview.options.map((o) => (
             <DataCard
               key={o.platformOptionId ?? o.itemName}
-              title={<span className="font-semibold">{o.itemName}</span>}
+              title={<NameText kind="product" name={o.itemName} className="font-semibold" expandable />}
               body={
                 <div className="text-sm text-gray-500">
                   <p>판매가: {o.salePrice.toLocaleString('ko-KR')}</p>
@@ -75,7 +76,9 @@ export function MarketSourceCard({ market }: { market: MarketSource }) {
           <tbody>
             {preview.options.map((o) => (
               <tr key={o.platformOptionId ?? o.itemName} className="border-t border-gray-100">
-                <td className="px-2 py-1.5 text-gray-900">{o.itemName}</td>
+                <td className="px-2 py-1.5 text-gray-900">
+                  <NameText kind="product" name={o.itemName} inTable expandable />
+                </td>
                 <td className="px-2 py-1.5 text-right text-gray-600">
                   {o.salePrice.toLocaleString('ko-KR')}
                 </td>

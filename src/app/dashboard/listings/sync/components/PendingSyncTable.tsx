@@ -3,6 +3,7 @@
 import type { PendingSyncResponse } from '@/domain/entities/ListingRegistrationEntity';
 import { platformDisplayName } from '@/config/platforms';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 
 interface PendingSyncTableProps {
   rows: PendingSyncResponse[];
@@ -33,7 +34,7 @@ export function PendingSyncTable({ rows, selected, onToggle }: PendingSyncTableP
           label: `${row.masterProductName} 선택`,
         }}
         fields={[
-          { label: '마스터명', value: row.masterProductName },
+          { label: '마스터명', value: <NameText kind="product" name={row.masterProductName} expandable /> },
           { label: '판매자', value: row.seller },
           { label: '플랫폼', value: platformDisplayName(row.platform) },
           {
@@ -68,7 +69,9 @@ export function PendingSyncTable({ rows, selected, onToggle }: PendingSyncTableP
                 onChange={() => onToggle(row.productListingId)}
               />
             </td>
-            <td className="px-4 py-3">{row.masterProductName}</td>
+            <td className="px-4 py-3">
+              <NameText kind="product" name={row.masterProductName} inTable expandable />
+            </td>
             <td className="px-4 py-3">{row.seller}</td>
             <td className="px-4 py-3">{platformDisplayName(row.platform)}</td>
             <td className="px-4 py-3">

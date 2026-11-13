@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { OutboundOrder } from '@/domain/entities/StockEntity';
 import { getOrderStatusLabel } from '@/domain/entities/OrderEntity';
 import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
+import { NameText } from '@/presentation/components/NameText';
 
 interface OutboundOrderCardProps {
   order: OutboundOrder;
@@ -34,7 +35,7 @@ export function OutboundOrderCard({
     <div className="bg-white rounded-lg shadow p-4 space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-semibold text-gray-900">{order.externalOrderId}</span>
-        <span className="text-gray-700">{order.itemName ?? '—'}</span>
+        <NameText kind="product" name={order.itemName} emptyText="—" className="text-gray-700" expandable />
         <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-700">
           {getOrderStatusLabel(order.status)}
         </span>
@@ -58,7 +59,9 @@ export function OutboundOrderCard({
                   productId={product.productId}
                   alt={product.productName}
                 />
-                <span className="min-w-40 text-gray-800">{product.productName}</span>
+                <span className="min-w-40">
+                  <NameText kind="product" name={product.productName} className="text-gray-800" expandable />
+                </span>
                 <span className="text-gray-600">필요 {product.requiredQty}</span>
                 <span className="text-gray-600">확인 {product.confirmedQty}</span>
                 <input

@@ -5,6 +5,7 @@ import { formatMoney } from '@/domain/entities/SalesSummary';
 import { Card } from '@/presentation/components/ui/Card';
 import { StateBlock } from '@/presentation/components/ui/StateBlock';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 import { useShowCards } from '@/presentation/hooks/useShowCards';
 
 /**
@@ -127,9 +128,9 @@ export function ChannelSaleRecords({
             <p className="text-xs text-gray-500">
               {formatSoldAt(row.orderedAt)} · {row.externalOrderId}
             </p>
-            <p className="line-clamp-2 break-words">
-              {row.itemName ?? '—'}
-              {row.masterProductName == null && <span className="text-gray-300"> (상품 미연결)</span>}
+            <p className="flex items-start gap-1">
+              <NameText kind="product" name={row.itemName} emptyText="—" expandable />
+              {row.masterProductName == null && <span className="shrink-0 text-gray-300"> (상품 미연결)</span>}
             </p>
             <p className="mt-1 text-[13px]">
               취소{' '}
@@ -199,11 +200,11 @@ export function ChannelSaleRecords({
                 {/* 🔴 두 줄까지만 보이고 넘치면 말줄임이다 — 세 줄짜리 상품명 하나가 표 전체 높이를 흔들지
                   않게. 잘린 이름은 `title` 로 전문을 준다. */}
                 <td className="px-4 py-2 text-gray-700">
-                  <span className="line-clamp-2 break-words" title={row.itemName ?? undefined}>
-                    {row.itemName ?? '—'}
+                  <span className="flex items-start gap-1">
+                    <NameText kind="product" name={row.itemName} emptyText="—" inTable expandable />
                     {row.masterProductName == null && (
                       <span
-                        className="ml-1 text-gray-400"
+                        className="shrink-0 text-gray-400"
                         title="채널 옵션에 연결되지 않은 주문입니다. 매출에는 포함됩니다"
                       >
                         (상품 미연결)

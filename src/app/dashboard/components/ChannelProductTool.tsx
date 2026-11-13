@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/presentation/components/ui/Button';
 import { Input } from '@/presentation/components/ui/Input';
 import { Spinner } from '@/presentation/components/Spinner';
+import { NameText } from '@/presentation/components/NameText';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ChannelProductUseCase } from '@/application/usecases/ChannelProductUseCase';
 import { ChannelProductRepositoryImpl } from '@/infrastructure/repositories/ChannelProductRepositoryImpl';
@@ -385,7 +386,7 @@ export function ChannelProductTool() {
                   onClick={() => void loadDetail(item.platformProductId)}
                   className="block w-full px-2 py-1.5 text-left hover:bg-gray-50"
                 >
-                  <p className="truncate text-sm text-gray-900">{item.productName ?? '(이름 없음)'}</p>
+                  <NameText kind="product" name={item.productName} emptyText="(이름 없음)" className="text-sm text-gray-900" />
                   <p className="truncate text-[11px] text-gray-500">
                     {item.brand ?? '브랜드 없음'} · {STATUS_LABEL[item.status] ?? item.status}
                     {item.createdAt && ` · ${item.createdAt.slice(0, 10)}`}

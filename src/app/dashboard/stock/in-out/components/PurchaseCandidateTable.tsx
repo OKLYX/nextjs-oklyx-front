@@ -3,6 +3,7 @@
 import type { PurchaseCandidate } from '@/domain/entities/StockEntity';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { useShowCards } from '@/presentation/hooks/useShowCards';
+import { NameText } from '@/presentation/components/NameText';
 
 interface PurchaseCandidateTableProps {
   candidates: PurchaseCandidate[];
@@ -33,7 +34,7 @@ export function PurchaseCandidateTable({
         key={candidate.purchaseRecordId}
         body={
           <div>
-            <p className="truncate text-sm text-gray-900">{candidate.productName}</p>
+            <NameText kind="product" name={candidate.productName} className="text-sm text-gray-900" expandable />
             <p className="text-[11px] text-gray-500">
               {candidate.purchasedOn} · {candidate.sellerName} · 구매 {candidate.purchasedQty} / 입고{' '}
               {candidate.receivedQty} · 남은 {candidate.remainingQty}
@@ -94,7 +95,9 @@ export function PurchaseCandidateTable({
               {candidates.map((candidate) => (
                 <tr key={candidate.purchaseRecordId} className="hover:bg-gray-50">
                   <td className="px-4 py-2 text-sm text-gray-700">{candidate.purchasedOn}</td>
-                  <td className="px-4 py-2 text-sm text-gray-700">{candidate.productName}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">
+                    <NameText kind="product" name={candidate.productName} inTable expandable />
+                  </td>
                   <td className="px-4 py-2 text-sm text-gray-700">{candidate.sellerName}</td>
                   <td className="px-4 py-2 text-sm text-gray-700 text-right">
                     {candidate.purchasedQty}

@@ -8,6 +8,7 @@ import {
 } from '@/domain/entities/StockEntity';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { StockProductThumb } from './StockProductThumb';
+import { NameText } from '@/presentation/components/NameText';
 
 /**
  * Stock ledger history table (FEATURE_2609_28).
@@ -34,6 +35,8 @@ interface StockMovementTableProps {
   emptyMessage?: string;
   /** Where the narrow-screen cards sit (FEATURE_2610_31 D25): `page` (default) or `nested` (inside a table row). */
   cardPlacement?: 'page' | 'nested';
+  /** False = show the full product name (detail · sheet callers, D32). */
+  truncateNames?: boolean;
 }
 
 export function StockMovementTable({
@@ -43,6 +46,7 @@ export function StockMovementTable({
   showSeller = true,
   emptyMessage = '이력이 없습니다.',
   cardPlacement = 'page',
+  truncateNames = true,
 }: StockMovementTableProps) {
   if (error) {
     return (
@@ -99,7 +103,13 @@ export function StockMovementTable({
                 alt={movement.productName}
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-gray-900">{movement.productName}</p>
+                <NameText
+                  kind="product"
+                  name={movement.productName}
+                  className="text-[13px] font-medium text-gray-900"
+                  expandable
+                  noTruncate={!truncateNames}
+                />
                 <p className="line-clamp-2 text-[11px] text-gray-500">{detail}</p>
               </div>
               <span
@@ -142,7 +152,7 @@ export function StockMovementTable({
                     productId={movement.productId}
                     alt={movement.productName}
                   />
-                  <span>{movement.productName}</span>
+                  <NameText kind="product" name={movement.productName} inTable expandable noTruncate={!truncateNames} />
                 </div>
               </td>
               {showSeller && (
