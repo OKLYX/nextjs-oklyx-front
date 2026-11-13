@@ -6,6 +6,7 @@ import { PageContainer } from '@/presentation/components/PageContainer';
 import { Spinner } from '@/presentation/components/Spinner';
 import { Pagination } from '@/presentation/components/Pagination';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { detailHrefWithReturn } from '@/infrastructure/utils/listReturn';
@@ -168,7 +169,7 @@ export function MasterProductList() {
             )}
           </div>
         }
-        title={<span className="font-semibold">{m.name}</span>}
+        title={<NameText kind="product" name={m.name} className="font-semibold" />}
         trailing={
           <button
             type="button"
@@ -270,7 +271,9 @@ export function MasterProductList() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-medium">{m.name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <NameText kind="product" name={m.name} inTable />
+                    </td>
                     <td className="px-4 py-3">{m.components.length}</td>
                     <td className="px-4 py-3">{m.options.length}</td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>

@@ -5,6 +5,7 @@ import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/Button';
 import { Input } from '@/presentation/components/ui/Input';
 import { Spinner } from '@/presentation/components/Spinner';
+import { NameText } from '@/presentation/components/NameText';
 import { ImageLightbox } from '@/presentation/components/ImageLightbox';
 import { CopyIdButton } from '@/app/dashboard/master-products/[id]/components/CopyIdButton';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
@@ -355,7 +356,7 @@ export function RegisteredProductTool() {
                       <span className="block h-10 w-10 shrink-0 rounded border border-gray-200 bg-gray-100" />
                     )}
                     <span className="block min-w-0 flex-1">
-                      <span className="block truncate text-sm text-gray-900">{product.productName}</span>
+                      <NameText kind="product" name={product.productName} className="text-sm text-gray-900" />
                       <span className="block truncate text-[11px] text-gray-500">
                         {filled(product.brand) ?? '브랜드 없음'} · {filled(product.barcodeId) ?? '바코드 없음'}
                       </span>

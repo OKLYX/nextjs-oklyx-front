@@ -9,6 +9,7 @@ import { Pagination } from '@/presentation/components/Pagination';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { Button } from '@/presentation/components/ui/Button';
 import { DataCard } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 
 interface InquiryTableProps {
   inquiries: Inquiry[];
@@ -107,7 +108,7 @@ export function InquiryTable({
           }
           body={
             <div className="space-y-1.5">
-              <p className="truncate text-[13px] text-gray-500">{inquiry.itemName ?? '-'}</p>
+              <NameText kind="product" name={inquiry.itemName} className="text-[13px] text-gray-500" />
               <p className="line-clamp-2 text-sm text-gray-900">{content ? content : '-'}</p>
               <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
                 <span>{channelOptionLabel(inquiry.marketplaceAccountId, inquiry.accountAlias)}</span>
@@ -182,12 +183,14 @@ export function InquiryTable({
                 {typeLabelMap[inquiry.inquiryType] ?? inquiry.inquiryType}
               </td>
               <td className="px-6 py-3 text-sm text-gray-700">
-                {inquiry.itemName ?? '-'}
-                {!inquiry.linked && (
-                  <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">
-                    주문 미연결
-                  </span>
-                )}
+                <div className="flex items-start gap-2">
+                  <NameText kind="product" name={inquiry.itemName} inTable />
+                  {!inquiry.linked && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap shrink-0">
+                      주문 미연결
+                    </span>
+                  )}
+                </div>
               </td>
               <td className="px-6 py-3 text-sm text-gray-700 max-w-xs truncate">
                 {inquiry.content}

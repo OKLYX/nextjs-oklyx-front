@@ -10,6 +10,7 @@ import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 import { DataCard } from '@/presentation/components/DataCard';
 import { ZoomableThumb } from '@/presentation/components/ZoomableThumb';
 import { Button } from '@/presentation/components/ui/Button';
+import { NameText } from '@/presentation/components/NameText';
 
 interface OrderTableProps {
   orders: OrderItem[];
@@ -158,8 +159,8 @@ export function OrderTable({
                 <span>판매자 {order.sellerName ?? '-'}</span>
                 <span>판매처 {salesChannelLabel(order.platform, order.accountAlias)}</span>
               </p>
-              <p className="truncate text-[13px] text-gray-500">고객 {getCustomerName(order)}</p>
-              <p className="text-[13px] text-gray-900">{order.itemName ?? '-'}</p>
+              <NameText kind="customer" name={`고객 ${getCustomerName(order)}`} className="text-[13px] text-gray-500" />
+              <NameText kind="product" name={order.itemName} className="text-[13px] text-gray-900" />
               <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
                 <span>주문수량 {order.orderCount}</span>
                 <span>취소 {order.cancelCount}</span>
@@ -290,11 +291,13 @@ export function OrderTable({
               </td>
               <td className="px-6 py-3 text-sm text-gray-700">{order.sellerName ?? '-'}</td>
               <td className="px-6 py-3 text-sm text-gray-700">{salesChannelLabel(order.platform, order.accountAlias)}</td>
-              <td className="px-6 py-3 text-sm text-gray-700">{getCustomerName(order)}</td>
+              <td className="px-6 py-3 text-sm text-gray-700">
+                <NameText kind="customer" name={getCustomerName(order)} inTable />
+              </td>
               <td className="px-6 py-3 text-sm text-gray-700">
                 <div className="flex items-center gap-2">
                   <OrderThumbnail order={order} />
-                  <span>{order.itemName || '-'}</span>
+                  <NameText kind="product" name={order.itemName} inTable />
                 </div>
               </td>
               <td className="px-6 py-3 text-sm text-right text-gray-700">{order.orderCount}</td>
