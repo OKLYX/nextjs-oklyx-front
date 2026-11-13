@@ -272,6 +272,20 @@ body {
   background-color: #7a7a7a;
 }
 
+/* Full-screen modal under 768px (FEATURE_2611_29 / D20) — `!important` beats the inline panelStyle, and `translate` (not transform) undoes Tailwind v4 `-translate-*`. */
+@media (max-width: 767px) {
+  .modal-fullscreen-narrow {
+    top: 0 !important;
+    left: 0 !important;
+    translate: none !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
 /* ---- 포장 작업: 송장을 기다리는 동안 스캔 카드를 깜빡여 눈을 끈다 ----
    쓰는 곳: src/app/dashboard/stock/packing/page.tsx (스캔 카드 바깥 래퍼).
    🔴 테두리(box-shadow)만 깜빡인다 — 카드 전체를 페이드시키면(animate-pulse) 송장·고객 글자가

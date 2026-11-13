@@ -4,19 +4,21 @@ import type { ReactNode } from 'react';
 import { Button } from '@/presentation/components/ui/Button';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
 import { ROUTES } from '@/config/routes';
-import type { OrderDetail, OrderDetailParcel, OrderLineMaster } from '@/domain/entities/OrderEntity';
-import { PARCEL_STATUS_LABELS, getOrderStatusLabel, parcelChipLabel } from '@/domain/entities/OrderEntity';
+import { CopyIdButton } from '@/app/dashboard/master-products/[id]/components/CopyIdButton';
+import type { OrderDetail, OrderDetailParcel, OrderItem, OrderLineMaster } from '@/domain/entities/OrderEntity';
+import {
+  PARCEL_STATUS_LABELS, getOrderStatusLabel, orderNetAmount, parcelChipLabel, salesChannelLabel,
+} from '@/domain/entities/OrderEntity';
 import { unexpandedReasonLabel } from '@/domain/entities/StockEntity';
-
-export interface OrderDetailField {
-  label: string;
-  value: string | number;
-}
 
 interface OrderDetailSummaryProps {
   detail: OrderDetail;
-  /** Field rows above the lists — the opening mode builds them */
-  fields: OrderDetailField[];
+  /** The clicked line — source of the payment, quantity, item ID and box ID groups; null = packing entry (R17) */
+  line: OrderItem | null;
+  /** Quantity group values (cancel results already applied by the opener); null = packing entry */
+  quantities: { order: number; cancel: number; hold: number; purchasable: number } | null;
+  /** true = the order is fully canceled — picks the 「no invoice」 text (R16) */
+  fullyCanceled: boolean;
   /** Line to paint (the clicked list row), `null` = none (D33) */
   highlightLineId: number | null;
   /** Parcel id of the open chip, `null` = none open */
@@ -37,6 +39,14 @@ export function formatDate(value: string | null): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString('ko-KR');
+}
+
+// Order-time amount snapshot (PLAN 2609_26 D9·D10).
+// ⚠️ null is unknown, not 0 — older orders only carry what was backfilled.
+// Drawing it as 0 would look like a free order, so it is rendered as '—'.
+export function formatAmount(value: number | null): string {
+  if (value == null) return '—';
+  return `${value.toLocaleString('ko-KR')}원`;
 }
 
 /** 40×40 product photo; no photo = grey empty box. */
@@ -107,9 +117,11 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * Body of the shared order detail (FEATURE_2611_07 / D13 · D23 · D26 · D33 · D36) — the field list, 「상품 목록」 and
- * 「송장 목록」 (one chip per parcel, the open chip's content below it).
- * Each 「상품 목록」 line also shows its master product · master option and component products × quantity, or the broken
+ * Body of the shared order detail (FEATURE_2611_07 / D13 · D23 · D26 · D33 · D36 · FEATURE_2611_29 / D2 · D8 · R15 ~ R17) —
+ * two columns on wide screens: left = 「상품 {N}건」 · 「결제 금액」 · 「수량 현황」, right = 「주문 정보」 · 「주문자 · 수취인」 ·
+ * 「송장」 (one chip per parcel, the open chip's content below it); one column below 768px with the customer group above
+ * the order info group and no 「판매처」 row. The packing entry (`line` null) has no payment or quantity group.
+ * Each product line also shows its master product · master option and component products × quantity, or the broken
  * link's reason (FEATURE_2611_15) — the master name is a new-tab link only when the server says `detail.admin`, every
  * component product name is a new-tab link for everyone.
  *
@@ -120,115 +132,213 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
  */
 export function OrderDetailSummary({
   detail,
-  fields,
+  line,
+  quantities,
+  fullyCanceled,
   highlightLineId,
   openParcelId,
   onSelectParcel,
   onChangeBox,
 }: OrderDetailSummaryProps) {
   const openParcel = detail.parcels.find((parcel) => parcel.parcelId === openParcelId) ?? null;
+  const ordererName = detail.ordererName?.trim() ?? '';
+  const receiverName = detail.receiverName?.trim() ?? '';
+  const sameCustomer = ordererName !== '' && ordererName === receiverName;
+  const netAmount = line == null ? null : orderNetAmount(line.lineAmount, line.discountAmount);
 
   return (
-    <div>
-      <dl className="divide-y divide-gray-200">
-        {fields.map((field) => (
-          <div key={field.label} className="flex justify-between py-2">
-            <dt className="text-sm font-medium text-gray-500">{field.label}</dt>
-            <dd className="text-sm text-gray-900 text-right">{field.value}</dd>
-          </div>
-        ))}
-      </dl>
+    <div className="grid gap-4 md:grid-cols-[1.35fr_1fr]">
+      <div className="flex min-w-0 flex-col gap-4">
+        <section>
+          <h4 className="text-sm font-semibold text-gray-900">상품 {detail.lines.length}건</h4>
+          <ul className="mt-3 space-y-2">
+            {detail.lines.map((item) => (
+              <li
+                key={item.id}
+                className={`flex items-center gap-3 rounded-lg border border-gray-200 p-3 text-sm ${
+                  item.id === highlightLineId ? 'bg-blue-50' : ''
+                }`}
+              >
+                <Thumb
+                  src={item.thumbnailProductId != null
+                    ? getProductThumbUrl(item.thumbnailImageUrl, item.thumbnailProductId)
+                    : null}
+                  alt={item.itemName ?? ''}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-gray-900 break-words">{item.itemName ?? '-'}</p>
+                  <p className="mt-1 text-xs text-gray-500">수량 {item.orderCount}</p>
+                  {detail.lineMasters
+                    ?.filter((lineMaster) => lineMaster.orderLineId === item.id)
+                    .map((lineMaster) => (
+                      <LineMaster key={lineMaster.orderLineId} lineMaster={lineMaster} admin={detail.admin === true} />
+                    ))}
+                </div>
+                <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
+                  {getOrderStatusLabel(item.status)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-      <div className="mt-6 border-t border-gray-200 pt-6">
-        <h4 className="text-sm font-semibold text-gray-900">상품 목록</h4>
-        <ul className="mt-3 space-y-2">
-          {detail.lines.map((line) => (
-            <li
-              key={line.id}
-              className={`flex items-center gap-3 rounded-lg border border-gray-200 p-3 text-sm ${
-                line.id === highlightLineId ? 'bg-blue-50' : ''
-              }`}
-            >
-              <Thumb
-                src={line.thumbnailProductId != null
-                  ? getProductThumbUrl(line.thumbnailImageUrl, line.thumbnailProductId)
-                  : null}
-                alt={line.itemName ?? ''}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-gray-900 break-words">{line.itemName ?? '-'}</p>
-                <p className="mt-1 text-xs text-gray-500">수량 {line.orderCount}</p>
-                {detail.lineMasters
-                  ?.filter((lineMaster) => lineMaster.orderLineId === line.id)
-                  .map((lineMaster) => (
-                    <LineMaster key={lineMaster.orderLineId} lineMaster={lineMaster} admin={detail.admin === true} />
-                  ))}
+        {line && quantities && (
+          <section>
+            <h4 className="text-sm font-semibold text-gray-900">결제 금액</h4>
+            <dl className="mt-3 divide-y divide-gray-200">
+              <Row label="단가 × 수량">
+                {line.unitPrice == null ? '—' : `${formatAmount(line.unitPrice)} × ${quantities.order}`}
+              </Row>
+              <Row label="할인">
+                {line.discountAmount == null
+                  ? '—'
+                  : line.discountAmount === 0 ? '없음' : formatAmount(line.discountAmount)}
+              </Row>
+              {line.platformDiscountAmount != null && line.platformDiscountAmount > 0 && (
+                <Row label="플랫폼 부담 할인">{formatAmount(line.platformDiscountAmount)}</Row>
+              )}
+              <Row label="주문금액">
+                <span className="font-semibold">
+                  {formatAmount(netAmount)}
+                  {line.discountAmount != null && line.discountAmount > 0 && netAmount != null ? ' · 할인 적용' : ''}
+                </span>
+              </Row>
+            </dl>
+          </section>
+        )}
+
+        {quantities && (
+          <section>
+            <h4 className="text-sm font-semibold text-gray-900">수량 현황</h4>
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              <div className="rounded-lg bg-gray-50 p-3 text-center">
+                <p className="text-xs text-gray-500">주문</p>
+                <p className="text-lg font-semibold text-gray-900">{quantities.order}</p>
               </div>
-              <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
-                {getOrderStatusLabel(line.status)}
-              </span>
-            </li>
-          ))}
-        </ul>
+              <div className="rounded-lg bg-gray-50 p-3 text-center">
+                <p className="text-xs text-gray-500">취소</p>
+                <p className="text-lg font-semibold text-gray-900">{quantities.cancel}</p>
+              </div>
+              <div className="rounded-lg bg-gray-50 p-3 text-center">
+                <p className="text-xs text-gray-500">보류</p>
+                <p className="text-lg font-semibold text-gray-900">{quantities.hold}</p>
+              </div>
+              <div className="rounded-lg bg-green-50 p-3 text-center">
+                <p className="text-xs text-green-800">구매가능</p>
+                <p className="text-lg font-semibold text-green-800">{quantities.purchasable}</p>
+              </div>
+            </div>
+          </section>
+        )}
       </div>
 
-      <div className="mt-6 border-t border-gray-200 pt-6">
-        <h4 className="text-sm font-semibold text-gray-900">송장 목록</h4>
-        {detail.parcels.length === 0 ? (
-          <p className="mt-3 text-sm text-gray-500">송장이 없습니다</p>
-        ) : (
-          <>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {detail.parcels.map((parcel) => (
-                <button
-                  key={parcel.parcelId}
-                  type="button"
-                  onClick={() => onSelectParcel(parcel.parcelId)}
-                  className={`${CHIP_BASE} ${parcel.parcelId === openParcelId ? CHIP_ACTIVE : CHIP_IDLE}`}
-                >
-                  {parcelChipLabel(parcel)}
-                </button>
-              ))}
+      <div className="flex min-w-0 flex-col gap-4">
+        <section className="max-md:order-2">
+          <h4 className="text-sm font-semibold text-gray-900">주문 정보</h4>
+          <dl className="mt-3 divide-y divide-gray-200">
+            <div className="max-md:hidden">
+              <Row label="판매처">{salesChannelLabel(detail.platform, detail.accountAlias)}</Row>
             </div>
-
-            {openParcel && (
-              <dl className="mt-3 divide-y divide-gray-200">
-                <Row label="송장번호">{openParcel.invoiceNumber}</Row>
-                <Row label="택배사">{openParcel.carrierName ?? '-'}</Row>
-                <Row label="상태">{PARCEL_STATUS_LABELS[openParcel.status]}</Row>
-                <Row label="처리 시각">{formatDate(openParcel.packedAt)}</Row>
-                <Row label="상자">
+            <Row label="판매자">{detail.sellerName ?? '-'}</Row>
+            {line && (
+              <Row label="아이템 ID">
+                {line.externalItemId != null && line.externalItemId !== '' ? (
                   <span className="inline-flex items-center gap-2">
-                    {openParcel.boxName ?? '-'}
-                    {onChangeBox && openParcel.status === 'PACKED' && (
-                      <Button size="sm" variant="secondary" onClick={() => onChangeBox(openParcel)}>
-                        상자 변경
-                      </Button>
-                    )}
+                    {line.externalItemId}
+                    <CopyIdButton value={line.externalItemId} />
                   </span>
-                </Row>
-                <Row label="담은 물품">
-                  {openParcel.items.length === 0 ? (
-                    '-'
-                  ) : (
-                    <ul className="space-y-2">
-                      {openParcel.items.map((item) => (
-                        <li key={item.productId} className="flex items-center justify-end gap-3">
-                          <Thumb
-                            src={getProductThumbUrl(item.imageUrl, item.productId)}
-                            alt={item.productName ?? ''}
-                          />
-                          <span className="break-words">{item.productName ?? '-'}</span>
-                          <span className="shrink-0 text-gray-500">수량 {item.quantity}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </Row>
-              </dl>
+                ) : '-'}
+              </Row>
             )}
-          </>
-        )}
+            {line && (
+              <Row label="박스 ID">
+                {line.externalBoxId != null && line.externalBoxId !== '' ? (
+                  <span className="inline-flex items-center gap-2">
+                    {line.externalBoxId}
+                    <CopyIdButton value={line.externalBoxId} />
+                  </span>
+                ) : '-'}
+              </Row>
+            )}
+            <Row label="결제일">{formatDate(detail.paidAt)}</Row>
+          </dl>
+        </section>
+
+        <section className="max-md:order-1">
+          <h4 className="text-sm font-semibold text-gray-900">주문자 · 수취인</h4>
+          {sameCustomer ? (
+            <>
+              <p className="mt-3 text-sm text-gray-900">{ordererName}</p>
+              <p className="mt-1 text-xs text-gray-500">수취인 = 주문자와 동일</p>
+            </>
+          ) : (
+            <dl className="mt-3 divide-y divide-gray-200">
+              <Row label="주문자">{ordererName || '-'}</Row>
+              <Row label="수취인">{receiverName || '-'}</Row>
+            </dl>
+          )}
+        </section>
+
+        <section className="max-md:order-3">
+          <h4 className="text-sm font-semibold text-gray-900">송장</h4>
+          {detail.parcels.length === 0 ? (
+            <p className="mt-3 text-sm text-gray-500">
+              {fullyCanceled ? '취소된 주문이라 송장이 없습니다.' : '아직 송장이 없습니다.'}
+            </p>
+          ) : (
+            <>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {detail.parcels.map((parcel) => (
+                  <button
+                    key={parcel.parcelId}
+                    type="button"
+                    onClick={() => onSelectParcel(parcel.parcelId)}
+                    className={`${CHIP_BASE} ${parcel.parcelId === openParcelId ? CHIP_ACTIVE : CHIP_IDLE}`}
+                  >
+                    {parcelChipLabel(parcel)}
+                  </button>
+                ))}
+              </div>
+
+              {openParcel && (
+                <dl className="mt-3 divide-y divide-gray-200">
+                  <Row label="택배사">{openParcel.carrierName ?? '-'}</Row>
+                  <Row label="송장번호">{openParcel.invoiceNumber}</Row>
+                  <Row label="상태">{PARCEL_STATUS_LABELS[openParcel.status]}</Row>
+                  <Row label="처리 시각">{formatDate(openParcel.packedAt)}</Row>
+                  <Row label="상자">
+                    <span className="inline-flex items-center gap-2">
+                      {openParcel.boxName ?? '-'}
+                      {onChangeBox && openParcel.status === 'PACKED' && (
+                        <Button size="sm" variant="secondary" onClick={() => onChangeBox(openParcel)}>
+                          상자 변경
+                        </Button>
+                      )}
+                    </span>
+                  </Row>
+                  <Row label="담은 물품">
+                    {openParcel.items.length === 0 ? (
+                      '-'
+                    ) : (
+                      <ul className="space-y-2">
+                        {openParcel.items.map((parcelItem) => (
+                          <li key={parcelItem.productId} className="flex items-center justify-end gap-3">
+                            <Thumb
+                              src={getProductThumbUrl(parcelItem.imageUrl, parcelItem.productId)}
+                              alt={parcelItem.productName ?? ''}
+                            />
+                            <span className="break-words">{parcelItem.productName ?? '-'}</span>
+                            <span className="shrink-0 text-gray-500">수량 {parcelItem.quantity}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Row>
+                </dl>
+              )}
+            </>
+          )}
+        </section>
       </div>
     </div>
   );
