@@ -277,8 +277,8 @@ function LineOrderDetailsModal({ order, onClose, isAdmin, useCase, orderUseCase,
   const [cancelResult, setCancelResult] = useState<OrderCancelResult | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
-  // 발송처리·주문취소 탭. 기본은 왼쪽(발송처리). 상태 때문에 못 쓰는 탭이 골라져 있으면
-  // 아래 `activeTab` 이 파생값으로 되돌린다 — effect 로 고쳐 쓰지 않는다.
+  // Label sheet / shipment / cancel tabs. First pick = cancel when `order.cancelled`, otherwise shipment (FEATURE_2611_29 / D6 · R10);
+  // if the picked tab is locked, `activeTab` below falls back to the first open tab as a derived value — no effect.
   const [actionTab, setActionTab] = useState<ActionTab>(order?.cancelled ? 'cancel' : 'shipment');
   // Narrow screens: the reason of the locked tab just pressed, one grey line under the tab row (FEATURE_2611_29 / R9).
   const [lockedNotice, setLockedNotice] = useState('');

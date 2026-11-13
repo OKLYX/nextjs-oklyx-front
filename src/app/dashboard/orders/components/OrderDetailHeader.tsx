@@ -24,7 +24,7 @@ interface OrderDetailHeaderProps {
 }
 
 /**
- * Refresh button of the order detail (FEATURE_2611_29 / D4 보완 · R3) — icon + 「상태 갱신」 on wide screens, icon only on
+ * Refresh button of the order detail (FEATURE_2611_29 / D4 supplement · R3) — icon + 「상태 갱신」 on wide screens, icon only on
  * narrow screens; a spinner while the refresh runs.
  *
  * **File**: src/app/dashboard/orders/components/OrderDetailHeader.tsx
