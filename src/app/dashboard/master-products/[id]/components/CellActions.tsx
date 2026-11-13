@@ -26,6 +26,7 @@ import type {
   ListingStatus,
   ListingStatusResponse,
   GeneratedProductResponse,
+  ListingMarketValueGroup,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type { ShippingUseCase } from '@/application/usecases/ShippingUseCase';
 
@@ -63,6 +64,10 @@ interface CellActionsProps {
   onShippingSaved: (updated: GeneratedProductResponse) => void;
   // 채널 카테고리(2609_45/D13). 서버 판정 그대로 — false 면 버튼을 렌더하지 않는다(되돌리는 방향은 400).
   usesOwnCategory: boolean;
+  // FEATURE_2611_27 / D20: server judgement, PLAN §3-2 — false hides that [마스터 값으로 바꾸기] item.
+  usesMarketAttributes: boolean;
+  usesMarketTags: boolean;
+  usesMarketShipping: boolean;
   channelCategoryLabel: string | null; // categoryName ?? categoryCode (둘 다 없으면 null)
   masterCategoryName: string | null;
   /**
@@ -89,6 +94,8 @@ interface MenuItem {
   onClick?: () => void;
   /** 있으면 새 탭 링크로 연다(onClick 무시). */
   href?: string;
+  /** FEATURE_2611_27 / D35: when set, the item cannot be clicked and this text shows under its label. */
+  disabledReason?: string;
 }
 
 interface MenuGroup {
@@ -115,7 +122,23 @@ type Busy =
   | 'apply-names'
   | 'unlink'
   | 'delete-cell'
+  | 'master-values'
   | null;
+
+// FEATURE_2611_27 / D20 · R15: menu labels and confirm text per group (same text as mobile).
+const MASTER_VALUES_LABEL: Record<ListingMarketValueGroup, string> = {
+  ATTRIBUTES: '마스터 값으로 바꾸기: 속성·고시',
+  TAGS: '마스터 값으로 바꾸기: 검색어',
+  SHIPPING: '마스터 값으로 바꾸기: 배송',
+};
+
+const MASTER_VALUES_MESSAGE: Record<ListingMarketValueGroup, string> = {
+  ATTRIBUTES:
+    '이 채널의 속성·고시를 마켓에서 가져온 값 대신 마스터 값으로 바꿉니다. 마켓에서 가져온 속성·고시 값은 지워집니다.',
+  TAGS: '이 채널의 검색어를 마켓에서 가져온 값 대신 마스터 검색어로 바꿉니다. 마켓에서 가져온 검색어는 지워집니다.',
+  SHIPPING:
+    '이 채널의 배송 설정을 마켓에서 가져온 값 대신 마스터 · 계정 기본값으로 바꿉니다. 이 채널에 넣어 둔 배송 값은 모두 지워지고, 출고지·반품지는 계정 기본값으로 돌아갑니다.',
+};
 
 /**
  * Actions of one listing (cell) row = **one primary button + ⋯ menu**.
@@ -150,6 +173,9 @@ export function CellActions({
   shippingUseCase,
   onShippingSaved,
   usesOwnCategory,
+  usesMarketAttributes,
+  usesMarketTags,
+  usesMarketShipping,
   channelCategoryLabel,
   masterCategoryName,
   cells,
@@ -176,6 +202,8 @@ export function CellActions({
   const [showPrice, setShowPrice] = useState(false);
   const [showOptionName, setShowOptionName] = useState(false);
   const [showCategorySource, setShowCategorySource] = useState(false);
+  // FEATURE_2611_27 / D20: the group whose [마스터 값으로 바꾸기] confirm is open.
+  const [masterValuesTarget, setMasterValuesTarget] = useState<ListingMarketValueGroup | null>(null);
   // 2609_77/D43·D57: the [마켓에 올리기] confirm (upload) and [⋯ > 올릴 옵션 고르기] (select) are the same window.
   const [showUpload, setShowUpload] = useState(false);
   const [showOptionPicker, setShowOptionPicker] = useState(false);
@@ -277,6 +305,25 @@ export function CellActions({
       const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
       setShowCategorySource(false);
       setError(msg ?? '마스터 카테고리로 변경하지 못했습니다.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // FEATURE_2611_27 / D20: same shape as handleCategorySource — the server reason is shown as is.
+  const handleUseMasterValues = async (group: ListingMarketValueGroup) => {
+    setBusy('master-values');
+    setError('');
+    setPushedBanner('');
+    try {
+      await useCase.useMasterValues(listing.id, group);
+      setMasterValuesTarget(null);
+      setPushedBanner('마스터 값으로 바꿨습니다. 다음 수정 요청 때 마켓에 반영됩니다.');
+      onReload();
+    } catch (e) {
+      const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
+      setMasterValuesTarget(null);
+      setError(msg ?? '마스터 값으로 바꾸지 못했습니다.');
     } finally {
       setBusy(null);
     }
@@ -450,6 +497,37 @@ export function CellActions({
               },
             ]
           : []),
+        // FEATURE_2611_27 / D20 · D35: one item per group that uses the market values.
+        ...(usesMarketAttributes
+          ? [
+              {
+                key: 'master-values-attributes',
+                label: MASTER_VALUES_LABEL.ATTRIBUTES,
+                onClick: () => setMasterValuesTarget('ATTRIBUTES'),
+                disabledReason: usesOwnCategory
+                  ? '[마스터 카테고리로 변경]을 쓰면 속성·고시도 함께 바뀝니다'
+                  : undefined,
+              },
+            ]
+          : []),
+        ...(usesMarketTags
+          ? [
+              {
+                key: 'master-values-tags',
+                label: MASTER_VALUES_LABEL.TAGS,
+                onClick: () => setMasterValuesTarget('TAGS'),
+              },
+            ]
+          : []),
+        ...(usesMarketShipping
+          ? [
+              {
+                key: 'master-values-shipping',
+                label: MASTER_VALUES_LABEL.SHIPPING,
+                onClick: () => setMasterValuesTarget('SHIPPING'),
+              },
+            ]
+          : []),
       ],
     },
   ];
@@ -567,9 +645,13 @@ export function CellActions({
                           type="button"
                           role="menuitem"
                           onClick={() => runMenuItem(item)}
-                          className="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-100"
+                          disabled={item.disabledReason !== undefined}
+                          className="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
                         >
                           {item.label}
+                          {item.disabledReason && (
+                            <span className="block text-[10px] text-gray-400">{item.disabledReason}</span>
+                          )}
                         </button>
                       ),
                     )}
@@ -769,6 +851,22 @@ export function CellActions({
         onConfirm={handleCategorySource}
         onCancel={() => setShowCategorySource(false)}
         isLoading={busy === 'category-source'}
+      />
+
+      {/* FEATURE_2611_27 / D20: same shape as the category confirm — no isDangerous. */}
+      <ConfirmDialog
+        isOpen={masterValuesTarget !== null}
+        title="마스터 값으로 바꾸기"
+        message={
+          <>
+            {masterValuesTarget && MASTER_VALUES_MESSAGE[masterValuesTarget]}
+            <p>지금 마켓에 반영되지는 않습니다. 다음 [수정 요청] 때 함께 전송됩니다.</p>
+          </>
+        }
+        confirmText="바꾸기"
+        onConfirm={() => masterValuesTarget && handleUseMasterValues(masterValuesTarget)}
+        onCancel={() => setMasterValuesTarget(null)}
+        isLoading={busy === 'master-values'}
       />
 
       {/* 2609_74/D15: 되돌릴 수 있는 조작이라 isDangerous 를 쓰지 않는다(채널에서 옵션명을 다시 고치면 된다). */}

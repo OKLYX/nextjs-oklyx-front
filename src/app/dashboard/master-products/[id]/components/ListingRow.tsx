@@ -339,6 +339,9 @@ export function ListingRow({
             shippingUseCase={shippingUseCase}
             onShippingSaved={(updated) => onShippingSaved(listingId, updated)}
             usesOwnCategory={categoryMismatch}
+            usesMarketAttributes={cell.usesMarketAttributes === true}
+            usesMarketTags={cell.usesMarketTags === true}
+            usesMarketShipping={cell.usesMarketShipping === true}
             channelCategoryLabel={categoryLabel}
             masterCategoryName={masterCategoryName}
             // ⚠️ 자기 셀 하나만 — 전체를 넘기면 해제·삭제 항목이 셀 수만큼 늘어난다.
