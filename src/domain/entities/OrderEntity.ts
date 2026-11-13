@@ -228,6 +228,44 @@ export const ORDER_STATUSES = [
   'DELIVERED',
 ] as const;
 
+// The order detail progress steps, left to right (FEATURE_2611_29 / R5). A fully canceled line shows 「취소됨」 in slot 2.
+export const ORDER_PROGRESS_STEPS: readonly OrderStatus[] = ['PAID', 'PREPARING', 'SHIPPED', 'DELIVERING', 'DELIVERED'];
+
+const PAID_AT_SHAPE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+/**
+ * Paid time of the order detail header (FEATURE_2611_29 / R4 · R5): `2026.11.12 오후 7:05`, or `11.12 오후 7:05` without the year.
+ * `paidAt` is a KST wall clock without an offset — read by slicing the characters, never through `Date`.
+ * `'-'` when null or not shaped like `yyyy-MM-ddTHH:mm`.
+ */
+export function formatPaidAt(paidAt: string | null, withYear: boolean): string {
+  if (paidAt == null || !PAID_AT_SHAPE.test(paidAt.slice(0, 16))) return '-';
+  const year = paidAt.slice(0, 4);
+  const month = paidAt.slice(5, 7);
+  const day = paidAt.slice(8, 10);
+  const hour = Number(paidAt.slice(11, 13));
+  const minute = paidAt.slice(14, 16);
+  const meridiem = hour < 12 ? '오전' : '오후';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  const date = withYear ? `${year}.${month}.${day}` : `${month}.${day}`;
+  return `${date} ${meridiem} ${hour12}:${minute}`;
+}
+
+/** Paid clock under the 「결제완료」 progress step (FEATURE_2611_29 / R5): `19:05` sliced from `paidAt`, `''` when null or not shaped. */
+export function formatPaidClock(paidAt: string | null): string {
+  if (paidAt == null || !PAID_AT_SHAPE.test(paidAt.slice(0, 16))) return '';
+  return paidAt.slice(11, 16);
+}
+
+/**
+ * Order amount of one line = line total before discount − total discount (FEATURE_2611_29 / R15 · D8).
+ * null = unknown, never 0 — either value missing (older orders before the backfill) makes the result null (2609_26 D9 · D10).
+ */
+export function orderNetAmount(lineAmount: number | null, discountAmount: number | null): number | null {
+  if (lineAmount == null || discountAmount == null) return null;
+  return lineAmount - discountAmount;
+}
+
 // 출고관리 화면 대상 — 아직 발송하지 않은 주문(PLAN 2609_15 D1).
 // 전량취소는 status 가 CANCELLED 로 내려오지만, 서버 판정 `cancelled` 로도 한 번 더 제외한다.
 export const SHIPMENT_STATUSES = ['PAID', 'PREPARING'] as const;
