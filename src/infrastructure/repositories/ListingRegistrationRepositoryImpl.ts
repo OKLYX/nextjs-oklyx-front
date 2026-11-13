@@ -46,6 +46,7 @@ import type {
   SiteMargin,
   ListingUpdatePreview,
   ListingUpdateSelectionRequest,
+  ListingMarketValueGroup,
 } from '@/domain/entities/ListingRegistrationEntity';
 import type {
   TagsUpdateRequest,
@@ -353,6 +354,11 @@ export class ListingRegistrationRepositoryImpl implements ListingRegistrationRep
 
   async setCategorySource(listingId: number, useMasterCategory: boolean): Promise<void> {
     await axiosInstance.patch(`${listingBase}/${listingId}/category-source`, { useMasterCategory });
+  }
+
+  // FEATURE_2611_27 / D20: response unused — the reload is the source of truth.
+  async useMasterValues(listingId: number, group: ListingMarketValueGroup): Promise<void> {
+    await axiosInstance.post(`${listingBase}/${listingId}/use-master-values`, { group });
   }
 
   async masterFromChannelPreview(

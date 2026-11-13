@@ -7,6 +7,8 @@ export type ApprovalStatus = 'APPROVED' | 'NOT_APPROVED';
 // FEATURE_2611_11 / D7 · D23: 'MARKET' = taken from the market (thumbnail 「마켓 이미지」 · detail 「마켓 상세」).
 // Only `source` / `thumbnailSource` carry it — a price or an option name never does.
 export type GeneratedSource = 'AUTO' | 'MANUAL_OVERRIDE' | 'MARKET';
+// FEATURE_2611_27 / D20: one group of market values a listing can switch back to the master values.
+export type ListingMarketValueGroup = 'ATTRIBUTES' | 'TAGS' | 'SHIPPING';
 
 // Channel add (15): category·delivery·box live on the master and every option is
 // copied, so the channel-add payload only identifies the target channel.

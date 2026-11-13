@@ -869,6 +869,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
           label: `${r.sellerName} · ${platformDisplayName(r.platform)}${cells.length > 1 ? ` · ${cellTag(c)}` : ''}`,
           // undefined = not loaded yet / fetch failed → excluded from the hint (never over-report).
           override: generated[c.productListingId]?.shippingOverride,
+          usesMarketShipping: c.usesMarketShipping === true,
         }));
       }),
     [matrix, generated],

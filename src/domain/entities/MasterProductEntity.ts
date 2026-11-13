@@ -109,7 +109,7 @@ export interface ShippingOverrideUpdateRequest {
 }
 
 // Force-apply body (79): which channels to overwrite with the master's shipping settings.
-// Omitted / empty list = every linked channel (backend keeps the bodyless "all channels" behaviour).
+// Omitted / empty list = every linked channel except those using the market shipping values (FEATURE_2611_27 / D39); a listed one is overwritten and its flag turned off.
 export interface ShippingForceApplyRequest {
   listingIds?: number[];
 }
@@ -285,6 +285,10 @@ export interface MatrixCell {
   // FEATURE_2610_36 / D14: the Coupang bundle type this listing has on the market (`ProductListing.marketBundleType`);
   // null = not known yet. ⚠️ optional — an older response has no field.
   marketBundleType?: 'SINGLE' | 'AB' | null;
+  // FEATURE_2611_27 / D20 — true = this group uses the market values; an older response has no field.
+  usesMarketAttributes?: boolean;
+  usesMarketTags?: boolean;
+  usesMarketShipping?: boolean;
 }
 
 export interface MatrixRow {

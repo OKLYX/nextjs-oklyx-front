@@ -213,7 +213,7 @@ export class MasterProductRepositoryImpl implements MasterProductRepository {
   }
 
   // Overwrite the selected channels with this master's shipping settings (77/79).
-  // No body / empty listingIds = every linked channel.
+  // No body / empty listingIds = every linked channel except those using the market shipping values (FEATURE_2611_27 / D39).
   async applyShippingOverrideToChannels(
     id: number,
     data?: ShippingForceApplyRequest,
