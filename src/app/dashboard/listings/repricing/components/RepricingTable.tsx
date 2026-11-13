@@ -3,6 +3,7 @@
 import { Button } from '@/presentation/components/ui/Button';
 import { Spinner } from '@/presentation/components/Spinner';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 import type { RepricingRow } from '@/domain/entities/RepricingEntity';
 import { basePriceText, parsePrice, previewMargin, sanitizePriceInput } from './priceDraft';
 import { pushBlockLabel, pushBlockOf, type RecentActionMap } from './rowActions';
@@ -322,7 +323,7 @@ export function RepricingTable({
               label: '상품(셀) / 옵션',
               value: (
                 <>
-                  <p className="font-medium">{row.listingName}</p>
+                  <NameText kind="product" name={row.listingName} className="font-medium" expandable />
                   <p className="text-xs text-gray-500">{row.optionName}</p>
                   {(alert || row.excluded != null) && (
                     <div className="mt-1 flex flex-wrap items-center justify-end gap-1">
@@ -450,9 +451,7 @@ export function RepricingTable({
               </td>
               {/* 상품·옵션을 한 열에 2줄로 합쳐 손익분기가 열 자리를 만든다(2609_44 / PLAN D5·D6). */}
               <td className="px-3 py-3 align-top">
-                <p className="truncate font-medium" title={row.listingName}>
-                  {row.listingName}
-                </p>
+                <NameText kind="product" name={row.listingName} className="font-medium" inTable expandable />
                 <p className="truncate text-xs text-gray-500" title={row.optionName}>
                   {row.optionName}
                 </p>

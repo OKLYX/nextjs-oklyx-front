@@ -3,6 +3,7 @@
 import type { UnmappedOrder } from '@/domain/entities/PurchaseListEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { DataCard } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 
 interface UnmappedOrdersSectionProps {
   orders: UnmappedOrder[];
@@ -21,7 +22,13 @@ export function UnmappedOrdersSection({ orders, isLoading }: UnmappedOrdersSecti
         body={
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-gray-900">{order.itemName || '(이름 없음)'}</p>
+              <NameText
+                kind="product"
+                name={order.itemName}
+                emptyText="(이름 없음)"
+                className="text-[13px] font-medium text-gray-900"
+                expandable
+              />
               <p className="text-[11px] text-gray-500">
                 옵션ID {order.externalItemId} · 주문 {order.orderCount}건
               </p>
@@ -54,7 +61,9 @@ export function UnmappedOrdersSection({ orders, isLoading }: UnmappedOrdersSecti
           {orders.map((order) => (
             <tr key={order.externalItemId} className="hover:bg-gray-50">
               <td className="px-4 py-3 text-gray-700">{order.externalItemId}</td>
-              <td className="px-4 py-3 text-gray-900">{order.itemName}</td>
+              <td className="px-4 py-3 text-gray-900">
+                <NameText kind="product" name={order.itemName} inTable expandable />
+              </td>
               <td className="px-4 py-3 text-right text-gray-700">{order.orderCount}</td>
               <td className="px-4 py-3 text-right text-gray-700">{order.purchasableQty}</td>
             </tr>

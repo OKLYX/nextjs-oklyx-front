@@ -2,6 +2,7 @@
 
 import type { OutboundUnexpanded } from '@/domain/entities/StockEntity';
 import { unexpandedReasonLabel } from '@/domain/entities/StockEntity';
+import { NameText } from '@/presentation/components/NameText';
 
 interface OutboundUnexpandedSectionProps {
   items: OutboundUnexpanded[];
@@ -24,9 +25,9 @@ export function OutboundUnexpandedSection({ items }: OutboundUnexpandedSectionPr
       </p>
       <ul className="space-y-1">
         {items.map((item) => (
-          <li key={item.orderLineId} className="text-sm text-amber-900">
-            <span className="font-medium">{item.externalOrderId}</span>{' '}
-            <span>{item.itemName ?? '—'}</span>{' '}
+          <li key={item.orderLineId} className="flex flex-wrap items-start gap-x-1 text-sm text-amber-900">
+            <span className="font-medium">{item.externalOrderId}</span>
+            <NameText kind="product" name={item.itemName} emptyText="—" expandable />
             <span className="text-amber-700">
               — {unexpandedReasonLabel(item.reason)} ({item.reason})
             </span>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '@/presentation/components/Spinner';
 import { QuantityStepper } from '@/presentation/components/QuantityStepper';
+import { NameText } from '@/presentation/components/NameText';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { MasterProductUseCase } from '@/application/usecases/MasterProductUseCase';
 import { MasterProductRepositoryImpl } from '@/infrastructure/repositories/MasterProductRepositoryImpl';
@@ -295,6 +296,8 @@ interface MasterOptionEditorProps {
    * (2609_45 D3-1 — 마켓 재고는 판매상품 옵션에만). ⚠️ create 모드에서만 의미가 있다.
    */
   marketLocked?: boolean;
+  /** False = show the full product name (detail · sheet callers, D32). */
+  truncateNames?: boolean;
 }
 
 /**
@@ -327,6 +330,7 @@ export function MasterOptionEditor({
   onFormOpenChange,
   focusOption,
   marketLocked = false,
+  truncateNames = true,
 }: MasterOptionEditorProps) {
   const isEdit = master != null;
   const components = master?.components ?? propComponents ?? [];
@@ -972,7 +976,12 @@ export function MasterOptionEditor({
                           key={it.productId}
                           className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700"
                         >
-                          {itemName(it)} {it.quantity}
+                          <NameText
+                            kind="product"
+                            name={`${itemName(it)} ${it.quantity}`}
+                            expandable
+                            noTruncate={!truncateNames}
+                          />
                         </span>
                       ))}
                     </span>
@@ -1055,7 +1064,15 @@ export function MasterOptionEditor({
             <div className="space-y-2">
               {components.map((c) => (
                 <div key={c.productId} className="flex items-center gap-2">
-                  <span className="flex-1 text-sm text-gray-700">{c.productName}</span>
+                  <span className="min-w-0 flex-1">
+                    <NameText
+                      kind="product"
+                      name={c.productName}
+                      className="text-sm text-gray-700"
+                      expandable
+                      noTruncate={!truncateNames}
+                    />
+                  </span>
                   {/* ⚠️ 84 lock 대상이 아니다 — 등록 시 잘못 넣은 수량을 고칠 유일한 경로다(삭제만 잠금). */}
                   <QuantityStepper
                     className="w-24"

@@ -15,6 +15,7 @@ import {
   type PriceChangeRow,
 } from '@/domain/entities/PriceHistoryEntity';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
+import { NameText } from '@/presentation/components/NameText';
 import { formatWon } from './RepricingTable';
 
 /** `yyyy-MM-dd` (로컬 기준). 🔴 `toISOString()` 은 UTC 로 밀려 KST 에서 하루가 어긋난다. */
@@ -153,7 +154,7 @@ export function RepricingHistoryTab({
         key={row.id}
         fields={[
           { label: '변경 시각', value: formatChangedAt(row.createdAt) },
-          { label: '상품(셀)', value: row.listingName ?? '—' },
+          { label: '상품(셀)', value: <NameText kind="product" name={row.listingName} emptyText="—" expandable /> },
           { label: '옵션', value: row.optionName ?? '—' },
           { label: '채널', value: row.platform ?? '—' },
           {
@@ -291,7 +292,9 @@ export function RepricingHistoryTab({
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td className="px-4 py-2 whitespace-nowrap">{formatChangedAt(row.createdAt)}</td>
-                  <td className="px-4 py-2">{row.listingName ?? '—'}</td>
+                  <td className="px-4 py-2">
+                    <NameText kind="product" name={row.listingName} emptyText="—" inTable expandable />
+                  </td>
                   <td className="px-4 py-2">{row.optionName ?? '—'}</td>
                   <td className="px-4 py-2 whitespace-nowrap">{row.platform ?? '—'}</td>
                   <td className="px-4 py-2 text-right whitespace-nowrap">

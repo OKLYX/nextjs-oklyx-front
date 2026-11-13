@@ -3,6 +3,7 @@
 import type { ReturnCandidate } from '@/domain/entities/StockEntity';
 import { DataCard, DataCardSwitch } from '@/presentation/components/DataCard';
 import { useShowCards } from '@/presentation/hooks/useShowCards';
+import { NameText } from '@/presentation/components/NameText';
 
 interface ReturnCandidateTableProps {
   candidates: ReturnCandidate[];
@@ -35,7 +36,7 @@ export function ReturnCandidateTable({
         key={candidate.orderClaimId}
         body={
           <div>
-            <p className="truncate text-sm text-gray-900">{candidate.itemName ?? '—'}</p>
+            <NameText kind="product" name={candidate.itemName} emptyText="—" className="text-sm text-gray-900" expandable />
             <p className="text-[11px] text-gray-500">
               {[
                 candidate.externalOrderId,
@@ -100,7 +101,9 @@ export function ReturnCandidateTable({
                       <span className="ml-1 text-xs text-amber-700">(주문 미매칭)</span>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-sm text-gray-700">{candidate.itemName ?? '—'}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">
+                    <NameText kind="product" name={candidate.itemName} emptyText="—" inTable expandable />
+                  </td>
                   <td className="px-4 py-2 text-sm text-gray-700">{candidate.claimStatus ?? '—'}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">
                     {candidate.collectStatus ?? '—'}

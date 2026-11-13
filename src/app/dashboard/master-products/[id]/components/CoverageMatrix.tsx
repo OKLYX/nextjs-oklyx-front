@@ -1842,6 +1842,7 @@ export function CoverageMatrix({ id }: CoverageMatrixProps) {
                             masterNoticeGroup={masterNoticeGroup}
                             onChanged={load}
                             focusOption={focusOption}
+                            truncateNames={false}
                           />
                         </div>
                       </div>
