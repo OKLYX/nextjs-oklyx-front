@@ -15,7 +15,7 @@ import { unexpandedReasonLabel } from '@/domain/entities/StockEntity';
 import { TableCard } from '@/presentation/components/ui/TableCard';
 import { InternalStageBadge } from './InternalStageBadge';
 import { ElevenstReservedBadge } from './ElevenstReservedBadge';
-import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
+import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { DataCard } from '@/presentation/components/DataCard';
 import { ZoomableThumb } from '@/presentation/components/ZoomableThumb';
 import { Button } from '@/presentation/components/ui/Button';
@@ -132,9 +132,7 @@ export function OrderTable({
     orders.map((order) => {
       const first = order.lines[0];
       const src =
-        first.thumbnailProductId != null
-          ? getProductThumbUrl(first.thumbnailImageUrl, first.thumbnailProductId)
-          : null;
+        first.masterCoverImageUrl != null ? resolveThumbUrl(first.masterCoverImageUrl) : null;
       return (
         <DataCard
           key={order.key}
@@ -370,14 +368,11 @@ export function OrderTable({
 }
 
 /**
- * Photo cell = the first component product's photo of the order's first option line (FEATURE_2611_30 / D3);
- * without one, the 「없음」 box.
+ * Photo cell = the master cover photo of the order's first option line (FEATURE_2611_31 / D1 · D6);
+ * without one — no cover or a broken line — the 「없음」 box (D2 · D3).
  */
 function OrderThumbnail({ order }: { order: OrderItem }) {
-  const src =
-    order.thumbnailProductId != null
-      ? getProductThumbUrl(order.thumbnailImageUrl, order.thumbnailProductId)
-      : null;
+  const src = order.masterCoverImageUrl != null ? resolveThumbUrl(order.masterCoverImageUrl) : null;
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img

@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/presentation/components/ui/Button';
 import { getProductThumbUrl } from '@/infrastructure/utils/imageUrl';
+import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
 import { ROUTES } from '@/config/routes';
 import { CopyIdButton } from '@/app/dashboard/master-products/[id]/components/CopyIdButton';
 import type { OrderDetail, OrderDetailParcel, OrderItem, OrderLineMaster } from '@/domain/entities/OrderEntity';
@@ -49,7 +50,7 @@ export function formatAmount(value: number | null): string {
   return `${value.toLocaleString('ko-KR')}원`;
 }
 
-/** 40×40 product photo; no photo = grey empty box. */
+/** 40×40 photo — the master cover on an order line, the product photo on a component or packed item; no photo = grey empty box. */
 function Thumb({ src, alt }: { src: string | null; alt: string }) {
   if (src === null) return <div className="w-10 h-10 shrink-0 rounded bg-gray-200" />;
   return (
@@ -160,9 +161,7 @@ export function OrderDetailSummary({
                 }`}
               >
                 <Thumb
-                  src={item.thumbnailProductId != null
-                    ? getProductThumbUrl(item.thumbnailImageUrl, item.thumbnailProductId)
-                    : null}
+                  src={item.masterCoverImageUrl != null ? resolveThumbUrl(item.masterCoverImageUrl) : null}
                   alt={item.itemName ?? ''}
                 />
                 <div className="min-w-0 flex-1">
