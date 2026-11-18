@@ -58,15 +58,17 @@ interface Column {
   key: OrderSortKey | null;
   label: string;
   align: 'left' | 'right' | 'center';
+  /** Tailwind width class of the column (the table uses `table-fixed`); `undefined` = takes the remaining width. */
+  width?: string;
 }
 
 const COLUMNS: Column[] = [
-  { key: null, label: '사진', align: 'left' },
-  { key: 'externalOrderId', label: '주문번호', align: 'left' },
-  { key: 'seller', label: '판매자/판매처', align: 'left' },
-  { key: 'customer', label: '고객', align: 'left' },
+  { key: null, label: '사진', align: 'left', width: 'w-28' },
+  { key: 'externalOrderId', label: '주문번호', align: 'left', width: 'w-48' },
+  { key: 'seller', label: '판매자/판매처', align: 'left', width: 'w-44' },
+  { key: 'customer', label: '고객', align: 'left', width: 'w-36' },
   { key: null, label: '주문 상품', align: 'left' },
-  { key: 'paidAt', label: '결제일', align: 'left' },
+  { key: 'paidAt', label: '결제일', align: 'left', width: 'w-48' },
 ];
 
 const SORT_OPTIONS: { key: OrderSortKey; label: string }[] = COLUMNS.flatMap((col) => (col.key == null ? [] : [{ key: col.key, label: col.label }]));
@@ -247,7 +249,16 @@ export function OrderTable({
         </>
       }
     >
-      <table className="w-full">
+      {/* Fixed layout: long product or customer names fold inside their column instead of widening it.
+          The raised scroll floor keeps the 「주문 상품」 column (the only one without a fixed width) from shrinking to nothing —
+          below it the wrapper scrolls sideways. */}
+      <table className="w-full table-fixed [--list-table-min-w:64rem]">
+        <colgroup>
+          {selection && <col className="w-10" />}
+          {COLUMNS.map((col) => (
+            <col key={col.label} className={col.width} />
+          ))}
+        </colgroup>
         <thead className="bg-gray-100 border-b border-gray-200">
           <tr>
             {selection && (
@@ -306,7 +317,7 @@ export function OrderTable({
               <td className="px-6 py-3">
                 <OrderThumbnail order={order.lines[0]} />
               </td>
-              <td className="px-6 py-3 text-sm text-gray-700">
+              <td className="px-6 py-3 text-sm text-gray-700 whitespace-normal break-all">
                 {order.lines[0].externalOrderId}
                 {isOrderCancelled(order) && <OrderCancelledBadge />}
                 {onEditInvoice && order.lines.some((line) => line.internalStage != null) && (
@@ -321,8 +332,8 @@ export function OrderTable({
                 )}
               </td>
               <td className="px-6 py-3 text-sm text-gray-700">
-                <div>{order.lines[0].sellerName ?? '-'}</div>
-                <div className="text-xs text-gray-500">{salesChannelLabel(order.lines[0].platform, order.lines[0].accountAlias)}</div>
+                <div className="truncate">{order.lines[0].sellerName ?? '-'}</div>
+                <div className="truncate text-xs text-gray-500">{salesChannelLabel(order.lines[0].platform, order.lines[0].accountAlias)}</div>
               </td>
               <td className="px-6 py-3 text-sm text-gray-700">
                 <NameText kind="customer" name={getCustomerName(order.lines[0])} inTable />
@@ -379,10 +390,10 @@ function OrderThumbnail({ order }: { order: OrderItem }) {
       src={src}
       alt={order.itemName ?? ''}
       loading="lazy"
-      className="w-10 h-10 shrink-0 rounded border border-gray-200 object-cover bg-gray-50"
+      className="w-16 h-16 shrink-0 rounded border border-gray-200 object-cover bg-gray-50"
     />
   ) : (
-    <div className="w-10 h-10 shrink-0 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-300 text-xs">
+    <div className="w-16 h-16 shrink-0 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-300 text-xs">
       없음
     </div>
   );
@@ -398,11 +409,11 @@ function OrderCancelledBadge() {
 }
 
 /**
- * 「주문 상품」 cell (FEATURE_2611_30 / D5 · D18 · D21 · D23 ~ D25 · D27 · D28 · D32): one row per option line —
+ * 「주문 상품」 cell (FEATURE_2611_30 / D5 · D18 · D21 · D23 ~ D25 · D27 · D28 · D32): one block per option line —
  * 「{master product} · {master option}」 (a broken line = the channel product name in gray + the reason text), the quantity
- * tail, the stage · reserved badges, 「→」, then the component products one per row. One chevron per order collapses
- * every line's components to 「구성상품 N개」 (shown only when some line has components). Tapping an option text opens the
- * detail at that line.
+ * tail and the stage · reserved badges. One chevron per order (shown only when some line has components) toggles every
+ * line at once: folded = 「(구성상품 N개)」 after the quantity, open = the component products listed one per row under the
+ * line. Tapping an option text opens the detail at that line.
  */
 function OrderProductsCell({
   order,
@@ -428,7 +439,7 @@ function OrderProductsCell({
           }}
           aria-label={collapsed ? '구성상품 펼치기' : '구성상품 접기'}
           aria-expanded={!collapsed}
-          className="text-gray-500 hover:text-gray-900 transition-colors"
+          className="mt-0.5 shrink-0 text-gray-500 hover:text-gray-900 transition-colors"
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
@@ -436,9 +447,10 @@ function OrderProductsCell({
       <div className="min-w-0 flex-1 space-y-1.5">
         {order.lines.map((line) => {
           const masterLabel = orderLineMasterLabel(line);
+          const componentCount = line.components.length;
           return (
-            <div key={line.id} className="flex items-start gap-2">
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5">
+            <div key={line.id} className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -455,27 +467,25 @@ function OrderProductsCell({
                   />
                 </button>
                 <span className="shrink-0 whitespace-nowrap">{orderLineQuantityLabel(line)}</span>
+                {collapsed && componentCount > 0 && (
+                  <span className="shrink-0 whitespace-nowrap text-gray-500">(구성상품 {componentCount}개)</span>
+                )}
                 {masterLabel == null && line.unexpandedReason != null && (
                   <span className="shrink-0 text-xs text-gray-500">{unexpandedReasonLabel(line.unexpandedReason)}</span>
                 )}
                 <InternalStageBadge stage={line.internalStage} />
                 <ElevenstReservedBadge reservedSale={line.reservedSale} />
               </div>
-              <span aria-hidden className="shrink-0 text-gray-400">→</span>
-              <div className="min-w-0 flex-1 space-y-0.5">
-                {line.components.length === 0 ? (
-                  <span>-</span>
-                ) : collapsed ? (
-                  <span>구성상품 {line.components.length}개</span>
-                ) : (
-                  line.components.map((component, index) => (
-                    <div key={index} className="flex items-start gap-1">
+              {!collapsed && componentCount > 0 && (
+                <ul className="mt-1 space-y-0.5 border-l border-gray-200 pl-3 text-gray-600">
+                  {line.components.map((component, index) => (
+                    <li key={index} className="flex items-start gap-1">
                       <NameText kind="product" name={component.productName} inTable={inTable} />
                       <span className="shrink-0 whitespace-nowrap">× {component.quantity}</span>
-                    </div>
-                  ))
-                )}
-              </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           );
         })}
