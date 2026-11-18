@@ -8,8 +8,8 @@ import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { ShippingLabelRepositoryImpl } from '@/infrastructure/repositories/ShippingLabelRepositoryImpl';
 import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
-import type { OrderItem } from '@/domain/entities/OrderEntity';
-import { CANCELED_FILTER, matchesOrderSearch, orderSortValue } from '@/domain/entities/OrderEntity';
+import type { OrderGroup, OrderItem, OrderSortKey } from '@/domain/entities/OrderEntity';
+import { CANCELED_FILTER, compareOrders, countOrders, groupOrders, isOrderCancelled, matchesOrderSearch, orderKey } from '@/domain/entities/OrderEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import {
   RECENT_PERIOD, buildPeriodOptions, isMonthPeriod, toPeriodRange,
@@ -53,7 +53,7 @@ export function OrderContainer() {
   const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<keyof OrderItem | null>(null);
+  const [sortKey, setSortKey] = useState<OrderSortKey | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [syncTargets, setSyncTargets] = useState<SyncTarget[]>([]);
@@ -218,7 +218,10 @@ export function OrderContainer() {
       ? CHANNEL_NOT_SYNCABLE
       : undefined;
 
-  // 기간(서버) -> 채널 -> 검색 -> 상태 -> 정렬 -> 페이징. 배지 건수도 이 결과를 센다.
+  // Period (server) -> channel -> search -> status -> sort -> page, same order as before. Filtering is per line; an order
+  // shows when at least one of its lines is left, and every count is a number of orders (FEATURE_2611_30 / D17).
+  const groups = useMemo(() => groupOrders(orders), [orders]);
+
   const channelFilteredOrders = useMemo(
     () => (selectedAccountId === ''
       ? orders
@@ -231,48 +234,42 @@ export function OrderContainer() {
     [channelFilteredOrders, searchField, searchTerm]
   );
 
-  // Count orders per status for the filter button badges (unaffected by selection).
-  // Fully-canceled orders are excluded here and counted separately below.
+  const searchedGroups = useMemo((): OrderGroup[] => {
+    const keys = new Set(searchedOrders.map(orderKey));
+    return groups.filter((group) => keys.has(group.key));
+  }, [groups, searchedOrders]);
+
+  // Count distinct orders per status for the filter button badges (unaffected by selection).
+  // Fully-canceled lines are left out; an order whose every line is fully canceled is counted by 「취소항목」 below.
   const statusCounts = useMemo(() => {
-    return searchedOrders.reduce<Record<string, number>>((acc, order) => {
-      if (order.cancelled) return acc;
-      acc[order.status] = (acc[order.status] ?? 0) + 1;
+    const live = searchedOrders.filter((o) => !o.cancelled);
+    return Array.from(new Set(live.map((o) => o.status))).reduce<Record<string, number>>((acc, status) => {
+      acc[status] = countOrders(live.filter((o) => o.status === status));
       return acc;
     }, {});
   }, [searchedOrders]);
 
   // Fully-canceled orders surfaced under the 취소항목 chip. 판정은 서버가 소유한다(PLAN 2609_26 D26)
   // — 출고중지(hold)로만 전량이 빠진 주문도 여기 들어온다.
-  const canceledCount = useMemo(() => searchedOrders.filter((o) => o.cancelled).length, [searchedOrders]);
+  const canceledCount = useMemo(() => searchedGroups.filter(isOrderCancelled).length, [searchedGroups]);
 
   // Apply the selected filter before sorting/paging:
   // - CANCELED_FILTER: only fully-canceled orders
   // - a status code: that status, excluding fully-canceled ones
   // - null: all orders except fully-canceled (those live under 취소항목)
-  const filteredOrders = useMemo(() => {
-    if (selectedStatus === CANCELED_FILTER) return searchedOrders.filter((o) => o.cancelled);
-    if (selectedStatus == null) return searchedOrders.filter((o) => !o.cancelled);
-    return searchedOrders.filter((o) => o.status === selectedStatus && !o.cancelled);
-  }, [searchedOrders, selectedStatus]);
+  const filteredOrders = useMemo((): OrderGroup[] => {
+    if (selectedStatus === CANCELED_FILTER) return searchedGroups.filter(isOrderCancelled);
+    if (selectedStatus == null) return searchedGroups.filter((group) => !isOrderCancelled(group));
+    const keys = new Set(
+      searchedOrders.filter((o) => o.status === selectedStatus && !o.cancelled).map(orderKey),
+    );
+    return searchedGroups.filter((group) => keys.has(group.key));
+  }, [searchedGroups, searchedOrders, selectedStatus]);
 
   const sortedOrders = useMemo(() => {
     if (sortKey == null) return filteredOrders;
     const copy = [...filteredOrders];
-    copy.sort((a, b) => {
-      const aValue = orderSortValue(a, sortKey);
-      const bValue = orderSortValue(b, sortKey);
-      // Null values always go last regardless of direction
-      if (aValue == null && bValue == null) return 0;
-      if (aValue == null) return 1;
-      if (bValue == null) return -1;
-      let comparison: number;
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        comparison = aValue - bValue;
-      } else {
-        comparison = String(aValue).localeCompare(String(bValue));
-      }
-      return sortDir === 'asc' ? comparison : -comparison;
-    });
+    copy.sort((a, b) => compareOrders(a, b, sortKey, sortDir));
     return copy;
   }, [filteredOrders, sortKey, sortDir]);
 
@@ -411,7 +408,7 @@ export function OrderContainer() {
     void startSync(failedTargets);
   };
 
-  const handleSort = (key: keyof OrderItem) => {
+  const handleSort = (key: OrderSortKey) => {
     if (sortKey === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -482,7 +479,7 @@ export function OrderContainer() {
           onSync={handleSync}
           isLoading={isLoading}
           isSyncing={isSyncing}
-          resultCount={searchedOrders.length}
+          resultCount={searchedGroups.length}
           channelOptions={channelOptions}
           selectedAccountId={selectedAccountId}
           onAccountChange={handleAccountChange}
