@@ -60,15 +60,19 @@ interface Column {
   align: 'left' | 'right' | 'center';
   /** Tailwind width class of the column (the table uses `table-fixed`); `undefined` = takes the remaining width. */
   width?: string;
+  /** Tailwind horizontal padding of the header and body cells — narrow columns use `px-3`. */
+  padX: string;
 }
 
 const COLUMNS: Column[] = [
-  { key: null, label: '사진', align: 'left', width: 'w-28' },
-  { key: 'externalOrderId', label: '주문번호', align: 'left', width: 'w-48' },
-  { key: 'seller', label: '판매자/판매처', align: 'left', width: 'w-44' },
-  { key: 'customer', label: '고객', align: 'left', width: 'w-36' },
-  { key: null, label: '주문 상품', align: 'left' },
-  { key: 'paidAt', label: '결제일', align: 'left', width: 'w-48' },
+  { key: null, label: '사진', align: 'left', width: 'w-24', padX: 'px-3' },
+  // Fits a 14-digit order number on one line; longer numbers wrap inside the cell.
+  { key: 'externalOrderId', label: '주문번호', align: 'left', width: 'w-36', padX: 'px-3' },
+  { key: 'seller', label: '판매자/판매처', align: 'left', width: 'w-44', padX: 'px-6' },
+  // A typical 3–4 character name; a longer one is cut with an ellipsis.
+  { key: 'customer', label: '고객', align: 'left', width: 'w-24', padX: 'px-3' },
+  { key: null, label: '주문 상품', align: 'left', padX: 'px-6' },
+  { key: 'paidAt', label: '결제일', align: 'left', width: 'w-48', padX: 'px-6' },
 ];
 
 const SORT_OPTIONS: { key: OrderSortKey; label: string }[] = COLUMNS.flatMap((col) => (col.key == null ? [] : [{ key: col.key, label: col.label }]));
@@ -279,7 +283,7 @@ export function OrderTable({
                 <th
                   key={col.label}
                   onClick={() => onSort(key)}
-                  className={`px-6 py-3 text-sm font-semibold text-gray-900 cursor-pointer select-none hover:bg-gray-200 transition-colors ${alignClass(col.align)}`}
+                  className={`${col.padX} py-3 text-sm font-semibold text-gray-900 cursor-pointer select-none hover:bg-gray-200 transition-colors ${alignClass(col.align)}`}
                 >
                   {col.label}
                   {sortKey === key && (
@@ -287,7 +291,7 @@ export function OrderTable({
                   )}
                 </th>
               ) : (
-                <th key={col.label} className={`px-6 py-3 text-sm font-semibold text-gray-900 ${alignClass(col.align)}`}>
+                <th key={col.label} className={`${col.padX} py-3 text-sm font-semibold text-gray-900 ${alignClass(col.align)}`}>
                   {col.label}
                 </th>
               );
@@ -314,10 +318,10 @@ export function OrderTable({
                   />
                 </td>
               )}
-              <td className="px-6 py-3">
+              <td className={`${COLUMNS[0].padX} py-3`}>
                 <OrderThumbnail order={order.lines[0]} />
               </td>
-              <td className="px-6 py-3 text-sm text-gray-700 whitespace-normal break-all">
+              <td className={`${COLUMNS[1].padX} py-3 text-sm text-gray-700 whitespace-normal break-all`}>
                 {order.lines[0].externalOrderId}
                 {isOrderCancelled(order) && <OrderCancelledBadge />}
                 {onEditInvoice && order.lines.some((line) => line.internalStage != null) && (
@@ -335,7 +339,7 @@ export function OrderTable({
                 <div className="truncate">{order.lines[0].sellerName ?? '-'}</div>
                 <div className="truncate text-xs text-gray-500">{salesChannelLabel(order.lines[0].platform, order.lines[0].accountAlias)}</div>
               </td>
-              <td className="px-6 py-3 text-sm text-gray-700">
+              <td className={`${COLUMNS[3].padX} py-3 text-sm text-gray-700`}>
                 <NameText kind="customer" name={getCustomerName(order.lines[0])} inTable />
               </td>
               <td className="px-6 py-3 text-sm text-gray-700">
@@ -390,10 +394,11 @@ function OrderThumbnail({ order }: { order: OrderItem }) {
       src={src}
       alt={order.itemName ?? ''}
       loading="lazy"
-      className="w-16 h-16 shrink-0 rounded border border-gray-200 object-cover bg-gray-50"
+      // max-w-none: the base `img { max-width: 100% }` must not squeeze the photo narrower than its height.
+      className="w-16 h-16 min-w-16 max-w-none shrink-0 rounded border border-gray-200 object-cover bg-gray-50"
     />
   ) : (
-    <div className="w-16 h-16 shrink-0 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-300 text-xs">
+    <div className="w-16 h-16 min-w-16 shrink-0 rounded border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-300 text-xs">
       없음
     </div>
   );
