@@ -9,8 +9,8 @@ import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { ShippingLabelRepositoryImpl } from '@/infrastructure/repositories/ShippingLabelRepositoryImpl';
 import { ShippingLabelUseCase } from '@/application/usecases/ShippingLabelUseCase';
 import { useAuthStore } from '@/infrastructure/stores/authStore';
-import type { OrderItem, OrderSearchField } from '@/domain/entities/OrderEntity';
-import { SHIPMENT_STATUSES, matchesOrderSearch, orderSortValue } from '@/domain/entities/OrderEntity';
+import type { OrderGroup, OrderItem, OrderSearchField, OrderSortKey } from '@/domain/entities/OrderEntity';
+import { SHIPMENT_STATUSES, compareOrders, countOrders, groupOrders, matchesOrderSearch, orderKey } from '@/domain/entities/OrderEntity';
 import type {
   InternalStageResult, OrderAcknowledgeResult, OrderRefreshResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
@@ -133,7 +133,7 @@ export function ShipmentContainer() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
-  const [sortKey, setSortKey] = useState<keyof OrderItem | null>(null);
+  const [sortKey, setSortKey] = useState<OrderSortKey | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
@@ -146,7 +146,7 @@ export function ShipmentContainer() {
   const [confirmKey, setConfirmKey] = useState(0);
   // 발송처리 모달의 저장된 송장 모드 대상(D18 🔁). null = 파일 모드.
   const [storedConfirmIds, setStoredConfirmIds] = useState<number[] | null>(null);
-  // The order line whose [송장 수정] is open — its order number and its market (D18 🔁 · FEATURE_2611_23 / D64 ②). null = closed.
+  // First line of the order whose [송장 수정] is open — only its order number and market are used (D18 🔁 · FEATURE_2611_23 / D64 ②). null = closed.
   const [invoiceOrder, setInvoiceOrder] = useState<OrderItem | null>(null);
   // 예약 발송 현황 재조회 신호(업로드·예약 취소 뒤).
   const [panelReloadKey, setPanelReloadKey] = useState(0);
@@ -299,9 +299,11 @@ export function ShipmentContainer() {
   );
 
   // Filter → sort → page. The shown list is derived only (no separate state — two copies drift apart).
-  // Fully-cancelled orders go out by the server's `cancelled` (PLAN 2609_26 D26) — this also catches orders emptied by holds only.
-  // Order: channel → search → status → paid stage (FEATURE_2610_07 / D16); the paid stage applies only while PAID is on.
-  // Chip counts also count the search result.
+  // The per-line chain is unchanged: fully-cancelled lines go out by the server's `cancelled` (PLAN 2609_26 D26), then
+  // channel → search → status → paid stage (FEATURE_2610_07 / D16). An order shows when at least one of its lines is left,
+  // and chip counts are numbers of orders (FEATURE_2611_30 / D17).
+  const groups = useMemo(() => groupOrders(orders), [orders]);
+
   const visible = useMemo(() => orders
     .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
     .filter((o) => !o.cancelled)
@@ -311,17 +313,23 @@ export function ShipmentContainer() {
     .filter((o) => selectedStatus !== 'PAID' || matchesPaidStage(o, paidStage)),
     [orders, selectedAccountId, selectedStatus, paidStage, searchField, searchTerm]);
 
-  // 칩 카운트는 탭 선택 전 목록으로 센다(선택해도 다른 칩 건수가 0 이 되지 않게).
-  const statusCounts = useMemo(() => orders
-    .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
-    .filter((o) => !o.cancelled)
-    .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
-    .filter((o) => matchesOrderSearch(o, searchField, searchTerm))
-    .reduce<Record<string, number>>((acc, order) => {
-      acc[order.status] = (acc[order.status] ?? 0) + 1;
+  const visibleOrders = useMemo((): OrderGroup[] => {
+    const keys = new Set(visible.map(orderKey));
+    return groups.filter((group) => keys.has(group.key));
+  }, [groups, visible]);
+
+  // Chip counts come from the list before a chip is picked (picking one does not zero the others), counted as orders.
+  const statusCounts = useMemo(() => {
+    const scoped = orders
+      .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
+      .filter((o) => !o.cancelled)
+      .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
+      .filter((o) => matchesOrderSearch(o, searchField, searchTerm));
+    return Array.from(new Set(scoped.map((o) => o.status))).reduce<Record<string, number>>((acc, status) => {
+      acc[status] = countOrders(scoped.filter((o) => o.status === status));
       return acc;
-    }, {}),
-    [orders, selectedAccountId, searchField, searchTerm]);
+    }, {});
+  }, [orders, selectedAccountId, searchField, searchTerm]);
 
   // 2nd-row chip counts: the same list as the 1st-row counts, narrowed to PAID (FEATURE_2610_07 / D13).
   const paidScoped = useMemo(() => orders
@@ -332,25 +340,11 @@ export function ShipmentContainer() {
     [orders, selectedAccountId, searchField, searchTerm]);
 
   const sorted = useMemo(() => {
-    if (sortKey == null) return visible;
-    const copy = [...visible];
-    copy.sort((a, b) => {
-      const aValue = orderSortValue(a, sortKey);
-      const bValue = orderSortValue(b, sortKey);
-      // Null values always go last regardless of direction
-      if (aValue == null && bValue == null) return 0;
-      if (aValue == null) return 1;
-      if (bValue == null) return -1;
-      let comparison: number;
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        comparison = aValue - bValue;
-      } else {
-        comparison = String(aValue).localeCompare(String(bValue));
-      }
-      return sortDir === 'asc' ? comparison : -comparison;
-    });
+    if (sortKey == null) return visibleOrders;
+    const copy = [...visibleOrders];
+    copy.sort((a, b) => compareOrders(a, b, sortKey, sortDir));
     return copy;
-  }, [visible, sortKey, sortDir]);
+  }, [visibleOrders, sortKey, sortDir]);
 
   const totalPages = Math.ceil(sorted.length / pageSize);
 
@@ -381,6 +375,7 @@ export function ShipmentContainer() {
    */
   const isSelectable = useCallback(
     (o: OrderItem) => o.platform === 'COUPANG' || o.platform === 'ELEVENST' || o.platform === 'LOTTEON', []);
+  const isSelectableOrder = useCallback((order: OrderGroup) => order.lines.some(isSelectable), [isSelectable]);
 
   /**
    * 선택한 것 중 실제로 발주처리되는 라인 id.
@@ -436,23 +431,30 @@ export function ShipmentContainer() {
     () => orders.some((o) => ackTargetIds.includes(o.id) && o.internalStage != null),
     [orders, ackTargetIds]
   );
+  const selectedOrderCount = useMemo(() => countOrders(orders.filter((o) => selectedIds.has(o.id))), [orders, selectedIds]);
+  const ackTargetOrderCount = useMemo(
+    () => countOrders(orders.filter((o) => selectedIds.has(o.id) && isAcknowledgeTarget(o))),
+    [orders, selectedIds, isAcknowledgeTarget]
+  );
 
-  // 전체 선택은 현재 페이지 기준으로만 계산한다(D7) — 선택 자체는 id 라 페이지를 넘겨도 유지된다.
-  const selectablePaged = useMemo(() => paged.filter(isSelectable), [paged, isSelectable]);
+  // Select-all works on the current page's orders only (D7); the selection itself is line ids, so it survives a page
+  // change. Picking an order puts every one of its lines in (FEATURE_2611_30 / D16).
+  const selectablePaged = useMemo(() => paged.filter(isSelectableOrder), [paged, isSelectableOrder]);
   const isPageAllSelected = selectablePaged.length > 0
-    && selectablePaged.every((o) => selectedIds.has(o.id));
+    && selectablePaged.every((order) => order.lines.every((line) => selectedIds.has(line.id)));
 
-  const toggleOne = (id: number) => setSelectedIds((prev) => {
-    const next = new Set(prev);   // Set 을 새로 만들어야 리렌더된다
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+  const toggleOne = (order: OrderGroup) => setSelectedIds((prev) => {
+    const next = new Set(prev);   // A new Set is needed for a re-render
+    const ids = order.lines.map((line) => line.id);
+    if (ids.every((id) => next.has(id))) ids.forEach((id) => next.delete(id));
+    else ids.forEach((id) => next.add(id));
     return next;
   });
 
   // 현재 페이지가 이미 전부 선택돼 있으면 이 페이지 분만 해제한다 — 다른 페이지 선택은 건드리지 않는다.
   const togglePage = () => setSelectedIds((prev) => {
     const next = new Set(prev);
-    const ids = selectablePaged.map((o) => o.id);
+    const ids = selectablePaged.flatMap((order) => order.lines.map((line) => line.id));
     if (isPageAllSelected) ids.forEach((id) => next.delete(id));
     else ids.forEach((id) => next.add(id));
     return next;
@@ -498,7 +500,7 @@ export function ShipmentContainer() {
       return;
     }
     // 되돌릴 수 없다 — 브라우저 confirm 으로 마지막 방어선을 둔다.
-    if (!window.confirm(`${ids.length}건을 발주처리합니다. 되돌릴 수 없습니다. 계속할까요?`)) return;
+    if (!window.confirm(`${ackTargetOrderCount}건을 발주처리합니다. 되돌릴 수 없습니다. 계속할까요?`)) return;
     await runAcknowledge(ids);
   };
 
@@ -653,7 +655,7 @@ export function ShipmentContainer() {
     clearSelection();
   };
 
-  const handleSort = (key: keyof OrderItem) => {
+  const handleSort = (key: OrderSortKey) => {
     if (sortKey === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -687,7 +689,7 @@ export function ShipmentContainer() {
         onSync={handleSync}
         isLoading={isLoading}
         isSyncing={isSyncing}
-        resultCount={visible.length}
+        resultCount={visibleOrders.length}
         canDownload={isAdmin}
         onDownload={() => { setPreviewSource('instruct'); setIsPreviewOpen(true); }}
         onDownloadInternal={() => { setPreviewSource('internal'); setIsPreviewOpen(true); }}
@@ -722,8 +724,9 @@ export function ShipmentContainer() {
 
       {/* 바는 showEmpty 분기 밖에 둔다 — 결과 0건이어도 페이지 크기 select 는 남아야 한다. */}
       <AcknowledgeBar
-        selectedCount={selectedIds.size}
-        acknowledgeableCount={ackTargetIds.length}
+        selectedCount={selectedOrderCount}
+        acknowledgeableCount={ackTargetOrderCount}
+        acknowledgeLineCount={ackTargetIds.length}
         acknowledgePlatforms={ackPlatforms}
         onAcknowledge={() => void handleAcknowledge()}
         isSubmitting={isAcknowledging}
@@ -762,11 +765,11 @@ export function ShipmentContainer() {
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
-          // 내부 단계 주문 줄의 [송장 수정](D18 🔁) — ADMIN 만. 모달은 아래 `StoredInvoiceModal`.
-          onEditInvoice={isAdmin ? (order) => setInvoiceOrder(order) : undefined}
+          // [송장 수정] is per order, ADMIN only; the dialog is `StoredInvoiceModal` below (FEATURE_2611_30 / D16).
+          onEditInvoice={isAdmin ? (order) => setInvoiceOrder(order.lines[0]) : undefined}
           // 비-ADMIN 에게는 선택 열 자체를 만들지 않는다(서버가 403 인 체크박스를 그리지 않는다).
           selection={isAdmin
-            ? { selectedIds, isSelectable, onToggle: toggleOne, onTogglePage: togglePage, isPageAllSelected }
+            ? { selectedIds, isSelectable: isSelectableOrder, onToggle: toggleOne, onTogglePage: togglePage, isPageAllSelected }
             : undefined}
         />
       )}
