@@ -65,8 +65,8 @@ export interface OrderItem {
   visitPickup: boolean;        // visit-pickup order: [방문수령 완료] instead of the invoice form
   reservedSale: boolean;       // reserved-sale paid order (raw 201): [입고완료 처리] instead of [발주처리]
   stockConfirmSent: boolean;   // [입고완료 처리] already sent — shown as 「입고완료 보냄」
-  // Row thumbnail = first component product of the line's master option (stored product.image_url as-is).
-  // Both null when the server could not expand the line (unmapped option etc.) — draw an empty box.
+  // First component product's id and its stored image_url. Screens no longer draw these (FEATURE_2611_31 / D6) —
+  // the server keeps them for already-installed apps (D11).
   thumbnailProductId: number | null;
   thumbnailImageUrl: string | null;
   // Real products of the line (FEATURE_2611_15 / D16 · D18): every component product of the line's master option,
@@ -78,6 +78,9 @@ export interface OrderItem {
   masterOptionName: string | null;
   // null = linked; otherwise the broken link's code — the screen text is `unexpandedReasonLabel` (D28).
   unexpandedReason: string | null;
+  // Stored cover photo of the line's master (assigned cover ?? legacy column) — draw it with `resolveThumbUrl`.
+  // null = no cover or a broken line → empty box; never fall back to a product photo (FEATURE_2611_31 / D1 · D2 · D3 · D6).
+  masterCoverImageUrl: string | null;
 }
 
 /** One component product of an order line and how many go out (FEATURE_2611_15 / D16 · D18). */
