@@ -31,8 +31,13 @@ const ACK_NOTICE_BY_PLATFORM: Record<'COUPANG' | 'ELEVENST' | 'LOTTEON', string>
 
 interface AcknowledgeBarProps {
   selectedCount: number;
-  /** 선택 중 실제로 발주처리되는 건수. 체크박스는 상태 무관이라 `selectedCount` 보다 작을 수 있다. */
+  /**
+   * Picked orders that have at least one order-confirmation target line — can be smaller than `selectedCount`
+   * (picked orders) (FEATURE_2611_30 / D16).
+   */
   acknowledgeableCount: number;
+  /** Number of line ids actually sent — the server's 500 limit is checked against this (R3). */
+  acknowledgeLineCount: number;
   /** Marketplaces among the confirmation targets, order Coupang → 11st → LotteON (FEATURE_2610_17 / D56 · FEATURE_2611_23 / D17). */
   acknowledgePlatforms: readonly ('COUPANG' | 'ELEVENST' | 'LOTTEON')[];
   onAcknowledge: () => void;
@@ -66,6 +71,7 @@ interface AcknowledgeBarProps {
 export function AcknowledgeBar({
   selectedCount,
   acknowledgeableCount,
+  acknowledgeLineCount,
   acknowledgePlatforms,
   onAcknowledge,
   isSubmitting,
@@ -86,8 +92,8 @@ export function AcknowledgeBar({
   onPageSizeChange,
   message,
 }: AcknowledgeBarProps) {
-  // 상한은 실제로 보내는 건수에 걸린다 — 선택에 발주처리 비대상이 섞여 있어도 요청에는 안 들어간다.
-  const isOverLimit = acknowledgeableCount > MAX_SELECTION;
+  // The limit applies to the line ids actually sent (`acknowledgeLineCount`) — non-target lines in the selection never go out.
+  const isOverLimit = acknowledgeLineCount > MAX_SELECTION;
   const notAcknowledgeable = selectedCount - acknowledgeableCount;
 
   return (

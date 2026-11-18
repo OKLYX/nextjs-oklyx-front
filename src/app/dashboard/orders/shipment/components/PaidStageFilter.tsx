@@ -1,7 +1,7 @@
 'use client';
 
 import type { InternalStage, OrderItem } from '@/domain/entities/OrderEntity';
-import { INTERNAL_STAGE_LABELS } from '@/domain/entities/OrderEntity';
+import { INTERNAL_STAGE_LABELS, countOrders } from '@/domain/entities/OrderEntity';
 
 /** 2nd-row chip value under PAID on the shipment page (FEATURE_2610_07 / D10·D11). */
 export type PaidStage = 'ALL' | 'BEFORE_ACK' | InternalStage;
@@ -25,7 +25,7 @@ export function matchesPaidStage(order: OrderItem, stage: PaidStage): boolean {
 }
 
 interface PaidStageFilterProps {
-  /** PAID orders after the channel and search filters, before any chip — every chip count comes from here (D13). */
+  /** PAID orders after the channel and search filters, before any chip — every chip count comes from here (D13), counted as orders (FEATURE_2611_30 / D17). */
   orders: OrderItem[];
   selected: PaidStage;
   onChange: (stage: PaidStage) => void;
@@ -63,7 +63,7 @@ export function PaidStageFilter({ orders, selected, onChange }: PaidStageFilterP
                 isActive ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-600'
               }`}
             >
-              {orders.filter((order) => matchesPaidStage(order, key)).length}
+              {countOrders(orders.filter((order) => matchesPaidStage(order, key)))}
             </span>
           </button>
         );

@@ -5,8 +5,8 @@ import { ELEVENST_RESERVED_LABEL } from '@/domain/entities/OrderEntity';
 /**
  * 「11번가 예약판매」 badge of an 11st reserved-sale paid order (FEATURE_2610_17 / D67).
  *
- * **Purpose**: the order list (`OrderTable`, shared by order history and shipment) draws it beside the order number,
- * in the same slot and shape as `InternalStageBadge`.
+ * **Purpose**: the order list (`OrderTable`) draws it at the end of the matching option line in the 「주문 상품」 cell
+ * (FEATURE_2611_30 / D23), in the same shape as `InternalStageBadge`.
  * **File**: src/app/dashboard/orders/components/ElevenstReservedBadge.tsx
  * ⚠️ The text comes from `ELEVENST_RESERVED_LABEL` only. `reservedSale` is the server's flag — never read the raw
  * status code here.

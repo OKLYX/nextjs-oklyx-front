@@ -72,6 +72,12 @@ export interface OrderItem {
   // Real products of the line (FEATURE_2611_15 / D16 · D18): every component product of the line's master option,
   // BOM order, quantity = per-set quantity × purchasableQty. Empty when the server could not expand the line.
   components: OrderComponentQuantity[];
+  // Master product and master option names the server puts on every line; null when the line's link is broken
+  // (FEATURE_2611_30 / D21 · D27 · D30).
+  masterProductName: string | null;
+  masterOptionName: string | null;
+  // null = linked; otherwise the broken link's code — the screen text is `unexpandedReasonLabel` (D28).
+  unexpandedReason: string | null;
 }
 
 /** One component product of an order line and how many go out (FEATURE_2611_15 / D16 · D18). */
@@ -79,15 +85,6 @@ export interface OrderComponentQuantity {
   productName: string;
   quantity: number;
 }
-
-/**
- * The order list's real product quantity text (FEATURE_2611_15 / D16): 「{name} × {quantity}」 joined by 「 · 」, e.g.
- * 「노란 수세미 × 3 · 초록 수세미 × 6」; 「-」 when the line has no components (a broken link) or an older server sent none.
- */
-export const componentQuantitiesLabel = (components: OrderComponentQuantity[] | undefined): string =>
-  !components || components.length === 0
-    ? '-'
-    : components.map((component) => `${component.productName} × ${component.quantity}`).join(' · ');
 
 /**
  * One order for the shared order detail (FEATURE_2611_07 / PLAN D17 · D30) — 1:1 with the backend
@@ -183,15 +180,92 @@ export const salesChannelLabel = (platform: string | null, accountAlias: string 
   return alias ? `${channel} · ${alias}` : channel;
 };
 
+/** Key of one order = the same account and the same order number (FEATURE_2611_30 / R1), e.g. 「7:O1」. */
+export const orderKey = (line: Pick<OrderItem, 'marketplaceAccountId' | 'externalOrderId'>): string =>
+  `${line.marketplaceAccountId}:${line.externalOrderId}`;
+
 /**
- * Compare value for sorting the order list — the 「판매자」 and 「판매처」 columns compare by their on-screen text
- * (FEATURE_2611_24 / D6); every other column compares by the raw field.
+ * One row of the order list = the lines of the same account and the same order number (FEATURE_2611_30 / D1 · D13).
+ * `lines` are in line id order; order-level values (order number, seller, customer, paid time, photo) come from `lines[0]`.
  */
-export const orderSortValue = (order: OrderItem, key: keyof OrderItem): OrderItem[keyof OrderItem] => {
-  if (key === 'sellerName') return order.sellerName ?? '-';
-  if (key === 'accountAlias') return salesChannelLabel(order.platform, order.accountAlias);
-  return order[key];
+export interface OrderGroup {
+  key: string;
+  lines: OrderItem[];
+}
+
+/** Groups lines into orders (R2): orders in the order their key first appears, lines inside by id ascending. */
+export function groupOrders(lines: OrderItem[]): OrderGroup[] {
+  const byKey = new Map<string, OrderItem[]>();
+  for (const line of lines) {
+    const key = orderKey(line);
+    const group = byKey.get(key);
+    if (group) {
+      group.push(line);
+    } else {
+      byKey.set(key, [line]);
+    }
+  }
+  return Array.from(byKey, ([key, group]) => ({ key, lines: [...group].sort((a, b) => a.id - b.id) }));
+}
+
+/** Number of distinct orders among the lines (R3). */
+export const countOrders = (lines: OrderItem[]): number => new Set(lines.map(orderKey)).size;
+
+/** true when every line of the order is fully canceled — the server's `cancelled` only (D6). */
+export const isOrderCancelled = (order: OrderGroup): boolean => order.lines.every((line) => line.cancelled);
+
+/** 「{master product} · {master option}」 of a linked line, null when either name is missing (R8). */
+export const orderLineMasterLabel = (
+  line: Pick<OrderItem, 'masterProductName' | 'masterOptionName'>,
+): string | null =>
+  line.masterProductName != null && line.masterOptionName != null
+    ? `${line.masterProductName} · ${line.masterOptionName}`
+    : null;
+
+/** Quantity tail of an option line (R8): 「×3」, 「×2 (취소 1)」, 「×3 (환불대기 1)」, 「×5 (취소 1)(환불대기 1)」. */
+export const orderLineQuantityLabel = (line: Pick<OrderItem, 'orderCount' | 'cancelCount' | 'holdCount'>): string => {
+  const tails = [
+    line.cancelCount > 0 ? `(취소 ${line.cancelCount})` : '',
+    line.holdCount > 0 ? `(환불대기 ${line.holdCount})` : '',
+  ].join('');
+  return tails === '' ? `×${line.orderCount}` : `×${line.orderCount} ${tails}`;
 };
+
+/** Sortable columns of the order list (R5). */
+export type OrderSortKey = 'externalOrderId' | 'seller' | 'customer' | 'paidAt';
+
+// null last regardless of direction, both null = equal; null when neither side is null.
+const compareNullsLast = (a: unknown, b: unknown): number | null => {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return null;
+};
+
+/**
+ * Compares two orders by their first line (R5 · D20). 「판매자/판매처」 = seller text, then the sales channel text;
+ * 「고객」 = receiver, else orderer; 「고객」 and 「결제일」 without a value always go last.
+ */
+export function compareOrders(a: OrderGroup, b: OrderGroup, key: OrderSortKey, dir: 'asc' | 'desc'): number {
+  const x = a.lines[0];
+  const y = b.lines[0];
+  let result: number;
+  if (key === 'externalOrderId') {
+    result = x.externalOrderId.localeCompare(y.externalOrderId);
+  } else if (key === 'seller') {
+    result = (x.sellerName ?? '-').localeCompare(y.sellerName ?? '-');
+    if (result === 0) {
+      result = salesChannelLabel(x.platform, x.accountAlias).localeCompare(salesChannelLabel(y.platform, y.accountAlias));
+    }
+  } else {
+    const xValue = key === 'customer' ? x.receiverName ?? x.ordererName : x.paidAt;
+    const yValue = key === 'customer' ? y.receiverName ?? y.ordererName : y.paidAt;
+    const nulls = compareNullsLast(xValue, yValue);
+    if (nulls != null) return nulls;
+    result = (xValue as string).localeCompare(yValue as string);
+  }
+  return dir === 'desc' ? -result : result;
+}
 
 // The reserved-sale label next to the status (FEATURE_2610_17 / D67) — one source for the list and the detail.
 export const ELEVENST_RESERVED_LABEL = '11번가 예약판매';
@@ -294,7 +368,7 @@ const normalize = (value: string): string => value.replace(/\s+/g, '').toLowerCa
 
 type SearchableOrder = Pick<
   OrderItem,
-  'ordererName' | 'receiverName' | 'externalOrderId' | 'itemName'
+  'ordererName' | 'receiverName' | 'externalOrderId' | 'itemName' | 'masterProductName' | 'masterOptionName'
 >;
 
 // A gift order has different orderer/receiver names — both are searched.
@@ -305,10 +379,11 @@ const matchesCustomer = (order: SearchableOrder, needle: string): boolean =>
 const matchesOrderNo = (order: SearchableOrder, needle: string): boolean =>
   normalize(order.externalOrderId).includes(needle);
 
-// itemName is the channel's own text (product + option in one string) and is nullable —
-// a null line simply never matches by product (PLAN 2609_27 D6).
+// The product chip searches the channel's product name, the master product name and the master option name;
+// a null value never matches through that field (FEATURE_2611_30 / D29).
 const matchesProduct = (order: SearchableOrder, needle: string): boolean =>
-  order.itemName != null && normalize(order.itemName).includes(needle);
+  [order.itemName, order.masterProductName, order.masterOptionName]
+    .some((value) => value != null && normalize(value).includes(needle));
 
 export function matchesOrderSearch(
   order: SearchableOrder,
