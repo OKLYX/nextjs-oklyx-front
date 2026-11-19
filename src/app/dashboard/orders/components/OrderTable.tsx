@@ -433,8 +433,9 @@ function OrderCancelledTag() {
  * 「주문 상품」 cell (FEATURE_2611_30 / D5 · D18 · D21 · D23 ~ D25 · D27 · D28 · D32): one block per option line —
  * 「{master product} · {master option}」 (a broken line = the channel product name in gray + the reason text), the quantity
  * tail and the stage · reserved badges. One chevron per order (shown only when some line has components) toggles every
- * line at once: folded = 「(구성상품 N개)」 after the quantity, open = the component products listed one per row under the
- * line. Tapping an option text opens the detail at that line.
+ * line at once. Table (`inTable`): folded = 「(구성상품 N개)」 after the quantity (table only), open = the component
+ * products listed one per row under the line. Card (FEATURE_2611_32 / D9 ②): folded = 「구성상품 N개」 below the line,
+ * open = the components under a 2px left rule, no components = 「-」. Tapping an option text opens the detail at that line.
  */
 function OrderProductsCell({
   order,
