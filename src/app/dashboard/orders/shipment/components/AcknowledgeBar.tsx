@@ -1,7 +1,9 @@
 'use client';
 
+import type { LucideIcon } from 'lucide-react';
+import { CalendarX, ClipboardCheck, PackageCheck, RefreshCw, Truck, Undo2 } from 'lucide-react';
 import { Spinner } from '@/presentation/components/Spinner';
-import { Button } from '@/presentation/components/ui/Button';
+import { Button, type ButtonVariant } from '@/presentation/components/ui/Button';
 
 /**
  * 출고관리 표 상단 선택 액션 바 — 선택 건수 · [주문 상태 갱신] · [발주처리] · [내부 발주처리] · [내부 발주 해제] ·
@@ -13,7 +15,9 @@ import { Button } from '@/presentation/components/ui/Button';
  * 자리다. 발주처리는 선택에 종속되고 페이지 크기는 표에 종속이라 표 바로 위가 맞다.
  * ⚠️ 바 자체는 항상 렌더한다(비-ADMIN·결과 0건 포함) — 숨는 것은 ADMIN 버튼들뿐.
  * ⚠️ Below 768px the container renders it with `docked` after the list, only when the list has rows
- * (FEATURE_2611_32 / D12 ① ⑥).
+ * (FEATURE_2611_32 / D12 ① ⑥). Docked = one row of icon-only buttons (label in `title`/`aria-label`),
+ * no guidance lines except the over-limit warning, and no page-size select — the container draws
+ * `PageSizeSelect` above the list instead.
  * ⚠️ [내부 발주처리]는 [발주처리] **바로 옆 · 초록**(`variant="confirm"`)이다(FEATURE_2609_75 / D13). 색을 바꾸지 말 것.
  */
 /** 페이지 크기는 판매상품 마스터와 같은 25/50/100 (PLAN 2609_17 D16). 그 화면의 URL 쿼리 모듈에서 import 하지 않는다. */
@@ -30,6 +34,35 @@ const ACK_NOTICE_BY_PLATFORM: Record<'COUPANG' | 'ELEVENST' | 'LOTTEON', string>
   ELEVENST: '11번가: 선택한 상품(같은 배송건의 같은 상품 옵션 포함)만 발주확인됩니다.',
   LOTTEON: '롯데ON: 선택한 상품만 발주확인됩니다.',
 };
+
+/** Rows-per-page select. Inside the bar on desktop; above the list below 768px (the docked bar has no room). */
+export function PageSizeSelect({ value, onChange }: { value: number; onChange: (size: number) => void }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      aria-label="페이지당 개수"
+    >
+      {PAGE_SIZE_OPTIONS.map((size) => (
+        <option key={size} value={size}>
+          {size}개씩
+        </option>
+      ))}
+    </select>
+  );
+}
+
+interface BarAction {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  variant: ButtonVariant;
+  onClick: () => void;
+  disabled: boolean;
+  busy: boolean;
+  busyLabel: string;
+}
 
 interface AcknowledgeBarProps {
   selectedCount: number;
@@ -101,6 +134,12 @@ export function AcknowledgeBar({
   const isOverLimit = acknowledgeLineCount > MAX_SELECTION;
   const notAcknowledgeable = selectedCount - acknowledgeableCount;
 
+  const overLimitNotice = (
+    <p className="text-xs text-red-700">
+      한 번에 {MAX_SELECTION}건까지 발주처리할 수 있습니다. 선택을 줄여주세요.
+    </p>
+  );
+
   const notices = (
     <>
       {/* What gets confirmed, one line per marketplace in the targets (PLAN 2609_17 D1 · FEATURE_2610_17 / D56). */}
@@ -125,13 +164,47 @@ export function AcknowledgeBar({
         </p>
       )}
 
-      {isOverLimit && (
-        <p className="text-xs text-red-700">
-          한 번에 {MAX_SELECTION}건까지 발주처리할 수 있습니다. 선택을 줄여주세요.
-        </p>
-      )}
+      {isOverLimit && overLimitNotice}
     </>
   );
+
+  // Same order as before: refresh → acknowledge → internal (green, right next to it) → release → cancel → stored.
+  // 상태 갱신은 마켓에 쓰지 않는 읽기라 ADMIN 게이트를 걸지 않는다(PLAN 2609_50 D17). 상한은 서버가 판정한다(D3).
+  const actions: BarAction[] = [
+    {
+      key: 'refresh', label: '주문 상태 갱신', icon: RefreshCw, variant: 'secondary',
+      onClick: onRefresh, disabled: refreshableCount === 0 || isRefreshing,
+      busy: isRefreshing, busyLabel: '확인 중...',
+    },
+    ...(canAcknowledge ? [
+      {
+        key: 'ack', label: '발주처리', icon: ClipboardCheck, variant: 'primary',
+        onClick: onAcknowledge, disabled: acknowledgeableCount === 0 || isOverLimit || isSubmitting,
+        busy: isSubmitting, busyLabel: '전송 중...',
+      },
+      {
+        key: 'internal', label: '내부 발주처리', icon: PackageCheck, variant: 'confirm',
+        onClick: onInternalAcknowledge, disabled: internalCount === 0 || internalBusy !== null,
+        busy: internalBusy === 'mark', busyLabel: '처리 중...',
+      },
+      {
+        key: 'release', label: '내부 발주 해제', icon: Undo2, variant: 'secondary',
+        onClick: onReleaseInternal, disabled: releaseCount === 0 || internalBusy !== null,
+        busy: internalBusy === 'release', busyLabel: '처리 중...',
+      },
+      {
+        key: 'cancel', label: '예약 취소', icon: CalendarX, variant: 'secondary',
+        onClick: onCancelReservation, disabled: cancelCount === 0 || internalBusy !== null,
+        busy: internalBusy === 'cancel', busyLabel: '처리 중...',
+      },
+      // D18 🔁 — 파일 없이 저장된 송장으로 [예약 발송]/[지금 발송]. 요청·결과는 발송처리 모달(저장된 송장 모드)이 한다.
+      {
+        key: 'stored', label: '저장된 송장으로 발송', icon: Truck, variant: 'secondary',
+        onClick: onShipStored, disabled: storedCount === 0 || internalBusy !== null,
+        busy: false, busyLabel: '',
+      },
+    ] satisfies BarAction[] : []),
+  ];
 
   return (
     <div
@@ -141,95 +214,53 @@ export function AcknowledgeBar({
           : 'bg-white rounded-lg shadow px-4 py-3 space-y-2'
       }
     >
-      {docked && notices}
+      {/* Docked: only the over-limit warning — the guidance lines took half the phone screen. */}
+      {docked && isOverLimit && overLimitNotice}
 
-      <div className="flex items-center justify-between gap-3 max-md:flex-wrap">
+      <div className={docked ? 'flex items-center justify-between gap-2' : 'flex items-center justify-between gap-3 max-md:flex-wrap'}>
         {/* 선택 건수는 이 바에서만 말한다 — 버튼 글자에 건수를 넣지 않는다.
             버튼마다 같은 수를 반복하면 두 버튼 중 어느 쪽 수인지 되읽게 된다. */}
-        <div className="text-sm text-gray-700">
+        <div className={docked ? 'shrink-0 whitespace-nowrap text-sm text-gray-700' : 'text-sm text-gray-700'}>
           {docked
             ? selectedCount > 0
-              ? <><span className="font-semibold text-gray-900">{selectedCount}건</span> 선택됨</>
-              : '주문을 선택하세요'
+              ? <><span className="font-semibold text-gray-900">{selectedCount}건</span> 선택</>
+              : '선택 없음'
             : selectedCount > 0
               ? <>선택 <span className="font-semibold text-gray-900">{selectedCount}건</span></>
               : '주문을 선택하세요'}
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          {/* 상태 갱신은 마켓에 쓰지 않는 읽기라 ADMIN 게이트를 걸지 않는다(PLAN 2609_50 D17).
-              상한(주문 50건)도 서버가 판정하므로 여기서 건수로 막지 않는다(D3). */}
-          <Button
-            variant="secondary"
-            onClick={onRefresh}
-            disabled={refreshableCount === 0 || isRefreshing}
-          >
-            {isRefreshing ? <Spinner label="확인 중..." /> : '주문 상태 갱신'}
-          </Button>
-
-          {canAcknowledge && (
-            <Button
-              onClick={onAcknowledge}
-              disabled={acknowledgeableCount === 0 || isOverLimit || isSubmitting}
-            >
-              {isSubmitting ? <Spinner label="전송 중..." /> : '발주처리'}
-            </Button>
-          )}
-
-          {canAcknowledge && (
-            <Button
-              variant="confirm"
-              onClick={onInternalAcknowledge}
-              disabled={internalCount === 0 || internalBusy !== null}
-            >
-              {internalBusy === 'mark' ? <Spinner label="처리 중..." /> : '내부 발주처리'}
-            </Button>
-          )}
-
-          {canAcknowledge && (
-            <Button
-              variant="secondary"
-              onClick={onReleaseInternal}
-              disabled={releaseCount === 0 || internalBusy !== null}
-            >
-              {internalBusy === 'release' ? <Spinner label="처리 중..." /> : '내부 발주 해제'}
-            </Button>
-          )}
-
-          {canAcknowledge && (
-            <Button
-              variant="secondary"
-              onClick={onCancelReservation}
-              disabled={cancelCount === 0 || internalBusy !== null}
-            >
-              {internalBusy === 'cancel' ? <Spinner label="처리 중..." /> : '예약 취소'}
-            </Button>
-          )}
-
-          {/* D18 🔁 — 파일 없이 저장된 송장으로 [예약 발송]/[지금 발송]. 요청·결과는 발송처리 모달(저장된 송장 모드)이 한다. */}
-          {canAcknowledge && (
-            <Button
-              variant="secondary"
-              onClick={onShipStored}
-              disabled={storedCount === 0 || internalBusy !== null}
-            >
-              저장된 송장으로 발송
-            </Button>
-          )}
-
-          <select
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            aria-label="페이지당 개수"
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}개씩
-              </option>
+        {docked ? (
+          // One row, icons only — the label is in title/aria-label. Colors keep [발주처리] blue and
+          // [내부 발주처리] green so the two stay apart without text.
+          <div className="flex items-center justify-end gap-1.5">
+            {actions.map((a) => {
+              const Icon = a.icon;
+              return (
+                <Button
+                  key={a.key}
+                  size="sm"
+                  variant={a.variant}
+                  onClick={a.onClick}
+                  disabled={a.disabled}
+                  title={a.label}
+                  aria-label={a.label}
+                >
+                  {a.busy ? <Spinner size={18} /> : <Icon size={18} aria-hidden />}
+                </Button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {actions.map((a) => (
+              <Button key={a.key} variant={a.variant} onClick={a.onClick} disabled={a.disabled}>
+                {a.busy ? <Spinner label={a.busyLabel} /> : a.label}
+              </Button>
             ))}
-          </select>
-        </div>
+            <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+          </div>
+        )}
       </div>
 
       {!docked && notices}
