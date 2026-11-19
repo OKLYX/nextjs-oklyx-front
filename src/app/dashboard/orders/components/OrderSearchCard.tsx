@@ -3,7 +3,9 @@
 import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { OrderPeriodOption } from '@/domain/entities/OrderPeriod';
+import { isMonthPeriod } from '@/domain/entities/OrderPeriod';
 import { OrderSearchInput } from './OrderSearchInput';
+import { OrderFilterChipSelect } from './OrderFilterChipSelect';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
 
@@ -79,7 +81,41 @@ export function OrderSearchCard({
   return (
     <Card>
       <div className="space-y-4">
-        <div>
+        <div className="space-y-2 md:hidden">
+          <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto">
+              <OrderFilterChipSelect
+                label={selectedSellerId === '' ? '판매자' : sellers.find((s) => s.id === selectedSellerId)?.sellerName ?? '판매자'}
+                value={selectedSellerId}
+                options={[{ value: '', label: '전체' }, ...sellers.map((s) => ({ value: s.id, label: s.sellerName }))]}
+                onChange={(v) => onSellerChange(v === '' ? '' : Number(v))}
+                highlighted={selectedSellerId !== ''}
+                ariaLabel="판매자"
+              />
+              <OrderFilterChipSelect
+                label={periodOptions.find((o) => o.value === selectedPeriod)?.label ?? selectedPeriod}
+                value={selectedPeriod}
+                options={periodOptions}
+                onChange={onPeriodChange}
+                highlighted={isMonthPeriod(selectedPeriod)}
+                ariaLabel="기간"
+              />
+              <OrderFilterChipSelect
+                label={selectedAccountId === '' ? '채널' : channelOptions.find((o) => o.accountId === selectedAccountId)?.label ?? '채널'}
+                value={selectedAccountId}
+                options={[{ value: '', label: '전체 채널' }, ...channelOptions.map((o) => ({ value: o.accountId, label: o.label }))]}
+                onChange={(v) => onAccountChange(v === '' ? '' : Number(v))}
+                highlighted={selectedAccountId !== ''}
+                ariaLabel="채널"
+              />
+            </div>
+            <Button className="shrink-0" onClick={onSearch} disabled={isLoading}>
+              {isLoading ? '조회 중...' : '조회'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="max-md:hidden">
           <label className="block text-sm font-medium text-gray-700 mb-2">판매자</label>
           <div className="flex items-center gap-2 max-md:flex-wrap">
             <select
@@ -149,11 +185,12 @@ export function OrderSearchCard({
               onClick={onSync}
               disabled={isSyncing || syncDisabledReason != null}
               title={syncDisabledReason}
-              className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed max-md:hidden"
             >
               {isSyncing ? '동기화 중...' : '동기화'}
             </button>
             <Button
+              className="max-md:hidden"
               onClick={onSearch}
               disabled={isLoading}
             >

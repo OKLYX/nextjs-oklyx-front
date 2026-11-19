@@ -12,6 +12,8 @@ import { Button } from '@/presentation/components/ui/Button';
  * ⚠️ `ShipmentFilterCard` 에 넣지 않는다 — 그 카드는 "조회 조건 + 서버가 sellerId 로 처리하는 액션"의
  * 자리다. 발주처리는 선택에 종속되고 페이지 크기는 표에 종속이라 표 바로 위가 맞다.
  * ⚠️ 바 자체는 항상 렌더한다(비-ADMIN·결과 0건 포함) — 숨는 것은 ADMIN 버튼들뿐.
+ * ⚠️ Below 768px the container renders it with `docked` after the list, only when the list has rows
+ * (FEATURE_2611_32 / D12 ① ⑥).
  * ⚠️ [내부 발주처리]는 [발주처리] **바로 옆 · 초록**(`variant="confirm"`)이다(FEATURE_2609_75 / D13). 색을 바꾸지 말 것.
  */
 /** 페이지 크기는 판매상품 마스터와 같은 25/50/100 (PLAN 2609_17 D16). 그 화면의 URL 쿼리 모듈에서 import 하지 않는다. */
@@ -66,6 +68,8 @@ interface AcknowledgeBarProps {
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   message: { text: string; detail: string[] } | null;
+  /** true = drawn below 768px as the bar stuck to the screen bottom after the list (FEATURE_2611_32 / D12 ⑥ · R12). */
+  docked?: boolean;
 }
 
 export function AcknowledgeBar({
@@ -91,20 +95,65 @@ export function AcknowledgeBar({
   pageSize,
   onPageSizeChange,
   message,
+  docked = false,
 }: AcknowledgeBarProps) {
   // The limit applies to the line ids actually sent (`acknowledgeLineCount`) — non-target lines in the selection never go out.
   const isOverLimit = acknowledgeLineCount > MAX_SELECTION;
   const notAcknowledgeable = selectedCount - acknowledgeableCount;
 
+  const notices = (
+    <>
+      {/* What gets confirmed, one line per marketplace in the targets (PLAN 2609_17 D1 · FEATURE_2610_17 / D56). */}
+      {acknowledgeableCount > 0 && acknowledgePlatforms.map((platform) => (
+        <p key={platform} className="text-xs text-gray-500">
+          {ACK_NOTICE_BY_PLATFORM[platform]}
+        </p>
+      ))}
+
+      {/* Says why [발주처리] stays off — picking orders only to refresh their status is common. */}
+      {notAcknowledgeable > 0 && (
+        <p className="text-xs text-gray-500">
+          선택한 {selectedCount}건 중 {notAcknowledgeable}건은 결제완료가 아니거나 입고완료 전 11번가 예약판매라서 발주처리 대상이 아닙니다.
+          주문 상태 갱신은 그대로 됩니다.
+        </p>
+      )}
+
+      {/* Internal acknowledge is not sent to the market — the market keeps the order as paid (D1 · FEATURE_2611_23 / D54). */}
+      {canAcknowledge && internalCount > 0 && (
+        <p className="text-xs text-gray-500">
+          내부 발주처리는 마켓에 보내지 않습니다. 마켓에는 결제완료로 남고 오클릭스에만 「내부 상품준비중」으로 표시됩니다.
+        </p>
+      )}
+
+      {isOverLimit && (
+        <p className="text-xs text-red-700">
+          한 번에 {MAX_SELECTION}건까지 발주처리할 수 있습니다. 선택을 줄여주세요.
+        </p>
+      )}
+    </>
+  );
+
   return (
-    <div className="bg-white rounded-lg shadow px-4 py-3 space-y-2">
+    <div
+      className={
+        docked
+          ? 'sticky bottom-0 z-20 -mx-4 space-y-2 border-t border-gray-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]'
+          : 'bg-white rounded-lg shadow px-4 py-3 space-y-2'
+      }
+    >
+      {docked && notices}
+
       <div className="flex items-center justify-between gap-3 max-md:flex-wrap">
         {/* 선택 건수는 이 바에서만 말한다 — 버튼 글자에 건수를 넣지 않는다.
             버튼마다 같은 수를 반복하면 두 버튼 중 어느 쪽 수인지 되읽게 된다. */}
         <div className="text-sm text-gray-700">
-          {selectedCount > 0
-            ? <>선택 <span className="font-semibold text-gray-900">{selectedCount}건</span></>
-            : '주문을 선택하세요'}
+          {docked
+            ? selectedCount > 0
+              ? <><span className="font-semibold text-gray-900">{selectedCount}건</span> 선택됨</>
+              : '주문을 선택하세요'
+            : selectedCount > 0
+              ? <>선택 <span className="font-semibold text-gray-900">{selectedCount}건</span></>
+              : '주문을 선택하세요'}
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-3">
@@ -183,33 +232,7 @@ export function AcknowledgeBar({
         </div>
       </div>
 
-      {/* What gets confirmed, one line per marketplace in the targets (PLAN 2609_17 D1 · FEATURE_2610_17 / D56). */}
-      {acknowledgeableCount > 0 && acknowledgePlatforms.map((platform) => (
-        <p key={platform} className="text-xs text-gray-500">
-          {ACK_NOTICE_BY_PLATFORM[platform]}
-        </p>
-      ))}
-
-      {/* 발주처리 버튼이 왜 안 눌리는지 말해 준다 — 상태 갱신만 하려고 고른 경우가 흔하다. */}
-      {notAcknowledgeable > 0 && (
-        <p className="text-xs text-gray-500">
-          선택한 {selectedCount}건 중 {notAcknowledgeable}건은 결제완료가 아니거나 입고완료 전 11번가 예약판매라서 발주처리 대상이 아닙니다.
-          주문 상태 갱신은 그대로 됩니다.
-        </p>
-      )}
-
-      {/* Internal acknowledge is not sent to the market — the market keeps the order as paid (D1 · FEATURE_2611_23 / D54). */}
-      {canAcknowledge && internalCount > 0 && (
-        <p className="text-xs text-gray-500">
-          내부 발주처리는 마켓에 보내지 않습니다. 마켓에는 결제완료로 남고 오클릭스에만 「내부 상품준비중」으로 표시됩니다.
-        </p>
-      )}
-
-      {isOverLimit && (
-        <p className="text-xs text-red-700">
-          한 번에 {MAX_SELECTION}건까지 발주처리할 수 있습니다. 선택을 줄여주세요.
-        </p>
-      )}
+      {!docked && notices}
 
       {message && (
         <div className="text-sm text-gray-800">

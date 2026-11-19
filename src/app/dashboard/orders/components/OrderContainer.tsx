@@ -15,6 +15,7 @@ import {
   RECENT_PERIOD, buildPeriodOptions, isMonthPeriod, toPeriodRange,
 } from '@/domain/entities/OrderPeriod';
 import type { SyncTarget } from '@/application/dto/OrderDTOs';
+import { isSyncIncomplete } from '@/application/dto/OrderDTOs';
 import { formatRelativeTime } from '@/domain/entities/DateTimeFormat';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
@@ -23,6 +24,7 @@ import { OrderSearchCard } from './OrderSearchCard';
 import { channelOptionLabel } from './OrderSearchCard';
 import type { ChannelOption } from './OrderSearchCard';
 import { OrderStatusFilter } from './OrderStatusFilter';
+import { OrderSyncPill } from './OrderSyncPill';
 import { OrderTable } from './OrderTable';
 import { OrderDetailsModal } from './OrderDetailsModal';
 import { SyncProgressModal } from './SyncProgressModal';
@@ -257,14 +259,15 @@ export function OrderContainer() {
   // - CANCELED_FILTER: only fully-canceled orders
   // - a status code: that status, excluding fully-canceled ones
   // - null: all orders except fully-canceled (those live under 취소항목)
+  const liveGroups = useMemo((): OrderGroup[] => searchedGroups.filter((group) => !isOrderCancelled(group)), [searchedGroups]);
   const filteredOrders = useMemo((): OrderGroup[] => {
     if (selectedStatus === CANCELED_FILTER) return searchedGroups.filter(isOrderCancelled);
-    if (selectedStatus == null) return searchedGroups.filter((group) => !isOrderCancelled(group));
+    if (selectedStatus == null) return liveGroups;
     const keys = new Set(
       searchedOrders.filter((o) => o.status === selectedStatus && !o.cancelled).map(orderKey),
     );
     return searchedGroups.filter((group) => keys.has(group.key));
-  }, [searchedGroups, searchedOrders, selectedStatus]);
+  }, [searchedGroups, searchedOrders, selectedStatus, liveGroups]);
 
   const sortedOrders = useMemo(() => {
     if (sortKey == null) return filteredOrders;
@@ -457,18 +460,27 @@ export function OrderContainer() {
   };
 
   // Reason text is owned by the server (lastSyncError) — never composed here.
-  const nonSuccessTargets = syncTargets.filter(
-    (t) => t.lastSyncStatus && t.lastSyncStatus !== 'SUCCESS'
-  );
+  const nonSuccessTargets = syncTargets.filter(isSyncIncomplete);
 
   return (
     <PageContainer
       title="주문내역"
       action={
-        <p className="text-sm text-gray-500 whitespace-nowrap">
-          마지막 동기화:{' '}
-          <span className="font-medium text-gray-700">{formatRelativeTime(lastSyncedAt)}</span>
-        </p>
+        <>
+          <p className="text-sm text-gray-500 whitespace-nowrap max-md:hidden">
+            마지막 동기화:{' '}
+            <span className="font-medium text-gray-700">{formatRelativeTime(lastSyncedAt)}</span>
+          </p>
+          <OrderSyncPill
+            className="md:hidden"
+            lastSyncedAt={lastSyncedAt}
+            hasIncompleteChannel={nonSuccessTargets.length > 0}
+            isSyncing={isSyncing}
+            disabled={isSyncing || syncDisabledReason != null}
+            title={syncDisabledReason}
+            onClick={() => void handleSync()}
+          />
+        </>
       }
     >
         <OrderSearchCard
@@ -535,6 +547,7 @@ export function OrderContainer() {
           onStatusChange={handleStatusChange}
           counts={statusCounts}
           canceledCount={canceledCount}
+          allCount={liveGroups.length}
         />
 
         <OrderTable
