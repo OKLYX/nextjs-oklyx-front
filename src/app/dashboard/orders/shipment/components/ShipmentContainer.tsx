@@ -31,7 +31,7 @@ import { SyncProgressModal } from '../../components/SyncProgressModal';
 import { channelOptionLabel } from '../../components/OrderSearchCard';
 import type { ChannelOption } from '../../components/OrderSearchCard';
 import { ShipmentFilterCard } from './ShipmentFilterCard';
-import { AcknowledgeBar } from './AcknowledgeBar';
+import { AcknowledgeBar, PageSizeSelect } from './AcknowledgeBar';
 import { ReservedShipmentPanel } from './ReservedShipmentPanel';
 import { PaidStageFilter, matchesPaidStage } from './PaidStageFilter';
 import type { PaidStage } from './PaidStageFilter';
@@ -769,6 +769,12 @@ export function ShipmentContainer() {
       {/* 바는 showEmpty 분기 밖에 둔다 — 결과 0건이어도 페이지 크기 select 는 남아야 한다. */}
       {/* Below 768px it moves after the list, docked, and only with rows (FEATURE_2611_32 / D12). */}
       {!isMobile && ackBar(false)}
+      {/* The docked bar has no page-size select — below 768px it sits above the list. */}
+      {isMobile && hasRows && (
+        <div className="flex justify-end">
+          <PageSizeSelect value={pageSize} onChange={(n) => { setPageSize(n); setCurrentPage(0); }} />
+        </div>
+      )}
 
       {showEmpty ? (
         <Card padded={false}>
