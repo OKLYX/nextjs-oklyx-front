@@ -5,6 +5,7 @@ import type { Seller } from '@/domain/entities/SellerEntity';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 import type { ChannelOption } from '../../components/OrderSearchCard';
 import { OrderSearchInput } from '../../components/OrderSearchInput';
+import { OrderFilterChipSelect } from '@/app/dashboard/orders/components/OrderFilterChipSelect';
 import { Card } from '@/presentation/components/ui/Card';
 import { Button } from '@/presentation/components/ui/Button';
 
@@ -66,14 +67,50 @@ export function ShipmentFilterCard({
   searchTerm,
   onSearchTermChange,
 }: ShipmentFilterCardProps) {
+  const actionTiles = [
+    { label: '송장 접수시트', Icon: Download, onClick: onDownload, yellow: false },
+    { label: '내부 상품준비중 접수시트', Icon: Download, onClick: onDownloadInternal, yellow: false },
+    { label: '발송처리', Icon: Upload, onClick: onOpenConfirm, yellow: true },
+  ] as const;
+
   return (
     <Card>
-      <p className="mb-6 text-sm text-gray-500">
+      <p className="mb-6 text-sm text-gray-500 max-md:hidden">
         목록은 최근 14일 기준입니다. 접수시트는 30일까지 포함합니다.
       </p>
 
       <div className="space-y-4">
-        <div>
+        <div className="space-y-2 md:hidden">
+          <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto">
+              <OrderFilterChipSelect
+                label={selectedSellerId === '' ? '판매자' : sellers.find((s) => s.id === selectedSellerId)?.sellerName ?? '판매자'}
+                value={selectedSellerId}
+                options={[{ value: '', label: '전체' }, ...sellers.map((s) => ({ value: s.id, label: s.sellerName }))]}
+                onChange={(v) => onSellerChange(v === '' ? '' : Number(v))}
+                highlighted={selectedSellerId !== ''}
+                ariaLabel="판매자"
+              />
+              <OrderFilterChipSelect
+                label={selectedAccountId === '' ? '채널' : channelOptions.find((o) => o.accountId === selectedAccountId)?.label ?? '채널'}
+                value={selectedAccountId}
+                options={[{ value: '', label: '전체 채널' }, ...channelOptions.map((o) => ({ value: o.accountId, label: o.label }))]}
+                onChange={(v) => onAccountChange(v === '' ? '' : Number(v))}
+                highlighted={selectedAccountId !== ''}
+                ariaLabel="채널"
+              />
+            </div>
+            <Button className="shrink-0" onClick={onSearch} disabled={isLoading}>
+              {isLoading ? '조회 중...' : '조회'}
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500">목록은 최근 14일 기준입니다. 접수시트는 30일까지 포함합니다.</p>
+          {canDownload && selectedAccountId !== '' && (
+            <p className="text-xs text-gray-500">접수시트·발송처리는 선택한 판매자의 전 채널을 포함합니다.</p>
+          )}
+        </div>
+
+        <div className="max-md:hidden">
           <label className="block text-sm font-medium text-gray-700 mb-2">판매자</label>
           <div className="flex flex-wrap items-center gap-2">
             <select
@@ -144,6 +181,26 @@ export function ShipmentFilterCard({
           onSearchTermChange={onSearchTermChange}
         />
 
+        {canDownload && (
+          <div className="grid grid-cols-3 gap-1 md:hidden">
+            {actionTiles.map(({ label, Icon, onClick, yellow }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={onClick}
+                className="flex min-h-16 flex-col items-center gap-1.5 py-1"
+              >
+                <span
+                  className={`flex h-11 w-11 items-center justify-center rounded-[14px] ${yellow ? 'bg-brand' : 'bg-brand-soft'}`}
+                >
+                  <Icon size={20} aria-hidden className="text-on-brand" />
+                </span>
+                <span className="line-clamp-2 text-center text-xs text-gray-900">{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-center justify-between max-md:flex-wrap">
           <div>
             {resultCount > 0 && (
@@ -154,11 +211,12 @@ export function ShipmentFilterCard({
             <button
               onClick={onSync}
               disabled={isSyncing}
-              className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed max-md:hidden"
             >
               {isSyncing ? '동기화 중...' : '동기화'}
             </button>
             <Button
+              className="max-md:hidden"
               onClick={onSearch}
               disabled={isLoading}
             >
