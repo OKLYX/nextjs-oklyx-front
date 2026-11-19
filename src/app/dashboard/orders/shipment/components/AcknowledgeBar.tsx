@@ -15,7 +15,7 @@ import { Button, type ButtonVariant } from '@/presentation/components/ui/Button'
  * 자리다. 발주처리는 선택에 종속되고 페이지 크기는 표에 종속이라 표 바로 위가 맞다.
  * ⚠️ 바 자체는 항상 렌더한다(비-ADMIN·결과 0건 포함) — 숨는 것은 ADMIN 버튼들뿐.
  * ⚠️ Below 768px the container renders it with `docked` after the list, only when the list has rows
- * (FEATURE_2611_32 / D12 ① ⑥). Docked = one row of icon-only buttons (label in `title`/`aria-label`),
+ * (FEATURE_2611_32 / D12 ① ⑥). Docked = one row of icon buttons with a short name below (full name in `title`),
  * no guidance lines except the over-limit warning, and no page-size select — the container draws
  * `PageSizeSelect` above the list instead.
  * ⚠️ [내부 발주처리]는 [발주처리] **바로 옆 · 초록**(`variant="confirm"`)이다(FEATURE_2609_75 / D13). 색을 바꾸지 말 것.
@@ -53,9 +53,22 @@ export function PageSizeSelect({ value, onChange }: { value: number; onChange: (
   );
 }
 
+/**
+ * Icon box colors of the docked bar — the same roles as `Button` variants (the docked cell is icon + name
+ * stacked, which `Button`'s fixed padding cannot draw).
+ */
+const ICON_BOX: Record<ButtonVariant, string> = {
+  primary: 'bg-blue-600 text-white group-enabled:group-hover:bg-blue-700 group-disabled:bg-blue-400',
+  secondary: 'border border-gray-300 bg-white text-gray-700 group-enabled:group-hover:bg-gray-50 group-disabled:opacity-50',
+  danger: 'bg-red-600 text-white group-enabled:group-hover:bg-red-700 group-disabled:opacity-50',
+  confirm: 'bg-green-600 text-white group-enabled:group-hover:bg-green-700 group-disabled:opacity-50',
+};
+
 interface BarAction {
   key: string;
   label: string;
+  /** Name under the icon in the docked bar — at most 4 Korean letters so six cells fit a 360px screen. */
+  shortLabel: string;
   icon: LucideIcon;
   variant: ButtonVariant;
   onClick: () => void;
@@ -172,34 +185,34 @@ export function AcknowledgeBar({
   // 상태 갱신은 마켓에 쓰지 않는 읽기라 ADMIN 게이트를 걸지 않는다(PLAN 2609_50 D17). 상한은 서버가 판정한다(D3).
   const actions: BarAction[] = [
     {
-      key: 'refresh', label: '주문 상태 갱신', icon: RefreshCw, variant: 'secondary',
+      key: 'refresh', label: '주문 상태 갱신', shortLabel: '상태 갱신', icon: RefreshCw, variant: 'secondary',
       onClick: onRefresh, disabled: refreshableCount === 0 || isRefreshing,
       busy: isRefreshing, busyLabel: '확인 중...',
     },
     ...(canAcknowledge ? [
       {
-        key: 'ack', label: '발주처리', icon: ClipboardCheck, variant: 'primary',
+        key: 'ack', label: '발주처리', shortLabel: '발주처리', icon: ClipboardCheck, variant: 'primary',
         onClick: onAcknowledge, disabled: acknowledgeableCount === 0 || isOverLimit || isSubmitting,
         busy: isSubmitting, busyLabel: '전송 중...',
       },
       {
-        key: 'internal', label: '내부 발주처리', icon: PackageCheck, variant: 'confirm',
+        key: 'internal', label: '내부 발주처리', shortLabel: '내부 발주', icon: PackageCheck, variant: 'confirm',
         onClick: onInternalAcknowledge, disabled: internalCount === 0 || internalBusy !== null,
         busy: internalBusy === 'mark', busyLabel: '처리 중...',
       },
       {
-        key: 'release', label: '내부 발주 해제', icon: Undo2, variant: 'secondary',
+        key: 'release', label: '내부 발주 해제', shortLabel: '발주 해제', icon: Undo2, variant: 'secondary',
         onClick: onReleaseInternal, disabled: releaseCount === 0 || internalBusy !== null,
         busy: internalBusy === 'release', busyLabel: '처리 중...',
       },
       {
-        key: 'cancel', label: '예약 취소', icon: CalendarX, variant: 'secondary',
+        key: 'cancel', label: '예약 취소', shortLabel: '예약 취소', icon: CalendarX, variant: 'secondary',
         onClick: onCancelReservation, disabled: cancelCount === 0 || internalBusy !== null,
         busy: internalBusy === 'cancel', busyLabel: '처리 중...',
       },
       // D18 🔁 — 파일 없이 저장된 송장으로 [예약 발송]/[지금 발송]. 요청·결과는 발송처리 모달(저장된 송장 모드)이 한다.
       {
-        key: 'stored', label: '저장된 송장으로 발송', icon: Truck, variant: 'secondary',
+        key: 'stored', label: '저장된 송장으로 발송', shortLabel: '송장 발송', icon: Truck, variant: 'secondary',
         onClick: onShipStored, disabled: storedCount === 0 || internalBusy !== null,
         busy: false, busyLabel: '',
       },
@@ -217,10 +230,10 @@ export function AcknowledgeBar({
       {/* Docked: only the over-limit warning — the guidance lines took half the phone screen. */}
       {docked && isOverLimit && overLimitNotice}
 
-      <div className={docked ? 'flex items-center justify-between gap-2' : 'flex items-center justify-between gap-3 max-md:flex-wrap'}>
+      <div className={docked ? 'flex items-center justify-between gap-1' : 'flex items-center justify-between gap-3 max-md:flex-wrap'}>
         {/* 선택 건수는 이 바에서만 말한다 — 버튼 글자에 건수를 넣지 않는다.
             버튼마다 같은 수를 반복하면 두 버튼 중 어느 쪽 수인지 되읽게 된다. */}
-        <div className={docked ? 'shrink-0 whitespace-nowrap text-sm text-gray-700' : 'text-sm text-gray-700'}>
+        <div className={docked ? 'shrink-0 whitespace-nowrap text-xs text-gray-700' : 'text-sm text-gray-700'}>
           {docked
             ? selectedCount > 0
               ? <><span className="font-semibold text-gray-900">{selectedCount}건</span> 선택</>
@@ -231,23 +244,28 @@ export function AcknowledgeBar({
         </div>
 
         {docked ? (
-          // One row, icons only — the label is in title/aria-label. Colors keep [발주처리] blue and
-          // [내부 발주처리] green so the two stay apart without text.
-          <div className="flex items-center justify-end gap-1.5">
+          // One row of equal cells: icon box + short name below (icons alone were not recognizable).
+          // The full name stays in title/aria-label. Box colors keep [발주처리] blue and [내부 발주처리] green.
+          <div className="flex min-w-0 flex-1 items-start justify-end">
             {actions.map((a) => {
               const Icon = a.icon;
               return (
-                <Button
+                <button
                   key={a.key}
-                  size="sm"
-                  variant={a.variant}
+                  type="button"
                   onClick={a.onClick}
                   disabled={a.disabled}
                   title={a.label}
                   aria-label={a.label}
+                  className="group flex w-11 shrink-0 flex-col items-center gap-1 disabled:cursor-not-allowed"
                 >
-                  {a.busy ? <Spinner size={18} /> : <Icon size={18} aria-hidden />}
-                </Button>
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${ICON_BOX[a.variant]}`}>
+                    {a.busy ? <Spinner size={18} /> : <Icon size={18} aria-hidden />}
+                  </span>
+                  <span className="whitespace-nowrap text-[10px] leading-none text-gray-700 group-disabled:text-gray-400" aria-hidden>
+                    {a.shortLabel}
+                  </span>
+                </button>
               );
             })}
           </div>
