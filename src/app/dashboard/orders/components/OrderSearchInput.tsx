@@ -1,6 +1,6 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import type { OrderSearchField } from '@/domain/entities/OrderEntity';
 
 /**
@@ -60,7 +60,7 @@ export function OrderSearchInput({
   return (
     /* No <form>: Enter would reload the page, and filtering happens as you type. */
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">검색</label>
+      <label className="block text-sm font-medium text-gray-700 mb-2 max-md:hidden">검색</label>
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         {SEARCH_FIELDS.map(({ value, label }) => (
           <button
@@ -74,12 +74,17 @@ export function OrderSearchInput({
         ))}
       </div>
       <div className="relative">
+        <Search
+          size={18}
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 md:hidden"
+        />
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => onSearchTermChange(e.target.value)}
           placeholder={SEARCH_PLACEHOLDER[searchField]}
-          className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-md:h-11 max-md:rounded-xl max-md:border-0 max-md:bg-gray-100 max-md:pl-10 max-md:focus:ring-0"
         />
         {searchTerm && (
           <button

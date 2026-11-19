@@ -43,6 +43,14 @@ export interface SyncTarget {
 }
 
 /**
+ * The channel's last sync did not finish (PARTIAL · FAILED) — the warning banner and the sync pill's red dot
+ * (FEATURE_2611_32 / D6 ③ · R13).
+ */
+export function isSyncIncomplete(target: SyncTarget): boolean {
+  return target.lastSyncStatus != null && target.lastSyncStatus !== 'SUCCESS';
+}
+
+/**
  * Order-confirmation result (POST /api/admin/orders/acknowledge).
  *
  * The backend reuses `ShipmentConfirmResult.FailedBox` / `SkippedOrder` as they are, so the front end imports the

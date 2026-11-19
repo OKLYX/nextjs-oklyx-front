@@ -33,6 +33,8 @@ export interface DataCardSelection {
   /** Screen-reader label of the checkbox. */
   label: string;
   disabled?: boolean;
+  /** true = the 22px brand-yellow checkbox of the order cards (FEATURE_2611_32 / D11). */
+  large?: boolean;
 }
 
 /** true = the cards of the surrounding `DataCardList` are `flat`. */
@@ -174,6 +176,10 @@ interface DataCardProps {
   onClick?: () => void;
   /** true = the picked row (the table's highlighted row) — light blue background. */
   selected?: boolean;
+  /** true = padding 16 · 14 instead of 12 (the order cards, FEATURE_2611_32 / D8). */
+  roomy?: boolean;
+  /** Background of `selected`: `blue` (default) = bg-blue-50 · `amber` = bg-amber-50 (the picked order card, D11). */
+  selectedTone?: 'blue' | 'amber';
   /** true = a row the table draws on a gray background (e.g. a line not matched to an order) — light gray background. */
   muted?: boolean;
   className?: string;
@@ -217,6 +223,8 @@ const stopTap = (event: MouseEvent) => event.stopPropagation();
  * ```
  *
  * ⚠️ Shape (corners, shadow, gap) comes from `CARD_STYLE` through `DataCardList` — the card never takes it.
+ * ⚠️ `roomy` · `selectedTone` · `selection.large` are for the order cards only (FEATURE_2611_32 / D19) — other lists
+ *    keep the defaults.
  * ⚠️ A button inside `badges` or `body` must stop its own click (`event.stopPropagation()`), or the tap also
  *    opens the card. `actions` and `expansion` stop it for you.
  * ⚠️ Colours = the `bg-white` · `text-gray-*` · `border-gray-*` tokens (dark mode is mapped globally).
@@ -235,12 +243,14 @@ export function DataCard({
   expansion,
   onClick,
   selected = false,
+  roomy = false,
+  selectedTone = 'blue',
   muted = false,
   className,
 }: DataCardProps) {
   const flat = useContext(FlatCardContext);
   const clickable = typeof onClick === 'function';
-  const background = selected ? 'bg-blue-50' : muted ? 'bg-gray-50' : 'bg-white';
+  const background = selected ? (selectedTone === 'amber' ? 'bg-amber-50' : 'bg-blue-50') : muted ? 'bg-gray-50' : 'bg-white';
   const shape = flat ? background : `rounded-lg ${background} shadow`;
   const hasTitleRow = title !== undefined || badges !== undefined || trailing !== undefined;
   const shownExtraFields = (extraFields ?? []).filter((field) => field.value != null && field.value !== '');
@@ -262,14 +272,18 @@ export function DataCard({
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={onKeyDown}
-      className={`${shape} p-3 ${clickable ? 'cursor-pointer transition-colors hover:bg-gray-50' : ''} ${className ?? ''}`}
+      className={`${shape} ${roomy ? 'px-4 py-3.5' : 'p-3'} ${clickable ? 'cursor-pointer transition-colors hover:bg-gray-50' : ''} ${className ?? ''}`}
     >
       <div className="flex items-start gap-3">
         {selection && (
           <input
             type="checkbox"
             aria-label={selection.label}
-            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer"
+            className={
+              selection.large
+                ? 'mt-0.5 h-[22px] w-[22px] shrink-0 cursor-pointer accent-brand'
+                : 'mt-0.5 h-4 w-4 shrink-0 cursor-pointer'
+            }
             checked={selection.checked}
             disabled={selection.disabled}
             onClick={stopTap}

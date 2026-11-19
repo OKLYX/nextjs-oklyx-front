@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Package } from 'lucide-react';
 import {
   getCustomerName,
   getOrderStatusLabel,
@@ -16,6 +16,7 @@ import { TableCard } from '@/presentation/components/ui/TableCard';
 import { InternalStageBadge } from './InternalStageBadge';
 import { ElevenstReservedBadge } from './ElevenstReservedBadge';
 import { resolveThumbUrl } from '@/infrastructure/utils/thumbUrl';
+import { formatKstWallClock } from '@/infrastructure/utils/kstWallClock';
 import { DataCard } from '@/presentation/components/DataCard';
 import { ZoomableThumb } from '@/presentation/components/ZoomableThumb';
 import { Button } from '@/presentation/components/ui/Button';
@@ -130,9 +131,9 @@ export function OrderTable({
     );
   }
 
-  // Narrow-screen cards (FEATURE_2610_31 D13 · D14 · D31 · D34): one card = one order — the checkbox, the photo (first option
-  // line, tap = zoom), bold order number with the 「취소」 badge and [송장 수정], 「판매자 … · 판매처 …」, 「고객 …」, the order
-  // products block and 「결제일 …」. A card tap opens the detail at the first option line (FEATURE_2611_30 / D10 · D18).
+  // Narrow-screen cards (FEATURE_2611_32 / D19 · D9 · D21): one card = one order — the checkbox (22, D11), the photo 64
+  // (tap = zoom), row ① channel tag (+ 「취소」 · [송장 수정]) · seller ··· order number, row ② option lines with their
+  // components below (left rule), row ③ customer ··· paid time. A card tap opens the detail at the first option line.
   // 「전체 선택」 and the sort select with the direction button sit above the cards.
   const renderCards = () =>
     orders.map((order) => {
@@ -142,7 +143,10 @@ export function OrderTable({
       return (
         <DataCard
           key={order.key}
+          roomy
           onClick={() => onRowClick(first)}
+          selected={selection != null && order.lines.every((line) => selection.selectedIds.has(line.id))}
+          selectedTone="amber"
           selection={
             selection
               ? {
@@ -150,6 +154,7 @@ export function OrderTable({
                   onChange: () => selection.onToggle(order),
                   label: `${first.externalOrderId} 선택`,
                   disabled: !selection.isSelectable(order),
+                  large: true,
                 }
               : undefined
           }
@@ -157,49 +162,51 @@ export function OrderTable({
             <ZoomableThumb
               src={src}
               alt={first.itemName ?? ''}
-              imgClassName="h-14 w-14 rounded-md bg-gray-200 object-cover"
+              imgClassName="h-16 w-16 rounded-lg border border-gray-200 bg-gray-100 object-cover"
               placeholder={
-                <div className="flex h-14 w-14 items-center justify-center rounded-md bg-gray-200 text-xs text-gray-500">
-                  없음
+                <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 text-gray-500">
+                  <Package size={26} aria-hidden />
                 </div>
               }
             />
           }
-          title={first.externalOrderId}
-          badges={
-            <>
-              {isOrderCancelled(order) && <OrderCancelledBadge />}
-              {onEditInvoice && order.lines.some((line) => line.internalStage != null) && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEditInvoice(order);
-                  }}
-                  className="rounded px-3 py-1 text-xs text-gray-900 hover:bg-gray-100"
-                >
-                  송장 수정
-                </button>
-              )}
-            </>
-          }
           body={
-            <div className="space-y-1.5">
-              <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-                <span>판매자 {first.sellerName ?? '-'}</span>
-                <span>판매처 {salesChannelLabel(first.platform, first.accountAlias)}</span>
-              </p>
-              <NameText kind="customer" name={`고객 ${getCustomerName(first)}`} className="text-[13px] text-gray-500" />
-              <div className="text-[13px] text-gray-900">
-                <OrderProductsCell
-                  order={order}
-                  inTable={false}
-                  collapsed={collapsedKeys.has(order.key)}
-                  onToggleCollapsed={() => toggleCollapsed(order.key)}
-                  onOpenLine={onRowClick}
-                />
+            <div className="space-y-1">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="min-w-0 max-w-[50%] truncate rounded px-1.5 py-0.5 text-[11px] font-medium bg-indigo-50 text-indigo-800">
+                  {salesChannelLabel(first.platform, first.accountAlias)}
+                </span>
+                {isOrderCancelled(order) && <OrderCancelledTag />}
+                {onEditInvoice && order.lines.some((line) => line.internalStage != null) && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditInvoice(order);
+                    }}
+                    className="rounded px-3 py-1 text-xs text-gray-900 hover:bg-gray-100"
+                  >
+                    송장 수정
+                  </button>
+                )}
+                <span className="min-w-0 flex-1 truncate text-xs text-gray-500">{first.sellerName ?? '-'}</span>
+                <span className="shrink-0 text-xs text-gray-500 tabular-nums">{first.externalOrderId}</span>
               </div>
-              <p className="text-xs text-gray-500">결제일 {formatDate(first.paidAt)}</p>
+              <OrderProductsCell
+                order={order}
+                inTable={false}
+                collapsed={collapsedKeys.has(order.key)}
+                onToggleCollapsed={() => toggleCollapsed(order.key)}
+                onOpenLine={onRowClick}
+              />
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <NameText kind="customer" name={getCustomerName(first)} className="text-[13px] text-gray-500" />
+                </div>
+                <span className="shrink-0 text-xs text-gray-500 tabular-nums">
+                  {first.paidAt ? formatKstWallClock(first.paidAt) : '-'}
+                </span>
+              </div>
             </div>
           }
         />
@@ -221,7 +228,7 @@ export function OrderTable({
                 checked={selection.isPageAllSelected}
                 disabled={!orders.some(selection.isSelectable)}
                 onChange={selection.onTogglePage}
-                className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+                className="h-[22px] w-[22px] cursor-pointer accent-brand disabled:cursor-not-allowed"
               />
               전체 선택
             </label>
@@ -413,12 +420,22 @@ function OrderCancelledBadge() {
   );
 }
 
+/** 「취소」 tag of the narrow-screen card (FEATURE_2611_32 / D9 ①) — the wide table keeps `OrderCancelledBadge`. */
+function OrderCancelledTag() {
+  return (
+    <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold whitespace-nowrap bg-cancel-soft text-cancel">
+      {getOrderStatusLabel('CANCELLED')}
+    </span>
+  );
+}
+
 /**
  * 「주문 상품」 cell (FEATURE_2611_30 / D5 · D18 · D21 · D23 ~ D25 · D27 · D28 · D32): one block per option line —
  * 「{master product} · {master option}」 (a broken line = the channel product name in gray + the reason text), the quantity
  * tail and the stage · reserved badges. One chevron per order (shown only when some line has components) toggles every
- * line at once: folded = 「(구성상품 N개)」 after the quantity, open = the component products listed one per row under the
- * line. Tapping an option text opens the detail at that line.
+ * line at once. Table (`inTable`): folded = 「(구성상품 N개)」 after the quantity (table only), open = the component
+ * products listed one per row under the line. Card (FEATURE_2611_32 / D9 ②): folded = 「구성상품 N개」 below the line,
+ * open = the components under a 2px left rule, no components = 「-」. Tapping an option text opens the detail at that line.
  */
 function OrderProductsCell({
   order,
@@ -468,11 +485,25 @@ function OrderProductsCell({
                     kind="product"
                     name={masterLabel ?? line.itemName}
                     inTable={inTable}
-                    className={masterLabel == null ? 'text-gray-400' : undefined}
+                    className={
+                      inTable
+                        ? masterLabel == null
+                          ? 'text-gray-400'
+                          : undefined
+                        : masterLabel == null
+                          ? 'text-[15px] font-medium text-gray-400'
+                          : 'text-[15px] font-medium text-gray-900'
+                    }
                   />
                 </button>
-                <span className="shrink-0 whitespace-nowrap">{orderLineQuantityLabel(line)}</span>
-                {collapsed && componentCount > 0 && (
+                <span
+                  className={
+                    inTable ? 'shrink-0 whitespace-nowrap' : 'shrink-0 whitespace-nowrap text-[13px] text-gray-900'
+                  }
+                >
+                  {orderLineQuantityLabel(line)}
+                </span>
+                {inTable && collapsed && componentCount > 0 && (
                   <span className="shrink-0 whitespace-nowrap text-gray-500">(구성상품 {componentCount}개)</span>
                 )}
                 {masterLabel == null && line.unexpandedReason != null && (
@@ -481,12 +512,28 @@ function OrderProductsCell({
                 <InternalStageBadge stage={line.internalStage} />
                 <ElevenstReservedBadge reservedSale={line.reservedSale} />
               </div>
-              {!collapsed && componentCount > 0 && (
-                <ul className="mt-1 space-y-0.5 border-l border-gray-200 pl-3 text-gray-600">
+              {inTable ? (
+                !collapsed &&
+                componentCount > 0 && (
+                  <ul className="mt-1 space-y-0.5 border-l border-gray-200 pl-3 text-gray-600">
+                    {line.components.map((component, index) => (
+                      <li key={index} className="flex items-start gap-1">
+                        <NameText kind="product" name={component.productName} inTable={inTable} />
+                        <span className="shrink-0 whitespace-nowrap">× {component.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : componentCount === 0 ? (
+                <p className="mt-0.5 text-[13px] text-gray-600">-</p>
+              ) : collapsed ? (
+                <p className="mt-0.5 text-[13px] text-gray-600">구성상품 {componentCount}개</p>
+              ) : (
+                <ul className="mt-0.5 space-y-0.5 border-l-2 border-gray-200 pl-2">
                   {line.components.map((component, index) => (
-                    <li key={index} className="flex items-start gap-1">
-                      <NameText kind="product" name={component.productName} inTable={inTable} />
-                      <span className="shrink-0 whitespace-nowrap">× {component.quantity}</span>
+                    <li key={index} className="flex min-w-0 items-start gap-1 text-[13px]">
+                      <NameText kind="product" name={component.productName} inTable={false} className="text-gray-600" />
+                      <span className="shrink-0 whitespace-nowrap font-bold text-gray-900">× {component.quantity}</span>
                     </li>
                   ))}
                 </ul>

@@ -14,11 +14,14 @@ import { SHIPMENT_STATUSES, compareOrders, countOrders, groupOrders, matchesOrde
 import type {
   InternalStageResult, OrderAcknowledgeResult, OrderRefreshResult, SyncTarget,
 } from '@/application/dto/OrderDTOs';
+import { isSyncIncomplete } from '@/application/dto/OrderDTOs';
 import { formatRelativeTime } from '@/domain/entities/DateTimeFormat';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { PageContainer } from '@/presentation/components/PageContainer';
 import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { useOrderSync } from '@/presentation/hooks/useOrderSync';
+import { useIsMobile } from '@/presentation/hooks/useIsMobile';
+import { OrderSyncPill } from '@/app/dashboard/orders/components/OrderSyncPill';
 import { OrderStatusFilter } from '../../components/OrderStatusFilter';
 import { OrderTable } from '../../components/OrderTable';
 import { OrderDetailsModal } from '../../components/OrderDetailsModal';
@@ -319,17 +322,17 @@ export function ShipmentContainer() {
   }, [groups, visible]);
 
   // Chip counts come from the list before a chip is picked (picking one does not zero the others), counted as orders.
+  const statusScoped = useMemo(() => orders
+    .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
+    .filter((o) => !o.cancelled)
+    .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
+    .filter((o) => matchesOrderSearch(o, searchField, searchTerm)), [orders, selectedAccountId, searchField, searchTerm]);
   const statusCounts = useMemo(() => {
-    const scoped = orders
-      .filter((o) => SHIPMENT_STATUS_LIST.includes(o.status))
-      .filter((o) => !o.cancelled)
-      .filter((o) => !selectedAccountId || o.marketplaceAccountId === selectedAccountId)
-      .filter((o) => matchesOrderSearch(o, searchField, searchTerm));
-    return Array.from(new Set(scoped.map((o) => o.status))).reduce<Record<string, number>>((acc, status) => {
-      acc[status] = countOrders(scoped.filter((o) => o.status === status));
+    return Array.from(new Set(statusScoped.map((o) => o.status))).reduce<Record<string, number>>((acc, status) => {
+      acc[status] = countOrders(statusScoped.filter((o) => o.status === status));
       return acc;
     }, {});
-  }, [orders, selectedAccountId, searchField, searchTerm]);
+  }, [statusScoped]);
 
   // 2nd-row chip counts: the same list as the 1st-row counts, narrowed to PAID (FEATURE_2610_07 / D13).
   const paidScoped = useMemo(() => orders
@@ -667,15 +670,54 @@ export function ShipmentContainer() {
 
   // 결과 0건은 에러가 아니다 — OrderTable 의 '조회 결과가 없습니다.' 대신 출고 문구를 쓴다(표 diff 0).
   const showEmpty = hasSearched && !isLoading && error === '' && sorted.length === 0;
+  const isMobile = useIsMobile();
+  const hasRows = hasSearched && !isLoading && error === '' && sorted.length > 0;
+  const ackBar = (docked: boolean) => (
+    <AcknowledgeBar
+      selectedCount={selectedOrderCount}
+      acknowledgeableCount={ackTargetOrderCount}
+      acknowledgeLineCount={ackTargetIds.length}
+      acknowledgePlatforms={ackPlatforms}
+      onAcknowledge={() => void handleAcknowledge()}
+      isSubmitting={isAcknowledging}
+      internalCount={internalTargetIds.length}
+      releaseCount={releaseTargetIds.length}
+      onInternalAcknowledge={() => void runInternal('mark')}
+      onReleaseInternal={() => setConfirmKind('release')}
+      cancelCount={cancelTargetIds.length}
+      onCancelReservation={() => void runCancelReservation()}
+      storedCount={storedTargetIds.length}
+      onShipStored={() => void openConfirm(storedTargetIds)}
+      internalBusy={internalBusy}
+      onRefresh={() => void handleRefresh()}
+      refreshableCount={refreshTargetIds.length}
+      isRefreshing={isRefreshing}
+      canAcknowledge={isAdmin}
+      pageSize={pageSize}
+      onPageSizeChange={(n) => { setPageSize(n); setCurrentPage(0); }}
+      message={ackMessage}
+      docked={docked}
+    />
+  );
 
   return (
     <PageContainer
       title="출고관리"
       action={
-        <p className="text-sm text-gray-500 whitespace-nowrap">
-          마지막 동기화:{' '}
-          <span className="font-medium text-gray-700">{formatRelativeTime(lastSyncedAt)}</span>
-        </p>
+        <>
+          <p className="text-sm text-gray-500 whitespace-nowrap max-md:hidden">
+            마지막 동기화:{' '}
+            <span className="font-medium text-gray-700">{formatRelativeTime(lastSyncedAt)}</span>
+          </p>
+          <OrderSyncPill
+            className="md:hidden"
+            lastSyncedAt={lastSyncedAt}
+            hasIncompleteChannel={syncTargets.some(isSyncIncomplete)}
+            isSyncing={isSyncing}
+            disabled={isSyncing}
+            onClick={() => void handleSync()}
+          />
+        </>
       }
     >
       <ShipmentFilterCard
@@ -716,6 +758,8 @@ export function ShipmentContainer() {
           canceledCount={0}
           statuses={SHIPMENT_STATUSES}
           showCanceledChip={false}
+          allCount={countOrders(statusScoped)}
+          equalWidth
         />
         {selectedStatus === 'PAID' && (
           <PaidStageFilter orders={paidScoped} selected={paidStage} onChange={handlePaidStageChange} />
@@ -723,30 +767,8 @@ export function ShipmentContainer() {
       </div>
 
       {/* 바는 showEmpty 분기 밖에 둔다 — 결과 0건이어도 페이지 크기 select 는 남아야 한다. */}
-      <AcknowledgeBar
-        selectedCount={selectedOrderCount}
-        acknowledgeableCount={ackTargetOrderCount}
-        acknowledgeLineCount={ackTargetIds.length}
-        acknowledgePlatforms={ackPlatforms}
-        onAcknowledge={() => void handleAcknowledge()}
-        isSubmitting={isAcknowledging}
-        internalCount={internalTargetIds.length}
-        releaseCount={releaseTargetIds.length}
-        onInternalAcknowledge={() => void runInternal('mark')}
-        onReleaseInternal={() => setConfirmKind('release')}
-        cancelCount={cancelTargetIds.length}
-        onCancelReservation={() => void runCancelReservation()}
-        storedCount={storedTargetIds.length}
-        onShipStored={() => void openConfirm(storedTargetIds)}
-        internalBusy={internalBusy}
-        onRefresh={() => void handleRefresh()}
-        refreshableCount={refreshTargetIds.length}
-        isRefreshing={isRefreshing}
-        canAcknowledge={isAdmin}
-        pageSize={pageSize}
-        onPageSizeChange={(n) => { setPageSize(n); setCurrentPage(0); }}
-        message={ackMessage}
-      />
+      {/* Below 768px it moves after the list, docked, and only with rows (FEATURE_2611_32 / D12). */}
+      {!isMobile && ackBar(false)}
 
       {showEmpty ? (
         <Card padded={false}>
@@ -773,6 +795,7 @@ export function ShipmentContainer() {
             : undefined}
         />
       )}
+      {isMobile && hasRows && ackBar(true)}
 
       {/* key remount resets the modal's sheet state when the order changes or the modal closes
           (it is always rendered, so it never unmounts on its own). */}
