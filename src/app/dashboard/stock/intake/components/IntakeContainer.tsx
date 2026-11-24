@@ -28,8 +28,9 @@ import { ClaimWorkPanel } from '@/app/dashboard/stock/components/ClaimWorkPanel'
  * - The barcode is read like the packing console: page-wide keys (scanner or keyboard), Enter confirms, no input box
  *   of its own (D117 ② · `ScanInput`).
  * - 「판매자」 (「미정」 + sellers) and 「사유」 (「매입」 · 「기초재고」) sit next to the day (FEATURE_2611_01 D1 · D16). A found
- *   product goes into the list with 1 and those two values; the same barcode again adds 1 to the top line of that
- *   product with the same seller and reason, else a new line (D17 · D23). The quantity can be changed or the line
+ *   product goes into the list with 1 and those two values; the same barcode again adds 1 to the line of that
+ *   product with the same seller and reason and moves it to the top, else a new line at the top (D17 · D23). These
+ *   controls and [입고 저장] sit above the scan bar. The quantity can be changed or the line
  *   removed (D117 ③).
  * - Each line may take its own seller and reason — that line is then 「따로 정함」 and no longer follows the screen
  *   values; every other line follows them when they change (D18 · D21). 「미정」 + 「기초재고」 cannot be picked, on the
@@ -110,7 +111,8 @@ export function IntakeContainer() {
       .catch(() => setSellers([]));
   }, [sellerUseCase]);
 
-  // D17 · D23: +1 on the top line of that product with the screen seller and reason, else a new line with them.
+  // D17 · D23: +1 on the line of that product with the screen seller and reason (moved to the top), else a new line
+  // with them at the top.
   // FEATURE_2611_02 D15: a new line keeps the photo of the value it came from.
   const addToCart = useCallback(
     (productId: number, productName: string, imageUrl: string | null) => {
@@ -118,14 +120,15 @@ export function IntakeContainer() {
         const found = prev.find(
           (line) => line.productId === productId && line.sellerId === screenSellerId && line.reason === screenReason
         );
+        // Newest first: a re-scanned line moves to the top, a new line is added at the top — right under the scan bar.
         if (found) {
-          return prev.map((line) =>
-            line.key === found.key ? { ...line, quantity: String(Number(line.quantity || '0') + 1) } : line
-          );
+          return [
+            { ...found, quantity: String(Number(found.quantity || '0') + 1) },
+            ...prev.filter((line) => line.key !== found.key),
+          ];
         }
         const key = nextKey.current++;
         return [
-          ...prev,
           {
             key,
             productId,
@@ -136,6 +139,7 @@ export function IntakeContainer() {
             reason: screenReason,
             custom: false,
           },
+          ...prev,
         ];
       });
     },
@@ -301,6 +305,51 @@ export function IntakeContainer() {
       />
       {tab === 'INTAKE' && (
         <>
+          {/* Date · seller · reason · save sit above the scan bar — the seller is picked before any scan. */}
+          <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-end gap-2">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">입고일</label>
+              <input type="date" value={movedOn} onChange={(e) => setMovedOn(e.target.value)} className={INPUT_CLASS} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">판매자</label>
+              {soleSeller ? (
+                <p className="py-1 text-sm text-gray-700">{soleSeller.sellerName}</p>
+              ) : (
+                <select
+                  value={screenSellerId}
+                  onChange={(e) => changeScreen(e.target.value, screenReason)}
+                  className={INPUT_CLASS}
+                >
+                  <option value="" disabled={screenReason === 'OPENING'}>
+                    미정
+                  </option>
+                  {sellers.map((seller) => (
+                    <option key={seller.id} value={seller.id}>
+                      {seller.sellerName}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">사유</label>
+              <select
+                value={screenReason}
+                onChange={(e) => changeScreen(screenSellerId, e.target.value as IntakeReason)}
+                className={INPUT_CLASS}
+              >
+                <option value="PURCHASE">매입</option>
+                <option value="OPENING" disabled={screenSellerId === ''}>
+                  {screenSellerId === '' ? OPENING_NEEDS_SELLER : '기초재고'}
+                </option>
+              </select>
+            </div>
+            <Button onClick={() => void save()} disabled={cart.length === 0} isLoading={isSaving} loadingText="저장 중...">
+              입고 저장
+            </Button>
+          </div>
+
           <ScanInput mode="ITEM" buffer={buffer} disabled={isSaving} isScanning={isScanning} />
 
           {message && (
@@ -449,49 +498,6 @@ export function IntakeContainer() {
                 ))}
               </tbody>
             </table>
-            <div className="flex flex-wrap items-end justify-end gap-2">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">입고일</label>
-                <input type="date" value={movedOn} onChange={(e) => setMovedOn(e.target.value)} className={INPUT_CLASS} />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">판매자</label>
-                {soleSeller ? (
-                  <p className="py-1 text-sm text-gray-700">{soleSeller.sellerName}</p>
-                ) : (
-                  <select
-                    value={screenSellerId}
-                    onChange={(e) => changeScreen(e.target.value, screenReason)}
-                    className={INPUT_CLASS}
-                  >
-                    <option value="" disabled={screenReason === 'OPENING'}>
-                      미정
-                    </option>
-                    {sellers.map((seller) => (
-                      <option key={seller.id} value={seller.id}>
-                        {seller.sellerName}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">사유</label>
-                <select
-                  value={screenReason}
-                  onChange={(e) => changeScreen(screenSellerId, e.target.value as IntakeReason)}
-                  className={INPUT_CLASS}
-                >
-                  <option value="PURCHASE">매입</option>
-                  <option value="OPENING" disabled={screenSellerId === ''}>
-                    {screenSellerId === '' ? OPENING_NEEDS_SELLER : '기초재고'}
-                  </option>
-                </select>
-              </div>
-              <Button onClick={() => void save()} disabled={cart.length === 0} isLoading={isSaving} loadingText="저장 중...">
-                입고 저장
-              </Button>
-            </div>
           </div>
         </>
       )}
