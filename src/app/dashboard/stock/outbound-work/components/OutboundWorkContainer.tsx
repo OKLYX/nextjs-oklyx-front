@@ -6,6 +6,7 @@ import { SellerUseCase } from '@/application/usecases/SellerUseCase';
 import { SellerRepositoryImpl } from '@/infrastructure/repositories/SellerRepositoryImpl';
 import type { Seller } from '@/domain/entities/SellerEntity';
 import { WorkTabs } from '@/app/dashboard/stock/components/WorkTabs';
+import { ClaimWorkPanel } from '@/app/dashboard/stock/components/ClaimWorkPanel';
 import { OutboundWorkPanel } from './OutboundWorkPanel';
 
 /**
@@ -15,7 +16,7 @@ import { OutboundWorkPanel } from './OutboundWorkPanel';
  *   tabs clears nothing — both panels stay mounted and only the visible one takes the page-wide keys (R12 · R20).
  * - The seller list is read once here and shared by both panels.
  */
-export type OutboundWorkTab = 'DISPOSAL' | 'SUPPLIER_RETURN';
+export type OutboundWorkTab = 'DISPOSAL' | 'SUPPLIER_RETURN' | 'EXCHANGE_SHIP';
 
 export function OutboundWorkContainer() {
   const sellerUseCase = useMemo(() => new SellerUseCase(new SellerRepositoryImpl()), []);
@@ -35,12 +36,14 @@ export function OutboundWorkContainer() {
         tabs={[
           { value: 'DISPOSAL', label: '폐기' },
           { value: 'SUPPLIER_RETURN', label: '매입처 반품' },
+          { value: 'EXCHANGE_SHIP', label: '교환 발송' },
         ]}
         value={tab}
         onChange={setTab}
       />
       <OutboundWorkPanel mode="DISPOSAL" active={tab === 'DISPOSAL'} sellers={sellers} />
       <OutboundWorkPanel mode="SUPPLIER_RETURN" active={tab === 'SUPPLIER_RETURN'} sellers={sellers} />
+      <ClaimWorkPanel kind="EXCHANGE_SHIP" active={tab === 'EXCHANGE_SHIP'} />
     </PageContainer>
   );
 }

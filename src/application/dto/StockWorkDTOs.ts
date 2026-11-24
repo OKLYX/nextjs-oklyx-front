@@ -12,3 +12,11 @@ export interface OutboundWorkRequest {
   movedOn: string;
   lines: { productId: number; sellerId: number; reason: StockReason; reasonNote?: string; quantity: number }[];
 }
+
+/**
+ * 「반품 재입고」 · 「교환 발송」 save (FEATURE_2611_34 D20 · D35 ④ ⑦): only the (claim · product) cells above 0.
+ */
+export interface ClaimWorkRequest {
+  movedOn: string;
+  lines: { orderClaimId: number; productId: number; quantity: number }[];
+}
