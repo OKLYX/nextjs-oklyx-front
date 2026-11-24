@@ -17,6 +17,8 @@ export const ROUTES = {
   STOCK_SEARCH: '/dashboard/stock/search',
   // FEATURE_2610_19 D117 · D119: intake work (scan in, seller undecided) and the daily in/out view.
   STOCK_INTAKE: '/dashboard/stock/intake',
+  // FEATURE_2611_34 D3 · D4: 「출고 작업」 (disposal · supplier return · exchange shipment).
+  STOCK_OUTBOUND_WORK: '/dashboard/stock/outbound-work',
   STOCK_DAILY: '/dashboard/stock/daily',
   USER_REGISTER: '/dashboard/users/register',
   USER_MANAGE: '/dashboard/users/manage',
