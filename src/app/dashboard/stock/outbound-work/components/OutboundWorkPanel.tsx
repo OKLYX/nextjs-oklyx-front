@@ -25,8 +25,8 @@ import { NameText } from '@/presentation/components/NameText';
  * - Barcodes come from page-wide keys like 「입고 작업」 (D37); a hidden panel (`active` false) ignores them (R20).
  * - No screen seller yet = nothing is added, 「먼저 판매자를 고르세요」 (D9). One seller = that seller, fixed (R24).
  *   The seller list has real sellers only (D10).
- * - The same barcode adds 1 to the top line of that product with the screen seller and reason, else a new line (D13 ·
- *   R24). A line changed on its own is 「따로 정함」 and stops following the screen values (D11).
+ * - The same barcode adds 1 to the line of that product with the screen seller and reason and moves it to the top,
+ *   else a new line at the top (D13 · R24). Date · seller · reason · save sit above the scan bar. A line changed on its own is 「따로 정함」 and stops following the screen values (D11).
  * - 「폐기」 picks a disposal reason (D11 · R13); 「매입처 반품」 always saves SUPPLIER_RETURN and shows no reason (D5).
  * - Unknown barcode = a notice only, no product link or new product (D14).
  * - Save sends every line of this tab in one request (D34); success = toast and empty lines, seller · reason · day
@@ -93,21 +93,23 @@ export function OutboundWorkPanel({ mode, active, sellers }: OutboundWorkPanelPr
   const screenSeller = soleSeller ? String(soleSeller.id) : screenSellerId;
   const lineSeller = (line: WorkLine) => (soleSeller ? String(soleSeller.id) : line.sellerId);
 
-  // D13 · R24: +1 on the top line of that product with the screen seller and reason, else a new line with them.
+  // D13 · R24: +1 on the line of that product with the screen seller and reason (moved to the top), else a new line
+  // with them at the top.
   const addToCart = useCallback(
     (productId: number, productName: string, imageUrl: string | null) => {
       setCart((prev) => {
         const found = prev.find(
           (line) => line.productId === productId && line.sellerId === screenSeller && line.reason === screenReason
         );
+        // Newest first: a re-scanned line moves to the top, a new line is added at the top — right under the scan bar.
         if (found) {
-          return prev.map((line) =>
-            line.key === found.key ? { ...line, quantity: String(Number(line.quantity || '0') + 1) } : line
-          );
+          return [
+            { ...found, quantity: String(Number(found.quantity || '0') + 1) },
+            ...prev.filter((line) => line.key !== found.key),
+          ];
         }
         const key = nextKey.current++;
         return [
-          ...prev,
           {
             key,
             productId,
@@ -119,6 +121,7 @@ export function OutboundWorkPanel({ mode, active, sellers }: OutboundWorkPanelPr
             reasonNote: '',
             custom: false,
           },
+          ...prev,
         ];
       });
     },
@@ -247,6 +250,54 @@ export function OutboundWorkPanel({ mode, active, sellers }: OutboundWorkPanelPr
 
   return (
     <div className={active ? 'space-y-4' : 'hidden'}>
+      {/* Date · seller · reason · save sit above the scan bar — the seller is picked before any scan. */}
+      <div className="bg-white rounded-lg shadow p-4 flex flex-wrap items-end gap-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">{MODE_TEXT[mode].dateLabel}</label>
+          <input type="date" value={movedOn} onChange={(e) => setMovedOn(e.target.value)} className={INPUT_CLASS} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">판매자</label>
+          {soleSeller ? (
+            <p className="py-1 text-sm text-gray-700">{soleSeller.sellerName}</p>
+          ) : (
+            <select
+              value={screenSellerId}
+              onChange={(e) => changeScreen(e.target.value, screenReason)}
+              className={INPUT_CLASS}
+            >
+              <option value="" disabled>
+                판매자를 고르세요
+              </option>
+              {sellers.map((seller) => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.sellerName}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        {mode === 'DISPOSAL' && (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">사유</label>
+            <select
+              value={screenReason}
+              onChange={(e) => changeScreen(screenSeller, e.target.value as StockReason)}
+              className={INPUT_CLASS}
+            >
+              {OUTBOUND_WORK_DISPOSAL_REASONS.map((reason) => (
+                <option key={reason} value={reason}>
+                  {STOCK_REASON_LABELS[reason]}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <Button onClick={save} disabled={cart.length === 0} isLoading={isSaving} loadingText="저장 중...">
+          {MODE_TEXT[mode].saveLabel}
+        </Button>
+      </div>
+
       <ScanInput mode="ITEM" buffer={buffer} disabled={isSaving} isScanning={isScanning} />
 
       {message && (
@@ -347,52 +398,6 @@ export function OutboundWorkPanel({ mode, active, sellers }: OutboundWorkPanelPr
             ))}
           </tbody>
         </table>
-        <div className="flex flex-wrap items-end justify-end gap-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">{MODE_TEXT[mode].dateLabel}</label>
-            <input type="date" value={movedOn} onChange={(e) => setMovedOn(e.target.value)} className={INPUT_CLASS} />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">판매자</label>
-            {soleSeller ? (
-              <p className="py-1 text-sm text-gray-700">{soleSeller.sellerName}</p>
-            ) : (
-              <select
-                value={screenSellerId}
-                onChange={(e) => changeScreen(e.target.value, screenReason)}
-                className={INPUT_CLASS}
-              >
-                <option value="" disabled>
-                  판매자를 고르세요
-                </option>
-                {sellers.map((seller) => (
-                  <option key={seller.id} value={seller.id}>
-                    {seller.sellerName}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          {mode === 'DISPOSAL' && (
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">사유</label>
-              <select
-                value={screenReason}
-                onChange={(e) => changeScreen(screenSeller, e.target.value as StockReason)}
-                className={INPUT_CLASS}
-              >
-                {OUTBOUND_WORK_DISPOSAL_REASONS.map((reason) => (
-                  <option key={reason} value={reason}>
-                    {STOCK_REASON_LABELS[reason]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          <Button onClick={save} disabled={cart.length === 0} isLoading={isSaving} loadingText="저장 중...">
-            {MODE_TEXT[mode].saveLabel}
-          </Button>
-        </div>
       </div>
     </div>
   );
