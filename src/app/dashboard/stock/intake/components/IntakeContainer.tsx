@@ -19,6 +19,8 @@ import { extractErrorMessage } from '@/infrastructure/utils/errorMessage';
 import { ScanInput } from '../../packing/components/ScanInput';
 import { StockProductThumb } from '@/app/dashboard/stock/components/StockProductThumb';
 import { NameText } from '@/presentation/components/NameText';
+import { WorkTabs } from '@/app/dashboard/stock/components/WorkTabs';
+import { ClaimWorkPanel } from '@/app/dashboard/stock/components/ClaimWorkPanel';
 
 /**
  * 「재고관리 > 입고 작업」 (FEATURE_2610_19 D113 · D117).
@@ -37,6 +39,8 @@ import { NameText } from '@/presentation/components/NameText';
  *   that product's name (D117 ⑤ — the server message).
  * - [입고 저장] saves every line at once: the day (today, changeable), each line's seller and reason, amount from the
  *   registered price (D117 ⑥ · D135). An 「기초재고」 line without a seller stops the whole save (D19).
+ * - 「입고」 · 「반품 재입고」 tabs (FEATURE_2611_34 D1 · D2) — the return tab is `ClaimWorkPanel`; this screen's page-wide
+ *   keys are ignored while it is shown.
  */
 
 interface CartLine {
@@ -69,6 +73,7 @@ const INPUT_CLASS =
 const OPENING_NEEDS_SELLER = '기초재고 (먼저 판매자를 고르세요)';
 
 export function IntakeContainer() {
+  const [tab, setTab] = useState<'INTAKE' | 'RETURN_IN'>('INTAKE');
   const lotUseCase = useMemo(() => new StockLotUseCase(new StockLotRepositoryImpl()), []);
   const createUseCase = useMemo(() => new CreateProductUseCase(new ProductRepositoryImpl()), []);
   const updateUseCase = useMemo(() => new UpdateProductUseCase(new ProductRepositoryImpl()), []);
@@ -177,9 +182,9 @@ export function IntakeContainer() {
   );
 
   // Page-wide key capture (same rule as the packing console): a focused input keeps its keys.
-  const handlersRef = useRef({ lookup, buffer, busy: false });
+  const handlersRef = useRef({ lookup, buffer, busy: false, active: true });
   useEffect(() => {
-    handlersRef.current = { lookup, buffer, busy: isScanning || isSaving };
+    handlersRef.current = { lookup, buffer, busy: isScanning || isSaving, active: tab === 'INTAKE' };
   });
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -187,6 +192,7 @@ export function IntakeContainer() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       const handlers = handlersRef.current;
+      if (!handlers.active) return;
       if (handlers.busy) return;
       if (event.key === 'Enter') {
         event.preventDefault();
@@ -285,198 +291,211 @@ export function IntakeContainer() {
 
   return (
     <PageContainer title="입고 작업">
-      <ScanInput mode="ITEM" buffer={buffer} disabled={isSaving} isScanning={isScanning} />
+      <WorkTabs
+        tabs={[
+          { value: 'INTAKE', label: '입고' },
+          { value: 'RETURN_IN', label: '반품 재입고' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+      {tab === 'INTAKE' && (
+        <>
+          <ScanInput mode="ITEM" buffer={buffer} disabled={isSaving} isScanning={isScanning} />
 
-      {message && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{message}</div>
-      )}
+          {message && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{message}</div>
+          )}
 
-      {unknownBarcode !== null && (
-        <div className="bg-white rounded-lg shadow p-4 space-y-3">
-          <p className="text-sm font-medium text-amber-800">등록 안 된 바코드: {unknownBarcode}</p>
-          <div className="space-y-2">
-            <p className="text-sm text-gray-700">있는 상품에 이 바코드 넣기</p>
-            <ProductPicker
-              productId={picked?.id ?? null}
-              productName={picked?.name ?? ''}
-              onSelect={(id, name) => {
-                setPicked({ id, name });
-                setEditName(name);
-              }}
-              onClear={() => setPicked(null)}
-            />
-            {picked && (
-              <div className="flex flex-wrap items-end gap-2">
+          {unknownBarcode !== null && (
+            <div className="bg-white rounded-lg shadow p-4 space-y-3">
+              <p className="text-sm font-medium text-amber-800">등록 안 된 바코드: {unknownBarcode}</p>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-700">있는 상품에 이 바코드 넣기</p>
+                <ProductPicker
+                  productId={picked?.id ?? null}
+                  productName={picked?.name ?? ''}
+                  onSelect={(id, name) => {
+                    setPicked({ id, name });
+                    setEditName(name);
+                  }}
+                  onClear={() => setPicked(null)}
+                />
+                {picked && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">상품 이름</label>
+                      <input value={editName} onChange={(e) => setEditName(e.target.value)} className={INPUT_CLASS} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">등록가 (비우면 그대로)</label>
+                      <input
+                        value={editPrice}
+                        inputMode="decimal"
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                    <Button size="sm" onClick={() => void saveBarcodeOnPicked()}>
+                      이 상품에 바코드 저장
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <div className="border-t border-gray-200 pt-3 flex flex-wrap items-end gap-2">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">상품 이름</label>
-                  <input value={editName} onChange={(e) => setEditName(e.target.value)} className={INPUT_CLASS} />
+                  <label className="block text-xs text-gray-500 mb-1">새 상품 이름</label>
+                  <input value={newName} onChange={(e) => setNewName(e.target.value)} className={INPUT_CLASS} />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">등록가 (비우면 그대로)</label>
+                  <label className="block text-xs text-gray-500 mb-1">등록가</label>
                   <input
-                    value={editPrice}
+                    value={newPrice}
                     inputMode="decimal"
-                    onChange={(e) => setEditPrice(e.target.value)}
+                    onChange={(e) => setNewPrice(e.target.value)}
                     className={INPUT_CLASS}
                   />
                 </div>
-                <Button size="sm" onClick={() => void saveBarcodeOnPicked()}>
-                  이 상품에 바코드 저장
+                <Button size="sm" variant="secondary" onClick={() => void createWithBarcode()}>
+                  새 상품으로 등록
                 </Button>
               </div>
-            )}
-          </div>
-          <div className="border-t border-gray-200 pt-3 flex flex-wrap items-end gap-2">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">새 상품 이름</label>
-              <input value={newName} onChange={(e) => setNewName(e.target.value)} className={INPUT_CLASS} />
             </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">등록가</label>
-              <input
-                value={newPrice}
-                inputMode="decimal"
-                onChange={(e) => setNewPrice(e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </div>
-            <Button size="sm" variant="secondary" onClick={() => void createWithBarcode()}>
-              새 상품으로 등록
-            </Button>
-          </div>
-        </div>
-      )}
+          )}
 
-      <div className="bg-white rounded-lg shadow p-4 space-y-3">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-gray-500">
-              <th className="py-2">상품</th>
-              <th className="py-2 w-40">판매자</th>
-              <th className="py-2 w-56">사유</th>
-              <th className="py-2 w-32">수량</th>
-              <th className="py-2 w-20" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {cart.length === 0 && (
-              <tr>
-                <td colSpan={5} className="py-6 text-center text-gray-500">
-                  바코드를 스캔하면 여기에 담깁니다.
-                </td>
-              </tr>
-            )}
-            {cart.map((line) => (
-              <tr key={line.key}>
-                <td className="py-2 text-gray-900">
-                  <div className="flex items-center gap-2">
-                    <StockProductThumb imageUrl={line.imageUrl} productId={line.productId} alt={line.productName} />
-                    <span className="flex items-start gap-2">
-                      <NameText kind="product" name={line.productName} inTable expandable />
-                      {line.custom && <span className="shrink-0 text-xs text-amber-700">따로 정함</span>}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-2">
-                  {soleSeller ? (
-                    <span className="text-gray-700">{soleSeller.sellerName}</span>
-                  ) : (
-                    <select
-                      value={line.sellerId}
-                      onChange={(e) => changeLine(line.key, { sellerId: e.target.value })}
-                      className={INPUT_CLASS}
-                    >
-                      <option value="" disabled={line.reason === 'OPENING'}>
-                        미정
-                      </option>
-                      {sellers.map((seller) => (
-                        <option key={seller.id} value={seller.id}>
-                          {seller.sellerName}
+          <div className="bg-white rounded-lg shadow p-4 space-y-3">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500">
+                  <th className="py-2">상품</th>
+                  <th className="py-2 w-40">판매자</th>
+                  <th className="py-2 w-56">사유</th>
+                  <th className="py-2 w-32">수량</th>
+                  <th className="py-2 w-20" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {cart.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-gray-500">
+                      바코드를 스캔하면 여기에 담깁니다.
+                    </td>
+                  </tr>
+                )}
+                {cart.map((line) => (
+                  <tr key={line.key}>
+                    <td className="py-2 text-gray-900">
+                      <div className="flex items-center gap-2">
+                        <StockProductThumb imageUrl={line.imageUrl} productId={line.productId} alt={line.productName} />
+                        <span className="flex items-start gap-2">
+                          <NameText kind="product" name={line.productName} inTable expandable />
+                          {line.custom && <span className="shrink-0 text-xs text-amber-700">따로 정함</span>}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-2">
+                      {soleSeller ? (
+                        <span className="text-gray-700">{soleSeller.sellerName}</span>
+                      ) : (
+                        <select
+                          value={line.sellerId}
+                          onChange={(e) => changeLine(line.key, { sellerId: e.target.value })}
+                          className={INPUT_CLASS}
+                        >
+                          <option value="" disabled={line.reason === 'OPENING'}>
+                            미정
+                          </option>
+                          {sellers.map((seller) => (
+                            <option key={seller.id} value={seller.id}>
+                              {seller.sellerName}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td className="py-2">
+                      <select
+                        value={line.reason}
+                        onChange={(e) => changeLine(line.key, { reason: e.target.value as IntakeReason })}
+                        className={INPUT_CLASS}
+                      >
+                        <option value="PURCHASE">매입</option>
+                        <option value="OPENING" disabled={lineSeller(line) === ''}>
+                          {lineSeller(line) === '' ? OPENING_NEEDS_SELLER : '기초재고'}
                         </option>
-                      ))}
-                    </select>
-                  )}
-                </td>
-                <td className="py-2">
+                      </select>
+                    </td>
+                    <td className="py-2">
+                      <input
+                        type="number"
+                        min={1}
+                        value={line.quantity}
+                        onChange={(e) =>
+                          setCart((prev) => prev.map((l) => (l.key === line.key ? { ...l, quantity: e.target.value } : l)))
+                        }
+                        className={`${INPUT_CLASS} w-24`}
+                      />
+                    </td>
+                    <td className="py-2 text-right">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setCart((prev) => prev.filter((l) => l.key !== line.key))}
+                      >
+                        빼기
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex flex-wrap items-end justify-end gap-2">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">입고일</label>
+                <input type="date" value={movedOn} onChange={(e) => setMovedOn(e.target.value)} className={INPUT_CLASS} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">판매자</label>
+                {soleSeller ? (
+                  <p className="py-1 text-sm text-gray-700">{soleSeller.sellerName}</p>
+                ) : (
                   <select
-                    value={line.reason}
-                    onChange={(e) => changeLine(line.key, { reason: e.target.value as IntakeReason })}
+                    value={screenSellerId}
+                    onChange={(e) => changeScreen(e.target.value, screenReason)}
                     className={INPUT_CLASS}
                   >
-                    <option value="PURCHASE">매입</option>
-                    <option value="OPENING" disabled={lineSeller(line) === ''}>
-                      {lineSeller(line) === '' ? OPENING_NEEDS_SELLER : '기초재고'}
+                    <option value="" disabled={screenReason === 'OPENING'}>
+                      미정
                     </option>
+                    {sellers.map((seller) => (
+                      <option key={seller.id} value={seller.id}>
+                        {seller.sellerName}
+                      </option>
+                    ))}
                   </select>
-                </td>
-                <td className="py-2">
-                  <input
-                    type="number"
-                    min={1}
-                    value={line.quantity}
-                    onChange={(e) =>
-                      setCart((prev) => prev.map((l) => (l.key === line.key ? { ...l, quantity: e.target.value } : l)))
-                    }
-                    className={`${INPUT_CLASS} w-24`}
-                  />
-                </td>
-                <td className="py-2 text-right">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setCart((prev) => prev.filter((l) => l.key !== line.key))}
-                  >
-                    빼기
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="flex flex-wrap items-end justify-end gap-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">입고일</label>
-            <input type="date" value={movedOn} onChange={(e) => setMovedOn(e.target.value)} className={INPUT_CLASS} />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">판매자</label>
-            {soleSeller ? (
-              <p className="py-1 text-sm text-gray-700">{soleSeller.sellerName}</p>
-            ) : (
-              <select
-                value={screenSellerId}
-                onChange={(e) => changeScreen(e.target.value, screenReason)}
-                className={INPUT_CLASS}
-              >
-                <option value="" disabled={screenReason === 'OPENING'}>
-                  미정
-                </option>
-                {sellers.map((seller) => (
-                  <option key={seller.id} value={seller.id}>
-                    {seller.sellerName}
+                )}
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">사유</label>
+                <select
+                  value={screenReason}
+                  onChange={(e) => changeScreen(screenSellerId, e.target.value as IntakeReason)}
+                  className={INPUT_CLASS}
+                >
+                  <option value="PURCHASE">매입</option>
+                  <option value="OPENING" disabled={screenSellerId === ''}>
+                    {screenSellerId === '' ? OPENING_NEEDS_SELLER : '기초재고'}
                   </option>
-                ))}
-              </select>
-            )}
+                </select>
+              </div>
+              <Button onClick={() => void save()} disabled={cart.length === 0} isLoading={isSaving} loadingText="저장 중...">
+                입고 저장
+              </Button>
+            </div>
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">사유</label>
-            <select
-              value={screenReason}
-              onChange={(e) => changeScreen(screenSellerId, e.target.value as IntakeReason)}
-              className={INPUT_CLASS}
-            >
-              <option value="PURCHASE">매입</option>
-              <option value="OPENING" disabled={screenSellerId === ''}>
-                {screenSellerId === '' ? OPENING_NEEDS_SELLER : '기초재고'}
-              </option>
-            </select>
-          </div>
-          <Button onClick={() => void save()} disabled={cart.length === 0} isLoading={isSaving} loadingText="저장 중...">
-            입고 저장
-          </Button>
-        </div>
-      </div>
+        </>
+      )}
+      <ClaimWorkPanel kind="RETURN_IN" active={tab === 'RETURN_IN'} />
     </PageContainer>
   );
 }
