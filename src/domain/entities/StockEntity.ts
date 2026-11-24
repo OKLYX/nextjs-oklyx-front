@@ -20,6 +20,8 @@ export type StockReason =
   | 'LOST'
   | 'SAMPLE'
   | 'INTERNAL_USE'
+  | 'SUPPLIER_RETURN'
+  | 'EXCHANGE_SHIP'
   | 'COUNT_DIFF'
   | 'ETC';
 
@@ -40,6 +42,8 @@ export const STOCK_REASON_LABELS: Record<StockReason, string> = {
   LOST: '분실',
   SAMPLE: '증정·샘플',
   INTERNAL_USE: '자가소비',
+  SUPPLIER_RETURN: '매입처 반품',
+  EXCHANGE_SHIP: '교환 발송',
   COUNT_DIFF: '실사 차이',
   ETC: '기타',
 };
@@ -55,16 +59,21 @@ export const RECORDABLE_MOVEMENT_TYPES: RecordableMovementType[] = [
 ];
 
 /**
- * 유형별 사유 목록 (PLAN D7). 서버 {@code StockReason.allowedFor} 와 같은 표다.
+ * Reasons per type (PLAN D7) — the server {@code StockReason.allowedFor} table, except `EXCHANGE_SHIP` (DISPOSAL on the server, never picked in a form — FEATURE_2611_34 D40).
  * RETURN_IN 은 사유를 받지 않는다 — 빈 배열이면 사유 select 를 비활성한다.
  */
 export const REASONS_BY_TYPE: Record<StockMovementType, StockReason[]> = {
   STOCK_IN: ['PURCHASE', 'OPENING', 'FREE', 'ETC'],
   RETURN_IN: [],
-  DISPOSAL: ['DAMAGED', 'EXPIRED', 'LOST', 'SAMPLE', 'INTERNAL_USE', 'ETC'],
+  DISPOSAL: ['DAMAGED', 'EXPIRED', 'LOST', 'SAMPLE', 'INTERNAL_USE', 'SUPPLIER_RETURN', 'ETC'],
   ADJUST: ['COUNT_DIFF', 'ETC'],
   STOCK_OUT: [],
 };
+
+/** 「출고 작업」 「폐기」 tab reasons (FEATURE_2611_34 D11). */
+export const OUTBOUND_WORK_DISPOSAL_REASONS: StockReason[] = REASONS_BY_TYPE.DISPOSAL.filter(
+  (reason) => reason !== 'SUPPLIER_RETURN'
+);
 
 /** 전개 실패 사유 (백엔드 OutboundUnexpandedView.reason). 원문 코드도 그대로 함께 보여준다. */
 export const UNEXPANDED_REASON_LABELS: Record<string, string> = {

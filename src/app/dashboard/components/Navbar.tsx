@@ -165,6 +165,8 @@ export function Navbar({ collapsible = false, pinned = false }: NavbarProps) {
         { href: ROUTES.STOCK_OUTBOUND, label: '출고 확인' },
         // FEATURE_2610_19 D117 ①: intake work sits before packing — ADMIN only, stock link on only.
         ...(stockLinked === true ? [{ href: ROUTES.STOCK_INTAKE, label: '입고 작업', adminOnly: true }] : []),
+        // FEATURE_2611_34 D4: 「출고 작업」 right after 「입고 작업」 — ADMIN only, stock link on only.
+        ...(stockLinked === true ? [{ href: ROUTES.STOCK_OUTBOUND_WORK, label: '출고 작업', adminOnly: true }] : []),
         // 포장 콘솔은 `/api/admin/packing` 전용이다 — 일반 사용자에게 보이면 열자마자 403 이 된다.
         { href: ROUTES.STOCK_PACKING, label: '포장 작업', adminOnly: true },
         // FEATURE_2611_03 D28: packing history follows packing work — ADMIN only (`/api/admin/packing/history`).
